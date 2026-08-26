@@ -4,6 +4,10 @@ This slice accepts a synthetic cash Vehicle and Dealer Offer, queues determinist
 and persists a versioned Deal Analysis Report. Spring Boot owns the API and worker boundary,
 PostgreSQL owns durable state, Flyway owns schema history, and React renders the Buyer workflow.
 
+Analysis POST requests require an `Idempotency-Key` header. Reusing a key returns the original
+Buying Case and operation, so client retries cannot create extra report versions. The worker also
+recovers queued or interrupted operations from durable state when the application starts.
+
 ## Run locally
 
 Requirements: Java 21, Maven, Node.js, npm, and Docker.

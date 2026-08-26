@@ -5,8 +5,13 @@ import java.time.Instant;
 public record MarketEvidence(
     long lowMinor,
     long highMinor,
-    String confidence,
+    Confidence confidence,
     Instant dataAsOf,
     String source,
-    String providerSnapshotVersion) {}
-
+    String providerSnapshotVersion) {
+  public enum Confidence {
+    LOW,
+    MEDIUM,
+    HIGH
+  }
+}

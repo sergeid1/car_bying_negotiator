@@ -51,6 +51,7 @@ const fixture = {
     mileage: 38000,
   },
   dealerOffer: {
+    currency: "USD",
     sellingPriceMinor: 2500000,
     dealerFeesMinor: 79900,
     addOnsMinor: 50000,
@@ -101,7 +102,10 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
     try {
       const started = await requestJson<StartedAnalysis>("/api/v1/cases/synthetic", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
         body: JSON.stringify(fixture),
       });
       setStage(started.operation.stage);

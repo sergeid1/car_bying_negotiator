@@ -54,9 +54,67 @@ class SyntheticCashDealAcceptanceTest {
           .isEqualTo(firstReport.at("/reproduction/inputFingerprint").asText());
       assertThat(secondReport.at("/reproduction/analysisFingerprint").asText())
           .isEqualTo(firstReport.at("/reproduction/analysisFingerprint").asText());
+      assertThat(secondReport.get("coverage")).isEqualTo(firstReport.get("coverage"));
+      assertThat(secondReport.at("/reproduction/expectedVersionDifferences").fieldNames())
+          .toIterable()
+          .containsExactlyInAnyOrder("id", "version", "generatedAt");
 
       JsonNode originalReport = get(client, "/api/v1/cases/" + caseId + "/reports/1");
       assertThat(originalReport).isEqualTo(firstReport);
+    }
+  }
+
+  @Test
+  void duplicateAnalysisRequestReturnsTheOriginalOperationAndReportVersion() throws Exception {
+    try (RunningApplication application = start("idempotency")) {
+      String key = "same-analysis-request";
+      JsonNode first = post(application.client(), "/api/v1/cases/synthetic", syntheticCashDeal(), key);
+      JsonNode duplicate = post(application.client(), "/api/v1/cases/synthetic", syntheticCashDeal(), key);
+
+      assertThat(duplicate.at("/case/id").asText()).isEqualTo(first.at("/case/id").asText());
+      assertThat(duplicate.at("/operation/id").asText())
+          .isEqualTo(first.at("/operation/id").asText());
+      awaitCompleted(application.client(), first.at("/operation/id").asText());
+      assertThat(get(application.client(), "/api/v1/cases/" + first.at("/case/id").asText())
+          .get("currentReportVersion").asInt()).isEqualTo(1);
+    }
+  }
+
+  @Test
+  void reportReasonsAreDerivedFromTheRecordedOffer() throws Exception {
+    try (RunningApplication application = start("derived-reasons")) {
+      Map<String, Object> input = syntheticCashDeal(28_000_00, 100_00, 200_00);
+      JsonNode started = post(application.client(), "/api/v1/cases/synthetic", input);
+      awaitCompleted(application.client(), started.at("/operation/id").asText());
+      JsonNode report = get(application.client(),
+          "/api/v1/cases/" + started.at("/case/id").asText() + "/reports/latest");
+
+      assertThat(report.at("/analysis/dealRating").asText()).isEqualTo("POOR_DEAL");
+      assertThat(report.at("/analysis/topReasons/0").asText()).contains("above");
+      assertThat(report.at("/analysis/topReasons/1").asText()).contains("$300.00");
+      assertThat(report.at("/analysis/topReasons/2").asText()).contains("$30,476.00");
+    }
+  }
+
+  @Test
+  void queuedOperationIsRecoveredAfterProcessRestart() throws Exception {
+    String caseId;
+    String operationId;
+    try (RunningApplication stoppedBeforeWork = start("recovery", false)) {
+      JsonNode started = post(
+          stoppedBeforeWork.client(), "/api/v1/cases/synthetic", syntheticCashDeal());
+      caseId = started.at("/case/id").asText();
+      operationId = started.at("/operation/id").asText();
+      assertThat(get(stoppedBeforeWork.client(), "/api/v1/operations/" + operationId)
+          .get("stage").asText()).isEqualTo("QUEUED");
+    }
+
+    try (RunningApplication restarted = start("recovery", true)) {
+      awaitCompleted(restarted.client(), operationId);
+      assertThat(get(restarted.client(), "/api/v1/cases/" + caseId)
+          .get("status").asText()).isEqualTo("COMPLETE");
+      assertThat(get(restarted.client(), "/api/v1/cases/" + caseId + "/reports/latest")
+          .get("version").asInt()).isEqualTo(1);
     }
   }
 
@@ -87,6 +145,10 @@ class SyntheticCashDealAcceptanceTest {
   }
 
   private RunningApplication start(String databaseName) {
+    return start(databaseName, true);
+  }
+
+  private RunningApplication start(String databaseName, boolean workerEnabled) {
     String dataSourceUrl =
         "jdbc:h2:file:"
             + temporaryDirectory.resolve(databaseName).toAbsolutePath()
@@ -97,6 +159,7 @@ class SyntheticCashDealAcceptanceTest {
             .run(
                 "--server.port=0",
                 "--spring.datasource.url=" + dataSourceUrl,
+                "--analysis.worker.enabled=" + workerEnabled,
                 "--spring.task.execution.pool.core-size=1");
     int port = ((WebServerApplicationContext) context).getWebServer().getPort();
     return new RunningApplication(context, RestClient.create("http://localhost:" + port));
@@ -116,11 +179,17 @@ class SyntheticCashDealAcceptanceTest {
   }
 
   private static JsonNode post(RestClient client, String path, Object body) throws Exception {
+    return post(client, path, body, java.util.UUID.randomUUID().toString());
+  }
+
+  private static JsonNode post(RestClient client, String path, Object body, String idempotencyKey)
+      throws Exception {
     String response =
         client
             .post()
             .uri(path)
             .contentType(MediaType.APPLICATION_JSON)
+            .header("Idempotency-Key", idempotencyKey)
             .body(body)
             .retrieve()
             .body(String.class);
@@ -132,6 +201,11 @@ class SyntheticCashDealAcceptanceTest {
   }
 
   private static Map<String, Object> syntheticCashDeal() {
+    return syntheticCashDeal(25_000_00, 799_00, 500_00);
+  }
+
+  private static Map<String, Object> syntheticCashDeal(
+      int sellingPriceMinor, int dealerFeesMinor, int addOnsMinor) {
     return Map.of(
         "buyerZip", "27601",
         "dealerZip", "27604",
@@ -145,9 +219,10 @@ class SyntheticCashDealAcceptanceTest {
                 "mileage", 38_000),
         "dealerOffer",
             Map.of(
-                "sellingPriceMinor", 25_000_00,
-                "dealerFeesMinor", 799_00,
-                "addOnsMinor", 500_00,
+                "currency", "USD",
+                "sellingPriceMinor", sellingPriceMinor,
+                "dealerFeesMinor", dealerFeesMinor,
+                "addOnsMinor", addOnsMinor,
                 "taxesMinor", 1_946_00,
                 "governmentChargesMinor", 230_00));
   }

@@ -1,6 +1,7 @@
 package com.dealanalyzer.market;
 
 import com.dealanalyzer.buyingcase.SyntheticAnalysisRequest.VehicleInput;
+import com.dealanalyzer.market.MarketEvidence.Confidence;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +15,7 @@ final class DeterministicFakeMarketDataProvider implements MarketDataProvider {
     return new MarketEvidence(
         FIXTURE.wholesaleFloorMinor(),
         FIXTURE.retailCeilingMinor(),
-        FIXTURE.confidence().toUpperCase(),
+        Confidence.valueOf(FIXTURE.confidence().toUpperCase()),
         Instant.parse(FIXTURE.observedAt()),
         "Synthetic licensed-market fixture",
         "synthetic-market-fixture.v1");
@@ -26,4 +27,3 @@ final class DeterministicFakeMarketDataProvider implements MarketDataProvider {
       String confidence,
       String observedAt) {}
 }
-

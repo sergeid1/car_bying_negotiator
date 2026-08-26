@@ -20,10 +20,14 @@ public record SyntheticAnalysisRequest(
       @Min(0) int mileage) {}
 
   public record DealerOfferInput(
+      @NotNull CurrencyCode currency,
       @Min(0) long sellingPriceMinor,
       @Min(0) long dealerFeesMinor,
       @Min(0) long addOnsMinor,
       @Min(0) long taxesMinor,
       @Min(0) long governmentChargesMinor) {}
-}
 
+  public enum CurrencyCode {
+    USD
+  }
+}

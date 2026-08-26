@@ -5,8 +5,8 @@ import java.util.List;
 import java.util.Map;
 
 public record DealAnalysis(
-    String reviewStatus,
-    String dealRating,
+    ReviewStatus reviewStatus,
+    DealRating dealRating,
     List<String> topReasons,
     String nextAction,
     Economics economics,
@@ -23,14 +23,20 @@ public record DealAnalysis(
       MoneyAmount outTheDoorTotal,
       String calculationVersion) {}
 
-  public record MoneyAmount(long minorUnits, String currency, String precision, String source) {}
+  public record MoneyAmount(
+      long minorUnits, Currency currency, Precision precision, String source) {}
 
   public record MarketAssessment(
       MoneyAmount low,
       MoneyAmount high,
-      String confidence,
+      Confidence confidence,
       Instant dataAsOf,
       String source,
       String providerSnapshotVersion) {}
-}
 
+  public enum ReviewStatus { REVIEW_REQUIRED }
+  public enum DealRating { FAIR_NEGOTIATE, POOR_DEAL }
+  public enum Currency { USD }
+  public enum Precision { EXACT, ESTIMATED, UNAVAILABLE }
+  public enum Confidence { LOW, MEDIUM, HIGH }
+}

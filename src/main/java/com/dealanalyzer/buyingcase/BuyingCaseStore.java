@@ -10,6 +10,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import com.dealanalyzer.buyingcase.AnalysisWorkflow.OperationStage;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ public class BuyingCaseStore {
   public void createCase(
       String caseId,
       String operationId,
+      String idempotencyKey,
       SyntheticAnalysisRequest input,
       String inputJson,
       String inputFingerprint,
@@ -48,11 +50,12 @@ public class BuyingCaseStore {
         inputFingerprint,
         databaseTimestamp(now),
         databaseTimestamp(now));
-    insertOperation(operationId, caseId, now);
+    insertOperation(operationId, caseId, idempotencyKey, now);
   }
 
   @Transactional
-  public void createOperation(String operationId, String caseId, Instant now) {
+  public void createOperation(
+      String operationId, String caseId, String idempotencyKey, Instant now) {
     jdbc.update(
         "UPDATE analysis_cases SET status = 'ANALYZING', updated_at = ? WHERE id = ?",
         databaseTimestamp(now),
@@ -61,17 +64,19 @@ public class BuyingCaseStore {
         == 0) {
       throw new ResourceNotFoundException("Buying Case not found");
     }
-    insertOperation(operationId, caseId, now);
+    insertOperation(operationId, caseId, idempotencyKey, now);
   }
 
-  private void insertOperation(String operationId, String caseId, Instant now) {
+  private void insertOperation(
+      String operationId, String caseId, String idempotencyKey, Instant now) {
     jdbc.update(
         """
-        INSERT INTO operations (id, case_id, stage, created_at, updated_at)
-        VALUES (?, ?, 'QUEUED', ?, ?)
+        INSERT INTO operations (id, case_id, idempotency_key, stage, created_at, updated_at)
+        VALUES (?, ?, ?, 'QUEUED', ?, ?)
         """,
         operationId,
         caseId,
+        idempotencyKey,
         databaseTimestamp(now),
         databaseTimestamp(now));
   }
@@ -90,24 +95,44 @@ public class BuyingCaseStore {
   public OperationView requireOperation(String operationId) {
     return jdbc.query(
             "SELECT id, case_id, stage, error_message, created_at, updated_at FROM operations WHERE id = ?",
-            (resultSet, rowNumber) ->
-                new OperationView(
-                    resultSet.getString("id"),
-                    resultSet.getString("case_id"),
-                    resultSet.getString("stage"),
-                    resultSet.getString("error_message"),
-                    readTimestamp(resultSet, "created_at"),
-                    readTimestamp(resultSet, "updated_at")),
+            (resultSet, rowNumber) -> mapOperation(resultSet),
             operationId)
         .stream()
         .findFirst()
         .orElseThrow(() -> new ResourceNotFoundException("Operation not found"));
   }
 
-  public void updateStage(String operationId, String stage, Instant now) {
+  public Optional<OperationView> findOperationByIdempotencyKey(String idempotencyKey) {
+    return jdbc.query(
+            "SELECT id, case_id, stage, error_message, created_at, updated_at "
+                + "FROM operations WHERE idempotency_key = ?",
+            (resultSet, rowNumber) -> mapOperation(resultSet),
+            idempotencyKey)
+        .stream()
+        .findFirst();
+  }
+
+  public List<OperationView> findRecoverableOperations() {
+    return jdbc.query(
+        "SELECT id, case_id, stage, error_message, created_at, updated_at FROM operations "
+            + "WHERE stage NOT IN ('COMPLETE', 'FAILED') ORDER BY created_at",
+        (resultSet, rowNumber) -> mapOperation(resultSet));
+  }
+
+  private OperationView mapOperation(ResultSet resultSet) throws SQLException {
+    return new OperationView(
+        resultSet.getString("id"),
+        resultSet.getString("case_id"),
+        OperationStage.valueOf(resultSet.getString("stage")),
+        resultSet.getString("error_message"),
+        readTimestamp(resultSet, "created_at"),
+        readTimestamp(resultSet, "updated_at"));
+  }
+
+  public void updateStage(String operationId, OperationStage stage, Instant now) {
     jdbc.update(
         "UPDATE operations SET stage = ?, updated_at = ? WHERE id = ?",
-        stage,
+        stage.name(),
         databaseTimestamp(now),
         operationId);
   }
@@ -140,7 +165,7 @@ public class BuyingCaseStore {
         version,
         databaseTimestamp(now),
         caseId);
-    updateStage(operationId, "COMPLETE", now);
+    updateStage(operationId, OperationStage.COMPLETE, now);
   }
 
   @Transactional
@@ -179,8 +204,8 @@ public class BuyingCaseStore {
         resultSet.getString("id"),
         resultSet.getString("buyer_zip"),
         resultSet.getString("dealer_zip"),
-        resultSet.getString("purchase_method"),
-        resultSet.getString("status"),
+        PurchaseMethod.valueOf(resultSet.getString("purchase_method")),
+        CaseStatus.valueOf(resultSet.getString("status")),
         readTree(resultSet.getString("vehicle_json")),
         readTree(resultSet.getString("dealer_offer_json")),
         resultSet.getString("input_json"),
@@ -218,8 +243,8 @@ public class BuyingCaseStore {
       String id,
       String buyerZip,
       String dealerZip,
-      String purchaseMethod,
-      String status,
+      PurchaseMethod purchaseMethod,
+      CaseStatus status,
       JsonNode vehicle,
       JsonNode dealerOffer,
       String inputJson,
@@ -228,11 +253,10 @@ public class BuyingCaseStore {
       Instant createdAt,
       Instant updatedAt) {}
 
+  public enum PurchaseMethod { CASH }
+  public enum CaseStatus { ANALYZING, COMPLETE, FAILED }
+
   public record OperationView(
-      String id,
-      String caseId,
-      String stage,
-      String error,
-      Instant createdAt,
+      String id, String caseId, OperationStage stage, String error, Instant createdAt,
       Instant updatedAt) {}
 }
