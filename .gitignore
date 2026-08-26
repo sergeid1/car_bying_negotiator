@@ -3,10 +3,8 @@
 .agents/
 .codex/
 .claude/
-.cursor/
 AGENTS.md
 CLAUDE.md
-GEMINI.md
 .github/copilot-instructions.md
 target/
 .m2/
