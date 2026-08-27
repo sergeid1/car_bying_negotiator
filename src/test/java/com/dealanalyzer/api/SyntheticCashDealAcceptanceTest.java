@@ -10,16 +10,23 @@ import com.dealanalyzer.evaluation.ReportReplayEvaluator;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.nio.file.Path;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.web.client.RestClient;
 
 class SyntheticCashDealAcceptanceTest {
   @TempDir Path temporaryDirectory;
+  private HttpAcceptanceHarness harness;
+
+  @BeforeEach
+  void createHttpHarness() {
+    harness = new HttpAcceptanceHarness(temporaryDirectory);
+  }
 
   @Test
   void buyerCanCompleteSyntheticCashWorkflowAndRegenerateTheSameAnalysis() throws Exception {
-    try (RunningApplication application = start("workflow")) {
+    try (RunningApplication application = harness.start("workflow")) {
       RestClient client = application.client();
 
       JsonNode started = post(client, "/api/v1/cases/synthetic", syntheticCashDeal());
@@ -62,7 +69,7 @@ class SyntheticCashDealAcceptanceTest {
 
   @Test
   void duplicateAnalysisRequestReturnsTheOriginalOperationAndReportVersion() throws Exception {
-    try (RunningApplication application = start("idempotency")) {
+    try (RunningApplication application = harness.start("idempotency")) {
       String key = "same-analysis-request";
       JsonNode first = post(application.client(), "/api/v1/cases/synthetic", syntheticCashDeal(), key);
       JsonNode duplicate = post(application.client(), "/api/v1/cases/synthetic", syntheticCashDeal(), key);
@@ -78,7 +85,7 @@ class SyntheticCashDealAcceptanceTest {
 
   @Test
   void reportReasonsAreDerivedFromTheRecordedOffer() throws Exception {
-    try (RunningApplication application = start("derived-reasons")) {
+    try (RunningApplication application = harness.start("derived-reasons")) {
       Map<String, Object> input = syntheticCashDeal(28_000_00, 100_00, 200_00);
       JsonNode started = post(application.client(), "/api/v1/cases/synthetic", input);
       awaitCompleted(application.client(), started.at("/operation/id").asText());
@@ -96,7 +103,7 @@ class SyntheticCashDealAcceptanceTest {
   void queuedOperationIsRecoveredAfterProcessRestart() throws Exception {
     String caseId;
     String operationId;
-    try (RunningApplication stoppedBeforeWork = start("recovery", false)) {
+    try (RunningApplication stoppedBeforeWork = harness.start("recovery", false)) {
       JsonNode started = post(
           stoppedBeforeWork.client(), "/api/v1/cases/synthetic", syntheticCashDeal());
       caseId = started.at("/case/id").asText();
@@ -105,7 +112,7 @@ class SyntheticCashDealAcceptanceTest {
           .get("stage").asText()).isEqualTo("QUEUED");
     }
 
-    try (RunningApplication restarted = start("recovery", true)) {
+    try (RunningApplication restarted = harness.start("recovery", true)) {
       awaitCompleted(restarted.client(), operationId);
       assertThat(get(restarted.client(), "/api/v1/cases/" + caseId)
           .get("status").asText()).isEqualTo("COMPLETE");
@@ -119,7 +126,7 @@ class SyntheticCashDealAcceptanceTest {
     String caseId;
     JsonNode reportBeforeRestart;
 
-    try (RunningApplication firstProcess = start("restart")) {
+    try (RunningApplication firstProcess = harness.start("restart")) {
       JsonNode started =
           post(firstProcess.client(), "/api/v1/cases/synthetic", syntheticCashDeal());
       caseId = started.at("/case/id").asText();
@@ -128,7 +135,7 @@ class SyntheticCashDealAcceptanceTest {
           get(firstProcess.client(), "/api/v1/cases/" + caseId + "/reports/latest");
     }
 
-    try (RunningApplication restartedProcess = start("restart")) {
+    try (RunningApplication restartedProcess = harness.start("restart")) {
       JsonNode buyingCase = get(restartedProcess.client(), "/api/v1/cases/" + caseId);
       JsonNode reportAfterRestart =
           get(restartedProcess.client(), "/api/v1/cases/" + caseId + "/reports/latest");
@@ -138,14 +145,6 @@ class SyntheticCashDealAcceptanceTest {
       assertThat(buyingCase.at("/dealerOffer/sellingPriceMinor").asLong()).isEqualTo(25_000_00L);
       assertThat(reportAfterRestart).isEqualTo(reportBeforeRestart);
     }
-  }
-
-  private RunningApplication start(String databaseName) {
-    return new HttpAcceptanceHarness(temporaryDirectory).start(databaseName);
-  }
-
-  private RunningApplication start(String databaseName, boolean workerEnabled) {
-    return new HttpAcceptanceHarness(temporaryDirectory).start(databaseName, workerEnabled);
   }
 
   private static Map<String, Object> syntheticCashDeal() {

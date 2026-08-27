@@ -3,7 +3,9 @@ package com.dealanalyzer.evaluation;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 /** Scores normalized extraction output against a frozen, field-labeled source of truth. */
 public final class ExtractionEvaluator {
@@ -27,17 +29,32 @@ public final class ExtractionEvaluator {
     }
 
     int expectedCount = 0;
+    int observedCount = 0;
     int presentCount = 0;
     int expectedNumericCount = 0;
     int exactNumericCount = 0;
-    int materialCount = 0;
-    int presentMaterialCount = 0;
     double expectedWeight = 0.0;
     double presentWeight = 0.0;
     double exactWeight = 0.0;
     double expectedNumericWeight = 0.0;
     double exactNumericWeight = 0.0;
+    double materialWeight = 0.0;
+    double presentMaterialWeight = 0.0;
     Map<String, FieldScore> fieldScores = new LinkedHashMap<>();
+    Set<String> unexpectedFields = new LinkedHashSet<>();
+    observedFields.fields().forEachRemaining(observed -> {
+      if (!observed.getValue().isNull() && !observed.getValue().isMissingNode()
+          && !expectedFields.has(observed.getKey())) {
+        unexpectedFields.add(observed.getKey());
+      }
+    });
+    Iterator<JsonNode> observedValues = observedFields.elements();
+    while (observedValues.hasNext()) {
+      JsonNode observed = observedValues.next();
+      if (!observed.isNull() && !observed.isMissingNode()) {
+        observedCount++;
+      }
+    }
     Iterator<Map.Entry<String, JsonNode>> fields = expectedFields.fields();
     while (fields.hasNext()) {
       Map.Entry<String, JsonNode> expected = fields.next();
@@ -58,9 +75,9 @@ public final class ExtractionEvaluator {
         presentWeight += weight;
       }
       if (material) {
-        materialCount++;
+        materialWeight += weight;
         if (present) {
-          presentMaterialCount++;
+          presentMaterialWeight += weight;
         }
       }
       boolean exact = present && valuesMatch(expected.getValue(), observed);
@@ -82,15 +99,19 @@ public final class ExtractionEvaluator {
           expected.getKey(), new FieldScore(present, exact, numericExact, weight, material));
     }
 
-    double materialPresenceRecall = ratio(presentMaterialCount, materialCount);
+    double materialPresenceRecall = ratio(presentMaterialWeight, materialWeight);
     return new Score(
         expectedCount,
+        observedCount,
         presentCount,
+        unexpectedFields.size(),
         expectedNumericCount,
         exactNumericCount,
         ratio(presentCount, expectedCount),
+        ratio(presentCount, observedCount),
         ratio(exactNumericCount, expectedNumericCount),
         Map.copyOf(fieldScores),
+        Set.copyOf(unexpectedFields),
         ratio(presentWeight, expectedWeight),
         ratio(exactWeight, expectedWeight),
         ratio(exactNumericWeight, expectedNumericWeight),
@@ -122,12 +143,16 @@ public final class ExtractionEvaluator {
 
   public record Score(
       int expectedFieldCount,
+      int observedFieldCount,
       int presentFieldCount,
+      int unexpectedFieldCount,
       int expectedNumericFieldCount,
       int exactNumericFieldCount,
       double presenceRecall,
+      double presencePrecision,
       double numericExactMatchRate,
       Map<String, FieldScore> fields,
+      Set<String> unexpectedFields,
       double weightedPresenceRecall,
       double weightedExactMatchRate,
       double weightedNumericExactMatchRate,

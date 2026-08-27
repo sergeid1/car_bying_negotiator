@@ -19,12 +19,16 @@ class ExtractionEvaluatorTest {
     JsonNode expected = fixture.get("expectedScore");
 
     assertThat(score.expectedFieldCount()).isEqualTo(expected.get("expectedFieldCount").asInt());
+    assertThat(score.observedFieldCount()).isEqualTo(expected.get("observedFieldCount").asInt());
     assertThat(score.presentFieldCount()).isEqualTo(expected.get("presentFieldCount").asInt());
+    assertThat(score.unexpectedFieldCount())
+        .isEqualTo(expected.get("unexpectedFieldCount").asInt());
     assertThat(score.expectedNumericFieldCount())
         .isEqualTo(expected.get("expectedNumericFieldCount").asInt());
     assertThat(score.exactNumericFieldCount())
         .isEqualTo(expected.get("exactNumericFieldCount").asInt());
     assertThat(score.presenceRecall()).isEqualTo(expected.get("presenceRecall").asDouble());
+    assertThat(score.presencePrecision()).isEqualTo(expected.get("presencePrecision").asDouble());
     assertThat(score.numericExactMatchRate())
         .isCloseTo(expected.get("numericExactMatchRate").asDouble(),
             org.assertj.core.data.Offset.offset(0.0000000001));
@@ -48,6 +52,7 @@ class ExtractionEvaluatorTest {
         .isEqualTo(new ExtractionEvaluator.FieldScore(true, false, false, 3.0, true));
     assertThat(score.fields().get("dealerFeeMinor"))
         .isEqualTo(new ExtractionEvaluator.FieldScore(false, false, false, 1.0, true));
+    assertThat(score.unexpectedFields()).containsExactly("inventedProtectionPlanMinor");
     assertThat(score.weightedPresenceRecall())
         .isEqualTo(expected.get("weightedPresenceRecall").asDouble());
     assertThat(score.weightedExactMatchRate())

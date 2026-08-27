@@ -55,8 +55,8 @@ Frozen JSON fixtures under `src/test/resources/fixtures` establish reusable qual
 - `providers` exercises success, timeout, rate limits, missing VINs, stale and partial data,
   duplicate filtering, and schema drift with recorded synthetic responses; it never calls a paid
   endpoint.
-- `extraction` reports per-field and weighted presence/exact-match scores, numeric exact-match rate,
-  and a configurable material-field presence gate.
+- `extraction` reports per-field and weighted presence/exact-match scores, false-positive precision,
+  numeric exact-match rate, and a configurable weighted material-field presence gate.
 - `review` is a fail-closed release corpus: any unsafe `MATCHES_APPROVED_BASELINE` result fails,
   including unresolved questions, limit violations, and missing check scope or time metadata.
 

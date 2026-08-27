@@ -4,9 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 /** Compares report replays while honoring only differences declared by the report contract. */
 public final class ReportReplayEvaluator {
+  private static final Set<String> SUPPORTED_VERSION_DIFFERENCES =
+      Set.of("id", "version", "generatedAt");
+
   public void assertReproduces(JsonNode original, JsonNode replay) {
     requireEqual(
         "frozen input fingerprint",
@@ -22,6 +27,13 @@ public final class ReportReplayEvaluator {
     requireEqual("declared replay differences", originalDifferences, replayDifferences);
     if (!originalDifferences.isObject()) {
       throw new IllegalStateException("Report replay differences must be declared as an object");
+    }
+    Set<String> unsupportedDifferences = new TreeSet<>();
+    originalDifferences.fieldNames().forEachRemaining(unsupportedDifferences::add);
+    unsupportedDifferences.removeAll(SUPPORTED_VERSION_DIFFERENCES);
+    if (!unsupportedDifferences.isEmpty()) {
+      throw new IllegalStateException(
+          "unsupported replay difference fields: " + String.join(", ", unsupportedDifferences));
     }
 
     ObjectNode normalizedOriginal = original.deepCopy();
