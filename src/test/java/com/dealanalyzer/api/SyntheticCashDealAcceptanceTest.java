@@ -1,26 +1,20 @@
 package com.dealanalyzer.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static com.dealanalyzer.api.HttpAcceptanceHarness.awaitCompleted;
+import static com.dealanalyzer.api.HttpAcceptanceHarness.get;
+import static com.dealanalyzer.api.HttpAcceptanceHarness.post;
 
-import com.dealanalyzer.DealAnalyzerApplication;
+import com.dealanalyzer.api.HttpAcceptanceHarness.RunningApplication;
 import com.dealanalyzer.evaluation.ReportReplayEvaluator;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.boot.WebApplicationType;
-import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework.boot.web.context.WebServerApplicationContext;
-import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
 class SyntheticCashDealAcceptanceTest {
-  private static final ObjectMapper JSON = new ObjectMapper();
-
   @TempDir Path temporaryDirectory;
 
   @Test
@@ -147,59 +141,11 @@ class SyntheticCashDealAcceptanceTest {
   }
 
   private RunningApplication start(String databaseName) {
-    return start(databaseName, true);
+    return new HttpAcceptanceHarness(temporaryDirectory).start(databaseName);
   }
 
   private RunningApplication start(String databaseName, boolean workerEnabled) {
-    String dataSourceUrl =
-        "jdbc:h2:file:"
-            + temporaryDirectory.resolve(databaseName).toAbsolutePath()
-            + ";MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_ON_EXIT=FALSE";
-    ConfigurableApplicationContext context =
-        new SpringApplicationBuilder(DealAnalyzerApplication.class)
-            .web(WebApplicationType.SERVLET)
-            .run(
-                "--server.port=0",
-                "--spring.datasource.url=" + dataSourceUrl,
-                "--analysis.worker.enabled=" + workerEnabled,
-                "--spring.task.execution.pool.core-size=1");
-    int port = ((WebServerApplicationContext) context).getWebServer().getPort();
-    return new RunningApplication(context, RestClient.create("http://localhost:" + port));
-  }
-
-  private static JsonNode awaitCompleted(RestClient client, String operationId) throws Exception {
-    long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
-    JsonNode operation;
-    do {
-      operation = get(client, "/api/v1/operations/" + operationId);
-      if (operation.get("stage").asText().equals("COMPLETE")) {
-        return operation;
-      }
-      Thread.sleep(25);
-    } while (System.nanoTime() < deadline);
-    throw new AssertionError("Operation did not complete: " + operation);
-  }
-
-  private static JsonNode post(RestClient client, String path, Object body) throws Exception {
-    return post(client, path, body, java.util.UUID.randomUUID().toString());
-  }
-
-  private static JsonNode post(RestClient client, String path, Object body, String idempotencyKey)
-      throws Exception {
-    String response =
-        client
-            .post()
-            .uri(path)
-            .contentType(MediaType.APPLICATION_JSON)
-            .header("Idempotency-Key", idempotencyKey)
-            .body(body)
-            .retrieve()
-            .body(String.class);
-    return JSON.readTree(response);
-  }
-
-  private static JsonNode get(RestClient client, String path) throws Exception {
-    return JSON.readTree(client.get().uri(path).retrieve().body(String.class));
+    return new HttpAcceptanceHarness(temporaryDirectory).start(databaseName, workerEnabled);
   }
 
   private static Map<String, Object> syntheticCashDeal() {
@@ -227,13 +173,5 @@ class SyntheticCashDealAcceptanceTest {
                 "addOnsMinor", addOnsMinor,
                 "taxesMinor", 1_946_00,
                 "governmentChargesMinor", 230_00));
-  }
-
-  private record RunningApplication(ConfigurableApplicationContext context, RestClient client)
-      implements AutoCloseable {
-    @Override
-    public void close() {
-      context.close();
-    }
   }
 }

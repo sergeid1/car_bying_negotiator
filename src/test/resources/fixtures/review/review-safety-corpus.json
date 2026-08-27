@@ -4,19 +4,71 @@
       "name": "verified unchanged offer",
       "allMaterialFieldsVerified": true,
       "materialDiscrepancyPresent": false,
+      "limitViolationPresent": false,
+      "unresolvedQuestionsPresent": false,
+      "checkScope": "approved-baseline-v1",
+      "checkedAt": "2026-08-27T16:00:00Z",
       "actualStatus": "MATCHES_APPROVED_BASELINE"
     },
     {
       "name": "unreadable material amount",
       "allMaterialFieldsVerified": false,
       "materialDiscrepancyPresent": false,
+      "limitViolationPresent": false,
+      "unresolvedQuestionsPresent": false,
+      "checkScope": "approved-baseline-v1",
+      "checkedAt": "2026-08-27T16:00:00Z",
       "actualStatus": "UNABLE_TO_VERIFY"
     },
     {
       "name": "material fee changed",
       "allMaterialFieldsVerified": true,
       "materialDiscrepancyPresent": true,
+      "limitViolationPresent": false,
+      "unresolvedQuestionsPresent": false,
+      "checkScope": "approved-baseline-v1",
+      "checkedAt": "2026-08-27T16:00:00Z",
       "actualStatus": "REVIEW_REQUIRED"
+    },
+    {
+      "name": "approved limit exceeded",
+      "allMaterialFieldsVerified": true,
+      "materialDiscrepancyPresent": false,
+      "limitViolationPresent": true,
+      "unresolvedQuestionsPresent": false,
+      "checkScope": "approved-baseline-v1",
+      "checkedAt": "2026-08-27T16:00:00Z",
+      "actualStatus": "REVIEW_REQUIRED"
+    },
+    {
+      "name": "unresolved buyer question",
+      "allMaterialFieldsVerified": true,
+      "materialDiscrepancyPresent": false,
+      "limitViolationPresent": false,
+      "unresolvedQuestionsPresent": true,
+      "checkScope": "approved-baseline-v1",
+      "checkedAt": "2026-08-27T16:00:00Z",
+      "actualStatus": "UNABLE_TO_VERIFY"
+    },
+    {
+      "name": "missing check scope",
+      "allMaterialFieldsVerified": true,
+      "materialDiscrepancyPresent": false,
+      "limitViolationPresent": false,
+      "unresolvedQuestionsPresent": false,
+      "checkScope": "",
+      "checkedAt": "2026-08-27T16:00:00Z",
+      "actualStatus": "UNABLE_TO_VERIFY"
+    },
+    {
+      "name": "missing check time",
+      "allMaterialFieldsVerified": true,
+      "materialDiscrepancyPresent": false,
+      "limitViolationPresent": false,
+      "unresolvedQuestionsPresent": false,
+      "checkScope": "approved-baseline-v1",
+      "checkedAt": "",
+      "actualStatus": "UNABLE_TO_VERIFY"
     }
   ]
 }

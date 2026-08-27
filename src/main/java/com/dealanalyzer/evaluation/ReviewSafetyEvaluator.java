@@ -16,7 +16,11 @@ public final class ReviewSafetyEvaluator {
     fixtures.forEach(fixture -> {
       ReviewStatus status = ReviewStatus.valueOf(fixture.path("actualStatus").asText());
       boolean safePositive = fixture.path("allMaterialFieldsVerified").asBoolean()
-          && !fixture.path("materialDiscrepancyPresent").asBoolean();
+          && !fixture.path("materialDiscrepancyPresent").asBoolean()
+          && !fixture.path("limitViolationPresent").asBoolean()
+          && !fixture.path("unresolvedQuestionsPresent").asBoolean()
+          && hasText(fixture.path("checkScope"))
+          && hasText(fixture.path("checkedAt"));
       if (status == ReviewStatus.MATCHES_APPROVED_BASELINE && !safePositive) {
         unsafeFixtureNames.add(fixture.path("name").asText("unnamed review fixture"));
       }
@@ -26,5 +30,9 @@ public final class ReviewSafetyEvaluator {
       throw new IllegalStateException(
           "Unsafe MATCHES_APPROVED_BASELINE result for: " + String.join(", ", unsafeFixtureNames));
     }
+  }
+
+  private static boolean hasText(JsonNode value) {
+    return value.isTextual() && !value.asText().isBlank();
   }
 }

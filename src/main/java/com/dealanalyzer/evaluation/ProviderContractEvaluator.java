@@ -26,11 +26,18 @@ public final class ProviderContractEvaluator {
     if ("TIMEOUT".equals(fixture.path("transportOutcome").asText())) {
       return new Result(Status.TIMEOUT, 0);
     }
+    if ("RATE_LIMITED".equals(fixture.path("transportOutcome").asText())) {
+      return new Result(Status.RATE_LIMITED, 0);
+    }
 
     JsonNode response = fixture.path("response");
     int observationCount = uniqueObservationCount(response.path("observations"));
     if (!SUPPORTED_SCHEMA.equals(response.path("schemaVersion").asText())) {
       return new Result(Status.SCHEMA_DRIFT, observationCount);
+    }
+    if (response.path("vinAvailable").isBoolean()
+        && !response.get("vinAvailable").asBoolean()) {
+      return new Result(Status.MISSING_VIN, observationCount);
     }
     if (!hasCompleteRange(response)) {
       return new Result(Status.PARTIAL_DATA, observationCount);
@@ -76,6 +83,8 @@ public final class ProviderContractEvaluator {
   public enum Status {
     SUCCESS,
     TIMEOUT,
+    RATE_LIMITED,
+    MISSING_VIN,
     STALE_DATA,
     PARTIAL_DATA,
     DUPLICATES_FILTERED,

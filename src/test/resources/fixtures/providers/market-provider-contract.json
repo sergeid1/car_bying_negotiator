@@ -22,6 +22,26 @@
       "expectedUniqueObservations": 0
     },
     {
+      "name": "rate limited",
+      "transportOutcome": "RATE_LIMITED",
+      "expectedStatus": "RATE_LIMITED",
+      "expectedUniqueObservations": 0
+    },
+    {
+      "name": "missing VIN",
+      "transportOutcome": "RESPONSE",
+      "response": {
+        "schemaVersion": "market-provider.v1",
+        "vinAvailable": false,
+        "observedAt": "2026-08-20T12:00:00Z",
+        "lowMinor": 2450000,
+        "highMinor": 2700000,
+        "observations": []
+      },
+      "expectedStatus": "MISSING_VIN",
+      "expectedUniqueObservations": 0
+    },
+    {
       "name": "stale data",
       "transportOutcome": "RESPONSE",
       "response": {

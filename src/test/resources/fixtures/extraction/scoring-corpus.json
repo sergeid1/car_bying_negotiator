@@ -11,12 +11,24 @@
     "sellingPriceMinor": 2500000,
     "outTheDoorTotalMinor": 2845700
   },
+  "fieldPolicies": {
+    "vin": { "weight": 3.0, "material": true },
+    "sellingPriceMinor": { "weight": 3.0, "material": true },
+    "outTheDoorTotalMinor": { "weight": 3.0, "material": true },
+    "dealerFeeMinor": { "weight": 1.0, "material": true }
+  },
+  "minimumMaterialPresenceRecall": 0.99,
   "expectedScore": {
     "expectedFieldCount": 4,
     "presentFieldCount": 3,
     "expectedNumericFieldCount": 3,
     "exactNumericFieldCount": 1,
     "presenceRecall": 0.75,
-    "numericExactMatchRate": 0.3333333333
+    "numericExactMatchRate": 0.3333333333,
+    "weightedPresenceRecall": 0.9,
+    "weightedExactMatchRate": 0.6,
+    "weightedNumericExactMatchRate": 0.4285714286,
+    "materialPresenceRecall": 0.75,
+    "passesMaterialPresenceGate": false
   }
 }

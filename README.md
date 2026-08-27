@@ -52,10 +52,13 @@ Frozen JSON fixtures under `src/test/resources/fixtures` establish reusable qual
 
 - `golden` drives cash-deal reports through the public API and asserts monetary results,
   calculation steps, declared rounding, and policy/schema versions.
-- `providers` exercises success, timeout, stale and partial data, duplicate filtering, and schema
-  drift with recorded synthetic responses; it never calls a paid endpoint.
-- `extraction` independently reports field-presence recall and numeric exact-match rate.
-- `review` is a fail-closed release corpus: any unsafe `MATCHES_APPROVED_BASELINE` result fails.
+- `providers` exercises success, timeout, rate limits, missing VINs, stale and partial data,
+  duplicate filtering, and schema drift with recorded synthetic responses; it never calls a paid
+  endpoint.
+- `extraction` reports per-field and weighted presence/exact-match scores, numeric exact-match rate,
+  and a configurable material-field presence gate.
+- `review` is a fail-closed release corpus: any unsafe `MATCHES_APPROVED_BASELINE` result fails,
+  including unresolved questions, limit violations, and missing check scope or time metadata.
 
 `ReportReplayEvaluator` compares regenerated reports after removing only differences explicitly
 declared in the report payload. `ExtractionEvaluator`, `ProviderContractEvaluator`, and

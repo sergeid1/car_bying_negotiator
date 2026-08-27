@@ -31,4 +31,25 @@ class ReviewSafetyEvaluatorTest {
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("unreadable material amount");
   }
+
+  @Test
+  void everyUnsafeConditionRejectsAPositiveReview() throws Exception {
+    JsonNode corpus = JSON.readTree(getClass().getResourceAsStream(
+        "/fixtures/review/review-safety-corpus.json"));
+
+    for (JsonNode fixture : corpus.get("fixtures")) {
+      if (fixture.path("actualStatus").asText().equals("MATCHES_APPROVED_BASELINE")) {
+        continue;
+      }
+      ObjectNode unsafePositive = ((ObjectNode) fixture).deepCopy();
+      unsafePositive.put("actualStatus", "MATCHES_APPROVED_BASELINE");
+      ArrayNode singleFixtureCorpus = JSON.createArrayNode().add(unsafePositive);
+
+      assertThatThrownBy(
+          () -> new ReviewSafetyEvaluator().assertNoUnsafeMatches(singleFixtureCorpus))
+          .as(fixture.path("name").asText())
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining(fixture.path("name").asText());
+    }
+  }
 }
