@@ -45,3 +45,18 @@ npm run build
 The backend acceptance suite exercises the public HTTP workflow, immutable regeneration, and
 a full application restart against a file-backed test database using the production Flyway
 migration.
+
+## Contract evaluation fixtures
+
+Frozen JSON fixtures under `src/test/resources/fixtures` establish reusable quality contracts:
+
+- `golden` drives cash-deal reports through the public API and asserts monetary results,
+  calculation steps, declared rounding, and policy/schema versions.
+- `providers` exercises success, timeout, stale and partial data, duplicate filtering, and schema
+  drift with recorded synthetic responses; it never calls a paid endpoint.
+- `extraction` independently reports field-presence recall and numeric exact-match rate.
+- `review` is a fail-closed release corpus: any unsafe `MATCHES_APPROVED_BASELINE` result fails.
+
+`ReportReplayEvaluator` compares regenerated reports after removing only differences explicitly
+declared in the report payload. `ExtractionEvaluator`, `ProviderContractEvaluator`, and
+`ReviewSafetyEvaluator` are public harness APIs so later product slices can reuse the same gates.

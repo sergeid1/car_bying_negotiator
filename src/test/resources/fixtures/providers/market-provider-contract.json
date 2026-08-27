@@ -1,0 +1,80 @@
+{
+  "frozenNow": "2026-08-27T12:00:00Z",
+  "maxAgeDays": 30,
+  "scenarios": [
+    {
+      "name": "success",
+      "transportOutcome": "RESPONSE",
+      "response": {
+        "schemaVersion": "market-provider.v1",
+        "observedAt": "2026-08-20T12:00:00Z",
+        "lowMinor": 2450000,
+        "highMinor": 2700000,
+        "observations": [{"listingId": "listing-1"}, {"listingId": "listing-2"}]
+      },
+      "expectedStatus": "SUCCESS",
+      "expectedUniqueObservations": 2
+    },
+    {
+      "name": "timeout",
+      "transportOutcome": "TIMEOUT",
+      "expectedStatus": "TIMEOUT",
+      "expectedUniqueObservations": 0
+    },
+    {
+      "name": "stale data",
+      "transportOutcome": "RESPONSE",
+      "response": {
+        "schemaVersion": "market-provider.v1",
+        "observedAt": "2026-06-01T12:00:00Z",
+        "lowMinor": 2450000,
+        "highMinor": 2700000,
+        "observations": [{"listingId": "listing-1"}]
+      },
+      "expectedStatus": "STALE_DATA",
+      "expectedUniqueObservations": 1
+    },
+    {
+      "name": "partial data",
+      "transportOutcome": "RESPONSE",
+      "response": {
+        "schemaVersion": "market-provider.v1",
+        "observedAt": "2026-08-20T12:00:00Z",
+        "lowMinor": 2450000,
+        "observations": [{"listingId": "listing-1"}]
+      },
+      "expectedStatus": "PARTIAL_DATA",
+      "expectedUniqueObservations": 1
+    },
+    {
+      "name": "duplicate observations",
+      "transportOutcome": "RESPONSE",
+      "response": {
+        "schemaVersion": "market-provider.v1",
+        "observedAt": "2026-08-20T12:00:00Z",
+        "lowMinor": 2450000,
+        "highMinor": 2700000,
+        "observations": [
+          {"listingId": "listing-1"},
+          {"listingId": "listing-1"},
+          {"listingId": "listing-2"}
+        ]
+      },
+      "expectedStatus": "DUPLICATES_FILTERED",
+      "expectedUniqueObservations": 2
+    },
+    {
+      "name": "schema drift",
+      "transportOutcome": "RESPONSE",
+      "response": {
+        "schemaVersion": "market-provider.v2",
+        "observedAt": "2026-08-20T12:00:00Z",
+        "rangeFloorMinor": 2450000,
+        "rangeCeilingMinor": 2700000,
+        "observations": [{"listingId": "listing-1"}]
+      },
+      "expectedStatus": "SCHEMA_DRIFT",
+      "expectedUniqueObservations": 1
+    }
+  ]
+}

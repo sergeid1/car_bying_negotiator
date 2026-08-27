@@ -3,6 +3,7 @@ package com.dealanalyzer.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.dealanalyzer.DealAnalyzerApplication;
+import com.dealanalyzer.evaluation.ReportReplayEvaluator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
@@ -49,6 +50,7 @@ class SyntheticCashDealAcceptanceTest {
       JsonNode secondReport = get(client, "/api/v1/cases/" + caseId + "/reports/latest");
 
       assertThat(secondReport.get("version").asInt()).isEqualTo(2);
+      new ReportReplayEvaluator().assertReproduces(firstReport, secondReport);
       assertThat(secondReport.get("analysis")).isEqualTo(firstReport.get("analysis"));
       assertThat(secondReport.at("/reproduction/inputFingerprint").asText())
           .isEqualTo(firstReport.at("/reproduction/inputFingerprint").asText());

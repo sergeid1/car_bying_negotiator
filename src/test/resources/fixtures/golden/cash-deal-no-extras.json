@@ -1,0 +1,60 @@
+{
+  "name": "cash deal without dealer extras",
+  "input": {
+    "buyerZip": "27601",
+    "dealerZip": "27604",
+    "vehicle": {
+      "vin": "1HGCM82633A004352",
+      "year": 2021,
+      "make": "Honda",
+      "model": "Accord",
+      "trim": "EX-L",
+      "mileage": 38000
+    },
+    "dealerOffer": {
+      "currency": "USD",
+      "sellingPriceMinor": 2200000,
+      "dealerFeesMinor": 0,
+      "addOnsMinor": 0,
+      "taxesMinor": 154000,
+      "governmentChargesMinor": 20000
+    }
+  },
+  "expected": {
+    "sellingPriceMinor": 2200000,
+    "dealerFeesMinor": 0,
+    "addOnsMinor": 0,
+    "taxesMinor": 154000,
+    "governmentChargesMinor": 20000,
+    "outTheDoorTotalMinor": 2374000,
+    "calculationVersion": "cash-otd-policy.v1",
+    "rounding": {
+      "currencyScale": 2,
+      "mode": "UNNECESSARY",
+      "appliedAt": "INPUT_AND_FINAL_TOTAL"
+    },
+    "steps": [
+      {
+        "name": "vehicle subtotal",
+        "formula": "selling price",
+        "resultMinorUnits": 2200000
+      },
+      {
+        "name": "pre-tax dealer total",
+        "formula": "vehicle subtotal + dealer fees + add-ons",
+        "resultMinorUnits": 2200000
+      },
+      {
+        "name": "out-the-door total",
+        "formula": "pre-tax dealer total + taxes + government charges",
+        "resultMinorUnits": 2374000
+      }
+    ],
+    "policyVersions": {
+      "cashEconomics": "cash-otd-policy.v1",
+      "marketAssessment": "synthetic-market-policy.v1",
+      "report": "deal-analysis-report.v1"
+    },
+    "reportSchemaVersion": "deal-analysis-report.v1"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "presence and numeric accuracy are independent",
+  "expected": {
+    "vin": "1HGCM82633A004352",
+    "sellingPriceMinor": 2500000,
+    "outTheDoorTotalMinor": 2847500,
+    "dealerFeeMinor": 79900
+  },
+  "observed": {
+    "vin": "1HGCM82633A004352",
+    "sellingPriceMinor": 2500000,
+    "outTheDoorTotalMinor": 2845700
+  },
+  "expectedScore": {
+    "expectedFieldCount": 4,
+    "presentFieldCount": 3,
+    "expectedNumericFieldCount": 3,
+    "exactNumericFieldCount": 1,
+    "presenceRecall": 0.75,
+    "numericExactMatchRate": 0.3333333333
+  }
+}
