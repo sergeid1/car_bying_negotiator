@@ -14,7 +14,7 @@ Requirements: Java 21, Maven, Node.js, npm, and Docker.
 
 ```bash
 docker compose up -d database
-mvn spring-boot:run
+CASE_ACCESS_PEPPER="replace-with-a-long-random-production-secret" mvn spring-boot:run
 ```
 
 In another terminal:

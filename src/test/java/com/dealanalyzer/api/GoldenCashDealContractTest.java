@@ -32,9 +32,11 @@ class GoldenCashDealContractTest {
         .start("golden-contract-" + fixture.get("name").asText().hashCode())) {
       JsonNode started = post(
           application.client(), "/api/v1/cases/synthetic", fixture.get("input"));
-      awaitCompleted(application.client(), started.at("/operation/id").asText());
+      String accessToken = started.get("accessToken").asText();
+      awaitCompleted(
+          application.client(), started.at("/operation/id").asText(), accessToken);
       JsonNode report = get(application.client(), "/api/v1/cases/"
-          + started.at("/case/id").asText() + "/reports/latest");
+          + started.at("/case/id").asText() + "/reports/latest", accessToken);
 
       assertThat(report.at("/analysis/economics/sellingPrice/minorUnits").asLong())
           .isEqualTo(expected.get("sellingPriceMinor").asLong());

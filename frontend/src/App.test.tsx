@@ -9,6 +9,7 @@ test("buyer can start a synthetic cash analysis and reach the rendered report", 
     {
       case: { id: "case-1", status: "ANALYZING" },
       operation: { id: "operation-1", stage: "QUEUED" },
+      accessToken: "case-secret",
     },
     { id: "operation-1", caseId: "case-1", stage: "COMPLETE" },
     {
