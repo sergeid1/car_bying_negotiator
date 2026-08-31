@@ -54,20 +54,22 @@ public class AnalysisWorkflow {
     this.workerEnabled = workerEnabled;
   }
 
-  public StartedAnalysis start(SyntheticAnalysisRequest input, String idempotencyKey) {
+  public StartedAnalysis start(
+      SyntheticAnalysisRequest input, String idempotencyKey, String accessToken) {
     Optional<OperationView> existing = store.findOperationByIdempotencyKey(idempotencyKey);
     if (existing.isPresent()) {
       OperationView operation = existing.orElseThrow();
+      StoredCase buyingCase = requireAuthorizedCase(operation.caseId(), accessToken);
       return new StartedAnalysis(
-          caseView(store.requireCase(operation.caseId())),
+          caseView(buyingCase),
           operation,
-          caseAccess.reproduceToken(operation.caseId(), idempotencyKey));
+          null);
     }
     String caseId = UUID.randomUUID().toString();
     String operationId = UUID.randomUUID().toString();
     Instant now = Instant.now();
     String inputJson = write(input);
-    var credential = caseAccess.issue(caseId, idempotencyKey, now);
+    var credential = caseAccess.issue(now);
     try {
       store.createCase(
           caseId,
@@ -82,10 +84,11 @@ public class AnalysisWorkflow {
     } catch (DataIntegrityViolationException duplicate) {
       OperationView operation = store.findOperationByIdempotencyKey(idempotencyKey)
           .orElseThrow(() -> duplicate);
+      StoredCase buyingCase = requireAuthorizedCase(operation.caseId(), accessToken);
       return new StartedAnalysis(
-          caseView(store.requireCase(operation.caseId())),
+          caseView(buyingCase),
           operation,
-          caseAccess.reproduceToken(operation.caseId(), idempotencyKey));
+          null);
     }
     StartedAnalysis started =
         new StartedAnalysis(
@@ -143,12 +146,11 @@ public class AnalysisWorkflow {
   }
 
   private StoredCase requireAuthorizedCase(String caseId, String accessToken) {
-    StoredCase stored = store.requireCase(caseId);
-    if (!caseAccess.verifies(
-        stored.accessTokenHash(), stored.accessExpiresAt(), accessToken)) {
-      throw new ResourceNotFoundException("Buying Case not found");
-    }
-    return stored;
+    return caseAccess.requireAuthorized(
+        store.findCase(caseId),
+        accessToken,
+        StoredCase::accessTokenHash,
+        StoredCase::accessExpiresAt);
   }
 
   @EventListener(ApplicationReadyEvent.class)

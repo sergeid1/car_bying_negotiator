@@ -69,7 +69,12 @@ public class BuyingCaseStore {
 
   @Transactional(readOnly = true)
   public StoredCase requireCase(String caseId) {
-    return stored(cases.findById(caseId).orElseThrow(this::caseNotFound));
+    return findCase(caseId).orElseThrow(this::caseNotFound);
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<StoredCase> findCase(String caseId) {
+    return cases.findById(caseId).map(this::stored);
   }
 
   @Transactional(readOnly = true)
@@ -221,7 +226,7 @@ public class BuyingCaseStore {
 
   public enum PurchaseMethod { CASH, FINANCE }
 
-  public enum CaseStatus { CREATED, ANALYZING, COMPLETE, FAILED }
+  public enum CaseStatus { DRAFT, ANALYZING, COMPLETE, FAILED }
 
   public record OperationView(
       String id,

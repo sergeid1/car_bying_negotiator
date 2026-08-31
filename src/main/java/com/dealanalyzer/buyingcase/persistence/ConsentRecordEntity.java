@@ -28,6 +28,15 @@ class ConsentRecordEntity {
   @Column(name = "policy_version", nullable = false, length = 100)
   String policyVersion;
 
+  @Column(nullable = false, length = 40)
+  String actor;
+
+  @Column(nullable = false, length = 40)
+  String source;
+
+  @Column(name = "schema_version", nullable = false, length = 100)
+  String schemaVersion;
+
   @Column(name = "occurred_at", nullable = false)
   Instant occurredAt;
 
@@ -40,6 +49,9 @@ class ConsentRecordEntity {
       int consentVersion,
       String action,
       String policyVersion,
+      String actor,
+      String source,
+      String schemaVersion,
       Instant occurredAt) {
     this.id = id;
     this.caseId = caseId;
@@ -47,6 +59,9 @@ class ConsentRecordEntity {
     this.consentVersion = consentVersion;
     this.action = action;
     this.policyVersion = policyVersion;
+    this.actor = actor;
+    this.source = source;
+    this.schemaVersion = schemaVersion;
     this.occurredAt = occurredAt;
   }
 }

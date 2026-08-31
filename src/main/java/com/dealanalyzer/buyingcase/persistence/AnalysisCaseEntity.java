@@ -90,7 +90,7 @@ class AnalysisCaseEntity {
     entity.buyerJurisdiction = buyerJurisdiction;
     entity.dealerLocation = dealerLocation;
     entity.purchaseMethod = purchaseMethod;
-    entity.status = "CREATED";
+    entity.status = "DRAFT";
     entity.maxSellingPriceMinor = maxSellingPriceMinor;
     entity.maxOutTheDoorPriceMinor = maxOutTheDoorPriceMinor;
     entity.accessTokenHash = accessTokenHash;

@@ -11,6 +11,10 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class EphemeralBuyingCaseService {
+  private static final String CONSENT_ACTOR = "BUYER";
+  private static final String CONSENT_SOURCE = "BUYER_API";
+  private static final String CONSENT_SCHEMA_VERSION = "consent-record.v1";
+
   private final EphemeralCasePersistence persistence;
   private final CaseAccessService caseAccess;
 
@@ -21,15 +25,16 @@ public class EphemeralBuyingCaseService {
     this.caseAccess = caseAccess;
   }
 
-  public CreatedBuyingCase create(CreateBuyingCaseRequest request, String idempotencyKey) {
+  public CreatedBuyingCase create(
+      CreateBuyingCaseRequest request, String idempotencyKey, String accessToken) {
     StoredEphemeralCase existing = persistence.findByIdempotencyKey(idempotencyKey).orElse(null);
     if (existing != null) {
-      return created(existing, caseAccess.reproduceToken(existing.id(), idempotencyKey));
+      return created(requireAuthorized(existing, accessToken), null);
     }
 
     String caseId = UUID.randomUUID().toString();
     Instant now = Instant.now();
-    var credential = caseAccess.issue(caseId, idempotencyKey, now);
+    var credential = caseAccess.issue(now);
     StoredEphemeralCase stored;
     try {
       stored = persistence.create(
@@ -38,23 +43,24 @@ public class EphemeralBuyingCaseService {
           request,
           credential.protectedHash(),
           credential.expiresAt(),
+          CONSENT_ACTOR,
+          CONSENT_SOURCE,
+          CONSENT_SCHEMA_VERSION,
           now);
     } catch (DataIntegrityViolationException duplicate) {
       stored = persistence.findByIdempotencyKey(idempotencyKey)
           .orElseThrow(() -> duplicate);
+      return created(requireAuthorized(stored, accessToken), null);
     }
-    return created(stored, caseAccess.reproduceToken(stored.id(), idempotencyKey));
+    return created(stored, credential.token());
   }
 
   public BuyingCaseView reopen(String caseId, String accessToken) {
-    StoredEphemeralCase stored = persistence.findById(caseId)
-        .orElseThrow(this::notFound);
-    if (accessToken == null
-        || !caseAccess.verifies(
-            stored.accessTokenHash(), stored.accessExpiresAt(), accessToken)) {
-      throw notFound();
-    }
-    return view(stored);
+    return view(caseAccess.requireAuthorized(
+        persistence.findById(caseId),
+        accessToken,
+        StoredEphemeralCase::accessTokenHash,
+        StoredEphemeralCase::accessExpiresAt));
   }
 
   public boolean isEphemeralCase(String caseId) {
@@ -71,6 +77,9 @@ public class EphemeralBuyingCaseService {
         request.purpose(),
         request.granted(),
         request.policyVersion(),
+        CONSENT_ACTOR,
+        CONSENT_SOURCE,
+        CONSENT_SCHEMA_VERSION,
         Instant.now());
   }
 
@@ -97,8 +106,13 @@ public class EphemeralBuyingCaseService {
         stored.updatedAt());
   }
 
-  private ResourceNotFoundException notFound() {
-    return new ResourceNotFoundException("Buying Case not found");
+  private StoredEphemeralCase requireAuthorized(
+      StoredEphemeralCase stored, String accessToken) {
+    return caseAccess.requireAuthorized(
+        java.util.Optional.of(stored),
+        accessToken,
+        StoredEphemeralCase::accessTokenHash,
+        StoredEphemeralCase::accessExpiresAt);
   }
 
   public record CreatedBuyingCase(

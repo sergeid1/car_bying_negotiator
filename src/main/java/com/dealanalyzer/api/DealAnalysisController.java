@@ -44,8 +44,9 @@ public class DealAnalysisController {
   @ResponseStatus(HttpStatus.CREATED)
   public CreatedBuyingCase createCase(
       @NotBlank @Size(max = 200) @RequestHeader("Idempotency-Key") String idempotencyKey,
+      @RequestHeader(value = "Case-Access-Token", required = false) String accessToken,
       @Valid @RequestBody CreateBuyingCaseRequest request) {
-    return ephemeralCases.create(request, idempotencyKey);
+    return ephemeralCases.create(request, idempotencyKey, accessToken);
   }
 
   @GetMapping("/cases/{caseId}")
@@ -70,8 +71,9 @@ public class DealAnalysisController {
   @ResponseStatus(HttpStatus.ACCEPTED)
   public StartedAnalysis start(
       @NotBlank @Size(max = 200) @RequestHeader("Idempotency-Key") String idempotencyKey,
+      @RequestHeader(value = "Case-Access-Token", required = false) String accessToken,
       @Valid @RequestBody SyntheticAnalysisRequest request) {
-    return workflow.start(request, idempotencyKey);
+    return workflow.start(request, idempotencyKey, accessToken);
   }
 
   @PostMapping("/cases/{caseId}/analyses")

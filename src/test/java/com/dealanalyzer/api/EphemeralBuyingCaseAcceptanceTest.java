@@ -37,6 +37,7 @@ class EphemeralBuyingCaseAcceptanceTest {
       assertThat(created.at("/case/buyerJurisdiction").asText()).isEqualTo("US-NC");
       assertThat(created.at("/case/dealerLocation").asText()).isEqualTo("27604");
       assertThat(created.at("/case/purchaseMethod").asText()).isEqualTo("CASH");
+      assertThat(created.at("/case/status").asText()).isEqualTo("DRAFT");
       assertThat(created.at("/case/buyerLimits/maxSellingPriceMinor").asLong())
           .isEqualTo(25_000_00L);
 
@@ -115,6 +116,12 @@ class EphemeralBuyingCaseAcceptanceTest {
       assertThat(created.at("/case/consents").findValuesAsText("purpose"))
           .containsExactlyInAnyOrder(
               "SERVICE_PROCESSING", "HUMAN_REVIEW", "ANONYMIZED_RESEARCH");
+      assertThat(created.at("/case/consents").findValuesAsText("actor"))
+          .containsOnly("BUYER");
+      assertThat(created.at("/case/consents").findValuesAsText("source"))
+          .containsOnly("BUYER_API");
+      assertThat(created.at("/case/consents").findValuesAsText("schemaVersion"))
+          .containsOnly("consent-record.v1");
 
       JsonNode granted = changeConsent(
           application.client(), caseId, accessToken,
@@ -124,6 +131,9 @@ class EphemeralBuyingCaseAcceptanceTest {
               "policyVersion", "human-review.v2"));
       assertThat(granted.get("consentVersion").asInt()).isEqualTo(2);
       assertThat(granted.get("action").asText()).isEqualTo("GRANTED");
+      assertThat(granted.get("actor").asText()).isEqualTo("BUYER");
+      assertThat(granted.get("source").asText()).isEqualTo("BUYER_API");
+      assertThat(granted.get("schemaVersion").asText()).isEqualTo("consent-record.v1");
 
       JsonNode revoked = changeConsent(
           application.client(), caseId, accessToken,
@@ -133,6 +143,7 @@ class EphemeralBuyingCaseAcceptanceTest {
               "policyVersion", "human-review.v2"));
       assertThat(revoked.get("consentVersion").asInt()).isEqualTo(3);
       assertThat(revoked.get("action").asText()).isEqualTo("REVOKED");
+      assertThat(revoked.get("actor").asText()).isEqualTo("BUYER");
 
       JsonNode reopened = application.client().get()
           .uri("/api/v1/cases/{caseId}", caseId)
@@ -161,14 +172,23 @@ class EphemeralBuyingCaseAcceptanceTest {
   }
 
   @Test
-  void repeatedCreationReturnsTheSameCaseAndHighEntropyCredential() throws Exception {
+  void authenticatedCreationReplayReturnsTheSameCaseWithoutDisclosingTheCredential()
+      throws Exception {
     try (RunningApplication application = harness.start("creation-idempotency")) {
       JsonNode first = createCase(application.client(), "same-creation", validCase());
-      JsonNode repeated = createCase(
+      CapturedResponse unauthorized = captureCreate(
           application.client(), "same-creation", validCaseWithoutLimits("FINANCE"));
+      JsonNode repeated = createCase(
+          application.client(),
+          "same-creation",
+          first.get("accessToken").asText(),
+          validCaseWithoutLimits("FINANCE"));
 
+      assertThat(unauthorized.status()).isEqualTo(404);
+      assertThat(unauthorized.body())
+          .doesNotContain(first.get("accessToken").asText(), first.at("/case/id").asText());
       assertThat(repeated.at("/case/id")).isEqualTo(first.at("/case/id"));
-      assertThat(repeated.get("accessToken")).isEqualTo(first.get("accessToken"));
+      assertThat(repeated.get("accessToken").isNull()).isTrue();
       assertThat(Base64.getUrlDecoder().decode(first.get("accessToken").asText()))
           .hasSizeGreaterThanOrEqualTo(16);
       assertThat(repeated.at("/case/purchaseMethod").asText()).isEqualTo("CASH");
@@ -200,6 +220,20 @@ class EphemeralBuyingCaseAcceptanceTest {
         .uri("/api/v1/cases")
         .contentType(MediaType.APPLICATION_JSON)
         .header("Idempotency-Key", idempotencyKey)
+        .body(request)
+        .retrieve()
+        .body(String.class);
+    return JSON.readTree(response);
+  }
+
+  private static JsonNode createCase(
+      RestClient client, String idempotencyKey, String accessToken, Object request)
+      throws Exception {
+    String response = client.post()
+        .uri("/api/v1/cases")
+        .contentType(MediaType.APPLICATION_JSON)
+        .header("Idempotency-Key", idempotencyKey)
+        .header("Case-Access-Token", accessToken)
         .body(request)
         .retrieve()
         .body(String.class);

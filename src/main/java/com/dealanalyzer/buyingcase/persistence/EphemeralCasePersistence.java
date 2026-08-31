@@ -36,6 +36,9 @@ public class EphemeralCasePersistence {
       CreateBuyingCaseRequest request,
       String accessTokenHash,
       Instant expiresAt,
+      String consentActor,
+      String consentSource,
+      String consentSchemaVersion,
       Instant now) {
     var limits = request.buyerLimits();
     AnalysisCaseEntity saved = cases.saveAndFlush(AnalysisCaseEntity.ephemeral(
@@ -49,7 +52,13 @@ public class EphemeralCasePersistence {
         expiresAt,
         idempotencyKey,
         now));
-    saveInitialConsents(saved.id, request.consents(), now);
+    saveInitialConsents(
+        saved.id,
+        request.consents(),
+        consentActor,
+        consentSource,
+        consentSchemaVersion,
+        now);
     return stored(saved);
   }
 
@@ -59,6 +68,9 @@ public class EphemeralCasePersistence {
       ConsentPurpose purpose,
       boolean granted,
       String policyVersion,
+      String actor,
+      String source,
+      String schemaVersion,
       Instant now) {
     cases.findLockedById(caseId)
         .orElseThrow(() -> new IllegalArgumentException("Buying Case not found"));
@@ -77,22 +89,43 @@ public class EphemeralCasePersistence {
         version,
         action,
         policyVersion,
+        actor,
+        source,
+        schemaVersion,
         now)));
   }
 
   private void saveInitialConsents(
-      String caseId, CreateBuyingCaseRequest.InitialConsents decisions, Instant now) {
+      String caseId,
+      CreateBuyingCaseRequest.InitialConsents decisions,
+      String actor,
+      String source,
+      String schemaVersion,
+      Instant now) {
     consents.saveAll(List.of(
         initialConsent(
             caseId,
             ConsentPurpose.SERVICE_PROCESSING,
             decisions.serviceProcessing(),
+            actor,
+            source,
+            schemaVersion,
             now),
-        initialConsent(caseId, ConsentPurpose.HUMAN_REVIEW, decisions.humanReview(), now),
+        initialConsent(
+            caseId,
+            ConsentPurpose.HUMAN_REVIEW,
+            decisions.humanReview(),
+            actor,
+            source,
+            schemaVersion,
+            now),
         initialConsent(
             caseId,
             ConsentPurpose.ANONYMIZED_RESEARCH,
             decisions.anonymizedResearch(),
+            actor,
+            source,
+            schemaVersion,
             now)));
   }
 
@@ -100,6 +133,9 @@ public class EphemeralCasePersistence {
       String caseId,
       ConsentPurpose purpose,
       CreateBuyingCaseRequest.ConsentDecision decision,
+      String actor,
+      String source,
+      String schemaVersion,
       Instant now) {
     return new ConsentRecordEntity(
         UUID.randomUUID().toString(),
@@ -108,6 +144,9 @@ public class EphemeralCasePersistence {
         1,
         decision.granted() ? "GRANTED" : "DECLINED",
         decision.policyVersion(),
+        actor,
+        source,
+        schemaVersion,
         now);
   }
 
@@ -140,6 +179,9 @@ public class EphemeralCasePersistence {
         entity.consentVersion,
         ConsentAction.valueOf(entity.action),
         entity.policyVersion,
+        entity.actor,
+        entity.source,
+        entity.schemaVersion,
         entity.occurredAt);
   }
 
@@ -164,5 +206,8 @@ public class EphemeralCasePersistence {
       int consentVersion,
       ConsentAction action,
       String policyVersion,
+      String actor,
+      String source,
+      String schemaVersion,
       Instant occurredAt) {}
 }

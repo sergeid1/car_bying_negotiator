@@ -9,10 +9,13 @@ import com.dealanalyzer.api.HttpAcceptanceHarness.RunningApplication;
 import com.dealanalyzer.evaluation.ReportReplayEvaluator;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
 class SyntheticCashDealAcceptanceTest {
@@ -82,12 +85,31 @@ class SyntheticCashDealAcceptanceTest {
     try (RunningApplication application = harness.start("idempotency")) {
       String key = "same-analysis-request";
       JsonNode first = post(application.client(), "/api/v1/cases/synthetic", syntheticCashDeal(), key);
-      JsonNode duplicate = post(application.client(), "/api/v1/cases/synthetic", syntheticCashDeal(), key);
       String accessToken = first.get("accessToken").asText();
+      List<String> unauthorizedBodies = new ArrayList<>();
+      int unauthorizedStatus = application.client().post()
+          .uri("/api/v1/cases/synthetic")
+          .contentType(MediaType.APPLICATION_JSON)
+          .header("Idempotency-Key", key)
+          .body(syntheticCashDeal())
+          .exchange((request, response) -> {
+            unauthorizedBodies.add(new String(response.getBody().readAllBytes()));
+            return response.getStatusCode().value();
+          });
+      JsonNode duplicate = post(
+          application.client(),
+          "/api/v1/cases/synthetic",
+          syntheticCashDeal(),
+          key,
+          accessToken);
 
+      assertThat(unauthorizedStatus).isEqualTo(404);
+      assertThat(unauthorizedBodies.getFirst())
+          .doesNotContain(accessToken, first.at("/case/id").asText());
       assertThat(duplicate.at("/case/id").asText()).isEqualTo(first.at("/case/id").asText());
       assertThat(duplicate.at("/operation/id").asText())
           .isEqualTo(first.at("/operation/id").asText());
+      assertThat(duplicate.get("accessToken").isNull()).isTrue();
       awaitCompleted(application.client(), first.at("/operation/id").asText(), accessToken);
       assertThat(get(
               application.client(),
