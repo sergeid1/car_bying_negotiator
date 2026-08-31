@@ -1,22 +1,25 @@
 package com.dealanalyzer.api;
 
 import com.dealanalyzer.buyingcase.AnalysisWorkflow;
-import com.dealanalyzer.buyingcase.CreateBuyingCaseRequest;
-import com.dealanalyzer.buyingcase.ChangeConsentRequest;
-import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService;
-import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService.BuyingCaseView;
-import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService.CreatedBuyingCase;
-import com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence.StoredConsent;
-import com.dealanalyzer.buyingcase.AnalysisWorkflow.CaseView;
 import com.dealanalyzer.buyingcase.AnalysisWorkflow.StartedAnalysis;
-import com.dealanalyzer.buyingcase.persistence.BuyingCaseStore.OperationView;
+import com.dealanalyzer.buyingcase.ChangeConsentRequest;
+import com.dealanalyzer.buyingcase.CreateBuyingCaseRequest;
+import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService;
+import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService.CreatedBuyingCase;
 import com.dealanalyzer.buyingcase.SyntheticAnalysisRequest;
+import com.dealanalyzer.buyingcase.persistence.BuyingCaseStore.OperationView;
+import com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence.StoredConsent;
+import com.dealanalyzer.vehicle.EstablishVehicleRequest;
+import com.dealanalyzer.vehicle.ResolveIdentityConflictRequest;
+import com.dealanalyzer.vehicle.VehicleEvidenceService;
+import com.dealanalyzer.vehicle.VehicleEvidenceService.VehicleEvidenceView;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.Optional;
 import org.springframework.http.HttpStatus;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,7 +28,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.validation.annotation.Validated;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -33,11 +35,39 @@ import org.springframework.validation.annotation.Validated;
 public class DealAnalysisController {
   private final AnalysisWorkflow workflow;
   private final EphemeralBuyingCaseService ephemeralCases;
+  private final VehicleEvidenceService vehicleEvidence;
 
   public DealAnalysisController(
-      AnalysisWorkflow workflow, EphemeralBuyingCaseService ephemeralCases) {
+      AnalysisWorkflow workflow,
+      EphemeralBuyingCaseService ephemeralCases,
+      VehicleEvidenceService vehicleEvidence) {
     this.workflow = workflow;
     this.ephemeralCases = ephemeralCases;
+    this.vehicleEvidence = vehicleEvidence;
+  }
+
+  @PostMapping("/cases/{caseId}/vehicle-evidence")
+  public VehicleEvidenceView establishVehicle(
+      @PathVariable String caseId,
+      @RequestHeader("Case-Access-Token") String accessToken,
+      @RequestBody EstablishVehicleRequest request) {
+    return vehicleEvidence.establish(caseId, accessToken, request);
+  }
+
+  @GetMapping("/cases/{caseId}/vehicle-evidence")
+  public VehicleEvidenceView getVehicleEvidence(
+      @PathVariable String caseId,
+      @RequestHeader("Case-Access-Token") String accessToken) {
+    return vehicleEvidence.get(caseId, accessToken);
+  }
+
+  @PostMapping("/cases/{caseId}/vehicle-evidence/conflicts/{conflictId}/resolution")
+  public VehicleEvidenceView resolveVehicleConflict(
+      @PathVariable String caseId,
+      @PathVariable String conflictId,
+      @RequestHeader("Case-Access-Token") String accessToken,
+      @RequestBody ResolveIdentityConflictRequest request) {
+    return vehicleEvidence.resolve(caseId, accessToken, conflictId, request);
   }
 
   @PostMapping("/cases")
