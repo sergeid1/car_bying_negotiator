@@ -1,9 +1,10 @@
 package com.dealanalyzer.buyingcase;
 
-import com.dealanalyzer.buyingcase.BuyingCaseStore.OperationView;
-import com.dealanalyzer.buyingcase.BuyingCaseStore.StoredCase;
-import com.dealanalyzer.buyingcase.BuyingCaseStore.CaseStatus;
-import com.dealanalyzer.buyingcase.BuyingCaseStore.PurchaseMethod;
+import com.dealanalyzer.buyingcase.persistence.BuyingCaseStore;
+import com.dealanalyzer.buyingcase.persistence.BuyingCaseStore.OperationView;
+import com.dealanalyzer.buyingcase.persistence.BuyingCaseStore.StoredCase;
+import com.dealanalyzer.buyingcase.persistence.BuyingCaseStore.CaseStatus;
+import com.dealanalyzer.buyingcase.persistence.BuyingCaseStore.PurchaseMethod;
 import com.dealanalyzer.report.CashDealAnalyzer;
 import com.dealanalyzer.report.DealAnalysis;
 import com.dealanalyzer.report.ReportAssembler;
@@ -24,7 +25,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @Service
 public class AnalysisWorkflow {
@@ -34,6 +35,7 @@ public class AnalysisWorkflow {
   private final TaskExecutor taskExecutor;
   private final ReportAssembler reportAssembler;
   private final boolean workerEnabled;
+  private final CaseAccessService caseAccess;
 
   public AnalysisWorkflow(
       BuyingCaseStore store,
@@ -41,76 +43,114 @@ public class AnalysisWorkflow {
       ReportAssembler reportAssembler,
       ObjectMapper json,
       TaskExecutor taskExecutor,
+      CaseAccessService caseAccess,
       @Value("${analysis.worker.enabled:true}") boolean workerEnabled) {
     this.store = store;
     this.analyzer = analyzer;
     this.json = json.copy().enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY);
     this.taskExecutor = taskExecutor;
     this.reportAssembler = reportAssembler;
+    this.caseAccess = caseAccess;
     this.workerEnabled = workerEnabled;
   }
 
-  public StartedAnalysis start(SyntheticAnalysisRequest input, String idempotencyKey) {
+  public StartedAnalysis start(
+      SyntheticAnalysisRequest input, String idempotencyKey, String accessToken) {
     Optional<OperationView> existing = store.findOperationByIdempotencyKey(idempotencyKey);
     if (existing.isPresent()) {
       OperationView operation = existing.orElseThrow();
-      return new StartedAnalysis(caseView(store.requireCase(operation.caseId())), operation);
+      StoredCase buyingCase = requireAuthorizedCase(operation.caseId(), accessToken);
+      return new StartedAnalysis(
+          caseView(buyingCase),
+          operation,
+          null);
     }
     String caseId = UUID.randomUUID().toString();
     String operationId = UUID.randomUUID().toString();
     Instant now = Instant.now();
     String inputJson = write(input);
+    var credential = caseAccess.issue(now);
     try {
       store.createCase(
-          caseId, operationId, idempotencyKey, input, inputJson, sha256(inputJson), now);
-    } catch (DuplicateKeyException duplicate) {
+          caseId,
+          operationId,
+          idempotencyKey,
+          input,
+          inputJson,
+          sha256(inputJson),
+          credential.protectedHash(),
+          credential.expiresAt(),
+          now);
+    } catch (DataIntegrityViolationException duplicate) {
       OperationView operation = store.findOperationByIdempotencyKey(idempotencyKey)
           .orElseThrow(() -> duplicate);
-      return new StartedAnalysis(caseView(store.requireCase(operation.caseId())), operation);
+      StoredCase buyingCase = requireAuthorizedCase(operation.caseId(), accessToken);
+      return new StartedAnalysis(
+          caseView(buyingCase),
+          operation,
+          null);
     }
     StartedAnalysis started =
-        new StartedAnalysis(caseView(store.requireCase(caseId)), store.requireOperation(operationId));
+        new StartedAnalysis(
+            caseView(store.requireCase(caseId)),
+            store.requireOperation(operationId),
+            credential.token());
     dispatch(caseId, operationId);
     return started;
   }
 
-  public StartedAnalysis regenerate(String caseId, String idempotencyKey) {
+  public StartedAnalysis regenerate(
+      String caseId, String idempotencyKey, String accessToken) {
+    requireAuthorizedCase(caseId, accessToken);
     Optional<OperationView> existing = store.findOperationByIdempotencyKey(idempotencyKey);
     if (existing.isPresent()) {
       OperationView operation = existing.orElseThrow();
       if (!operation.caseId().equals(caseId)) {
         throw new IdempotencyConflictException();
       }
-      return new StartedAnalysis(caseView(store.requireCase(caseId)), operation);
+      return new StartedAnalysis(caseView(store.requireCase(caseId)), operation, null);
     }
     store.requireCase(caseId);
     String operationId = UUID.randomUUID().toString();
     try {
       store.createOperation(operationId, caseId, idempotencyKey, Instant.now());
-    } catch (DuplicateKeyException duplicate) {
+    } catch (DataIntegrityViolationException duplicate) {
       OperationView operation = store.findOperationByIdempotencyKey(idempotencyKey)
           .orElseThrow(() -> duplicate);
       if (!operation.caseId().equals(caseId)) {
         throw new IdempotencyConflictException();
       }
-      return new StartedAnalysis(caseView(store.requireCase(caseId)), operation);
+      return new StartedAnalysis(caseView(store.requireCase(caseId)), operation, null);
     }
     StartedAnalysis started =
-        new StartedAnalysis(caseView(store.requireCase(caseId)), store.requireOperation(operationId));
+        new StartedAnalysis(
+            caseView(store.requireCase(caseId)), store.requireOperation(operationId), null);
     dispatch(caseId, operationId);
     return started;
   }
 
-  public CaseView getCase(String caseId) {
-    return caseView(store.requireCase(caseId));
+  public CaseView getCase(String caseId, String accessToken) {
+    return caseView(requireAuthorizedCase(caseId, accessToken));
   }
 
-  public OperationView getOperation(String operationId) {
-    return store.requireOperation(operationId);
+  public OperationView getOperation(String operationId, String accessToken) {
+    OperationView operation = store.requireOperation(operationId);
+    requireAuthorizedCase(operation.caseId(), accessToken);
+    return operation;
   }
 
-  public JsonNode getReport(String caseId, Optional<Integer> version) {
+  public JsonNode getReport(
+      String caseId, Optional<Integer> version, String accessToken) {
+    requireAuthorizedCase(caseId, accessToken);
     return store.requireReport(caseId, version);
+  }
+
+  private StoredCase requireAuthorizedCase(String caseId, String accessToken) {
+    return caseAccess.requireAuthorized(
+        store.findCase(caseId),
+        accessToken,
+        StoredCase::accessTokenHash,
+        StoredCase::accessExpiresAt);
   }
 
   @EventListener(ApplicationReadyEvent.class)
@@ -179,7 +219,10 @@ public class AnalysisWorkflow {
     }
   }
 
-  public record StartedAnalysis(@JsonProperty("case") CaseView buyingCase, OperationView operation) {}
+  public record StartedAnalysis(
+      @JsonProperty("case") CaseView buyingCase,
+      OperationView operation,
+      String accessToken) {}
 
   public enum OperationStage {
     QUEUED, LOADING_INPUTS, FETCHING_MARKET, CALCULATING, ASSEMBLING_REPORT, COMPLETE, FAILED

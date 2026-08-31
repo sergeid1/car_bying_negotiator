@@ -35,6 +35,7 @@ type Report = {
 type StartedAnalysis = {
   case: { id: string; status: string };
   operation: { id: string; stage: string };
+  accessToken: string;
 };
 
 type Operation = { id: string; caseId: string; stage: string; error?: string };
@@ -117,6 +118,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         }
         operation = await requestJson<Operation>(
           `/api/v1/operations/${started.operation.id}`,
+          { headers: { "Case-Access-Token": started.accessToken } },
         );
         setStage(operation.stage);
       } while (operation.stage !== "COMPLETE" && operation.stage !== "FAILED");
@@ -127,6 +129,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       setReport(
         await requestJson<Report>(
           `/api/v1/cases/${started.case.id}/reports/latest`,
+          { headers: { "Case-Access-Token": started.accessToken } },
         ),
       );
     } catch (caught) {

@@ -4,9 +4,10 @@ This slice accepts a synthetic cash Vehicle and Dealer Offer, queues determinist
 and persists a versioned Deal Analysis Report. Spring Boot owns the API and worker boundary,
 PostgreSQL owns durable state, Flyway owns schema history, and React renders the Buyer workflow.
 
-Analysis POST requests require an `Idempotency-Key` header. Reusing a key returns the original
-Buying Case and operation, so client retries cannot create extra report versions. The worker also
-recovers queued or interrupted operations from durable state when the application starts.
+Analysis POST requests require an `Idempotency-Key` header. Reusing a key with the original
+`Case-Access-Token` returns the original Buying Case and operation without returning the token
+again, so client retries cannot create extra report versions or disclose case access. The worker
+also recovers queued or interrupted operations from durable state when the application starts.
 
 ## Run locally
 
@@ -14,7 +15,7 @@ Requirements: Java 21, Maven, Node.js, npm, and Docker.
 
 ```bash
 docker compose up -d database
-mvn spring-boot:run
+CASE_ACCESS_PEPPER="replace-with-a-long-random-production-secret" mvn spring-boot:run
 ```
 
 In another terminal:
@@ -31,7 +32,8 @@ The default development database credentials are intentionally local-only and ma
 `compose.yaml`. PostgreSQL is published on host port `55432` to avoid common local database
 collisions; override it with `DATABASE_PORT`. Override the application connection with
 `DATABASE_URL`, `DATABASE_USERNAME`, and `DATABASE_PASSWORD`. Flyway applies migrations from
-`src/main/resources/db/migration` when the application starts.
+`src/main/resources/db/migration` when the application starts. `CASE_ACCESS_PEPPER` must be a
+secret value containing at least 32 bytes.
 
 ## Verify
 
