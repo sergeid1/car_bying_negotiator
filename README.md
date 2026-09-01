@@ -15,7 +15,10 @@ Requirements: Java 21, Maven, Node.js, npm, and Docker.
 
 ```bash
 docker compose up -d database
-CASE_ACCESS_PEPPER="replace-with-a-long-random-production-secret" mvn spring-boot:run
+cd backend
+CASE_ACCESS_PEPPER="replace-with-a-long-random-production-secret" \
+DOCUMENT_STORAGE_ENCRYPTION_KEY="replace-with-an-independent-32-byte-secret" \
+mvn spring-boot:run
 ```
 
 In another terminal:
@@ -32,13 +35,17 @@ The default development database credentials are intentionally local-only and ma
 `compose.yaml`. PostgreSQL is published on host port `55432` to avoid common local database
 collisions; override it with `DATABASE_PORT`. Override the application connection with
 `DATABASE_URL`, `DATABASE_USERNAME`, and `DATABASE_PASSWORD`. Flyway applies migrations from
-`src/main/resources/db/migration` when the application starts. `CASE_ACCESS_PEPPER` must be a
-secret value containing at least 32 bytes.
+`backend/src/main/resources/db/migration` when the application starts. `CASE_ACCESS_PEPPER` and
+`DOCUMENT_STORAGE_ENCRYPTION_KEY` must be independent secret values containing at least 32 bytes.
+Encrypted Dealer document originals are stored outside PostgreSQL under
+`DOCUMENT_STORAGE_PATH` (default `backend/var/document-objects`).
 
 ## Verify
 
 ```bash
+cd backend
 mvn test
+cd ..
 cd frontend
 npm test
 npm run build
@@ -50,7 +57,7 @@ migration.
 
 ## Contract evaluation fixtures
 
-Frozen JSON fixtures under `src/test/resources/fixtures` establish reusable quality contracts:
+Frozen JSON fixtures under `backend/src/test/resources/fixtures` establish reusable quality contracts:
 
 - `golden` drives cash-deal reports through the public API and asserts monetary results,
   calculation steps, declared rounding, and policy/schema versions.
