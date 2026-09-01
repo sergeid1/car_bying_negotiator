@@ -30,6 +30,14 @@ public class EphemeralCasePersistence {
   }
 
   @Transactional
+  public void updateStatus(String caseId, String status, Instant now) {
+    AnalysisCaseEntity buyingCase = cases.findLockedById(caseId)
+        .orElseThrow(() -> new IllegalArgumentException("Buying Case not found"));
+    buyingCase.status = status;
+    buyingCase.updatedAt = now;
+  }
+
+  @Transactional
   public StoredEphemeralCase create(
       String caseId,
       String idempotencyKey,

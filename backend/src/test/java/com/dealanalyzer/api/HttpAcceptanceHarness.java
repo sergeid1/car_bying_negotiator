@@ -35,6 +35,15 @@ final class HttpAcceptanceHarness {
 
   RunningApplication start(
       String databaseName, boolean workerEnabled, String... additionalProperties) {
+    return startWithConfiguration(
+        databaseName, workerEnabled, DealAnalyzerApplication.class, additionalProperties);
+  }
+
+  RunningApplication startWithConfiguration(
+      String databaseName,
+      boolean workerEnabled,
+      Class<?> additionalConfiguration,
+      String... additionalProperties) {
     String dataSourceUrl = "jdbc:h2:file:"
         + temporaryDirectory.resolve(databaseName).toAbsolutePath()
         + ";MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_ON_EXIT=FALSE";
@@ -46,7 +55,7 @@ final class HttpAcceptanceHarness {
         "--spring.task.execution.pool.core-size=1"));
     properties.addAll(Arrays.asList(additionalProperties));
     ConfigurableApplicationContext context =
-        new SpringApplicationBuilder(DealAnalyzerApplication.class)
+        new SpringApplicationBuilder(DealAnalyzerApplication.class, additionalConfiguration)
             .web(WebApplicationType.SERVLET)
             .run(properties.toArray(String[]::new));
     int port = ((WebServerApplicationContext) context).getWebServer().getPort();

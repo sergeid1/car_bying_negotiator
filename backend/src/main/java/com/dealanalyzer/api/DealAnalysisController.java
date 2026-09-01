@@ -13,6 +13,10 @@ import com.dealanalyzer.vehicle.EstablishVehicleRequest;
 import com.dealanalyzer.vehicle.ResolveIdentityConflictRequest;
 import com.dealanalyzer.vehicle.VehicleEvidenceService;
 import com.dealanalyzer.vehicle.VehicleEvidenceService.VehicleEvidenceView;
+import com.dealanalyzer.document.DocumentIntakeService;
+import com.dealanalyzer.document.DocumentIntakeService.StartedDocumentUpload;
+import com.dealanalyzer.document.persistence.DocumentIntakePersistence.DocumentOperationView;
+import com.dealanalyzer.document.persistence.DocumentIntakePersistence.SourceDocumentView;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -28,6 +32,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -36,14 +42,44 @@ public class DealAnalysisController {
   private final AnalysisWorkflow workflow;
   private final EphemeralBuyingCaseService ephemeralCases;
   private final VehicleEvidenceService vehicleEvidence;
+  private final DocumentIntakeService documentIntake;
 
   public DealAnalysisController(
       AnalysisWorkflow workflow,
       EphemeralBuyingCaseService ephemeralCases,
-      VehicleEvidenceService vehicleEvidence) {
+      VehicleEvidenceService vehicleEvidence,
+      DocumentIntakeService documentIntake) {
     this.workflow = workflow;
     this.ephemeralCases = ephemeralCases;
     this.vehicleEvidence = vehicleEvidence;
+    this.documentIntake = documentIntake;
+  }
+
+  @PostMapping(value = "/cases/{caseId}/documents", consumes = "multipart/form-data")
+  @ResponseStatus(HttpStatus.ACCEPTED)
+  public StartedDocumentUpload uploadDocument(
+      @PathVariable String caseId,
+      @NotBlank @Size(max = 200) @RequestHeader("Idempotency-Key") String idempotencyKey,
+      @RequestHeader("Case-Access-Token") String accessToken,
+      @RequestPart("file") MultipartFile file) {
+    return documentIntake.upload(caseId, accessToken, idempotencyKey, file);
+  }
+
+  @GetMapping("/cases/{caseId}/documents/{documentId}")
+  public SourceDocumentView getDocument(
+      @PathVariable String caseId,
+      @PathVariable String documentId,
+      @RequestHeader("Case-Access-Token") String accessToken) {
+    return documentIntake.getDocument(caseId, documentId, accessToken);
+  }
+
+  @PostMapping("/operations/{operationId}/retries")
+  @ResponseStatus(HttpStatus.ACCEPTED)
+  public DocumentOperationView retryDocumentOperation(
+      @PathVariable String operationId,
+      @NotBlank @Size(max = 200) @RequestHeader("Idempotency-Key") String idempotencyKey,
+      @RequestHeader("Case-Access-Token") String accessToken) {
+    return documentIntake.retry(operationId, accessToken, idempotencyKey);
   }
 
   @PostMapping("/cases/{caseId}/vehicle-evidence")
@@ -116,9 +152,14 @@ public class DealAnalysisController {
   }
 
   @GetMapping("/operations/{operationId}")
-  public OperationView getOperation(
+  public Object getOperation(
       @PathVariable String operationId,
       @RequestHeader("Case-Access-Token") String accessToken) {
+    Optional<DocumentOperationView> documentOperation =
+        documentIntake.findOperation(operationId, accessToken);
+    if (documentOperation.isPresent()) {
+      return documentOperation.orElseThrow();
+    }
     return workflow.getOperation(operationId, accessToken);
   }
 
