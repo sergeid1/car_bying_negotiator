@@ -1,7 +1,7 @@
 package com.dealanalyzer.document;
 
-import com.dealanalyzer.document.persistence.DocumentIntakePersistence.SourceDocumentView;
+import com.dealanalyzer.document.persistence.DocumentIntakePersistence.ProcessingDocument;
 
 public interface DocumentPageNormalizer {
-  void normalize(SourceDocumentView document);
+  void normalize(ProcessingDocument document);
 }

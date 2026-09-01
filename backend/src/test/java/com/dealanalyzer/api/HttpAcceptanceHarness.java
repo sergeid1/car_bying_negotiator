@@ -51,7 +51,9 @@ final class HttpAcceptanceHarness {
         "--server.port=0",
         "--spring.datasource.url=" + dataSourceUrl,
         "--case.access.pepper=acceptance-test-pepper-with-at-least-32-bytes",
+        "--document.malware-scanner=test",
         "--analysis.worker.enabled=" + workerEnabled,
+        "--document.worker.enabled=" + workerEnabled,
         "--spring.task.execution.pool.core-size=1"));
     properties.addAll(Arrays.asList(additionalProperties));
     ConfigurableApplicationContext context =

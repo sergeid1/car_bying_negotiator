@@ -29,6 +29,22 @@ class EncryptedFileDocumentStorage implements DocumentObjectStorage {
 
   @Override
   public StoredObject store(String caseId, String documentId, byte[] content) {
+    return encrypt(caseId + ":" + documentId, caseId + "-" + documentId + ".enc", content);
+  }
+
+  @Override
+  public byte[] readOriginal(String caseId, String documentId, String objectKey) {
+    return decrypt(caseId + ":" + documentId, objectKey);
+  }
+
+  @Override
+  public StoredObject storeNormalized(
+      String caseId, String documentId, int pageNumber, byte[] content) {
+    String objectKey = caseId + "-" + documentId + "-page-" + pageNumber + ".png.enc";
+    return encrypt(caseId + ":" + documentId + ":page:" + pageNumber, objectKey, content);
+  }
+
+  private StoredObject encrypt(String associatedData, String objectKey, byte[] content) {
     if (configuredKey.getBytes(StandardCharsets.UTF_8).length < 32) {
       throw new IllegalStateException("DOCUMENT_STORAGE_ENCRYPTION_KEY must contain at least 32 bytes");
     }
@@ -41,16 +57,50 @@ class EncryptedFileDocumentStorage implements DocumentObjectStorage {
       java.security.SecureRandom.getInstanceStrong().nextBytes(iv);
       Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
       cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(128, iv));
-      cipher.updateAAD((caseId + ":" + documentId).getBytes(StandardCharsets.UTF_8));
+      cipher.updateAAD(associatedData.getBytes(StandardCharsets.UTF_8));
       byte[] encrypted = cipher.doFinal(content);
       byte[] stored = ByteBufferSupport.join(iv, encrypted);
-      String objectKey = caseId + "-" + documentId + ".enc";
-      Files.write(storagePath.resolve(objectKey), stored);
+      Path temporary = Files.createTempFile(storagePath, objectKey, ".tmp");
+      Files.write(temporary, stored);
+      try {
+        Files.move(
+            temporary,
+            storagePath.resolve(objectKey),
+            java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+      } catch (java.nio.file.AtomicMoveNotSupportedException exception) {
+        Files.move(
+            temporary,
+            storagePath.resolve(objectKey),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+      }
       String keyReference = "local-kek:" + MessageDigest.getInstance("SHA-256")
           .digest(key)[0] + ":v1";
       return new StoredObject(objectKey, keyReference);
     } catch (IOException | GeneralSecurityException exception) {
       throw new IllegalStateException("Unable to encrypt and store document", exception);
+    }
+  }
+
+  private byte[] decrypt(String associatedData, String objectKey) {
+    if (configuredKey.getBytes(StandardCharsets.UTF_8).length < 32) {
+      throw new IllegalStateException("DOCUMENT_STORAGE_ENCRYPTION_KEY must contain at least 32 bytes");
+    }
+    try {
+      byte[] stored = Files.readAllBytes(storagePath.resolve(objectKey));
+      if (stored.length <= IV_BYTES) {
+        throw new IllegalStateException("Stored document is truncated");
+      }
+      byte[] key = Arrays.copyOf(
+          MessageDigest.getInstance("SHA-256").digest(configuredKey.getBytes(StandardCharsets.UTF_8)),
+          32);
+      byte[] iv = Arrays.copyOf(stored, IV_BYTES);
+      Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+      cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"), new GCMParameterSpec(128, iv));
+      cipher.updateAAD(associatedData.getBytes(StandardCharsets.UTF_8));
+      return cipher.doFinal(Arrays.copyOfRange(stored, IV_BYTES, stored.length));
+    } catch (IOException | GeneralSecurityException exception) {
+      throw new IllegalStateException("Unable to read encrypted document", exception);
     }
   }
 

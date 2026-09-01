@@ -46,6 +46,9 @@ class DocumentPageEntity {
   @Column(name = "created_at", nullable = false)
   Instant createdAt;
 
+  @Column(name = "normalized_deleted_at")
+  Instant normalizedDeletedAt;
+
   protected DocumentPageEntity() {}
 
   DocumentPageEntity(

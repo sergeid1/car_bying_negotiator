@@ -7,6 +7,7 @@ import com.dealanalyzer.document.DocumentFileInspector.InspectedDocument;
 import com.dealanalyzer.document.persistence.DocumentIntakePersistence;
 import com.dealanalyzer.document.persistence.DocumentIntakePersistence.DocumentOperationView;
 import com.dealanalyzer.document.persistence.DocumentIntakePersistence.NewDocument;
+import com.dealanalyzer.document.persistence.DocumentIntakePersistence.RetryDecision;
 import com.dealanalyzer.document.persistence.DocumentIntakePersistence.SourceDocumentView;
 import com.dealanalyzer.document.persistence.DocumentIntakePersistence.UploadRecords;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +19,7 @@ import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.task.TaskExecutor;
@@ -45,7 +47,7 @@ public class DocumentIntakeService {
       DocumentIntakePersistence persistence,
       EphemeralBuyingCaseService buyingCases,
       EphemeralCasePersistence casePersistence,
-      TaskExecutor taskExecutor,
+      @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
       DocumentPageNormalizer pageNormalizer,
       @Value("${document.retention:PT720H}") Duration retention,
       @Value("${document.worker.enabled:true}") boolean workerEnabled) {
@@ -69,7 +71,7 @@ public class DocumentIntakeService {
       String accessToken,
       String idempotencyKey,
       MultipartFile upload) {
-    buyingCases.reopen(caseId, accessToken);
+    requireServiceProcessingConsent(caseId, accessToken);
     byte[] bytes = read(upload);
     String checksum = sha256(bytes);
     Optional<UploadRecords> existing = persistence.findByIdempotencyKey(caseId, idempotencyKey);
@@ -83,11 +85,18 @@ public class DocumentIntakeService {
 
     InspectedDocument inspected = inspector.inspect(bytes);
     malwareScanner.requireClean(bytes);
+    requireServiceProcessingConsent(caseId, accessToken);
     String documentId = UUID.randomUUID().toString();
     String operationId = UUID.randomUUID().toString();
     String filename = safeFilename(upload.getOriginalFilename());
     Instant now = Instant.now();
     DocumentObjectStorage.StoredObject stored = objectStorage.store(caseId, documentId, bytes);
+    try {
+      requireServiceProcessingConsent(caseId, accessToken);
+    } catch (RuntimeException revokedBeforePersistence) {
+      objectStorage.delete(stored.objectKey());
+      throw revokedBeforePersistence;
+    }
     UploadRecords records;
     try {
       records = persistence.create(
@@ -129,13 +138,13 @@ public class DocumentIntakeService {
   public Optional<DocumentOperationView> findOperation(
       String operationId, String accessToken) {
     Optional<DocumentOperationView> operation = persistence.findOperation(operationId);
-    operation.ifPresent(view -> buyingCases.reopen(view.caseId(), accessToken));
+    operation.ifPresent(view -> requireServiceProcessingConsent(view.caseId(), accessToken));
     return operation;
   }
 
   public SourceDocumentView getDocument(
       String caseId, String documentId, String accessToken) {
-    buyingCases.reopen(caseId, accessToken);
+    requireServiceProcessingConsent(caseId, accessToken);
     SourceDocumentView document = persistence.requireDocument(documentId);
     if (!document.caseId().equals(caseId)) {
       throw new com.dealanalyzer.buyingcase.ResourceNotFoundException("Source Document not found");
@@ -146,19 +155,20 @@ public class DocumentIntakeService {
   public DocumentOperationView retry(
       String operationId, String accessToken, String idempotencyKey) {
     DocumentOperationView operation = persistence.requireOperation(operationId);
-    buyingCases.reopen(operation.caseId(), accessToken);
-    DocumentOperationView retried = persistence.retry(operationId, Instant.now());
-    if (!retried.stage().equals("READY_FOR_EXTRACTION")) {
+    requireServiceProcessingConsent(operation.caseId(), accessToken);
+    RetryDecision retry = persistence.retry(operationId, idempotencyKey, Instant.now());
+    if (retry.dispatch()) {
       casePersistence.updateStatus(operation.caseId(), "DOCUMENT_PROCESSING", Instant.now());
       dispatch(operationId);
     }
-    return retried;
+    return retry.operation();
   }
 
   @EventListener(ApplicationReadyEvent.class)
   public void recoverInterruptedOperations() {
     if (workerEnabled) {
-      persistence.recoverableOperations().forEach(operation -> dispatch(operation.id()));
+      persistence.recoverInterruptedOperations(Instant.now())
+          .forEach(operation -> dispatch(operation.id()));
     }
   }
 
@@ -170,9 +180,12 @@ public class DocumentIntakeService {
 
   private void process(String operationId) {
     DocumentOperationView operation = persistence.requireOperation(operationId);
+    if (!persistence.claimNormalization(operationId, Instant.now())) {
+      return;
+    }
     try {
-      persistence.markNormalizing(operationId, Instant.now());
-      pageNormalizer.normalize(persistence.requireDocument(operation.documentId()));
+      requireServiceProcessingConsent(operation.caseId(), null);
+      pageNormalizer.normalize(persistence.requireProcessingDocument(operation.documentId()));
       persistence.completeNormalization(operationId, Instant.now());
       casePersistence.updateStatus(operation.caseId(), "NEEDS_REVIEW", Instant.now());
     } catch (Exception exception) {
@@ -183,6 +196,26 @@ public class DocumentIntakeService {
           "Document page normalization could not be completed. Retry this stage without uploading again.",
           Instant.now());
       casePersistence.updateStatus(operation.caseId(), "FAILED", Instant.now());
+    }
+  }
+
+  private void requireServiceProcessingConsent(String caseId, String accessToken) {
+    java.util.List<com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence.StoredConsent>
+        consents = accessToken == null
+            ? casePersistence.findById(caseId).orElseThrow().consents()
+            : buyingCases.reopen(caseId, accessToken).consents();
+    boolean granted = consents.stream()
+        .filter(consent -> consent.purpose()
+            == com.dealanalyzer.buyingcase.ChangeConsentRequest.ConsentPurpose.SERVICE_PROCESSING)
+        .max(java.util.Comparator.comparingInt(
+            com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence.StoredConsent::consentVersion))
+        .map(consent -> consent.action()
+            == com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence.ConsentAction.GRANTED)
+        .orElse(false);
+    if (!granted) {
+      throw new InvalidDocumentException(
+          "SERVICE_PROCESSING_CONSENT_REQUIRED",
+          "Service-processing consent is not currently granted. Grant it before uploading or retrying a document.");
     }
   }
 

@@ -21,6 +21,7 @@ import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -42,7 +43,7 @@ public class AnalysisWorkflow {
       CashDealAnalyzer analyzer,
       ReportAssembler reportAssembler,
       ObjectMapper json,
-      TaskExecutor taskExecutor,
+      @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
       CaseAccessService caseAccess,
       @Value("${analysis.worker.enabled:true}") boolean workerEnabled) {
     this.store = store;

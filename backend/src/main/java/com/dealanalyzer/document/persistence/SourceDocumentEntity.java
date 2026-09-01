@@ -52,6 +52,9 @@ class SourceDocumentEntity {
   @Column(name = "updated_at", nullable = false)
   Instant updatedAt;
 
+  @Column(name = "original_deleted_at")
+  Instant originalDeletedAt;
+
   protected SourceDocumentEntity() {}
 
   SourceDocumentEntity(
