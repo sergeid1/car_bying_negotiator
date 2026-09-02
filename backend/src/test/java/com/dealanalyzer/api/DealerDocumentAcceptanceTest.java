@@ -76,7 +76,7 @@ class DealerDocumentAcceptanceTest {
 
       JsonNode completed = awaitTerminal(
           application, upload.at("/operation/id").asText(), accessToken);
-      assertThat(completed.get("stage").asText()).isEqualTo("READY_FOR_EXTRACTION");
+      assertThat(completed.get("stage").asText()).isEqualTo("EXTRACTION_COMPLETE");
       assertThat(completed.get("documentId").asText())
           .isEqualTo(upload.at("/document/id").asText());
       JsonNode document = HttpAcceptanceHarness.get(
@@ -354,7 +354,7 @@ class DealerDocumentAcceptanceTest {
       BlockingRetryNormalization.release.countDown();
 
       JsonNode completed = awaitTerminal(application, failed.get("id").asText(), token);
-      assertThat(completed.get("stage").asText()).isEqualTo("READY_FOR_EXTRACTION");
+      assertThat(completed.get("stage").asText()).isEqualTo("EXTRACTION_COMPLETE");
       assertThat(completed.get("retryCount").asInt()).isEqualTo(1);
       assertThat(BlockingRetryNormalization.invocations.get()).isEqualTo(2);
       try (var stored = Files.list(objects)) {
@@ -394,7 +394,7 @@ class DealerDocumentAcceptanceTest {
           "retry-normalization",
           token);
       JsonNode completed = awaitTerminal(application, retried.get("id").asText(), token);
-      assertThat(completed.get("stage").asText()).isEqualTo("READY_FOR_EXTRACTION");
+      assertThat(completed.get("stage").asText()).isEqualTo("EXTRACTION_COMPLETE");
       assertThat(completed.get("documentId").asText()).isEqualTo(failed.get("documentId").asText());
       assertThat(completed.get("retryCount").asInt()).isEqualTo(1);
       try (var stored = Files.list(objects)) {
@@ -449,7 +449,7 @@ class DealerDocumentAcceptanceTest {
     do {
       operation = HttpAcceptanceHarness.get(
           application.client(), "/api/v1/operations/" + operationId, accessToken);
-      if (operation.get("stage").asText().equals("READY_FOR_EXTRACTION")
+      if (operation.get("stage").asText().equals("EXTRACTION_COMPLETE")
           || operation.get("stage").asText().equals("FAILED")) {
         return operation;
       }

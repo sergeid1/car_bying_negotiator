@@ -81,12 +81,34 @@ public class DocumentIntakePersistence {
         document.pageCount, document.retentionDeadline, document.lifecycle);
   }
 
+  @Transactional(readOnly = true)
+  public ExtractionDocument requireExtractionDocument(String documentId) {
+    SourceDocumentEntity document = documents.findById(documentId)
+        .orElseThrow(() -> new ResourceNotFoundException("Source Document not found"));
+    List<ExtractionPage> extractionPages = pages.findByDocumentIdOrderByPageNumber(documentId)
+        .stream()
+        .map(page -> new ExtractionPage(
+            page.pageNumber, page.normalizedObjectKey, page.likelyMissing,
+            page.likelyDuplicate, page.likelyRotated, page.likelyCropped))
+        .toList();
+    if (!document.lifecycle.equals("ACTIVE")
+        || extractionPages.size() != document.pageCount
+        || extractionPages.stream().anyMatch(page -> page.normalizedObjectKey() == null)) {
+      throw new IllegalStateException("Normalized document is not ready for extraction");
+    }
+    return new ExtractionDocument(
+        document.caseId, document.id, document.objectKey,
+        document.verifiedMediaType, extractionPages);
+  }
+
   @Transactional
   public List<DocumentOperationView> recoverInterruptedOperations(Instant now) {
     List<DocumentOperationEntity> recoverable =
-        operations.findByStageInOrderByCreatedAt(List.of("QUEUED", "NORMALIZING"));
+        operations.findByStageInOrderByCreatedAt(
+            List.of("QUEUED", "NORMALIZING", "READY_FOR_EXTRACTION", "EXTRACTING"));
     recoverable.forEach(operation -> {
-      operation.stage = "QUEUED";
+      operation.stage = operation.stage.equals("READY_FOR_EXTRACTION")
+          || operation.stage.equals("EXTRACTING") ? "READY_FOR_EXTRACTION" : "QUEUED";
       operation.updatedAt = now;
     });
     return recoverable.stream().map(this::operationView).toList();
@@ -110,6 +132,29 @@ public class DocumentIntakePersistence {
     operation.stage = "NORMALIZING";
     operation.updatedAt = now;
     return true;
+  }
+
+  @Transactional
+  public boolean claimExtraction(String operationId, Instant now) {
+    DocumentOperationEntity operation = requireLockedOperation(operationId);
+    if (!operation.stage.equals("READY_FOR_EXTRACTION")) {
+      return false;
+    }
+    operation.stage = "EXTRACTING";
+    operation.updatedAt = now;
+    return true;
+  }
+
+  @Transactional
+  public void completeExtraction(String operationId, Instant now) {
+    DocumentOperationEntity operation = requireLockedOperation(operationId);
+    if (operation.stage.equals("EXTRACTING")) {
+      operation.stage = "EXTRACTION_COMPLETE";
+      operation.failedStage = null;
+      operation.errorCode = null;
+      operation.errorMessage = null;
+      operation.updatedAt = now;
+    }
   }
 
   @Transactional
@@ -170,7 +215,7 @@ public class DocumentIntakePersistence {
   public void fail(
       String operationId, String failedStage, String errorCode, String message, Instant now) {
     DocumentOperationEntity operation = requireLockedOperation(operationId);
-    if (!operation.stage.equals("NORMALIZING")) {
+    if (!operation.stage.equals(failedStage)) {
       return;
     }
     operation.stage = "FAILED";
@@ -191,7 +236,8 @@ public class DocumentIntakePersistence {
     if (!operation.stage.equals("FAILED")) {
       return new RetryDecision(operationView(operation), false);
     }
-    operation.stage = "QUEUED";
+    operation.stage = "EXTRACTING".equals(operation.failedStage)
+        ? "READY_FOR_EXTRACTION" : "QUEUED";
     operation.errorCode = null;
     operation.errorMessage = null;
     operation.retryCount++;
@@ -296,6 +342,12 @@ public class DocumentIntakePersistence {
   public record ProcessingDocument(
       String id, String caseId, String objectKey, String mediaType, int pageCount,
       Instant retentionDeadline, String lifecycle) {}
+  public record ExtractionDocument(
+      String caseId, String documentId, String originalObjectKey,
+      String mediaType, List<ExtractionPage> pages) {}
+  public record ExtractionPage(
+      int pageNumber, String normalizedObjectKey, boolean likelyMissing,
+      boolean likelyDuplicate, boolean likelyRotated, boolean likelyCropped) {}
   public record RetryDecision(DocumentOperationView operation, boolean dispatch) {}
   public record RetentionDocument(
       String id, String originalObjectKey, Instant originalDeletedAt, List<RetentionPage> pages) {}
