@@ -20,6 +20,11 @@ import com.dealanalyzer.document.persistence.DocumentIntakePersistence.SourceDoc
 import com.dealanalyzer.extraction.DocumentExtractionService;
 import com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence.ExtractionSummary;
 import com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence.ExtractionView;
+import com.dealanalyzer.verification.CorrectDealTermRequest;
+import com.dealanalyzer.verification.DealerOfferVerificationService;
+import com.dealanalyzer.verification.VerifyDealerOfferRequest;
+import com.dealanalyzer.verification.persistence.DealerOfferPersistence.CorrectionView;
+import com.dealanalyzer.verification.persistence.DealerOfferPersistence.DealerOfferView;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -48,18 +53,58 @@ public class DealAnalysisController {
   private final VehicleEvidenceService vehicleEvidence;
   private final DocumentIntakeService documentIntake;
   private final DocumentExtractionService documentExtractions;
+  private final DealerOfferVerificationService dealerOfferVerification;
 
   public DealAnalysisController(
       AnalysisWorkflow workflow,
       EphemeralBuyingCaseService ephemeralCases,
       VehicleEvidenceService vehicleEvidence,
       DocumentIntakeService documentIntake,
-      DocumentExtractionService documentExtractions) {
+      DocumentExtractionService documentExtractions,
+      DealerOfferVerificationService dealerOfferVerification) {
     this.workflow = workflow;
     this.ephemeralCases = ephemeralCases;
     this.vehicleEvidence = vehicleEvidence;
     this.documentIntake = documentIntake;
     this.documentExtractions = documentExtractions;
+    this.dealerOfferVerification = dealerOfferVerification;
+  }
+
+  @PostMapping("/cases/{caseId}/documents/{documentId}/extractions/{extractionId}/corrections")
+  public CorrectionView correctDealTerm(
+      @PathVariable String caseId,
+      @PathVariable String documentId,
+      @PathVariable String extractionId,
+      @NotBlank @Size(max = 200) @RequestHeader("Idempotency-Key") String idempotencyKey,
+      @RequestHeader("Case-Access-Token") String accessToken,
+      @RequestBody CorrectDealTermRequest request) {
+    return dealerOfferVerification.correct(
+        caseId, documentId, extractionId, accessToken, idempotencyKey, request);
+  }
+
+  @PostMapping("/cases/{caseId}/dealer-offers")
+  @ResponseStatus(HttpStatus.CREATED)
+  public DealerOfferView verifyDealerOffer(
+      @PathVariable String caseId,
+      @NotBlank @Size(max = 200) @RequestHeader("Idempotency-Key") String idempotencyKey,
+      @RequestHeader("Case-Access-Token") String accessToken,
+      @RequestBody VerifyDealerOfferRequest request) {
+    return dealerOfferVerification.verify(caseId, accessToken, idempotencyKey, request);
+  }
+
+  @GetMapping("/cases/{caseId}/dealer-offers/latest")
+  public DealerOfferView getLatestDealerOffer(
+      @PathVariable String caseId,
+      @RequestHeader("Case-Access-Token") String accessToken) {
+    return dealerOfferVerification.latest(caseId, accessToken);
+  }
+
+  @GetMapping("/cases/{caseId}/dealer-offers/{version}")
+  public DealerOfferView getDealerOffer(
+      @PathVariable String caseId,
+      @PathVariable int version,
+      @RequestHeader("Case-Access-Token") String accessToken) {
+    return dealerOfferVerification.version(caseId, version, accessToken);
   }
 
   @GetMapping("/cases/{caseId}/documents/{documentId}/extractions/latest")
