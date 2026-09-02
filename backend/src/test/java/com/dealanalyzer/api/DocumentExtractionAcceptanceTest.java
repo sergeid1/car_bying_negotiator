@@ -1,6 +1,7 @@
 package com.dealanalyzer.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.dealanalyzer.api.HttpAcceptanceHarness.RunningApplication;
 import com.dealanalyzer.extraction.DealTermsExtractionProvider;
@@ -11,6 +12,7 @@ import com.dealanalyzer.extraction.DealTermsExtractionProvider.ProviderExtractio
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.ByteArrayOutputStream;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -26,10 +28,144 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 
 class DocumentExtractionAcceptanceTest {
   @TempDir
   Path temporaryDirectory;
+
+  @Test
+  void buyerCanCorrectAndVerifyMaterialTermsIntoOneImmutableDealerOffer() throws Exception {
+    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+    try (RunningApplication application = harness.startWithConfiguration(
+        "dealer-offer-verification", true, FixtureExtractionProvider.class,
+        "--document.storage.path=" + temporaryDirectory.resolve("verification-objects"),
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
+      JsonNode created = HttpAcceptanceHarness.post(
+          application.client(), "/api/v1/cases", validCase(), "create-verification-case");
+      String caseId = created.at("/case/id").asText();
+      String token = created.get("accessToken").asText();
+      HttpAcceptanceHarness.post(
+          application.client(), "/api/v1/cases/" + caseId + "/vehicle-evidence",
+          Map.of("vin", "1HGCM82633A004352", "confirmed", true),
+          "establish-verification-vehicle", token);
+
+      var parts = new LinkedMultiValueMap<String, Object>();
+      parts.add("file", new NamedBytes("buyers-order.pdf", twoPagePdf()));
+      JsonNode upload = new com.fasterxml.jackson.databind.ObjectMapper().readTree(
+          application.client().post()
+              .uri("/api/v1/cases/" + caseId + "/documents")
+              .contentType(MediaType.MULTIPART_FORM_DATA)
+              .header("Idempotency-Key", "upload-verification-order")
+              .header("Case-Access-Token", token)
+              .body(parts)
+              .retrieve().body(String.class));
+      awaitExtraction(application, upload.at("/operation/id").asText(), token);
+
+      String documentId = upload.at("/document/id").asText();
+      String extractionPath = "/api/v1/cases/" + caseId + "/documents/" + documentId
+          + "/extractions/latest";
+      JsonNode extraction = HttpAcceptanceHarness.get(application.client(), extractionPath, token);
+      JsonNode unknown = find(extraction.get("lineItems"), "category", "UNKNOWN");
+      assertThat(unknown.get("clarificationAction").asText())
+          .isEqualTo("ASK_DEALER_TO_CLARIFY");
+
+      JsonNode missing = find(extraction.get("candidates"), "field", "AMOUNT_FINANCED");
+      String correctionPath = "/api/v1/cases/" + caseId + "/documents/" + documentId
+          + "/extractions/" + extraction.get("id").asText() + "/corrections";
+      Map<String, Object> correctionRequest = Map.of(
+          "targetType", "CANDIDATE",
+          "targetId", missing.get("id").asText(),
+          "normalizedValue", "2680000",
+          "normalizedUnit", "USD_MINOR");
+      JsonNode correction = HttpAcceptanceHarness.post(
+          application.client(), correctionPath, correctionRequest, "correct-financed", token);
+      JsonNode repeatedCorrection = HttpAcceptanceHarness.post(
+          application.client(), correctionPath, correctionRequest, "correct-financed", token);
+      assertThat(repeatedCorrection.get("id").asText()).isEqualTo(correction.get("id").asText());
+      assertThat(repeatedCorrection.get("version").asInt()).isEqualTo(1);
+
+      JsonNode correctedExtraction = HttpAcceptanceHarness.get(
+          application.client(), extractionPath, token);
+      JsonNode corrected = find(correctedExtraction.get("candidates"), "field", "AMOUNT_FINANCED");
+      assertThat(corrected.get("originalWording").asText())
+          .isEqualTo("Amount financed 26,800.OO");
+      assertThat(corrected.get("normalizedValue").isNull()).isTrue();
+      assertThat(corrected.at("/currentCorrection/normalizedValue").asText()).isEqualTo("2680000");
+      assertThat(corrected.at("/currentCorrection/version").asInt()).isEqualTo(1);
+
+      List<String> confirmedCandidates = new ArrayList<>();
+      correctedExtraction.get("candidates").forEach(candidate -> {
+        if (candidate.get("material").asBoolean()
+            && !candidate.get("id").asText().equals(corrected.get("id").asText())) {
+          confirmedCandidates.add(candidate.get("id").asText());
+        }
+      });
+      List<String> confirmedLineItems = new ArrayList<>();
+      correctedExtraction.get("lineItems")
+          .forEach(line -> confirmedLineItems.add(line.get("id").asText()));
+      Map<String, Object> verificationRequest = Map.of(
+          "extractionId", extraction.get("id").asText(),
+          "confirmedCandidateIds", confirmedCandidates,
+          "confirmedLineItemIds", confirmedLineItems);
+      assertThatThrownBy(() -> HttpAcceptanceHarness.post(
+          application.client(), "/api/v1/cases/" + caseId + "/dealer-offers",
+          Map.of(
+              "extractionId", extraction.get("id").asText(),
+              "confirmedCandidateIds", List.of(),
+              "confirmedLineItemIds", List.of()),
+          "verify-incomplete-offer", token))
+          .isInstanceOfSatisfying(HttpClientErrorException.Conflict.class,
+              error -> assertThat(error.getResponseBodyAsString())
+                  .contains("Confirm every financially material"));
+      JsonNode offer = HttpAcceptanceHarness.post(
+          application.client(), "/api/v1/cases/" + caseId + "/dealer-offers",
+          verificationRequest, "verify-offer", token);
+      JsonNode repeatedOffer = HttpAcceptanceHarness.post(
+          application.client(), "/api/v1/cases/" + caseId + "/dealer-offers",
+          verificationRequest, "verify-offer", token);
+
+      assertThat(offer.get("version").asInt()).isEqualTo(1);
+      assertThat(offer.get("status").asText()).isEqualTo("VERIFIED");
+      assertThat(repeatedOffer.get("id").asText()).isEqualTo(offer.get("id").asText());
+      assertThat(find(offer.at("/terms/candidates"), "field", "AMOUNT_FINANCED")
+          .get("value").asText()).isEqualTo("2680000");
+      assertThat(HttpAcceptanceHarness.get(
+          application.client(), "/api/v1/cases/" + caseId, token)
+          .get("status").asText()).isEqualTo("READY_TO_ANALYZE");
+
+      Map<String, Object> revisedCorrectionRequest = Map.of(
+          "targetType", "CANDIDATE",
+          "targetId", missing.get("id").asText(),
+          "normalizedValue", "2700000",
+          "normalizedUnit", "USD_MINOR");
+      JsonNode revisedCorrection = HttpAcceptanceHarness.post(
+          application.client(), correctionPath, revisedCorrectionRequest,
+          "correct-financed-again", token);
+      assertThat(revisedCorrection.get("version").asInt()).isEqualTo(2);
+      JsonNode revisedExtraction = HttpAcceptanceHarness.get(
+          application.client(), extractionPath, token);
+      assertThat(find(revisedExtraction.get("candidates"), "field", "AMOUNT_FINANCED")
+          .get("correctionHistory")).hasSize(2);
+      assertThat(HttpAcceptanceHarness.get(
+          application.client(), "/api/v1/cases/" + caseId + "/dealer-offers/1", token)
+          .at("/terms/candidates").findValuesAsText("value")).contains("2680000");
+      assertThat(HttpAcceptanceHarness.get(
+          application.client(), "/api/v1/cases/" + caseId, token)
+          .get("status").asText()).isEqualTo("NEEDS_REVIEW");
+
+      HttpAcceptanceHarness.post(
+          application.client(), "/api/v1/cases/" + caseId + "/vehicle-evidence",
+          Map.of("vin", "1M8GDM9AXKP042788", "confirmed", true),
+          "change-confirmed-vehicle", token);
+      assertThatThrownBy(() -> HttpAcceptanceHarness.post(
+          application.client(), "/api/v1/cases/" + caseId + "/dealer-offers",
+          verificationRequest, "verify-conflicting-vehicle", token))
+          .isInstanceOfSatisfying(HttpClientErrorException.Conflict.class,
+              error -> assertThat(error.getResponseBodyAsString())
+                  .contains("Vehicle VIN conflict"));
+    }
+  }
 
   @Test
   void normalizedDealerDocumentProducesInspectableVersionedTermsAndEvidence() throws Exception {
@@ -261,7 +397,7 @@ class DocumentExtractionAcceptanceTest {
                     "Rebate requires captive financing", "TEXT", second, true)),
             List.of(
                 new LineItem("Vehicle", "SELLING_PRICE", 2_500_000, "USD", "TAXABLE", "REQUIRED", first, 0.99),
-                new LineItem("Protection plan", "ADD_ON", 89_900, "USD", "UNKNOWN", "OPTIONAL", second, 0.96)),
+                new LineItem("Mystery protection", "MYSTERY", 89_900, "USD", "UNKNOWN", "OPTIONAL", second, 0.96)),
             List.of());
       };
     }

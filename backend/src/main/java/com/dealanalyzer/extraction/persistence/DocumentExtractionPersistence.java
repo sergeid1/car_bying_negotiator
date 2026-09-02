@@ -4,6 +4,8 @@ import com.dealanalyzer.buyingcase.ResourceNotFoundException;
 import com.dealanalyzer.extraction.DealTermsExtractionProvider.EvidenceRegion;
 import com.dealanalyzer.extraction.DealTermsValidator.ValidatedExtraction;
 import com.dealanalyzer.extraction.DealTermsValidator.ValidationIssue;
+import com.dealanalyzer.verification.persistence.DealerOfferPersistence;
+import com.dealanalyzer.verification.persistence.DealerOfferPersistence.CorrectionView;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
@@ -21,6 +23,7 @@ public class DocumentExtractionPersistence {
   private final CandidateDealTermRepository candidates;
   private final QuoteLineItemRepository lineItems;
   private final ExtractionValidationIssueRepository issues;
+  private final DealerOfferPersistence dealerOffers;
   private final ObjectMapper json;
 
   DocumentExtractionPersistence(
@@ -28,11 +31,13 @@ public class DocumentExtractionPersistence {
       CandidateDealTermRepository candidates,
       QuoteLineItemRepository lineItems,
       ExtractionValidationIssueRepository issues,
+      DealerOfferPersistence dealerOffers,
       ObjectMapper json) {
     this.extractions = extractions;
     this.candidates = candidates;
     this.lineItems = lineItems;
     this.issues = issues;
+    this.dealerOffers = dealerOffers;
     this.json = json;
   }
 
@@ -86,6 +91,22 @@ public class DocumentExtractionPersistence {
     return view(extraction);
   }
 
+  @Transactional(readOnly = true)
+  public ExtractionView require(String caseId, String documentId, String extractionId) {
+    DocumentExtractionEntity extraction = extractions.findById(extractionId)
+        .filter(value -> value.caseId.equals(caseId) && value.documentId.equals(documentId))
+        .orElseThrow(() -> new ResourceNotFoundException("Document Extraction not found"));
+    return view(extraction);
+  }
+
+  @Transactional(readOnly = true)
+  public ExtractionView require(String caseId, String extractionId) {
+    DocumentExtractionEntity extraction = extractions.findById(extractionId)
+        .filter(value -> value.caseId.equals(caseId))
+        .orElseThrow(() -> new ResourceNotFoundException("Document Extraction not found"));
+    return view(extraction);
+  }
+
   /** Returns only summary rows, with an enforced upper bound, and never fetches child collections. */
   @Transactional(readOnly = true)
   public List<ExtractionSummary> history(String caseId, String documentId, int limit) {
@@ -106,14 +127,21 @@ public class DocumentExtractionPersistence {
             value.id, value.fieldKey, value.originalWording, value.normalizedValue,
             value.normalizedUnit,
             evidence(value.pageNumber, value.regionX, value.regionY, value.regionWidth, value.regionHeight),
-            value.confidence.doubleValue(), value.material, value.verificationState))
+            value.confidence.doubleValue(), value.material,
+            reviewState(extraction.id, "CANDIDATE", value.id, value.verificationState),
+            dealerOffers.currentCorrection(extraction.id, "CANDIDATE", value.id).orElse(null),
+            dealerOffers.correctionHistory(extraction.id, "CANDIDATE", value.id)))
         .toList();
     List<LineItemView> lineItemViews = lineItems.findByExtractionIdOrderById(extraction.id).stream()
         .map(value -> new LineItemView(
             value.id, value.originalLabel, value.normalizedCategory, value.amountMinor,
             value.currency, value.taxClaim, value.optionalityClaim,
             evidence(value.pageNumber, value.regionX, value.regionY, value.regionWidth, value.regionHeight),
-            value.confidence.doubleValue(), value.verificationState))
+            value.confidence.doubleValue(),
+            reviewState(extraction.id, "LINE_ITEM", value.id, value.verificationState),
+            value.normalizedCategory.equals("UNKNOWN") ? "ASK_DEALER_TO_CLARIFY" : "NONE",
+            dealerOffers.currentCorrection(extraction.id, "LINE_ITEM", value.id).orElse(null),
+            dealerOffers.correctionHistory(extraction.id, "LINE_ITEM", value.id)))
         .toList();
     List<ValidationIssue> issueViews = issues.findByExtractionIdOrderById(extraction.id).stream()
         .map(value -> new ValidationIssue(
@@ -125,6 +153,17 @@ public class DocumentExtractionPersistence {
         extraction.schemaVersion, extraction.overallConfidence.doubleValue(),
         extraction.suspectedMissingPages, readWarnings(extraction.documentWarnings),
         candidateViews, lineItemViews, issueViews, extraction.createdAt);
+  }
+
+  private String reviewState(
+      String extractionId, String targetType, String targetId, String originalState) {
+    if (dealerOffers.isVerified(extractionId, targetType, targetId)) {
+      return "VERIFIED";
+    }
+    if (dealerOffers.currentCorrection(extractionId, targetType, targetId).isPresent()) {
+      return "CORRECTED";
+    }
+    return originalState;
   }
 
   private static EvidenceRegion evidence(
@@ -154,11 +193,13 @@ public class DocumentExtractionPersistence {
   public record CandidateView(
       String id, String field, String originalWording, String normalizedValue,
       String normalizedUnit, EvidenceRegion evidence, double confidence,
-      boolean material, String verificationState) {}
+      boolean material, String verificationState, CorrectionView currentCorrection,
+      List<CorrectionView> correctionHistory) {}
   public record LineItemView(
       String id, String originalLabel, String category, long amountMinor, String currency,
       String taxClaim, String optionalityClaim, EvidenceRegion evidence, double confidence,
-      String verificationState) {}
+      String verificationState, String clarificationAction, CorrectionView currentCorrection,
+      List<CorrectionView> correctionHistory) {}
   public record ExtractionView(
       String id, String caseId, String documentId, int version, String status,
       String extractorVersion, String modelVersion, String schemaVersion,

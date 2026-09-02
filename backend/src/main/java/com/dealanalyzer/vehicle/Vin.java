@@ -2,12 +2,12 @@ package com.dealanalyzer.vehicle;
 
 import java.util.Locale;
 
-final class Vin {
+public final class Vin {
   private static final int[] WEIGHTS = {8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2};
 
   private Vin() {}
 
-  static String validated(String value) {
+  public static String validated(String value) {
     String vin = value == null ? "" : value.strip().toUpperCase(Locale.ROOT);
     if (vin.length() != 17 || !vin.matches("[A-HJ-NPR-Z0-9]{17}") || !checksumMatches(vin)) {
       throw new InvalidVehicleEvidenceException(
