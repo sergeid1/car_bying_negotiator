@@ -17,6 +17,9 @@ import com.dealanalyzer.document.DocumentIntakeService;
 import com.dealanalyzer.document.DocumentIntakeService.StartedDocumentUpload;
 import com.dealanalyzer.document.persistence.DocumentIntakePersistence.DocumentOperationView;
 import com.dealanalyzer.document.persistence.DocumentIntakePersistence.SourceDocumentView;
+import com.dealanalyzer.extraction.DocumentExtractionService;
+import com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence.ExtractionSummary;
+import com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence.ExtractionView;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -33,6 +36,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
@@ -43,16 +47,45 @@ public class DealAnalysisController {
   private final EphemeralBuyingCaseService ephemeralCases;
   private final VehicleEvidenceService vehicleEvidence;
   private final DocumentIntakeService documentIntake;
+  private final DocumentExtractionService documentExtractions;
 
   public DealAnalysisController(
       AnalysisWorkflow workflow,
       EphemeralBuyingCaseService ephemeralCases,
       VehicleEvidenceService vehicleEvidence,
-      DocumentIntakeService documentIntake) {
+      DocumentIntakeService documentIntake,
+      DocumentExtractionService documentExtractions) {
     this.workflow = workflow;
     this.ephemeralCases = ephemeralCases;
     this.vehicleEvidence = vehicleEvidence;
     this.documentIntake = documentIntake;
+    this.documentExtractions = documentExtractions;
+  }
+
+  @GetMapping("/cases/{caseId}/documents/{documentId}/extractions/latest")
+  public ExtractionView getLatestExtraction(
+      @PathVariable String caseId,
+      @PathVariable String documentId,
+      @RequestHeader("Case-Access-Token") String accessToken) {
+    return documentExtractions.latest(caseId, documentId, accessToken);
+  }
+
+  @GetMapping("/cases/{caseId}/documents/{documentId}/extractions/{version}")
+  public ExtractionView getExtractionVersion(
+      @PathVariable String caseId,
+      @PathVariable String documentId,
+      @PathVariable int version,
+      @RequestHeader("Case-Access-Token") String accessToken) {
+    return documentExtractions.version(caseId, documentId, version, accessToken);
+  }
+
+  @GetMapping("/cases/{caseId}/documents/{documentId}/extractions")
+  public java.util.List<ExtractionSummary> getExtractionHistory(
+      @PathVariable String caseId,
+      @PathVariable String documentId,
+      @RequestParam(defaultValue = "10") int limit,
+      @RequestHeader("Case-Access-Token") String accessToken) {
+    return documentExtractions.history(caseId, documentId, limit, accessToken);
   }
 
   @PostMapping(value = "/cases/{caseId}/documents", consumes = "multipart/form-data")

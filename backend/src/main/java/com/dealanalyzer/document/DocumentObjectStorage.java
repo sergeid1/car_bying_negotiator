@@ -8,6 +8,8 @@ interface DocumentObjectStorage {
   StoredObject storeNormalized(
       String caseId, String documentId, int pageNumber, byte[] content);
 
+  byte[] readNormalized(String caseId, String documentId, int pageNumber, String objectKey);
+
   void delete(String objectKey);
 
   record StoredObject(String objectKey, String keyReference) {}

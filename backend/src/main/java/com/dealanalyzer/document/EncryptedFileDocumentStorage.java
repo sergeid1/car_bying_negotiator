@@ -44,6 +44,12 @@ class EncryptedFileDocumentStorage implements DocumentObjectStorage {
     return encrypt(caseId + ":" + documentId + ":page:" + pageNumber, objectKey, content);
   }
 
+  @Override
+  public byte[] readNormalized(
+      String caseId, String documentId, int pageNumber, String objectKey) {
+    return decrypt(caseId + ":" + documentId + ":page:" + pageNumber, objectKey);
+  }
+
   private StoredObject encrypt(String associatedData, String objectKey, byte[] content) {
     if (configuredKey.getBytes(StandardCharsets.UTF_8).length < 32) {
       throw new IllegalStateException("DOCUMENT_STORAGE_ENCRYPTION_KEY must contain at least 32 bytes");

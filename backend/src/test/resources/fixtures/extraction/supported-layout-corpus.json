@@ -1,0 +1,54 @@
+{
+  "minimumMaterialPresenceRecall": 0.99,
+  "layouts": [
+    {
+      "name": "clean buyers order",
+      "pages": [
+        "BUYER'S ORDER\nOrder Number: A-42\nVIN: 1HGCM82633A004352\nBuyer: Sample Buyer\nDealer: Triangle Motors\nDate: 8/30/2026\nSelling Price: $25,000.00\nDealer Fee: $899.00\nOut the Door Total: $26,800.00"
+      ],
+      "expected": {
+        "DOCUMENT_TYPE": "BUYERS ORDER",
+        "DOCUMENT_NUMBER": "A-42",
+        "VEHICLE_VIN": "1HGCM82633A004352",
+        "BUYER_NAME": "Sample Buyer",
+        "DEALER_NAME": "Triangle Motors",
+        "OFFER_DATE": "2026-08-30",
+        "SELLING_PRICE": 2500000,
+        "DEALER_CHARGES_TOTAL": 89900,
+        "OUT_THE_DOOR_TOTAL": 2680000
+      }
+    },
+    {
+      "name": "multi-page financed quote",
+      "pages": [
+        "DEALER QUOTE\nQuote Number: Q-99\nVIN: 1HGCM82633A004352\nSelling Price: $25,000.00\nDealer Fee: $899.00",
+        "Tax: $777.00\nDMV Fees: $124.00\nOut the Door Total: $26,800.00\nAmount Financed: $24,800.00\nAPR: 7.5%\nTerm: 60 months\nMonthly Payment: $496.96\nRebate requires dealer financing"
+      ],
+      "expected": {
+        "DOCUMENT_TYPE": "DEALER QUOTE",
+        "DOCUMENT_NUMBER": "Q-99",
+        "VEHICLE_VIN": "1HGCM82633A004352",
+        "SELLING_PRICE": 2500000,
+        "DEALER_CHARGES_TOTAL": 89900,
+        "TAX_TOTAL": 77700,
+        "GOVERNMENT_CHARGES_TOTAL": 12400,
+        "OUT_THE_DOOR_TOTAL": 2680000,
+        "AMOUNT_FINANCED": 2480000,
+        "APR": 7.5,
+        "TERM_MONTHS": 60,
+        "MONTHLY_PAYMENT": 49696,
+        "CONDITIONAL_LANGUAGE": "Rebate requires dealer financing"
+      }
+    }
+  ],
+  "fieldPolicies": {
+    "VEHICLE_VIN": { "weight": 3.0, "material": true },
+    "SELLING_PRICE": { "weight": 3.0, "material": true },
+    "OUT_THE_DOOR_TOTAL": { "weight": 3.0, "material": true },
+    "DEALER_CHARGES_TOTAL": { "weight": 1.0, "material": true },
+    "AMOUNT_FINANCED": { "weight": 3.0, "material": true },
+    "APR": { "weight": 3.0, "material": true },
+    "TERM_MONTHS": { "weight": 3.0, "material": true },
+    "MONTHLY_PAYMENT": { "weight": 3.0, "material": true }
+  }
+}

@@ -10,6 +10,7 @@ import com.dealanalyzer.document.persistence.DocumentIntakePersistence.NewDocume
 import com.dealanalyzer.document.persistence.DocumentIntakePersistence.RetryDecision;
 import com.dealanalyzer.document.persistence.DocumentIntakePersistence.SourceDocumentView;
 import com.dealanalyzer.document.persistence.DocumentIntakePersistence.UploadRecords;
+import com.dealanalyzer.extraction.DocumentExtractionService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -37,6 +38,7 @@ public class DocumentIntakeService {
   private final EphemeralCasePersistence casePersistence;
   private final TaskExecutor taskExecutor;
   private final DocumentPageNormalizer pageNormalizer;
+  private final DocumentExtractionService extractionService;
   private final Duration retention;
   private final boolean workerEnabled;
 
@@ -49,6 +51,7 @@ public class DocumentIntakeService {
       EphemeralCasePersistence casePersistence,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
       DocumentPageNormalizer pageNormalizer,
+      DocumentExtractionService extractionService,
       @Value("${document.retention:PT720H}") Duration retention,
       @Value("${document.worker.enabled:true}") boolean workerEnabled) {
     if (retention.isNegative() || retention.isZero() || retention.compareTo(Duration.ofDays(30)) > 0) {
@@ -62,6 +65,7 @@ public class DocumentIntakeService {
     this.casePersistence = casePersistence;
     this.taskExecutor = taskExecutor;
     this.pageNormalizer = pageNormalizer;
+    this.extractionService = extractionService;
     this.retention = retention;
     this.workerEnabled = workerEnabled;
   }
@@ -180,20 +184,35 @@ public class DocumentIntakeService {
 
   private void process(String operationId) {
     DocumentOperationView operation = persistence.requireOperation(operationId);
-    if (!persistence.claimNormalization(operationId, Instant.now())) {
-      return;
-    }
+    String stage = null;
     try {
+      if (operation.stage().equals("QUEUED")) {
+        if (!persistence.claimNormalization(operationId, Instant.now())) {
+          return;
+        }
+        stage = "NORMALIZING";
+        requireServiceProcessingConsent(operation.caseId(), null);
+        pageNormalizer.normalize(persistence.requireProcessingDocument(operation.documentId()));
+        persistence.completeNormalization(operationId, Instant.now());
+      }
+      if (!persistence.claimExtraction(operationId, Instant.now())) {
+        return;
+      }
+      stage = "EXTRACTING";
       requireServiceProcessingConsent(operation.caseId(), null);
-      pageNormalizer.normalize(persistence.requireProcessingDocument(operation.documentId()));
-      persistence.completeNormalization(operationId, Instant.now());
+      extractionService.extract(operation.documentId());
+      persistence.completeExtraction(operationId, Instant.now());
       casePersistence.updateStatus(operation.caseId(), "NEEDS_REVIEW", Instant.now());
     } catch (Exception exception) {
+      if (stage == null) {
+        return;
+      }
       persistence.fail(
-          operationId,
-          "NORMALIZING",
-          "NORMALIZATION_FAILED",
-          "Document page normalization could not be completed. Retry this stage without uploading again.",
+          operationId, stage,
+          stage.equals("EXTRACTING") ? "EXTRACTION_FAILED" : "NORMALIZATION_FAILED",
+          stage.equals("EXTRACTING")
+              ? "Deal Terms extraction could not be completed. Retry this stage without uploading again."
+              : "Document page normalization could not be completed. Retry this stage without uploading again.",
           Instant.now());
       casePersistence.updateStatus(operation.caseId(), "FAILED", Instant.now());
     }
