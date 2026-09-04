@@ -8,7 +8,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "dealer_offers")
-class DealerOfferEntity {
+public class DealerOfferEntity {
   @Id @Column(length = 36) String id;
   @Column(name = "case_id", nullable = false, length = 36) String caseId;
   @Column(name = "extraction_id", nullable = false, length = 36) String extractionId;
@@ -21,6 +21,10 @@ class DealerOfferEntity {
   @Column(name = "created_at", nullable = false) Instant createdAt;
 
   protected DealerOfferEntity() {}
+
+  public String id() {
+    return id;
+  }
 
   DealerOfferEntity(String id, String caseId, String extractionId, int version,
       String idempotencyKey, String requestFingerprint, String termsJson, Instant now) {

@@ -134,6 +134,42 @@ class DocumentExtractionAcceptanceTest {
           application.client(), "/api/v1/cases/" + caseId, token)
           .get("status").asText()).isEqualTo("READY_TO_ANALYZE");
 
+      JsonNode economics = HttpAcceptanceHarness.post(
+          application.client(), "/api/v1/cases/" + caseId + "/cash-economics",
+          Map.of(), "calculate-cash-economics", token);
+      JsonNode repeatedEconomics = HttpAcceptanceHarness.post(
+          application.client(), "/api/v1/cases/" + caseId + "/cash-economics",
+          Map.of(), "calculate-cash-economics-again", token);
+      assertThat(economics.get("dealerOfferId").asText()).isEqualTo(offer.get("id").asText());
+      assertThat(economics.get("policyVersion").asText()).isEqualTo("US-NC.cash.v1");
+      assertThat(economics.at("/result/vehicleSubtotal/minorUnits").asLong()).isEqualTo(2_450_000);
+      assertThat(economics.at("/result/unknownCharges/minorUnits").asLong()).isEqualTo(89_900);
+      assertThat(economics.at("/result/taxes/minorUnits").asLong()).isEqualTo(73_500);
+      assertThat(economics.at("/result/outTheDoorTotal/minorUnits").asLong()).isEqualTo(2_625_800);
+      assertThat(economics.at("/result/reconciliation/quotedTotal/minorUnits").asLong())
+          .isEqualTo(2_680_000);
+      assertThat(economics.at("/result/reconciliation/discrepancy/minorUnits").asLong())
+          .isEqualTo(54_200);
+      assertThat(economics.at(
+          "/result/priceReductions/conditionalRebatesExcluded/minorUnits").asLong())
+          .isEqualTo(100_000);
+      assertThat(repeatedEconomics.get("id").asText()).isEqualTo(economics.get("id").asText());
+      assertThat(HttpAcceptanceHarness.get(application.client(),
+          "/api/v1/cases/" + caseId + "/cash-economics/latest", token))
+          .isEqualTo(economics);
+
+      String rebateEvidenceId = find(offer.at("/terms/candidates"), "field", "REBATE_TOTAL")
+          .get("sourceCandidateId").asText();
+      JsonNode eligibleEconomics = HttpAcceptanceHarness.post(
+          application.client(), "/api/v1/cases/" + caseId + "/cash-economics",
+          Map.of("verifiedRebateEvidenceIds", List.of(rebateEvidenceId)),
+          "calculate-eligible-rebate", token);
+      assertThat(eligibleEconomics.get("id").asText()).isNotEqualTo(economics.get("id").asText());
+      assertThat(eligibleEconomics.at("/result/vehicleSubtotal/minorUnits").asLong())
+          .isEqualTo(2_350_000);
+      assertThat(eligibleEconomics.at("/result/priceReductions/guaranteed/minorUnits").asLong())
+          .isEqualTo(150_000);
+
       Map<String, Object> revisedCorrectionRequest = Map.of(
           "targetType", "CANDIDATE",
           "targetId", missing.get("id").asText(),
@@ -153,6 +189,12 @@ class DocumentExtractionAcceptanceTest {
       assertThat(HttpAcceptanceHarness.get(
           application.client(), "/api/v1/cases/" + caseId, token)
           .get("status").asText()).isEqualTo("NEEDS_REVIEW");
+      assertThatThrownBy(() -> HttpAcceptanceHarness.post(
+          application.client(), "/api/v1/cases/" + caseId + "/cash-economics",
+          Map.of(), "reject-stale-cash-economics", token))
+          .isInstanceOfSatisfying(HttpClientErrorException.Conflict.class,
+              error -> assertThat(error.getResponseBodyAsString())
+                  .contains("current verified Dealer Offer"));
 
       HttpAcceptanceHarness.post(
           application.client(), "/api/v1/cases/" + caseId + "/vehicle-evidence",
@@ -204,7 +246,7 @@ class DocumentExtractionAcceptanceTest {
       assertThat(extraction.get("extractorVersion").asText()).isEqualTo("fixture-extractor.v1");
       assertThat(extraction.get("schemaVersion").asText()).isEqualTo("deal-terms.v1");
       assertThat(extraction.get("status").asText()).isEqualTo("NEEDS_REVIEW");
-      assertThat(extraction.get("candidates")).hasSize(13);
+      assertThat(extraction.get("candidates")).hasSize(15);
       JsonNode unreadable = find(extraction.get("candidates"), "field", "AMOUNT_FINANCED");
       assertThat(unreadable.get("normalizedValue").isNull()).isTrue();
       assertThat(unreadable.get("originalWording").asText()).isEqualTo("Amount financed 26,800.OO");
@@ -298,7 +340,7 @@ class DocumentExtractionAcceptanceTest {
     return Map.of(
         "buyerJurisdiction", "US-NC",
         "dealerLocation", "27604",
-        "purchaseMethod", "FINANCE",
+        "purchaseMethod", "CASH",
         "consents", Map.of(
             "serviceProcessing", Map.of("granted", true, "policyVersion", "service.v1"),
             "humanReview", Map.of("granted", false, "policyVersion", "human-review.v1"),
@@ -386,6 +428,8 @@ class DocumentExtractionAcceptanceTest {
                 field("BUYER_NAME", "Buyer: Sample Buyer", "Sample Buyer", "TEXT", first, false),
                 field("OFFER_DATE", "08/30/2026", "2026-08-30", "DATE", first, false),
                 field("SELLING_PRICE", "Selling price $25,000", "2500000", "USD_MINOR", first, true),
+                field("DISCOUNT_TOTAL", "Dealer discount $500", "50000", "USD_MINOR", first, true),
+                field("REBATE_TOTAL", "Financing rebate $1,000", "100000", "USD_MINOR", first, true),
                 field("SUBTOTAL", "Subtotal $25,899", "2589900", "USD_MINOR", second, true),
                 field("TAX_TOTAL", "Tax $777", "77700", "USD_MINOR", second, true),
                 field("GOVERNMENT_CHARGES_TOTAL", "DMV $124", "12400", "USD_MINOR", second, true),

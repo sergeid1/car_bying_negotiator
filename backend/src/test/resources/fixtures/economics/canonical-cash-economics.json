@@ -1,0 +1,14 @@
+{
+  "policy": { "taxRate": "0.0725", "tolerance": "0.50" },
+  "offer": {
+    "sellingPrice": "100.50",
+    "quotedOtd": "109.00",
+    "evidence": "fixture-page-2"
+  },
+  "expected": {
+    "unroundedTax": "7.286250",
+    "taxMinor": 729,
+    "otdMinor": 10779,
+    "discrepancyMinor": 121
+  }
+}

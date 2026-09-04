@@ -1,0 +1,93 @@
+package com.dealanalyzer.economics.persistence;
+
+import com.dealanalyzer.economics.CashDealEconomics.Policy;
+import com.dealanalyzer.economics.CashDealEconomics.Result;
+import com.dealanalyzer.verification.persistence.DealerOfferEntity;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManager;
+import java.math.RoundingMode;
+import java.time.Instant;
+import java.util.Currency;
+import java.util.Optional;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+import com.dealanalyzer.economics.CashDealEconomics.LineType;
+import com.dealanalyzer.economics.InvalidCashEconomicsException;
+import java.util.UUID;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+@Repository
+public class CashEconomicsPersistence {
+  private final CashEconomicsResultRepository results;
+  private final JurisdictionPolicyRepository policies;
+  private final EntityManager entityManager;
+  private final ObjectMapper json;
+
+  CashEconomicsPersistence(
+      CashEconomicsResultRepository results, JurisdictionPolicyRepository policies,
+      EntityManager entityManager, ObjectMapper json) {
+    this.results = results;
+    this.policies = policies;
+    this.entityManager = entityManager;
+    this.json = json;
+  }
+
+  public Policy requirePolicy(String jurisdiction) {
+    JurisdictionPolicyEntity value = policies.findTopByJurisdictionOrderByEffectiveAtDesc(jurisdiction)
+        .orElseThrow(() -> new InvalidCashEconomicsException(
+            "No cash economics policy is configured for " + jurisdiction));
+    return new Policy(value.version, value.jurisdiction, Currency.getInstance(value.currency),
+        value.taxRate, Arrays.stream(value.taxableLineTypes.split(","))
+            .map(LineType::valueOf).collect(Collectors.toUnmodifiableSet()),
+        value.tradeTaxCreditEnabled, value.currencyScale, RoundingMode.valueOf(value.roundingMode),
+        value.reconciliationTolerance);
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<CashEconomicsView> find(
+      String dealerOfferId, String policyVersion, String eligibilityFingerprint) {
+    return results.findByDealerOfferIdAndPolicyVersionAndEligibilityFingerprint(
+        dealerOfferId, policyVersion, eligibilityFingerprint).map(this::view);
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<CashEconomicsView> latest(String caseId) {
+    return results.findTopByCaseIdOrderByCreatedAtDescIdDesc(caseId).map(this::view);
+  }
+
+  @Transactional
+  public CashEconomicsView save(
+      String caseId, String dealerOfferId, String policyVersion, String eligibilityFingerprint,
+      Result result, Instant now) {
+    DealerOfferEntity offer = entityManager.getReference(DealerOfferEntity.class, dealerOfferId);
+    JurisdictionPolicyEntity policy = entityManager.getReference(
+        JurisdictionPolicyEntity.class, policyVersion);
+    return view(results.saveAndFlush(new CashEconomicsResultEntity(
+        UUID.randomUUID().toString(), caseId, offer, policy, eligibilityFingerprint,
+        write(result), now)));
+  }
+
+  private CashEconomicsView view(CashEconomicsResultEntity value) {
+    try {
+      return new CashEconomicsView(value.id, value.caseId, value.schemaVersion,
+          value.dealerOffer.id(), value.policy.version(), json.readTree(value.resultJson), value.createdAt);
+    } catch (JsonProcessingException exception) {
+      throw new IllegalStateException("Unable to read cash economics result", exception);
+    }
+  }
+
+  private String write(Result result) {
+    try {
+      return json.writeValueAsString(result);
+    } catch (JsonProcessingException exception) {
+      throw new IllegalStateException("Unable to persist cash economics result", exception);
+    }
+  }
+
+  public record CashEconomicsView(
+      String id, String caseId, String schemaVersion, String dealerOfferId,
+      String policyVersion, JsonNode result, Instant createdAt) {}
+}
