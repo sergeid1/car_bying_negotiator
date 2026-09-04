@@ -129,6 +129,7 @@ public class DealerOfferVerificationService {
       lineTerms.add(Map.of(
           "id", line.id(), "originalLabel", line.originalLabel(), "category", category,
           "amountMinor", amount, "currency", line.currency(), "sourceLineItemId", line.id(),
+          "taxClaim", line.taxClaim(), "optionalityClaim", line.optionalityClaim(),
           "clarificationAction", category.equals("UNKNOWN") ? "ASK_DEALER_TO_CLARIFY" : "NONE"));
     }
     Map<String, Object> terms = Map.of(

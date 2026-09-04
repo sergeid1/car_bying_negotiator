@@ -25,6 +25,9 @@ import com.dealanalyzer.verification.DealerOfferVerificationService;
 import com.dealanalyzer.verification.VerifyDealerOfferRequest;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence.CorrectionView;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence.DealerOfferView;
+import com.dealanalyzer.economics.CashEconomicsService;
+import com.dealanalyzer.economics.CalculateCashEconomicsRequest;
+import com.dealanalyzer.economics.persistence.CashEconomicsPersistence.CashEconomicsView;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -54,6 +57,7 @@ public class DealAnalysisController {
   private final DocumentIntakeService documentIntake;
   private final DocumentExtractionService documentExtractions;
   private final DealerOfferVerificationService dealerOfferVerification;
+  private final CashEconomicsService cashEconomics;
 
   public DealAnalysisController(
       AnalysisWorkflow workflow,
@@ -61,13 +65,31 @@ public class DealAnalysisController {
       VehicleEvidenceService vehicleEvidence,
       DocumentIntakeService documentIntake,
       DocumentExtractionService documentExtractions,
-      DealerOfferVerificationService dealerOfferVerification) {
+      DealerOfferVerificationService dealerOfferVerification,
+      CashEconomicsService cashEconomics) {
     this.workflow = workflow;
     this.ephemeralCases = ephemeralCases;
     this.vehicleEvidence = vehicleEvidence;
     this.documentIntake = documentIntake;
     this.documentExtractions = documentExtractions;
     this.dealerOfferVerification = dealerOfferVerification;
+    this.cashEconomics = cashEconomics;
+  }
+
+  @PostMapping("/cases/{caseId}/cash-economics")
+  @ResponseStatus(HttpStatus.CREATED)
+  public CashEconomicsView calculateCashEconomics(
+      @PathVariable String caseId,
+      @RequestHeader("Case-Access-Token") String accessToken,
+      @RequestBody(required = false) CalculateCashEconomicsRequest request) {
+    return cashEconomics.calculate(caseId, accessToken, request);
+  }
+
+  @GetMapping("/cases/{caseId}/cash-economics/latest")
+  public CashEconomicsView getLatestCashEconomics(
+      @PathVariable String caseId,
+      @RequestHeader("Case-Access-Token") String accessToken) {
+    return cashEconomics.latest(caseId, accessToken);
   }
 
   @PostMapping("/cases/{caseId}/documents/{documentId}/extractions/{extractionId}/corrections")
