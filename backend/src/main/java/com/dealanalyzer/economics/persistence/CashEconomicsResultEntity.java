@@ -9,6 +9,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "cash_economics_results")
@@ -37,6 +38,8 @@ class CashEconomicsResultEntity {
     this.eligibilityFingerprint = eligibilityFingerprint;
     this.schemaVersion = "cash-economics.v1";
     this.resultJson = resultJson;
-    this.createdAt = createdAt;
+    // PostgreSQL timestamps retain microsecond precision. Normalize before the
+    // entity is returned so the create response matches subsequent reloads.
+    this.createdAt = createdAt.truncatedTo(ChronoUnit.MICROS);
   }
 }
