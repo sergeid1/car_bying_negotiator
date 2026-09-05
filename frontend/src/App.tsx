@@ -1,5 +1,7 @@
 import { FormEvent, useState } from "react";
 import "./styles.css";
+import { PricePlan } from "./PricePlan";
+import { CoreReportLoader } from "./CoreDealReport";
 
 type MoneyAmount = {
   minorUnits: number;
@@ -95,6 +97,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   const [stage, setStage] = useState<string>();
   const [report, setReport] = useState<Report>();
   const [error, setError] = useState<string>();
+  const [caseCredentials, setCaseCredentials] = useState<{ caseId: string; token: string }>();
 
   async function startAnalysis(event: FormEvent) {
     event.preventDefault();
@@ -147,6 +150,20 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
           connected to its input or calculation.
         </p>
       </header>
+
+      <section className="panel" aria-label="Open an existing Buying Case">
+        <form onSubmit={event => {
+          event.preventDefault();
+          const values = new FormData(event.currentTarget);
+          setCaseCredentials({ caseId: String(values.get("caseId")), token: String(values.get("token")) });
+        }}>
+          <label>Buying Case ID<input name="caseId" required /></label>
+          <label>Case access token<input name="token" type="password" required autoComplete="off" /></label>
+          <button>Open price plan</button>
+        </form>
+      </section>
+      {caseCredentials && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
+      {caseCredentials && <CoreReportLoader key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
 
       {!report && (
         <section className="panel" aria-labelledby="case-heading">
@@ -201,7 +218,7 @@ function DealReport({ report }: { report: Report }) {
         <p className="eyebrow">Deal Analysis Report</p>
         <h2 id="report-heading">Deal Analysis Report</h2>
         <div className="status-row">
-          <strong className="warning">{humanize(analysis.reviewStatus)}</strong>
+          <strong className="warning">{analysis.reviewStatus === "MATCHES_APPROVED_BASELINE" ? "Matches approved deal" : humanize(analysis.reviewStatus)}</strong>
           <span>{humanize(analysis.dealRating)}</span>
         </div>
         <p className="next-action">{analysis.nextAction}</p>

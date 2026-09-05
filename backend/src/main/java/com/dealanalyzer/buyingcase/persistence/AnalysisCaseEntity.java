@@ -10,6 +10,8 @@ import java.time.Instant;
 @Entity
 @Table(name = "analysis_cases")
 class AnalysisCaseEntity {
+  @Column(name = "core_review_blocked", nullable = false)
+  boolean coreReviewBlocked;
   @Id
   @Column(length = 36)
   String id;

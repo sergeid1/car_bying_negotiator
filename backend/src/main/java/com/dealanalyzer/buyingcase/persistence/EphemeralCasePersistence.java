@@ -29,6 +29,17 @@ public class EphemeralCasePersistence {
     return cases.findById(caseId).map(this::stored);
   }
 
+  public boolean requiresEvidenceReview(String caseId) {
+    return cases.findById(caseId).map(value -> value.coreReviewBlocked
+        && !"READY_TO_ANALYZE".equals(value.status)).orElse(true);
+  }
+
+  @Transactional
+  public void lock(String caseId) {
+    cases.findLockedById(caseId)
+        .orElseThrow(() -> new IllegalArgumentException("Buying Case not found"));
+  }
+
   @Transactional
   public void updateStatus(String caseId, String status, Instant now) {
     AnalysisCaseEntity buyingCase = cases.findLockedById(caseId)

@@ -114,8 +114,12 @@ public class BuyingCaseStore {
     AnalysisCaseEntity buyingCase = requireLockedCase(caseId);
     OperationEntity operation = operations.findById(operationId)
         .orElseThrow(() -> new ResourceNotFoundException("Operation not found"));
+    if ("COMPLETE".equals(operation.stage)) return;
+    version = buyingCase.currentReportVersion + 1;
+    var payload = (com.fasterxml.jackson.databind.node.ObjectNode) readTree(payloadJson);
+    payload.put("version", version);
     reports.saveAndFlush(new AnalysisReportEntity(
-        caseId, version, payloadJson, analysisFingerprint, now));
+        caseId, version, write(payload), analysisFingerprint, now, operationId));
     buyingCase.status = "COMPLETE";
     buyingCase.currentReportVersion = version;
     buyingCase.updatedAt = now;
@@ -226,7 +230,7 @@ public class BuyingCaseStore {
 
   public enum PurchaseMethod { CASH, FINANCE }
 
-  public enum CaseStatus { DRAFT, ANALYZING, COMPLETE, FAILED }
+  public enum CaseStatus { DRAFT, INTAKE_IN_PROGRESS, NEEDS_REVIEW, READY_TO_ANALYZE, ANALYZING, COMPLETE, PARTIAL, FAILED }
 
   public record OperationView(
       String id,

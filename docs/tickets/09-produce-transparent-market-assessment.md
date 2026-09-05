@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — Establish golden fixtures and contract evaluation; 04 — Establish Vehicle and Listing evidence.
 
-**Status:** ready-for-agent
+**Status:** Complete
 
 - [x] Licensed or deterministic recorded provider responses are normalized without exposing vendor-specific types to the domain.
 - [x] Duplicate, incompatible, stale, and implausible observations are excluded using versioned rules with visible reasons.

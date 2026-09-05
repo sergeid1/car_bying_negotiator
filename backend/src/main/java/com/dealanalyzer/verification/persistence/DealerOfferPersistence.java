@@ -152,6 +152,7 @@ public class DealerOfferPersistence {
   }
 
   private DealerOfferView view(DealerOfferEntity value) {
+    value = (DealerOfferEntity) org.hibernate.Hibernate.unproxy(value);
     try {
       return new DealerOfferView(
           value.id, value.caseId, value.extractionId, value.offerVersion, value.status,

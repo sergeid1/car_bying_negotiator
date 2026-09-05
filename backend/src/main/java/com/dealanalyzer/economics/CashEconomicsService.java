@@ -51,7 +51,7 @@ public class CashEconomicsService {
     if (buyingCase.purchaseMethod() != PurchaseMethod.CASH) {
       throw new InvalidCashEconomicsException("Cash economics require a CASH Buying Case");
     }
-    if (!"READY_TO_ANALYZE".equals(buyingCase.status())) {
+    if (!List.of("READY_TO_ANALYZE", "COMPLETE", "PARTIAL").contains(buyingCase.status())) {
       throw new InvalidCashEconomicsException(
           "Cash economics require a current verified Dealer Offer");
     }

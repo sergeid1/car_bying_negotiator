@@ -7,8 +7,9 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 @Entity
+@org.hibernate.annotations.Immutable
 @Table(name = "audit_events")
-class AuditEventEntity {
+public class AuditEventEntity {
   @Id @Column(length = 36) String id;
   @Column(name = "case_id", nullable = false, length = 36) String caseId;
   @Column(name = "event_type", nullable = false, length = 64) String eventType;
@@ -22,7 +23,7 @@ class AuditEventEntity {
 
   protected AuditEventEntity() {}
 
-  AuditEventEntity(String id, String caseId, String eventType, String aggregateType,
+  public AuditEventEntity(String id, String caseId, String eventType, String aggregateType,
       String aggregateId, int aggregateVersion, String idempotencyKey, String metadataJson,
       Instant now) {
     this.id = id;
