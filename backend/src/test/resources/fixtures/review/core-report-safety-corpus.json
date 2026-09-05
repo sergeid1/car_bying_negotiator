@@ -1,0 +1,8 @@
+[
+  {"name":"unchanged verified offer below both limits", "current":true, "baseline":true, "market":true, "changed":false, "overLimit":false, "expected":"MATCHES_APPROVED_BASELINE"},
+  {"name":"missing or unreadable material evidence", "current":false, "baseline":true, "market":true, "changed":false, "overLimit":false, "expected":"UNABLE_TO_VERIFY"},
+  {"name":"no explicit Buyer approval", "current":true, "baseline":false, "market":true, "changed":false, "overLimit":false, "expected":"REVIEW_REQUIRED"},
+  {"name":"new add-on even when totals look acceptable", "current":true, "baseline":true, "market":true, "changed":true, "overLimit":false, "expected":"REVIEW_REQUIRED"},
+  {"name":"Buyer maximum cannot be raised", "current":true, "baseline":true, "market":true, "changed":false, "overLimit":true, "expected":"REVIEW_REQUIRED"},
+  {"name":"provider failure cannot imply successful verification", "current":true, "baseline":true, "market":false, "changed":false, "overLimit":false, "expected":"REVIEW_REQUIRED"}
+]

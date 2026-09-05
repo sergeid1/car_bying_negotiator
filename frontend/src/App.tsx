@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import "./styles.css";
 import { PricePlan } from "./PricePlan";
+import { CoreReportLoader } from "./CoreDealReport";
 
 type MoneyAmount = {
   minorUnits: number;
@@ -162,6 +163,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         </form>
       </section>
       {caseCredentials && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
+      {caseCredentials && <CoreReportLoader key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
 
       {!report && (
         <section className="panel" aria-labelledby="case-heading">
@@ -216,7 +218,7 @@ function DealReport({ report }: { report: Report }) {
         <p className="eyebrow">Deal Analysis Report</p>
         <h2 id="report-heading">Deal Analysis Report</h2>
         <div className="status-row">
-          <strong className="warning">{humanize(analysis.reviewStatus)}</strong>
+          <strong className="warning">{analysis.reviewStatus === "MATCHES_APPROVED_BASELINE" ? "Matches approved deal" : humanize(analysis.reviewStatus)}</strong>
           <span>{humanize(analysis.dealRating)}</span>
         </div>
         <p className="next-action">{analysis.nextAction}</p>

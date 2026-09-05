@@ -41,8 +41,8 @@ public class PricePlanService {
 
   @Transactional
   public Snapshot propose(String caseId, String token, String key, Limits request) {
-    var buyingCase = cases.reopen(caseId, token);
     locks.lock(caseId);
+    var buyingCase = cases.reopen(caseId, token);
     Limits limits = request == null ? new Limits(null, null) : request;
     String fingerprint = offers.fingerprint(limits);
     var existing = existing(caseId, "PLAN", key, fingerprint);
@@ -70,8 +70,8 @@ public class PricePlanService {
 
   @Transactional
   public Snapshot approve(String caseId, String token, String key, Approval request) {
-    cases.reopen(caseId, token);
     locks.lock(caseId);
+    cases.reopen(caseId, token);
     if (request == null || !request.approved())
       throw new IllegalArgumentException("Explicit Buyer approval is required");
     String fingerprint = offers.fingerprint(request);
@@ -104,7 +104,8 @@ public class PricePlanService {
   }
 
   private void requireReady(String caseId, String token) {
-    if (!"READY_TO_ANALYZE".equals(cases.reopen(caseId, token).status())
+    if (!java.util.List.of("READY_TO_ANALYZE", "COMPLETE", "PARTIAL").contains(cases.reopen(caseId, token).status())
+        || locks.requiresEvidenceReview(caseId)
         || !vehicles.get(caseId, token).reliableForAnalysis())
       throw new IllegalArgumentException("Current verified Deal Terms and resolved Vehicle identity are required");
   }

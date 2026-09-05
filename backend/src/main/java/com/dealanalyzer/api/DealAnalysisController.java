@@ -61,6 +61,7 @@ public class DealAnalysisController {
   private final DealerOfferVerificationService dealerOfferVerification;
   private final CashEconomicsService cashEconomics;
   private final MarketAssessmentService marketAssessments;
+  private final com.dealanalyzer.buyingcase.persistence.CoreReportService coreReports;
 
   public DealAnalysisController(
       AnalysisWorkflow workflow,
@@ -70,7 +71,8 @@ public class DealAnalysisController {
       DocumentExtractionService documentExtractions,
       DealerOfferVerificationService dealerOfferVerification,
       CashEconomicsService cashEconomics,
-      MarketAssessmentService marketAssessments) {
+      MarketAssessmentService marketAssessments,
+      com.dealanalyzer.buyingcase.persistence.CoreReportService coreReports) {
     this.workflow = workflow;
     this.ephemeralCases = ephemeralCases;
     this.vehicleEvidence = vehicleEvidence;
@@ -79,6 +81,7 @@ public class DealAnalysisController {
     this.dealerOfferVerification = dealerOfferVerification;
     this.cashEconomics = cashEconomics;
     this.marketAssessments = marketAssessments;
+    this.coreReports = coreReports;
   }
 
   @PostMapping("/cases/{caseId}/market-assessments")
@@ -272,10 +275,12 @@ public class DealAnalysisController {
 
   @PostMapping("/cases/{caseId}/analyses")
   @ResponseStatus(HttpStatus.ACCEPTED)
-  public StartedAnalysis regenerate(
+  public Object regenerate(
       @PathVariable String caseId,
       @NotBlank @Size(max = 200) @RequestHeader("Idempotency-Key") String idempotencyKey,
       @RequestHeader("Case-Access-Token") String accessToken) {
+    if (ephemeralCases.isEphemeralCase(caseId))
+      return coreReports.analyze(caseId, accessToken, idempotencyKey);
     return workflow.regenerate(caseId, idempotencyKey, accessToken);
   }
 

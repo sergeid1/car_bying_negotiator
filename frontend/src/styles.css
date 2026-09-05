@@ -93,7 +93,7 @@ button:disabled { cursor: wait; opacity: .72; }
 .money-list { margin: 0; }
 .money-list > div { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 15px 0; border-bottom: 1px solid #e3e5e0; }
 .money-list > div:last-child { border: 0; }
-.money-list small { display: block; margin-top: 4px; color: #8a958f; }
+.money-list small { display: block; margin-top: 4px; color: #536259; }
 .money-list dd { margin: 0; font-variant-numeric: tabular-nums; }
 ol { margin: 0; padding-left: 1.35rem; }
 li { padding: 6px 0 6px 8px; line-height: 1.55; }
@@ -114,3 +114,8 @@ li { padding: 6px 0 6px 8px; line-height: 1.55; }
 label { display: block; margin: 0.75rem 0; }
 input { max-width: 100%; padding: 0.5rem; margin: 0.25rem; }
 :focus-visible { outline: 3px solid #2057b5; outline-offset: 4px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.85rem; }
+nav a, .money-list a { color: #164f98; }
+.money-list dt { overflow-wrap: anywhere; min-width: 0; }
+.money-list small { color: #536259; }
+.money-list dd { flex-shrink: 0; }

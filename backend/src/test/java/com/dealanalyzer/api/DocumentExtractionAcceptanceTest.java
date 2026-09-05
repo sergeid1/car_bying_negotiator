@@ -37,6 +37,10 @@ class DocumentExtractionAcceptanceTest {
   @Test
   void buyerCanCorrectAndVerifyMaterialTermsIntoOneImmutableDealerOffer() throws Exception {
     var harness = new HttpAcceptanceHarness(temporaryDirectory);
+    String savedCaseId;
+    String savedToken;
+    JsonNode savedBaseline;
+    JsonNode savedReport;
     try (RunningApplication application = harness.startWithConfiguration(
         "dealer-offer-verification", true, FixtureExtractionProvider.class,
         "--document.storage.path=" + temporaryDirectory.resolve("verification-objects"),
@@ -196,6 +200,44 @@ class DocumentExtractionAcceptanceTest {
           Map.of("planVersion", 2, "approved", true), "approve-one", token))
           .isInstanceOf(HttpClientErrorException.Conflict.class);
 
+      String analysisPath = "/api/v1/cases/" + caseId + "/analyses";
+      JsonNode analyzed = HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "core-analysis", token);
+      JsonNode report = HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/latest", token);
+      assertThat(report.get("schemaVersion").asText()).isEqualTo("core-deal-analysis-report.v1");
+      assertThat(report.at("/analysis/reviewStatus").asText()).isEqualTo("UNABLE_TO_VERIFY");
+      assertThat(report.at("/analysis/topReasons")).hasSize(3);
+      assertThat(report.at("/analysis/materialAmounts")).isNotEmpty();
+      assertThat(report.at("/evidence/approvedBaseline/id").asText()).isEqualTo(baseline.get("id").asText());
+      assertThat(HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "core-analysis", token))
+          .isEqualTo(analyzed);
+      assertThat(HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/1", token)).isEqualTo(report);
+
+      var duplicateRequests = java.util.stream.IntStream.range(0, 4).mapToObj(index ->
+          java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            try { return HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "concurrent-analysis", token); }
+            catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
+          })).toList();
+      JsonNode firstConcurrent = duplicateRequests.getFirst().join();
+      for (var duplicate : duplicateRequests) assertThat(duplicate.join()).isEqualTo(firstConcurrent);
+      assertThat(HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/latest", token)
+          .get("version").asInt()).isEqualTo(2);
+      var unavailable = new com.dealanalyzer.market.MarketDataProvider.ProviderResult(
+          com.dealanalyzer.market.MarketDataProvider.Availability.UNAVAILABLE, "Provider timeout",
+          new com.dealanalyzer.market.MarketDataProvider.ProviderSnapshot("TEST", "v1", "market-provider.v1", "fixture", null, java.time.Instant.now()), List.of());
+      var assessment = new com.dealanalyzer.market.MarketAssessment(
+          com.dealanalyzer.market.MarketAssessment.Status.UNAVAILABLE, null, "NC", null, 0, "market-selection.v1",
+          com.dealanalyzer.market.MarketAssessment.Confidence.UNAVAILABLE, "Provider timeout", unavailable.snapshot(), List.of());
+      application.context().getBean(com.dealanalyzer.market.persistence.MarketAssessmentPersistence.class)
+          .append(caseId, unavailable, assessment, java.time.Instant.now());
+      HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "partial-analysis", token);
+      JsonNode partial = HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/latest", token);
+      assertThat(partial.get("status").asText()).isEqualTo("PARTIAL");
+      assertThat(partial.at("/analysis/marketAvailability").asText()).isEqualTo("UNAVAILABLE");
+      assertThat(partial.at("/analysis/dealRating").asText()).isEqualTo("INSUFFICIENT_DATA");
+      assertThat(partial.at("/evidence/cashEconomics/id").asText()).isEqualTo(eligibleEconomics.get("id").asText());
+      assertThat(HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/1", token)).isEqualTo(report);
+      savedCaseId = caseId; savedToken = token; savedBaseline = baseline; savedReport = report;
+
       Map<String, Object> revisedCorrectionRequest = Map.of(
           "targetType", "CANDIDATE",
           "targetId", missing.get("id").asText(),
@@ -222,6 +264,14 @@ class DocumentExtractionAcceptanceTest {
               error -> assertThat(error.getResponseBodyAsString())
                   .contains("current verified Dealer Offer"));
 
+      for (int attempt = 0; attempt < 2; attempt++) {
+        HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "stale-analysis-" + attempt, token);
+        assertThat(HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/latest", token)
+            .at("/analysis/reviewStatus").asText()).isEqualTo("UNABLE_TO_VERIFY");
+      }
+      assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), plansPath,
+          Map.of(), "stale-plan", token)).isInstanceOf(HttpClientErrorException.BadRequest.class);
+
       HttpAcceptanceHarness.post(
           application.client(), "/api/v1/cases/" + caseId + "/vehicle-evidence",
           Map.of("vin", "1M8GDM9AXKP042788", "confirmed", true),
@@ -232,6 +282,16 @@ class DocumentExtractionAcceptanceTest {
           .isInstanceOfSatisfying(HttpClientErrorException.Conflict.class,
               error -> assertThat(error.getResponseBodyAsString())
                   .contains("Vehicle VIN conflict"));
+    }
+    try (RunningApplication restarted = harness.startWithConfiguration(
+        "dealer-offer-verification", true, FixtureExtractionProvider.class,
+        "--document.storage.path=" + temporaryDirectory.resolve("verification-objects"),
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
+      assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCaseId + "/reports/1", savedToken)).isEqualTo(savedReport);
+      assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCaseId + "/approved-baselines/1", savedToken)).isEqualTo(savedBaseline);
+      var jdbc = new org.springframework.jdbc.core.JdbcTemplate(restarted.context().getBean(javax.sql.DataSource.class));
+      assertThat(jdbc.queryForObject("select count(*) from audit_events where case_id = ? and event_type = 'BASELINE_APPROVED'", Integer.class, savedCaseId)).isEqualTo(1);
+      assertThat(jdbc.queryForObject("select count(*) from operations where case_id = ? and idempotency_key = 'concurrent-analysis'", Integer.class, savedCaseId)).isEqualTo(1);
     }
   }
 
