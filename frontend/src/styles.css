@@ -111,3 +111,6 @@ li { padding: 6px 0 6px 8px; line-height: 1.55; }
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation: none; }
 }
+label { display: block; margin: 0.75rem 0; }
+input { max-width: 100%; padding: 0.5rem; margin: 0.25rem; }
+:focus-visible { outline: 3px solid #2057b5; outline-offset: 4px; }

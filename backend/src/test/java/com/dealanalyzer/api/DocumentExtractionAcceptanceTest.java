@@ -47,7 +47,8 @@ class DocumentExtractionAcceptanceTest {
       String token = created.get("accessToken").asText();
       HttpAcceptanceHarness.post(
           application.client(), "/api/v1/cases/" + caseId + "/vehicle-evidence",
-          Map.of("vin", "1HGCM82633A004352", "confirmed", true),
+          Map.of("confirmed", true, "manualFacts",
+              Map.of("year", 2021, "make", "Honda", "model", "Accord", "trim", "EX-L", "mileage", 38000)),
           "establish-verification-vehicle", token);
 
       var parts = new LinkedMultiValueMap<String, Object>();
@@ -169,6 +170,31 @@ class DocumentExtractionAcceptanceTest {
           .isEqualTo(2_350_000);
       assertThat(eligibleEconomics.at("/result/priceReductions/guaranteed/minorUnits").asLong())
           .isEqualTo(150_000);
+
+      HttpAcceptanceHarness.post(application.client(), "/api/v1/cases/" + caseId + "/market-assessments",
+          Map.of(), "market-for-plan", token);
+      String plansPath = "/api/v1/cases/" + caseId + "/price-plans";
+      JsonNode plan = HttpAcceptanceHarness.post(application.client(), plansPath,
+          Map.of("maxSellingPriceMinor", 2_000_000, "maxOutTheDoorPriceMinor", 2_400_000), "plan-one", token);
+      assertThat(plan.at("/payload/plan/sellingPrice/walkAwayMinor").asLong()).isEqualTo(2_000_000);
+      assertThat(plan.at("/payload/plan/outTheDoor").isNull()).isTrue();
+      assertThat(plan.at("/payload/plan/warnings").toString()).contains("market values have not been changed");
+      String baselinePath = "/api/v1/cases/" + caseId + "/approved-baselines";
+      assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), baselinePath,
+          Map.of("planVersion", 1, "approved", false), "not-approved", token))
+          .isInstanceOf(HttpClientErrorException.BadRequest.class);
+      JsonNode baseline = HttpAcceptanceHarness.post(application.client(), baselinePath,
+          Map.of("planVersion", 1, "approved", true), "approve-one", token);
+      assertThat(HttpAcceptanceHarness.post(application.client(), baselinePath,
+          Map.of("planVersion", 1, "approved", true), "approve-one", token)).isEqualTo(baseline);
+      HttpAcceptanceHarness.post(application.client(), "/api/v1/cases/" + caseId + "/market-assessments",
+          Map.of(), "refresh-after-approval", token);
+      HttpAcceptanceHarness.post(application.client(), plansPath,
+          Map.of("maxSellingPriceMinor", 4_000_000), "plan-two", token);
+      assertThat(HttpAcceptanceHarness.get(application.client(), baselinePath + "/1", token)).isEqualTo(baseline);
+      assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), baselinePath,
+          Map.of("planVersion", 2, "approved", true), "approve-one", token))
+          .isInstanceOf(HttpClientErrorException.Conflict.class);
 
       Map<String, Object> revisedCorrectionRequest = Map.of(
           "targetType", "CANDIDATE",
