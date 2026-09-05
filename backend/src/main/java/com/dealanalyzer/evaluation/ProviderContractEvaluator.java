@@ -55,6 +55,18 @@ public final class ProviderContractEvaluator {
     if (observationCount < response.get("observations").size()) {
       return new Result(Status.DUPLICATES_FILTERED, observationCount);
     }
+    boolean incompatible = false;
+    for (JsonNode observation : response.path("observations")) {
+      incompatible |= observation.has("compatibleVariant")
+          && !observation.path("compatibleVariant").asBoolean();
+    }
+    if (incompatible) {
+      return new Result(Status.INCOMPATIBLE_VARIANTS_FILTERED, observationCount);
+    }
+    int minimumRequired = response.path("minimumRequired").asInt(0);
+    if (minimumRequired > 0 && observationCount < minimumRequired) {
+      return new Result(Status.INSUFFICIENT_SAMPLES, observationCount);
+    }
     return new Result(Status.SUCCESS, observationCount);
   }
 
@@ -88,6 +100,8 @@ public final class ProviderContractEvaluator {
     STALE_DATA,
     PARTIAL_DATA,
     DUPLICATES_FILTERED,
-    SCHEMA_DRIFT
+    SCHEMA_DRIFT,
+    INSUFFICIENT_SAMPLES,
+    INCOMPATIBLE_VARIANTS_FILTERED
   }
 }

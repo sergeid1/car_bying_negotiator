@@ -28,6 +28,8 @@ import com.dealanalyzer.verification.persistence.DealerOfferPersistence.DealerOf
 import com.dealanalyzer.economics.CashEconomicsService;
 import com.dealanalyzer.economics.CalculateCashEconomicsRequest;
 import com.dealanalyzer.economics.persistence.CashEconomicsPersistence.CashEconomicsView;
+import com.dealanalyzer.market.MarketAssessmentService;
+import com.dealanalyzer.market.persistence.MarketAssessmentPersistence.MarketAssessmentView;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -58,6 +60,7 @@ public class DealAnalysisController {
   private final DocumentExtractionService documentExtractions;
   private final DealerOfferVerificationService dealerOfferVerification;
   private final CashEconomicsService cashEconomics;
+  private final MarketAssessmentService marketAssessments;
 
   public DealAnalysisController(
       AnalysisWorkflow workflow,
@@ -66,7 +69,8 @@ public class DealAnalysisController {
       DocumentIntakeService documentIntake,
       DocumentExtractionService documentExtractions,
       DealerOfferVerificationService dealerOfferVerification,
-      CashEconomicsService cashEconomics) {
+      CashEconomicsService cashEconomics,
+      MarketAssessmentService marketAssessments) {
     this.workflow = workflow;
     this.ephemeralCases = ephemeralCases;
     this.vehicleEvidence = vehicleEvidence;
@@ -74,6 +78,30 @@ public class DealAnalysisController {
     this.documentExtractions = documentExtractions;
     this.dealerOfferVerification = dealerOfferVerification;
     this.cashEconomics = cashEconomics;
+    this.marketAssessments = marketAssessments;
+  }
+
+  @PostMapping("/cases/{caseId}/market-assessments")
+  @ResponseStatus(HttpStatus.CREATED)
+  public MarketAssessmentView createMarketAssessment(
+      @PathVariable String caseId,
+      @RequestHeader("Case-Access-Token") String accessToken) {
+    return marketAssessments.create(caseId, accessToken);
+  }
+
+  @GetMapping("/cases/{caseId}/market-assessments/latest")
+  public MarketAssessmentView getLatestMarketAssessment(
+      @PathVariable String caseId,
+      @RequestHeader("Case-Access-Token") String accessToken) {
+    return marketAssessments.latest(caseId, accessToken);
+  }
+
+  @GetMapping("/cases/{caseId}/market-assessments/{version}")
+  public MarketAssessmentView getMarketAssessment(
+      @PathVariable String caseId,
+      @PathVariable int version,
+      @RequestHeader("Case-Access-Token") String accessToken) {
+    return marketAssessments.version(caseId, version, accessToken);
   }
 
   @PostMapping("/cases/{caseId}/cash-economics")

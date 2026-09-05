@@ -84,6 +84,36 @@
       "expectedUniqueObservations": 2
     },
     {
+      "name": "insufficient samples",
+      "transportOutcome": "RESPONSE",
+      "response": {
+        "schemaVersion": "market-provider.v1",
+        "observedAt": "2026-08-20T12:00:00Z",
+        "lowMinor": 2450000,
+        "highMinor": 2700000,
+        "minimumRequired": 3,
+        "observations": [{"listingId": "listing-1"}, {"listingId": "listing-2"}]
+      },
+      "expectedStatus": "INSUFFICIENT_SAMPLES",
+      "expectedUniqueObservations": 2
+    },
+    {
+      "name": "incompatible variant",
+      "transportOutcome": "RESPONSE",
+      "response": {
+        "schemaVersion": "market-provider.v1",
+        "observedAt": "2026-08-20T12:00:00Z",
+        "lowMinor": 2450000,
+        "highMinor": 2700000,
+        "observations": [
+          {"listingId": "listing-1", "compatibleVariant": true},
+          {"listingId": "listing-2", "compatibleVariant": false}
+        ]
+      },
+      "expectedStatus": "INCOMPATIBLE_VARIANTS_FILTERED",
+      "expectedUniqueObservations": 2
+    },
+    {
       "name": "schema drift",
       "transportOutcome": "RESPONSE",
       "response": {
