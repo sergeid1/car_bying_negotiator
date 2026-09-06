@@ -61,6 +61,9 @@ Frozen JSON fixtures under `backend/src/test/resources/fixtures` establish reusa
 
 - `golden` drives cash-deal reports through the public API and asserts monetary results,
   calculation steps, declared rounding, and policy/schema versions.
+- `financing` covers fixed-rate loans, zero APR, payment reconciliation, full-term add-on
+  effects, and seeded loan properties. See [the financing policy](docs/financing-policy.md)
+  for the verification API, timing, rounding and supported scope.
 - `providers` exercises success, timeout, rate limits, missing VINs, stale and partial data,
   duplicate filtering, and schema drift with recorded synthetic responses; it never calls a paid
   endpoint.

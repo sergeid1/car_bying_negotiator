@@ -35,14 +35,15 @@ public class CoreReportService {
   private final PricePlanService plans;
   private final VehicleEvidenceService vehicles;
   private final ObjectMapper json;
+  private final FinancingService financing;
 
   public CoreReportService(EphemeralBuyingCaseService access, AnalysisCaseRepository cases,
       OperationRepository operations, AnalysisReportRepository reports, BuyingCaseStore store,
       DealerOfferPersistence offers, CashEconomicsPersistence economics, MarketAssessmentPersistence market,
-      PricePlanService plans, VehicleEvidenceService vehicles, ObjectMapper json) {
+      PricePlanService plans, VehicleEvidenceService vehicles, ObjectMapper json, FinancingService financing) {
     this.access = access; this.cases = cases; this.operations = operations; this.reports = reports;
     this.store = store; this.offers = offers; this.economics = economics; this.market = market;
-    this.plans = plans; this.vehicles = vehicles; this.json = json;
+    this.financing = financing; this.plans = plans; this.vehicles = vehicles; this.json = json;
   }
 
   @Transactional
@@ -56,6 +57,13 @@ public class CoreReportService {
       return new StartedReport(store.requireOperation(existing.get().id));
     }
     var offer = offers.latestOffer(caseId).orElse(null);
+    boolean financeCase = "FINANCE".equals(buyingCase.purchaseMethod);
+    var finance = financeCase ? financing.snapshot(caseId).orElse(null) : null;
+    boolean dealerCurrent = offer != null && ("READY_TO_ANALYZE".equals(buyingCase.status)
+        || List.of("COMPLETE", "PARTIAL").contains(buyingCase.status) && !buyingCase.coreReviewBlocked);
+    boolean financeCurrent = dealerCurrent && finance != null && finance.dealerOfferId().equals(offer.id());
+    String financeAvailability = !financeCase ? "NOT_APPLICABLE" : finance == null ? "UNAVAILABLE"
+        : !financeCurrent ? "STALE_OR_UNVERIFIED" : finance.result().status();
     var cashView = economics.latest(caseId).orElse(null);
     Result cash = cashView == null ? null : json.convertValue(cashView.result(), Result.class);
     var assessment = market.latest(caseId).orElse(null);
@@ -69,6 +77,10 @@ public class CoreReportService {
         && vehicle.reliableForAnalysis() && offer.status().equals("VERIFIED")
         && !offer.createdAt().isBefore(vehicle.vehicle().confirmedAt())
         && cash.dealerOfferId().equals(offer.id());
+    dealerCurrent = dealerCurrent && vehicle != null && vehicle.reliableForAnalysis()
+        && offer.status().equals("VERIFIED") && !offer.createdAt().isBefore(vehicle.vehicle().confirmedAt());
+    financeCurrent = financeCurrent && dealerCurrent;
+    if (finance != null && !financeCurrent) financeAvailability = "STALE_OR_UNVERIFIED";
     boolean available = assessment != null && "AVAILABLE".equals(assessment.status())
         && assessment.range() != null && vehicle != null
         && !assessment.createdAt().isBefore(vehicle.vehicle().confirmedAt());
@@ -86,11 +98,19 @@ public class CoreReportService {
       rating = selling < assessment.range().lowMinor() ? "STRONG_DEAL"
           : selling > assessment.range().highMinor() ? "POOR_DEAL" : "FAIR_NEGOTIATE";
     }
+    if (financeCase) status = "AVAILABLE".equals(financeAvailability) ? "REVIEW_REQUIRED" : "UNABLE_TO_VERIFY";
+    if (financeCase && available && "AVAILABLE".equals(financeAvailability)
+        && finance.inputs().currency().equals(assessment.range().currency())) {
+      long selling = finance.inputs().purchasePriceMinor();
+      rating = selling < assessment.range().lowMinor() ? "STRONG_DEAL"
+          : selling > assessment.range().highMinor() ? "POOR_DEAL" : "FAIR_NEGOTIATE";
+    }
     Instant now = Instant.now();
     int version = buyingCase.currentReportVersion + 1;
     String operationId = UUID.randomUUID().toString();
-    String completion = current && available ? "COMPLETE" : "PARTIAL";
+    String completion = (financeCase ? "AVAILABLE".equals(financeAvailability) : current) && available ? "COMPLETE" : "PARTIAL";
     ObjectNode evidence = json.createObjectNode();
+    evidence.set("financing", json.valueToTree(finance));
     evidence.set("dealerOffer", json.valueToTree(offer));
     evidence.set("cashEconomics", json.valueToTree(cashView));
     evidence.set("marketAssessment", json.valueToTree(assessment));
@@ -106,12 +126,41 @@ public class CoreReportService {
     analysis.put("ratingBasis", "Estimated selling-price comparison; OTD market rating is not available.");
     analysis.set("topReasons", json.valueToTree(new CoreReviewPolicy().reasons(status, available,
         cash != null && cash.reconciliation().withinTolerance())));
+    if (financeCase) analysis.set("topReasons", json.valueToTree(List.of(
+        "Dealer financing: " + financeAvailability + ".",
+        "AVAILABLE".equals(financeAvailability) && Boolean.FALSE.equals(finance.result().withinTolerance())
+            ? "Quoted payment differs beyond the recorded tolerance; ask the dealer to reconcile."
+            : "AVAILABLE".equals(financeAvailability) ? "Financing uses independently calculated payments and Buyer-confirmed inputs."
+            : "Resolve the missing, unsupported or stale financing inputs before relying on loan economics.",
+        "Financing is not checked against an approved financing baseline; review the full-term cost.")));
+    analysis.put("financingAvailability", financeAvailability);
+    analysis.set("financingTerms", json.valueToTree(finance == null ? null : finance.inputs()));
+    analysis.set("financing", json.valueToTree(finance == null ? null : finance.result()));
     analysis.put("nextAction", status.equals("MATCHES_APPROVED_BASELINE")
         ? "Confirm the dealer is still offering this exact version before proceeding."
         : "Resolve missing evidence, changed terms, or price-limit questions with the dealer before deciding.");
     analysis.put("marketAvailability", available ? "AVAILABLE" : "UNAVAILABLE");
     analysis.put("cashAvailability", cash == null ? "UNAVAILABLE" : current ? "AVAILABLE" : "STALE_OR_UNVERIFIED");
     List<MaterialAmount> amounts = new ArrayList<>();
+    if (finance != null) {
+      var inputs = finance.inputs();
+      String inputPrecision = financeCurrent && "USD".equals(inputs.currency()) ? "EXACT" : "UNAVAILABLE";
+      addFinanceAmount(amounts, "Purchase price", inputs.purchasePriceMinor(), inputPrecision, "/inputs/purchasePriceMinor");
+      addFinanceAmount(amounts, "Out-the-door total", inputs.outTheDoorTotalMinor(), inputPrecision, "/inputs/outTheDoorTotalMinor");
+      addFinanceAmount(amounts, "Net amount due", inputs.netAmountDueMinor(), inputPrecision, "/inputs/netAmountDueMinor");
+      addFinanceAmount(amounts, "Amount financed", inputs.principalMinor(), inputPrecision, "/inputs/principalMinor");
+      addFinanceAmount(amounts, "Financed lender fees", inputs.financedFeesMinor(), inputPrecision, "/inputs/financedFeesMinor");
+      addFinanceAmount(amounts, "Upfront lender fees (included in cash paid)", inputs.upfrontFeesMinor(), inputPrecision, "/inputs/upfrontFeesMinor");
+      addFinanceAmount(amounts, "Cash paid at or before closing", inputs.cashPaidAtClosingMinor(), inputPrecision, "/inputs/cashPaidAtClosingMinor");
+      addFinanceAmount(amounts, "Known deferred charges", inputs.deferredChargesMinor(), inputPrecision, "/inputs/deferredChargesMinor");
+      String precision = "AVAILABLE".equals(financeAvailability) ? "ESTIMATED" : "UNAVAILABLE";
+      var result = finance.result();
+      addFinanceAmount(amounts, "Calculated monthly payment", result.paymentMinor(), precision, "/result/paymentMinor");
+      addFinanceAmount(amounts, "Final payment", result.finalPaymentMinor(), precision, "/result/finalPaymentMinor");
+      addFinanceAmount(amounts, "Total scheduled payments", result.totalScheduledPaymentsMinor(), precision, "/result/totalScheduledPaymentsMinor");
+      addFinanceAmount(amounts, "Total interest", result.totalInterestMinor(), precision, "/result/totalInterestMinor");
+      addFinanceAmount(amounts, "Total Transaction Cost", result.totalTransactionCostMinor(), precision, "/result/totalTransactionCostMinor");
+    }
     if (cashView != null) collectAmounts(cashView.result(), "/result", "cashEconomics", "ESTIMATED", amounts);
     if (available) {
       amounts.add(new MaterialAmount("Market selling-price low", assessment.range().lowMinor(), assessment.range().currency(),
@@ -119,20 +168,22 @@ public class CoreReportService {
       amounts.add(new MaterialAmount("Market selling-price high", assessment.range().highMinor(), assessment.range().currency(),
           "ESTIMATED", "marketAssessment", "/range/highMinor"));
     } else amounts.add(new MaterialAmount("Market selling-price range", null, "USD", "UNAVAILABLE", "marketAssessment", ""));
-    if (cash == null) amounts.add(new MaterialAmount("Out-the-door total", null, "USD", "UNAVAILABLE", "cashEconomics", ""));
+    if (cash == null && finance == null) amounts.add(new MaterialAmount("Out-the-door total", null, "USD", "UNAVAILABLE", "cashEconomics", ""));
     if (baseline != null) collectPlanAmounts(baseline.payload().path("plan"), "/payload/plan", plan.currency(), amounts);
     analysis.set("materialAmounts", json.valueToTree(amounts));
     analysis.set("policyVersions", json.valueToTree(Map.of("review", CoreReviewPolicy.VERSION,
         "materiality", "core-materiality.v1: zero term/calculation delta; quoted-total tolerance is recorded in cash economics",
         "rating", "selling-price-rating.v1", "cashEconomics", cash == null ? "UNAVAILABLE" : cash.policyVersion(),
         "market", assessment == null ? "UNAVAILABLE" : assessment.methodVersion(),
+        "financing", com.dealanalyzer.finance.FinancingCalculator.VERSION,
         "priceBoundaries", plan == null ? "UNAVAILABLE" : plan.policyVersion())));
     analysis.set("limitations", json.valueToTree(List.of(
-        "Checks cover the frozen verified offer, approved limits, identity evidence and recorded cash calculation as of " + now + ".",
+        financeCase ? "Financing checks cover Buyer-confirmed inputs and the declared schedule as of " + now + "; approved financing limits and independent purchase-charge reconciliation are not covered."
+            : "Checks cover the frozen verified offer, approved limits, identity evidence and recorded cash calculation as of " + now + ".",
         "Jurisdiction coverage: " + (cash == null ? "unavailable" : cash.jurisdiction() + " using " + cash.policyVersion()) + ".",
         "Tax and fee rules are recorded estimates; unresolved classifications prevent a matching verdict.",
         "Market provider: " + (assessment == null ? "unavailable" : assessment.provider().source() + "; " + assessment.limitation()),
-        "Financing, mechanical condition, title, legal compliance and purchase safety are excluded. Savings are not guaranteed.")));
+        "Financing covers only the recorded standard monthly schedule. Mechanical condition, title, legal compliance and purchase safety are excluded. Savings are not guaranteed.")));
     ObjectNode payload = json.createObjectNode();
     payload.put("id", UUID.randomUUID().toString()); payload.put("caseId", caseId);
     payload.put("schemaVersion", "core-deal-analysis-report.v1"); payload.put("version", version);
@@ -145,8 +196,12 @@ public class CoreReportService {
     operations.saveAndFlush(new OperationEntity(operationId, caseId, key, "COMPLETE", now));
     reports.saveAndFlush(new AnalysisReportEntity(caseId, version, write(payload), fingerprint, now, operationId));
     buyingCase.currentReportVersion = version; buyingCase.status = completion; buyingCase.updatedAt = now;
-    buyingCase.coreReviewBlocked = !current;
+    buyingCase.coreReviewBlocked = financeCase ? !dealerCurrent : !current;
     return new StartedReport(store.requireOperation(operationId));
+  }
+
+  private void addFinanceAmount(List<MaterialAmount> amounts, String label, Long value, String precision, String pointer) {
+    amounts.add(new MaterialAmount(label, value, "USD", value == null ? "UNAVAILABLE" : precision, "financing", pointer));
   }
 
   private void collectAmounts(JsonNode node, String path, String source, String precision, List<MaterialAmount> amounts) {

@@ -53,6 +53,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/v1")
 @Validated
 public class DealAnalysisController {
+  private final com.dealanalyzer.buyingcase.persistence.FinancingService financing;
   private final AnalysisWorkflow workflow;
   private final EphemeralBuyingCaseService ephemeralCases;
   private final VehicleEvidenceService vehicleEvidence;
@@ -64,6 +65,7 @@ public class DealAnalysisController {
   private final com.dealanalyzer.buyingcase.persistence.CoreReportService coreReports;
 
   public DealAnalysisController(
+      com.dealanalyzer.buyingcase.persistence.FinancingService financing,
       AnalysisWorkflow workflow,
       EphemeralBuyingCaseService ephemeralCases,
       VehicleEvidenceService vehicleEvidence,
@@ -73,6 +75,7 @@ public class DealAnalysisController {
       CashEconomicsService cashEconomics,
       MarketAssessmentService marketAssessments,
       com.dealanalyzer.buyingcase.persistence.CoreReportService coreReports) {
+    this.financing = financing;
     this.workflow = workflow;
     this.ephemeralCases = ephemeralCases;
     this.vehicleEvidence = vehicleEvidence;
@@ -82,6 +85,22 @@ public class DealAnalysisController {
     this.cashEconomics = cashEconomics;
     this.marketAssessments = marketAssessments;
     this.coreReports = coreReports;
+  }
+
+  @PostMapping("/cases/{caseId}/finance-offers")
+  @ResponseStatus(HttpStatus.CREATED)
+  public com.dealanalyzer.buyingcase.persistence.FinancingService.View verifyFinanceOffer(
+      @PathVariable String caseId,
+      @RequestHeader("Case-Access-Token") String token,
+      @NotBlank @Size(max = 200) @RequestHeader("Idempotency-Key") String key,
+      @RequestBody com.dealanalyzer.buyingcase.persistence.FinancingService.VerifyRequest request) {
+    return financing.verify(caseId, token, key, request);
+  }
+
+  @GetMapping("/cases/{caseId}/finance-offers/latest")
+  public com.dealanalyzer.buyingcase.persistence.FinancingService.View latestFinanceOffer(
+      @PathVariable String caseId, @RequestHeader("Case-Access-Token") String token) {
+    return financing.latest(caseId, token);
   }
 
   @PostMapping("/cases/{caseId}/market-assessments")

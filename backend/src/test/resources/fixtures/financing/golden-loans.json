@@ -1,0 +1,41 @@
+[
+  {
+    "name": "standard",
+    "principalMinor": 3000000,
+    "aprPercent": "6",
+    "termMonths": 60,
+    "addonMinor": 200000,
+    "paymentMinor": 57998,
+    "finalPaymentMinor": 58026,
+    "totalScheduledPaymentsMinor": 3479908,
+    "totalInterestMinor": 479908,
+    "addonScheduledMinor": 231999,
+    "addonInterestMinor": 31999
+  },
+  {
+    "name": "zero-apr",
+    "principalMinor": 100000,
+    "aprPercent": "0",
+    "termMonths": 3,
+    "addonMinor": 10000,
+    "paymentMinor": 33333,
+    "finalPaymentMinor": 33334,
+    "totalScheduledPaymentsMinor": 100000,
+    "totalInterestMinor": 0,
+    "addonScheduledMinor": 10000,
+    "addonInterestMinor": 0
+  },
+  {
+    "name": "payment-mismatch",
+    "principalMinor": 2680000,
+    "aprPercent": "7.5",
+    "termMonths": 60,
+    "addonMinor": 89900,
+    "paymentMinor": 53702,
+    "finalPaymentMinor": 53680,
+    "totalScheduledPaymentsMinor": 3222098,
+    "totalInterestMinor": 542098,
+    "addonScheduledMinor": 108077,
+    "addonInterestMinor": 18177
+  }
+]
