@@ -1,7 +1,7 @@
 # Core Deal Analysis Report v1
 
 POST `/api/v1/cases/{caseId}/analyses` with Case-Access-Token and Idempotency-Key
-freezes the persisted Dealer Offer, cash economics, latest Market Assessment,
+freezes the persisted Dealer Offer, cash economics, verified financing inputs and results, latest Market Assessment,
 latest Approved Baseline, Vehicle evidence, and policy versions. The core path
 does no provider I/O, completes in one database transaction, and returns a completed
 operation. GET `/reports/latest` or `/reports/{version}` retrieves the saved JSON
@@ -37,8 +37,12 @@ Material amounts carry currency, precision, and a source plus JSON pointer into
 frozen evidence. Verified quoted amounts and input line items are exact; derived
 economics under recorded jurisdiction rules and market/boundary suggestions are
 estimated. Missing amounts are unavailable, never zero. The report states sources,
-as-of time, jurisdiction coverage, policies, and excluded finance, mechanical,
-title, legal and purchase-safety considerations.
+as-of time, jurisdiction coverage, policies, and excluded mechanical, title, legal
+and purchase-safety considerations. Financing follows the separate
+[dealer financing policy](financing-policy.md): supported loans receive independent
+economics and a review-required verdict; missing, unsupported or stale loans remain
+unavailable and cannot match an approved baseline. Financing amounts remain useful
+when market evidence is unavailable.
 
 The UI provides outcome-first navigation, an explicit partial warning, keyboard
 links to evidence, a focused report heading after loading, labeled sections, visible

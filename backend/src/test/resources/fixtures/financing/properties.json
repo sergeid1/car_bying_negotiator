@@ -1,0 +1,15 @@
+{
+  "seed": 120026,
+  "samples": 200,
+  "minPrincipalMinor": 100000,
+  "maxPrincipalMinor": 10000000,
+  "terms": [
+    12,
+    24,
+    36,
+    48,
+    60,
+    72,
+    84
+  ]
+}

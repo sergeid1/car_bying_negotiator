@@ -1,8 +1,10 @@
+import { DealerFinancingForm, DealerFinancingResult, type FinancingResult } from "./DealerFinancing";
 import { useEffect, useRef, useState } from "react";
 
 export type CoreReport = {
   version: number; asOf: string; status: string;
   analysis: {
+    financingAvailability?: string; financing?: FinancingResult | null; financingTerms?: { aprPercent: number | null; termMonths: number | null } | null;
     reviewLabel: string; dealRating: string; ratingBasis: string; nextAction: string;
     topReasons: string[]; marketAvailability: string; cashAvailability: string;
     materialAmounts: { label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string }[];
@@ -36,6 +38,7 @@ export function CoreReportLoader({ caseId, token }: { caseId: string; token: str
     } catch (caught) { setError(String(caught)); } finally { setBusy(false); }
   }
   return <section aria-label="Core deal report">
+    <DealerFinancingForm caseId={caseId} token={token} />
     <div className="panel">
       <button onClick={() => load(true)} disabled={busy}>Generate core deal report</button>
       <button onClick={() => load(false)} disabled={busy}>Open latest saved report</button>
@@ -62,7 +65,7 @@ export function CoreDealReport({ report }: { report: CoreReport }) {
     </section>
     <p>Version {report.version} · {report.status} · As of <time dateTime={report.asOf}>{report.asOf}</time></p>
     {report.status === "PARTIAL" && <p>Warning: this report is partial. One or more analysis areas are unavailable.</p>}
-    <nav aria-label="Report sections"><a href="#core-amounts">Amounts</a> · <a href="#core-evidence">Evidence and calculations</a> · <a href="#core-scope">Scope and policies</a></nav>
+    <nav aria-label="Report sections"><a href="#core-amounts">Amounts</a> · {analysis.financingAvailability && analysis.financingAvailability !== "NOT_APPLICABLE" && <><a href="#core-financing">Financing</a> · </>} <a href="#core-evidence">Evidence and calculations</a> · <a href="#core-scope">Scope and policies</a></nav>
     <section className="panel" id="core-amounts" tabIndex={-1}>
       <h3>Amounts and sources</h3>
       <p>Market analysis: {analysis.marketAvailability}. Cash economics: {analysis.cashAvailability}.</p>
@@ -73,6 +76,7 @@ export function CoreDealReport({ report }: { report: CoreReport }) {
         </div>)}
       </dl>
     </section>
+    {analysis.financingAvailability && analysis.financingAvailability !== "NOT_APPLICABLE" && <DealerFinancingResult result={analysis.financing ?? null} availability={analysis.financingAvailability} terms={analysis.financingTerms} />}
     <section className="panel" id="core-evidence" tabIndex={-1}>
       <h3>Frozen evidence and reproducible calculations</h3>
       {Object.entries(report.evidence).map(([source, value]) => <section key={source} id={`evidence-${source}`} tabIndex={-1}>
