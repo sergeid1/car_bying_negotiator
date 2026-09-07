@@ -72,3 +72,63 @@ positive add-on interest checks. HTTP acceptance covers Buyer confirmation,
 authorization, immutable reports, idempotency, missing fees, unsupported balloons,
 stale Dealer Offers and application restart. Frontend tests cover amounts,
 neutral mismatch text, source links, unsupported output and preserving unknown fees.
+
+## One outside financing comparison v1
+
+`outside-financing-comparison.v1` compares one Buyer-selected outside loan with the
+current confirmed dealer loan using the same deterministic calculator and bounds.
+The outside offer is financing chosen by the Buyer, never a dealer discount.
+Outside APR, term, principal and lender fees may differ from dealer financing.
+
+The Buyer explicitly confirms the outside loan's purchase assumptions. Purchase
+price after discounts/rebates, OTD, net amount due, cash contribution **excluding
+upfront lender fees**, deferred charges and the complete financed add-on list must
+match. Principal is reconciled separately to net due plus each lender's financed
+fees. Each differing purchase assumption is identified in `purchaseDifferences`;
+the Buyer must resolve it and submit a new confirmed version. The UI can copy the
+dealer purchase assumptions, but asks the Buyer to confirm that prices, rebates
+and add-ons also apply with outside financing. It does not infer rebate eligibility
+or silently change either offer. Matching monetary totals do not independently
+verify underlying purchase charges.
+
+Only two supported loans with matching purchase assumptions receive `COMPARABLE`
+and a signed `outsideMinusDealerCostMinor` (outside Total Transaction Cost minus
+dealer Total Transaction Cost). Negative means lower outside full-term cost.
+`NOT_COMPARABLE` identifies differing purchase assumptions; `UNAVAILABLE` identifies
+incomplete or unsupported inputs with scenario-specific reasons. Both withhold the
+cost delta and APR counterfactual; supported individual scenario economics remain
+visible. A different supported term is permitted: each loan is evaluated through
+its own full term, without present-value, early-payoff, or affordability conclusions.
+
+`aprOnlyScheduledPaymentsDeltaMinor` replaces only dealer APR with outside APR,
+holding dealer principal, term, timing, fees and add-ons fixed, and subtracts the
+original dealer scheduled payments. It isolates APR from other changed loan terms;
+it is a counterfactual, not an available third offer. If this counterfactual exceeds
+calculation bounds, it is unavailable with a reason. Each loan separately retains
+its financed add-on full-term scheduled-payment and interest effects.
+
+### Outside offer API and storage
+
+- `POST /api/v1/cases/{caseId}/outside-finance-offers` takes
+  `{dealerFinanceOfferId, confirmed: true, loan: {...}}` with the same `FinanceLoan`
+  fields as dealer financing. Requires `Case-Access-Token` and `Idempotency-Key`.
+- `GET /api/v1/cases/{caseId}/outside-finance-offers/latest` and `/{version}` require
+  case access and return immutable historical snapshots, including the exact dealer
+  financing inputs, outside inputs, result, policy version, and timestamp.
+- Revisions replace the latest selection while retaining historical versions; a
+  comparison contains exactly one outside offer. Reusing a key with different input
+  conflicts; retries return the original snapshot even after dealer changes.
+- New comparisons require current verified dealer and vehicle evidence. Historical
+  retrieval does not claim current applicability; the UI labels saved results and
+  asks for a new comparison following offer or vehicle changes.
+- A case lock serializes writes. Separate immutable JPA entities store outside
+  Finance Offers and comparison results atomically. Composite foreign keys enforce
+  same-case ownership of the referenced financing; no cascade modifies dealer
+  offers. Uniqueness covers case/version, case/idempotency key and offer/policy.
+- Comparison snapshots are opened separately from core reports; existing core report
+  versions and verified dealer financing remain unchanged.
+
+Validation covers known full-term costs, APR isolation, fees, add-ons, mismatched
+purchase assumptions, unknown/unsupported loans, HTTP access and confirmation,
+idempotency, revisions, stale evidence, unchanged dealer offers, and restart replay.
+Frontend checks cover entry, unknown fees, saved economics, and withheld deltas.

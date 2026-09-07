@@ -17,7 +17,9 @@ const fields = [
   ["deferredChargesMinor", "Known deferred charges"], ["quotedPaymentMinor", "Quoted monthly payment (optional)"],
 ] as const;
 
-export function DealerFinancingForm({ caseId, token }: { caseId: string; token: string }) {
+export function DealerFinancingForm({ caseId, token, outside = false, onSaved }: {
+  caseId: string; token: string; outside?: boolean; onSaved?: (value: unknown) => void;
+}) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [addons, setAddons] = useState<{ label: string; price: string }[]>([]);
   const [confirmed, setConfirmed] = useState(false);
@@ -31,26 +33,44 @@ export function DealerFinancingForm({ caseId, token }: { caseId: string; token: 
     try {
       const path = `/api/v1/cases/${encodeURIComponent(caseId)}`;
       const headers = { "Case-Access-Token": token, "Content-Type": "application/json", "Idempotency-Key": key };
-      const response = await fetch(`${path}/dealer-offers/latest`, { headers });
-      if (!response.ok) throw new Error("Establish and verify the current Dealer Offer first.");
+      const response = await fetch(`${path}/${outside ? "finance-offers" : "dealer-offers"}/latest`, { headers });
+      if (!response.ok) throw new Error(outside ? "Confirm current dealer financing first." : "Establish and verify the current Dealer Offer first.");
       const offer = await response.json();
       const loan = { currency: "USD", ...Object.fromEntries(fields.map(([name]) => [name, cents(values[name])])),
         aprPercent: values.apr ? Number(values.apr) : null, termMonths: values.term ? Number(values.term) : null,
         schedule: values.schedule || null, paymentTiming: values.timing || null,
         financedAddOns: addons.map(addon => ({ label: addon.label, cashPriceMinor: cents(addon.price) })) };
-      const saved = await fetch(`${path}/finance-offers`, { method: "POST", headers,
-        body: JSON.stringify({ dealerOfferId: offer.id, confirmed, loan }) });
+      const saved = await fetch(`${path}/${outside ? "outside-finance-offers" : "finance-offers"}`, { method: "POST", headers,
+        body: JSON.stringify({ [outside ? "dealerFinanceOfferId" : "dealerOfferId"]: offer.id, confirmed, loan }) });
       if (!saved.ok) {
         const error = await saved.json().catch(() => ({}));
         throw new Error(error.detail || error.message || "Finance Offer could not be saved. Check case access, purchase method and verified offer.");
       }
       const result = await saved.json();
-      setMessage(`Finance Offer version ${result.version} saved. Financing: ${result.result.status}. Generate a new report to review it.`);
+      onSaved?.(result);
+      setMessage(`Finance Offer version ${result.version} saved. Financing: ${result.result.status}. ${outside ? "Comparison saved below." : "Generate a new report to review it."}`);
       setKey(crypto.randomUUID());
     } catch (error) { setMessage(String(error)); } finally { setBusy(false); }
   }
-  return <details className="panel"><summary>Verify dealer financing (finance purchases)</summary>
-    <form onSubmit={save} aria-label="Verify dealer financing"><fieldset disabled={busy}><legend>Buyer-confirmed loan terms</legend>
+  async function copyPurchase() {
+    setBusy(true); setMessage("");
+    try {
+      const response = await fetch(`/api/v1/cases/${encodeURIComponent(caseId)}/finance-offers/latest`, { headers: { "Case-Access-Token": token } });
+      if (!response.ok) throw new Error("Confirm dealer financing first.");
+      const { inputs } = await response.json();
+      const purchase: Record<string, string> = {};
+      for (const name of ["purchasePriceMinor", "outTheDoorTotalMinor", "netAmountDueMinor", "deferredChargesMinor"])
+        purchase[name] = inputs[name] == null ? "" : String(inputs[name] / 100);
+      setValues({ ...values, ...purchase });
+      setAddons((inputs.financedAddOns || []).map((item: { label: string; cashPriceMinor: number | null }) => ({ label: item.label, price: item.cashPriceMinor == null ? "" : String(item.cashPriceMinor / 100) })));
+      setConfirmed(false); setKey(crypto.randomUUID());
+      setMessage("Dealer purchase assumptions copied. Confirm that these prices, rebates and add-ons also apply with outside financing. Enter outside principal, fees and total cash paid separately.");
+    } catch (error) { setMessage(String(error)); } finally { setBusy(false); }
+  }
+  return <details className="panel"><summary>{outside ? "Compare one outside financing offer" : "Verify dealer financing (finance purchases)"}</summary>
+    <form onSubmit={save} aria-label={outside ? "Compare outside financing" : "Verify dealer financing"}><fieldset disabled={busy}><legend>Buyer-confirmed loan terms</legend>
+      {outside && <><p>Buyer-selected outside financing is not a dealer discount. Purchase price, OTD, net due, cash contribution excluding lender fees, deferred charges and add-ons must match before a cost delta is shown. Resolve financing-dependent rebates with the dealer before confirming matching assumptions.</p>
+        <button type="button" onClick={copyPurchase}>Copy dealer purchase assumptions</button></>}
       <p>Enter USD amounts from the current offer. Enter 0 for confirmed zero fees or charges; leave unknown values blank. Add-ons must already be included in the principal. Cash paid includes upfront fees. Known deferred charges exclude scheduled loan payments.</p>
       {fields.map(([name, label]) => <label key={name}>{label} (USD)<input type="number" min="0" step="0.01" value={values[name] || ""} onChange={e => update(name, e.target.value)} /></label>)}
       <label>APR (%)<input type="number" min="0" max="100" step="0.00000001" value={values.apr || ""} onChange={e => update("apr", e.target.value)} /></label>
@@ -62,8 +82,8 @@ export function DealerFinancingForm({ caseId, token }: { caseId: string; token: 
         <label>Add-on {index + 1} cash price (USD)<input required type="number" min="0" step="0.01" value={addon.price} onChange={e => { setAddons(addons.map((item, i) => i === index ? { ...item, price: e.target.value } : item)); setConfirmed(false); setKey(crypto.randomUUID()); }} /></label>
         <button type="button" onClick={() => { setAddons(addons.filter((_, i) => i !== index)); setConfirmed(false); setKey(crypto.randomUUID()); }}>Remove add-on {index + 1}</button></div>)}
       <button type="button" onClick={() => { setAddons([...addons, { label: "", price: "" }]); setConfirmed(false); setKey(crypto.randomUUID()); }}>Add financed add-on</button>
-      <label><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />I verified these values, fees, timing and the complete financed add-on list against the current offer; blank fields are unknown.</label>
-      <button disabled={!confirmed} type="submit">Save verified Finance Offer</button>
+      <label><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />{outside ? "I confirm this Buyer-selected outside offer and its purchase assumptions, fees, timing and complete add-on list; blank fields are unknown." : "I verified these values, fees, timing and the complete financed add-on list against the current offer; blank fields are unknown."}</label>
+      <button disabled={!confirmed} type="submit">{outside ? "Save and compare outside financing" : "Save verified Finance Offer"}</button>
     </fieldset></form>{message && <p role="status">{message}</p>}
   </details>;
 }
