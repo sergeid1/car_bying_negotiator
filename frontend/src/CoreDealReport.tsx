@@ -1,3 +1,4 @@
+import { OutsideFinancing } from "./OutsideFinancing";
 import { DealerFinancingForm, DealerFinancingResult, type FinancingResult } from "./DealerFinancing";
 import { useEffect, useRef, useState } from "react";
 
@@ -38,7 +39,8 @@ export function CoreReportLoader({ caseId, token }: { caseId: string; token: str
     } catch (caught) { setError(String(caught)); } finally { setBusy(false); }
   }
   return <section aria-label="Core deal report">
-    <DealerFinancingForm caseId={caseId} token={token} />
+    <DealerFinancingForm key={`dealer-${caseId}-${token}`} caseId={caseId} token={token} />
+    <OutsideFinancing key={`outside-${caseId}-${token}`} caseId={caseId} token={token} />
     <div className="panel">
       <button onClick={() => load(true)} disabled={busy}>Generate core deal report</button>
       <button onClick={() => load(false)} disabled={busy}>Open latest saved report</button>

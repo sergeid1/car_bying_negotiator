@@ -302,6 +302,7 @@ class DocumentExtractionAcceptanceTest {
     String savedToken;
     JsonNode savedReport;
     JsonNode savedFinance;
+    JsonNode savedComparison;
     try (RunningApplication application = harness.startWithConfiguration(
         "finance-offer", true, FixtureExtractionProvider.class,
         "--document.storage.path=" + temporaryDirectory.resolve("finance-objects"),
@@ -419,6 +420,39 @@ class DocumentExtractionAcceptanceTest {
       assertThat(finance.at("/result/withinTolerance").asBoolean()).isFalse();
       assertThat(finance.at("/result/financedAddOns/0/incrementalInterestMinor").asLong()).isPositive();
       assertThat(HttpAcceptanceHarness.post(application.client(), financePath, request, "finance-one", token)).isEqualTo(finance);
+      String outsidePath = "/api/v1/cases/" + caseId + "/outside-finance-offers";
+      var outsideLoan = application.context().getBean(com.fasterxml.jackson.databind.ObjectMapper.class).valueToTree(loan);
+      ((com.fasterxml.jackson.databind.node.ObjectNode) outsideLoan).put("aprPercent", 0);
+      var outsideRequest = Map.of("dealerFinanceOfferId", finance.get("id").asText(), "confirmed", true, "loan", outsideLoan);
+      savedComparison = HttpAcceptanceHarness.post(application.client(), outsidePath, outsideRequest, "outside-one", token);
+      assertThat(savedComparison.at("/result/status").asText()).isEqualTo("COMPARABLE");
+      assertThat(savedComparison.at("/source").asText()).isEqualTo("BUYER_SELECTED_OUTSIDE_FINANCING");
+      assertThat(savedComparison.at("/result/outsideMinusDealerCostMinor").asLong()).isEqualTo(-542098);
+      assertThat(savedComparison.at("/result/aprOnlyScheduledPaymentsDeltaMinor").asLong()).isEqualTo(-542098);
+      assertThat(HttpAcceptanceHarness.post(application.client(), outsidePath, outsideRequest, "outside-one", token)).isEqualTo(savedComparison);
+      assertThat(HttpAcceptanceHarness.get(application.client(), financePath + "/latest", token)).isEqualTo(finance);
+      assertThatThrownBy(() -> HttpAcceptanceHarness.get(application.client(), outsidePath + "/latest", "wrong-token"))
+          .isInstanceOf(HttpClientErrorException.class);
+      ((com.fasterxml.jackson.databind.node.ObjectNode) outsideLoan).put("aprPercent", 1);
+      assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), outsidePath, outsideRequest, "outside-one", token))
+          .isInstanceOf(HttpClientErrorException.Conflict.class);
+      assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), outsidePath,
+          Map.of("dealerFinanceOfferId", finance.get("id").asText(), "confirmed", false, "loan", outsideLoan), "unconfirmed-outside", token))
+          .isInstanceOf(HttpClientErrorException.UnprocessableEntity.class);
+      assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), outsidePath,
+          Map.of("dealerFinanceOfferId", "another-case-finance-id", "confirmed", true, "loan", outsideLoan), "foreign-outside", token))
+          .isInstanceOf(HttpClientErrorException.UnprocessableEntity.class);
+      ((com.fasterxml.jackson.databind.node.ObjectNode) outsideLoan).put("purchasePriceMinor", 2500000);
+      var mismatchedComparison = HttpAcceptanceHarness.post(application.client(), outsidePath, outsideRequest, "outside-two", token);
+      assertThat(mismatchedComparison.at("/result/status").asText()).isEqualTo("NOT_COMPARABLE");
+      assertThat(mismatchedComparison.at("/result/purchaseDifferences/0").asText()).contains("Purchase price");
+      assertThat(mismatchedComparison.at("/result/outsideMinusDealerCostMinor").isNull()).isTrue();
+      ((com.fasterxml.jackson.databind.node.ObjectNode) outsideLoan).putNull("financedFeesMinor");
+      var incompleteComparison = HttpAcceptanceHarness.post(application.client(), outsidePath, outsideRequest, "outside-three", token);
+      assertThat(incompleteComparison.at("/result/status").asText()).isEqualTo("UNAVAILABLE");
+      assertThat(incompleteComparison.at("/result/outsideMinusDealerCostMinor").isNull()).isTrue();
+      assertThat(HttpAcceptanceHarness.get(application.client(), outsidePath + "/1", token)).isEqualTo(savedComparison);
+      assertThat(HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/dealer-offers/latest", token)).isEqualTo(offer);
       String analysisPath = "/api/v1/cases/" + caseId + "/analyses";
       JsonNode operation = HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "finance-report", token);
       JsonNode report = HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/latest", token);
@@ -464,6 +498,8 @@ class DocumentExtractionAcceptanceTest {
       HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "stale-finance-report", token);
       assertThat(HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/latest", token)
           .at("/analysis/financingAvailability").asText()).isEqualTo("STALE_OR_UNVERIFIED");
+      assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), outsidePath, outsideRequest, "stale-outside", token))
+          .isInstanceOf(HttpClientErrorException.UnprocessableEntity.class);
       savedCaseId = caseId; savedToken = token; savedReport = report;
       savedFinance = HttpAcceptanceHarness.get(application.client(), financePath + "/latest", token);
     }
@@ -472,6 +508,9 @@ class DocumentExtractionAcceptanceTest {
         "--document.storage.path=" + temporaryDirectory.resolve("finance-objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCaseId + "/finance-offers/latest", savedToken)).isEqualTo(savedFinance);
+      assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCaseId + "/outside-finance-offers/1", savedToken)).isEqualTo(savedComparison);
+      assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCaseId + "/outside-finance-offers/latest", savedToken).at("/version").asInt()).isEqualTo(3);
+
       assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCaseId + "/reports/1", savedToken)).isEqualTo(savedReport);
       var jdbc = new org.springframework.jdbc.core.JdbcTemplate(restarted.context().getBean(javax.sql.DataSource.class));
       assertThat(jdbc.queryForObject("select count(*) from finance_offers where case_id = ?", Integer.class, savedCaseId)).isEqualTo(4);
