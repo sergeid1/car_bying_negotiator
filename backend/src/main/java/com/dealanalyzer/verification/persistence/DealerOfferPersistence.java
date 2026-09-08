@@ -102,12 +102,13 @@ public class DealerOfferPersistence {
   public DealerOfferView appendOffer(
       String caseId, String extractionId, String idempotencyKey, String fingerprint,
       Object terms, List<VerifiedTarget> verifiedTargets, Instant now) {
-    int version = offers.findTopByCaseIdOrderByOfferVersionDesc(caseId)
-        .map(value -> value.offerVersion + 1).orElse(1);
+    cases.lock(caseId);
+    var previous = offers.findTopByCaseIdOrderByOfferVersionDesc(caseId).orElse(null);
+    int version = previous == null ? 1 : previous.offerVersion + 1;
     String offerId = UUID.randomUUID().toString();
     DealerOfferEntity offer = offers.saveAndFlush(new DealerOfferEntity(
         offerId, caseId, extractionId, version, idempotencyKey, fingerprint,
-        writeJson(terms), now));
+        writeJson(terms), previous == null ? null : previous.id, now));
     verifications.saveAll(verifiedTargets.stream().map(target -> new DealTermVerificationEntity(
         UUID.randomUUID().toString(), caseId, extractionId, offerId, target.targetType(),
         target.targetId(), version, target.effectiveValue(), now)).toList());

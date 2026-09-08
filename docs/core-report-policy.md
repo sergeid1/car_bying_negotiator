@@ -22,8 +22,8 @@ violations, or any difference in the frozen terms/calculation yield `REVIEW_REQU
 Only an exact match within both approved ceilings can yield `MATCHES_APPROVED_BASELINE`,
 labeled “Matches approved deal,” with scope and check time. Core materiality uses
 zero term/calculation delta; the jurisdiction's recorded tolerance applies only
-to quoted-total reconciliation. Revised-offer semantic comparison belongs to the
-later Deal Review ticket. A report cannot clear an evidence-review requirement;
+to quoted-total reconciliation. Revised-offer semantic comparison is saved alongside the report under the
+[revised-offer policy](revised-offer-policy.md). A report cannot clear an evidence-review requirement;
 fresh verification is needed to clear it.
 
 The rating is independent: below market low is STRONG_DEAL, within the range is

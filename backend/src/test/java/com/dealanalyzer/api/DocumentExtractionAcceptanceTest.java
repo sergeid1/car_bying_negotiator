@@ -34,6 +34,114 @@ class DocumentExtractionAcceptanceTest {
   @TempDir
   Path temporaryDirectory;
 
+
+  @Test
+  void revisedDocumentProducesAnImmutableReviewAgainstBaselineAndImmediatelyPreviousOffer() throws Exception {
+    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+    String savedCase; String savedToken; JsonNode savedReview;
+    try (RunningApplication application = harness.startWithConfiguration(
+        "revised-offer", true, FixtureExtractionProvider.class,
+        "--document.storage.path=" + temporaryDirectory.resolve("revised-objects"),
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
+
+      JsonNode created = HttpAcceptanceHarness.post(application.client(), "/api/v1/cases", validCase(), "create-case");
+      String caseId = created.at("/case/id").asText(), token = created.get("accessToken").asText();
+      String casePath = "/api/v1/cases/" + caseId;
+      HttpAcceptanceHarness.post(application.client(), casePath + "/vehicle-evidence",
+          Map.of("confirmed", true, "manualFacts",
+              Map.of("year", 2021, "make", "Honda", "model", "Accord", "trim", "EX-L", "mileage", 38000)), "vehicle", token);
+      var parts = new LinkedMultiValueMap<String, Object>();
+      parts.add("file", new NamedBytes("initial.pdf", twoPagePdf()));
+      JsonNode upload = new com.fasterxml.jackson.databind.ObjectMapper().readTree(
+          application.client().post().uri(casePath + "/documents")
+              .contentType(MediaType.MULTIPART_FORM_DATA)
+              .header("Idempotency-Key", "upload-initial").header("Case-Access-Token", token)
+              .body(parts).retrieve().body(String.class));
+      awaitExtraction(application, upload.at("/operation/id").asText(), token);
+      String documentPath = casePath + "/documents/" + upload.at("/document/id").asText();
+      JsonNode extraction = HttpAcceptanceHarness.get(application.client(), documentPath + "/extractions/latest", token);
+      HttpAcceptanceHarness.post(application.client(), documentPath + "/extractions/" + extraction.get("id").asText() + "/corrections",
+          Map.of("targetType", "CANDIDATE", "targetId", find(extraction.get("candidates"), "field", "AMOUNT_FINANCED").get("id").asText(),
+              "normalizedValue", "2680000", "normalizedUnit", "USD_MINOR"), "correct-initial", token);
+      List<String> initialCandidates = new ArrayList<>(), initialLines = new ArrayList<>();
+      extraction.get("candidates").forEach(c -> initialCandidates.add(c.get("id").asText()));
+      extraction.get("lineItems").forEach(c -> initialLines.add(c.get("id").asText()));
+      JsonNode offer = HttpAcceptanceHarness.post(application.client(), casePath + "/dealer-offers",
+          Map.of("extractionId", extraction.get("id").asText(), "confirmedCandidateIds", initialCandidates,
+              "confirmedLineItemIds", initialLines), "verify-initial", token);
+      HttpAcceptanceHarness.post(application.client(), casePath + "/cash-economics", Map.of(), "initial-economics", token);
+      HttpAcceptanceHarness.post(application.client(), casePath + "/market-assessments", Map.of(), "market", token);
+      HttpAcceptanceHarness.post(application.client(), casePath + "/price-plans",
+          Map.of("maxSellingPriceMinor", 2_000_000, "maxOutTheDoorPriceMinor", 2_660_000), "plan", token);
+      String baselinePath = casePath + "/approved-baselines";
+      JsonNode baseline = HttpAcceptanceHarness.post(application.client(), baselinePath,
+          Map.of("planVersion", 1, "approved", true), "baseline", token);
+      String analysisPath = casePath + "/analyses";
+      HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "initial-analysis", token);
+      JsonNode report = HttpAcceptanceHarness.get(application.client(), casePath + "/reports/latest", token);
+      parts = new LinkedMultiValueMap<String, Object>();
+      parts.add("file", new NamedBytes("revision.pdf", twoPagePdf()));
+      JsonNode revisionUpload = new com.fasterxml.jackson.databind.ObjectMapper().readTree(
+          application.client().post().uri("/api/v1/cases/" + caseId + "/documents")
+              .contentType(MediaType.MULTIPART_FORM_DATA)
+              .header("Idempotency-Key", "upload-revised").header("Case-Access-Token", token)
+              .body(parts).retrieve().body(String.class));
+      awaitExtraction(application, revisionUpload.at("/operation/id").asText(), token);
+      String revisedDocument = revisionUpload.at("/document/id").asText();
+      JsonNode revisedExtraction = HttpAcceptanceHarness.get(application.client(),
+          "/api/v1/cases/" + caseId + "/documents/" + revisedDocument + "/extractions/latest", token);
+      String corrections = "/api/v1/cases/" + caseId + "/documents/" + revisedDocument
+          + "/extractions/" + revisedExtraction.get("id").asText() + "/corrections";
+      HttpAcceptanceHarness.post(application.client(), corrections, Map.of(
+          "targetType", "CANDIDATE", "targetId", find(revisedExtraction.get("candidates"), "field", "AMOUNT_FINANCED").get("id").asText(),
+          "normalizedValue", "2700000", "normalizedUnit", "USD_MINOR"), "correct-revised", token);
+      List<String> candidateIds = new ArrayList<>(); List<String> lineIds = new ArrayList<>();
+      revisedExtraction.get("candidates").forEach(c -> candidateIds.add(c.get("id").asText()));
+      revisedExtraction.get("lineItems").forEach(c -> lineIds.add(c.get("id").asText()));
+      JsonNode revisedOffer = HttpAcceptanceHarness.post(application.client(), "/api/v1/cases/" + caseId + "/dealer-offers",
+          Map.of("extractionId", revisedExtraction.get("id").asText(), "confirmedCandidateIds", candidateIds,
+              "confirmedLineItemIds", lineIds), "verify-revised", token);
+      assertThat(revisedOffer.get("version").asInt()).isEqualTo(2);
+      HttpAcceptanceHarness.post(application.client(), "/api/v1/cases/" + caseId + "/cash-economics",
+          Map.of(), "revised-economics", token);
+      JsonNode reviewOperation = HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "revised-analysis", token);
+      JsonNode revisedReport = HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/latest", token);
+      JsonNode review = revisedReport.at("/analysis/dealReview");
+      assertThat(review.path("currentOfferVersion").asInt()).isEqualTo(2);
+      assertThat(review.path("previousOfferVersion").asInt()).isEqualTo(1);
+      assertThat(review.path("baselineVersion").asInt()).isEqualTo(1);
+      assertThat(review.path("discrepancies").toString()).contains("BASELINE", "PREVIOUS", "AMOUNT_FINANCED", "LIMIT_VIOLATION");
+      assertThat(review.path("tolerancePolicy").asText()).contains("zero tolerance");
+      assertThat(review.path("discrepancies")).anySatisfy(d -> {
+        assertThat(d.path("term").asText()).isEqualTo("buyerMaxOutTheDoorPriceMinor");
+        assertThat(d.path("kind").asText()).isEqualTo("LIMIT_VIOLATION");
+        assertThat(d.path("observed").asLong()).isEqualTo(2_680_000);
+        assertThat(d.path("delta").asLong()).isEqualTo(20_000);
+      });
+      assertThat(HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "revised-analysis", token)).isEqualTo(reviewOperation);
+      assertThat(HttpAcceptanceHarness.get(application.client(), baselinePath + "/1", token)).isEqualTo(baseline);
+      assertThat(HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/dealer-offers/1", token)).isEqualTo(offer);
+      assertThat(HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/1", token)).isEqualTo(report);
+      assertThat(HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/deal-reviews/1", token)).isEqualTo(review);
+      JsonNode thirdOffer = HttpAcceptanceHarness.post(application.client(), "/api/v1/cases/" + caseId + "/dealer-offers",
+          Map.of("extractionId", revisedExtraction.get("id").asText(), "confirmedCandidateIds", candidateIds,
+              "confirmedLineItemIds", lineIds), "verify-third", token);
+      HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "third-analysis", token);
+      JsonNode thirdReview = HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/deal-reviews/latest", token);
+      assertThat(thirdReview.path("previousOfferId").asText()).isEqualTo(revisedOffer.get("id").asText());
+      assertThat(thirdReview.path("currentOfferId").asText()).isEqualTo(thirdOffer.get("id").asText());
+      assertThat(thirdReview.path("status").asText()).isEqualTo("UNABLE_TO_VERIFY");
+      savedCase = caseId; savedToken = token; savedReview = review;
+    }
+    try (RunningApplication restarted = harness.startWithConfiguration(
+        "revised-offer", false, FixtureExtractionProvider.class,
+        "--document.storage.path=" + temporaryDirectory.resolve("revised-objects"),
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
+      assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCase + "/deal-reviews/1", savedToken)).isEqualTo(savedReview);
+      assertThatThrownBy(() -> HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCase + "/deal-reviews/1", "invalid"))
+          .isInstanceOf(HttpClientErrorException.class);
+    }
+  }
   @Test
   void buyerCanCorrectAndVerifyMaterialTermsIntoOneImmutableDealerOffer() throws Exception {
     var harness = new HttpAcceptanceHarness(temporaryDirectory);

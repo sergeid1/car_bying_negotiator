@@ -115,6 +115,10 @@ public class DealerOfferVerificationService {
       term.put("value", value);
       term.put("unit", unit);
       term.put("sourceCandidateId", candidate.id());
+      term.put("originalWording", candidate.originalWording());
+      term.put("confidence", candidate.confidence());
+      term.put("evidence", candidate.evidence());
+      term.put("buyerVerified", correction != null || request.confirmedCandidateIds().contains(candidate.id()));
       candidateTerms.add(term);
     }
     List<Map<String, Object>> lineTerms = new ArrayList<>();
@@ -126,11 +130,15 @@ public class DealerOfferVerificationService {
       String category = correction == null ? line.category() : correction.category();
       long amount = correction == null ? line.amountMinor() : correction.amountMinor();
       verified.add(new VerifiedTarget("LINE_ITEM", line.id(), Long.toString(amount)));
-      lineTerms.add(Map.of(
+      Map<String, Object> lineTerm = new java.util.LinkedHashMap<>(Map.of(
           "id", line.id(), "originalLabel", line.originalLabel(), "category", category,
           "amountMinor", amount, "currency", line.currency(), "sourceLineItemId", line.id(),
           "taxClaim", line.taxClaim(), "optionalityClaim", line.optionalityClaim(),
           "clarificationAction", category.equals("UNKNOWN") ? "ASK_DEALER_TO_CLARIFY" : "NONE"));
+      lineTerm.put("confidence", line.confidence());
+      lineTerm.put("evidence", line.evidence());
+      lineTerm.put("buyerVerified", true);
+      lineTerms.add(lineTerm);
     }
     Map<String, Object> terms = Map.of(
         "candidates", candidateTerms, "lineItems", lineTerms,
