@@ -1,3 +1,4 @@
+import { NegotiationLoader } from "./NegotiationDraft";
 import { RevisedOfferReview, type DealReview } from "./RevisedOfferReview";
 import { OutsideFinancing } from "./OutsideFinancing";
 import { DealerFinancingForm, DealerFinancingResult, type FinancingResult } from "./DealerFinancing";
@@ -49,7 +50,10 @@ export function CoreReportLoader({ caseId, token }: { caseId: string; token: str
       {busy && <p role="status">Loading report…</p>}
       {error && <p role="alert">{error}</p>}
     </div>
-    {report && <CoreDealReport report={report} />}
+    {report && <>
+      <CoreDealReport report={report} />
+      <NegotiationLoader key={`${caseId}-${token}-${report.version}`} caseId={caseId} token={token} reportVersion={report.version} />
+    </>}
   </section>;
 }
 

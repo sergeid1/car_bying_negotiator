@@ -312,6 +312,14 @@ class DocumentExtractionAcceptanceTest {
       JsonNode analyzed = HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "core-analysis", token);
       JsonNode report = HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/latest", token);
       assertThat(report.get("schemaVersion").asText()).isEqualTo("core-deal-analysis-report.v1");
+      String languagePath = "/api/v1/cases/" + caseId + "/reports/1/negotiation";
+      JsonNode language = HttpAcceptanceHarness.get(application.client(), languagePath, token);
+      assertThat(language.path("reportVersion").asInt()).isEqualTo(1);
+      assertThat(language.at("/language/items/0/sourcePointer").asText()).isEqualTo("/analysis/reviewStatus");
+      assertThat(language.at("/language/draft").asText()).contains("current itemized written offer");
+      assertThatThrownBy(() -> HttpAcceptanceHarness.get(application.client(), languagePath, "wrong-token"))
+          .isInstanceOf(HttpClientErrorException.class);
+
       assertThat(report.at("/analysis/reviewStatus").asText()).isEqualTo("UNABLE_TO_VERIFY");
       assertThat(report.at("/analysis/topReasons")).hasSize(3);
       assertThat(report.at("/analysis/materialAmounts")).isNotEmpty();
@@ -344,6 +352,7 @@ class DocumentExtractionAcceptanceTest {
       assertThat(partial.at("/analysis/dealRating").asText()).isEqualTo("INSUFFICIENT_DATA");
       assertThat(partial.at("/evidence/cashEconomics/id").asText()).isEqualTo(eligibleEconomics.get("id").asText());
       assertThat(HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/1", token)).isEqualTo(report);
+      assertThat(HttpAcceptanceHarness.get(application.client(), languagePath, token)).isEqualTo(language);
       savedCaseId = caseId; savedToken = token; savedBaseline = baseline; savedReport = report;
 
       Map<String, Object> revisedCorrectionRequest = Map.of(
@@ -396,6 +405,14 @@ class DocumentExtractionAcceptanceTest {
         "--document.storage.path=" + temporaryDirectory.resolve("verification-objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCaseId + "/reports/1", savedToken)).isEqualTo(savedReport);
+      JsonNode savedLanguage = HttpAcceptanceHarness.get(restarted.client(),
+          "/api/v1/cases/" + savedCaseId + "/reports/1/negotiation", savedToken);
+      new com.dealanalyzer.negotiation.GroundedLanguage().validate(savedReport,
+          new com.fasterxml.jackson.databind.ObjectMapper().treeToValue(savedLanguage.path("language"),
+              com.dealanalyzer.negotiation.GroundedLanguage.Language.class));
+      assertThat(HttpAcceptanceHarness.get(restarted.client(),
+          "/api/v1/cases/" + savedCaseId + "/reports/2/negotiation", savedToken)
+          .path("reportVersion").asInt()).isEqualTo(2);
       assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCaseId + "/approved-baselines/1", savedToken)).isEqualTo(savedBaseline);
       var jdbc = new org.springframework.jdbc.core.JdbcTemplate(restarted.context().getBean(javax.sql.DataSource.class));
       assertThat(jdbc.queryForObject("select count(*) from audit_events where case_id = ? and event_type = 'BASELINE_APPROVED'", Integer.class, savedCaseId)).isEqualTo(1);
