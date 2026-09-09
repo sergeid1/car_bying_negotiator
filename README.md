@@ -75,3 +75,5 @@ Frozen JSON fixtures under `backend/src/test/resources/fixtures` establish reusa
 `ReportReplayEvaluator` compares regenerated reports after removing only differences explicitly
 declared in the report payload. `ExtractionEvaluator`, `ProviderContractEvaluator`, and
 `ReviewSafetyEvaluator` are public harness APIs so later product slices can reuse the same gates.
+
+Core reports also provide [grounded explanations and editable negotiation drafts](docs/grounded-language-policy.md), with versioned source findings and local copy/download controls.

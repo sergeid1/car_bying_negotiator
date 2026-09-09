@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** One short transaction freezes all locally persisted evidence and inserts one report per operation. */
 @Service
 public class CoreReportService {
+  private final NegotiationService negotiation;
   private final EphemeralBuyingCaseService access;
   private final AnalysisCaseRepository cases;
   private final OperationRepository operations;
@@ -41,7 +42,8 @@ public class CoreReportService {
   public CoreReportService(EphemeralBuyingCaseService access, AnalysisCaseRepository cases,
       OperationRepository operations, AnalysisReportRepository reports, BuyingCaseStore store,
       DealerOfferPersistence offers, CashEconomicsPersistence economics, MarketAssessmentPersistence market,
-      PricePlanService plans, VehicleEvidenceService vehicles, ObjectMapper json, FinancingService financing, com.dealanalyzer.review.DealReviewService reviews) {
+      PricePlanService plans, VehicleEvidenceService vehicles, ObjectMapper json, FinancingService financing, com.dealanalyzer.review.DealReviewService reviews, NegotiationService negotiation) {
+    this.negotiation = negotiation;
     this.reviews = reviews;
     this.access = access; this.cases = cases; this.operations = operations; this.reports = reports;
     this.store = store; this.offers = offers; this.economics = economics; this.market = market;
@@ -203,6 +205,7 @@ public class CoreReportService {
         "regenerationDifferences", List.of("id", "version", "generatedAt", "asOf", "review check time"))));
     operations.saveAndFlush(new OperationEntity(operationId, caseId, key, "COMPLETE", now));
     reports.saveAndFlush(new AnalysisReportEntity(caseId, version, write(payload), fingerprint, now, operationId));
+    negotiation.append(caseId, version);
     buyingCase.currentReportVersion = version; buyingCase.status = completion; buyingCase.updatedAt = now;
     buyingCase.coreReviewBlocked = financeCase ? !dealerCurrent : !current;
     return new StartedReport(store.requireOperation(operationId));

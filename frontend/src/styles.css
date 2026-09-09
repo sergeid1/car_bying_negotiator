@@ -119,3 +119,5 @@ nav a, .money-list a { color: #164f98; }
 .money-list dt { overflow-wrap: anywhere; min-width: 0; }
 .money-list small { color: #536259; }
 .money-list dd { flex-shrink: 0; }
+
+#negotiation-draft { display: block; box-sizing: border-box; width: 100%; padding: 0.75rem; font: inherit; line-height: 1.5; resize: vertical; }
