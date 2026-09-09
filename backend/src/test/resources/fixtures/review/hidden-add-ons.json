@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Taxable protection plus non-taxable government fee and reduced discount",
+    "sellingPrice": "25000.00",
+    "initialDiscount": "500.00",
+    "revisedDiscount": "400.00",
+    "protection": "899.00",
+    "governmentFee": "50.00",
+    "taxRate": "0.03",
+    "expectedPreTaxDeltaMinor": 104900,
+    "expectedTaxEffectMinor": 2997,
+    "expectedOutTheDoorDeltaMinor": 107897
+  },
+  {
+    "name": "One-cent add-on remains visible below materiality with independently rounded tax",
+    "sellingPrice": "100.50",
+    "initialDiscount": "0.00",
+    "revisedDiscount": "0.00",
+    "protection": "0.01",
+    "governmentFee": "0.00",
+    "taxRate": "0.0725",
+    "expectedPreTaxDeltaMinor": 1,
+    "expectedTaxEffectMinor": 0,
+    "expectedOutTheDoorDeltaMinor": 1
+  }
+]

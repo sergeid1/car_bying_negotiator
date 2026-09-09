@@ -6,6 +6,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
+@org.hibernate.annotations.Immutable
 @Entity
 @Table(name = "dealer_offers")
 public class DealerOfferEntity {
@@ -20,6 +21,8 @@ public class DealerOfferEntity {
   @Column(name = "terms_json", nullable = false, columnDefinition = "text") String termsJson;
   @Column(name = "created_at", nullable = false) Instant createdAt;
 
+  @Column(name = "previous_offer_id", updatable = false) String previousOfferId;
+
   protected DealerOfferEntity() {}
 
   public String id() {
@@ -27,7 +30,8 @@ public class DealerOfferEntity {
   }
 
   DealerOfferEntity(String id, String caseId, String extractionId, int version,
-      String idempotencyKey, String requestFingerprint, String termsJson, Instant now) {
+      String idempotencyKey, String requestFingerprint, String termsJson, String previousOfferId, Instant now) {
+    this.previousOfferId = previousOfferId;
     this.id = id;
     this.caseId = caseId;
     this.extractionId = extractionId;

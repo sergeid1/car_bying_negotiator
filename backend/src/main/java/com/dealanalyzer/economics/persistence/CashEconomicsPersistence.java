@@ -58,6 +58,11 @@ public class CashEconomicsPersistence {
     return results.findTopByCaseIdOrderByCreatedAtDescIdDesc(caseId).map(this::view);
   }
 
+  @Transactional(readOnly = true)
+  public Optional<CashEconomicsView> forOffer(String offerId) {
+    return results.findTopByDealerOfferIdOrderByCreatedAtDescIdDesc(offerId).map(this::view);
+  }
+
   @Transactional
   public CashEconomicsView save(
       String caseId, String dealerOfferId, String policyVersion, String eligibilityFingerprint,

@@ -36,11 +36,13 @@ public class CoreReportService {
   private final VehicleEvidenceService vehicles;
   private final ObjectMapper json;
   private final FinancingService financing;
+  private final com.dealanalyzer.review.DealReviewService reviews;
 
   public CoreReportService(EphemeralBuyingCaseService access, AnalysisCaseRepository cases,
       OperationRepository operations, AnalysisReportRepository reports, BuyingCaseStore store,
       DealerOfferPersistence offers, CashEconomicsPersistence economics, MarketAssessmentPersistence market,
-      PricePlanService plans, VehicleEvidenceService vehicles, ObjectMapper json, FinancingService financing) {
+      PricePlanService plans, VehicleEvidenceService vehicles, ObjectMapper json, FinancingService financing, com.dealanalyzer.review.DealReviewService reviews) {
+    this.reviews = reviews;
     this.access = access; this.cases = cases; this.operations = operations; this.reports = reports;
     this.store = store; this.offers = offers; this.economics = economics; this.market = market;
     this.financing = financing; this.plans = plans; this.vehicles = vehicles; this.json = json;
@@ -119,6 +121,11 @@ public class CoreReportService {
     evidence.put("caseStatusAtAnalysis", buyingCase.status);
     evidence.put("buyerJurisdiction", buyingCase.buyerJurisdiction);
     ObjectNode analysis = json.createObjectNode();
+    if (offer != null && offer.version() > 1) {
+      JsonNode review = reviews.append(caseId, offer, baseline, status, now);
+      analysis.set("dealReview", review);
+      status = review.path("status").asText();
+    }
     analysis.put("reviewStatus", status);
     analysis.put("reviewLabel", "MATCHES_APPROVED_BASELINE".equals(status) ? "Matches approved deal"
         : status.equals("UNABLE_TO_VERIFY") ? "Unable to verify" : "Review required");
@@ -172,6 +179,7 @@ public class CoreReportService {
     if (baseline != null) collectPlanAmounts(baseline.payload().path("plan"), "/payload/plan", plan.currency(), amounts);
     analysis.set("materialAmounts", json.valueToTree(amounts));
     analysis.set("policyVersions", json.valueToTree(Map.of("review", CoreReviewPolicy.VERSION,
+        "revisedReview", com.dealanalyzer.review.RevisedOfferPolicy.VERSION,
         "materiality", "core-materiality.v1: zero term/calculation delta; quoted-total tolerance is recorded in cash economics",
         "rating", "selling-price-rating.v1", "cashEconomics", cash == null ? "UNAVAILABLE" : cash.policyVersion(),
         "market", assessment == null ? "UNAVAILABLE" : assessment.methodVersion(),

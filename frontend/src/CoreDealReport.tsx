@@ -1,3 +1,4 @@
+import { RevisedOfferReview, type DealReview } from "./RevisedOfferReview";
 import { OutsideFinancing } from "./OutsideFinancing";
 import { DealerFinancingForm, DealerFinancingResult, type FinancingResult } from "./DealerFinancing";
 import { useEffect, useRef, useState } from "react";
@@ -5,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 export type CoreReport = {
   version: number; asOf: string; status: string;
   analysis: {
+    dealReview?: DealReview;
     financingAvailability?: string; financing?: FinancingResult | null; financingTerms?: { aprPercent: number | null; termMonths: number | null } | null;
     reviewLabel: string; dealRating: string; ratingBasis: string; nextAction: string;
     topReasons: string[]; marketAvailability: string; cashAvailability: string;
@@ -67,7 +69,8 @@ export function CoreDealReport({ report }: { report: CoreReport }) {
     </section>
     <p>Version {report.version} · {report.status} · As of <time dateTime={report.asOf}>{report.asOf}</time></p>
     {report.status === "PARTIAL" && <p>Warning: this report is partial. One or more analysis areas are unavailable.</p>}
-    <nav aria-label="Report sections"><a href="#core-amounts">Amounts</a> · {analysis.financingAvailability && analysis.financingAvailability !== "NOT_APPLICABLE" && <><a href="#core-financing">Financing</a> · </>} <a href="#core-evidence">Evidence and calculations</a> · <a href="#core-scope">Scope and policies</a></nav>
+    <nav aria-label="Report sections">{analysis.dealReview && <><a href="#revised-offer-review">Revised offer comparison</a> · </>}<a href="#core-amounts">Amounts</a> · {analysis.financingAvailability && analysis.financingAvailability !== "NOT_APPLICABLE" && <><a href="#core-financing">Financing</a> · </>} <a href="#core-evidence">Evidence and calculations</a> · <a href="#core-scope">Scope and policies</a></nav>
+    {analysis.dealReview && <RevisedOfferReview review={analysis.dealReview} />}
     <section className="panel" id="core-amounts" tabIndex={-1}>
       <h3>Amounts and sources</h3>
       <p>Market analysis: {analysis.marketAvailability}. Cash economics: {analysis.cashAvailability}.</p>
