@@ -1,3 +1,4 @@
+import { CaseDownloads } from "./CasePortability";
 import { NegotiationLoader } from "./NegotiationDraft";
 import { RevisedOfferReview, type DealReview } from "./RevisedOfferReview";
 import { OutsideFinancing } from "./OutsideFinancing";
@@ -52,6 +53,7 @@ export function CoreReportLoader({ caseId, token }: { caseId: string; token: str
     </div>
     {report && <>
       <CoreDealReport report={report} />
+      <CaseDownloads key={`download-${caseId}-${token}-${report.version}`} caseId={caseId} token={token} reportVersion={report.version} />
       <NegotiationLoader key={`${caseId}-${token}-${report.version}`} caseId={caseId} token={token} reportVersion={report.version} />
     </>}
   </section>;

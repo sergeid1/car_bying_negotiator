@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import "./styles.css";
+import { RecoveryAccess, RecoveryEmailOptIn, CaseDownloads } from "./CasePortability";
 import { PricePlan } from "./PricePlan";
 import { CoreReportLoader } from "./CoreDealReport";
 
@@ -151,6 +152,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         </p>
       </header>
 
+      <RecoveryAccess onRecovered={setCaseCredentials} />
       <section className="panel" aria-label="Open an existing Buying Case">
         <form onSubmit={event => {
           event.preventDefault();
@@ -162,6 +164,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
           <button>Open price plan</button>
         </form>
       </section>
+      {caseCredentials && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
+      {caseCredentials && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
       {caseCredentials && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
       {caseCredentials && <CoreReportLoader key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
 

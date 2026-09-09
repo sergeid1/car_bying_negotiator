@@ -63,6 +63,10 @@ public class CaseAccessService {
             protect(suppliedToken).getBytes(StandardCharsets.US_ASCII));
   }
 
+  public String protectRecoveryToken(String token) {
+    return protect("recovery:" + token);
+  }
+
   private String protect(String token) {
     try {
       Mac hmac = Mac.getInstance("HmacSHA256");

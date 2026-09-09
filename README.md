@@ -77,3 +77,7 @@ declared in the report payload. `ExtractionEvaluator`, `ProviderContractEvaluato
 `ReviewSafetyEvaluator` are public harness APIs so later product slices can reuse the same gates.
 
 Core reports also provide [grounded explanations and editable negotiation drafts](docs/grounded-language-policy.md), with versioned source findings and local copy/download controls.
+
+Buying Cases also support [optional email recovery and retained-data downloads](docs/case-portability-policy.md).
+Configure SMTP and the public recovery URL to enable email delivery. ZIP, HTML and PDF downloads
+use saved snapshots and require `DOCUMENT_STORAGE_ENCRYPTION_KEY` for encrypted export storage.
