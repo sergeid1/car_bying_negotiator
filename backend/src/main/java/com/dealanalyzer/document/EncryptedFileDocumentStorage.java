@@ -17,18 +17,23 @@ import org.springframework.stereotype.Component;
 class EncryptedFileDocumentStorage implements DocumentObjectStorage {
   private static final int IV_BYTES = 12;
 
+  private final com.dealanalyzer.buyingcase.persistence.CaseWriteGuard guard;
   private final Path storagePath;
   private final String configuredKey;
 
   EncryptedFileDocumentStorage(
       @Value("${document.storage.path:./var/document-objects}") Path storagePath,
-      @Value("${document.storage.encryption-key:}") String configuredKey) {
+      @Value("${document.storage.encryption-key:}") String configuredKey,
+      com.dealanalyzer.buyingcase.persistence.CaseWriteGuard guard) {
+    this.guard = guard;
     this.storagePath = storagePath;
     this.configuredKey = configuredKey;
   }
 
   @Override
+  @org.springframework.transaction.annotation.Transactional
   public StoredObject store(String caseId, String documentId, byte[] content) {
+    guard.lockActive(caseId);
     return encrypt(caseId + ":" + documentId, caseId + "-" + documentId + ".enc", content);
   }
 
@@ -38,8 +43,10 @@ class EncryptedFileDocumentStorage implements DocumentObjectStorage {
   }
 
   @Override
+  @org.springframework.transaction.annotation.Transactional
   public StoredObject storeNormalized(
       String caseId, String documentId, int pageNumber, byte[] content) {
+    guard.lockActive(caseId);
     String objectKey = caseId + "-" + documentId + "-page-" + pageNumber + ".png.enc";
     return encrypt(caseId + ":" + documentId + ":page:" + pageNumber, objectKey, content);
   }

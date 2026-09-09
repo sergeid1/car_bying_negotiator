@@ -10,7 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class DocumentIntakePersistence {
-  private static final List<String> RETENTION_PENDING = List.of("ACTIVE", "DELETION_IN_PROGRESS");
+  private static final List<String> RETENTION_PENDING = List.of("ACTIVE", "DELETION_PENDING");
+  private final com.dealanalyzer.buyingcase.persistence.CaseRetentionService retention;
   private final SourceDocumentRepository documents;
   private final DocumentPageRepository pages;
   private final DocumentOperationRepository operations;
@@ -20,7 +21,9 @@ public class DocumentIntakePersistence {
       SourceDocumentRepository documents,
       DocumentPageRepository pages,
       DocumentOperationRepository operations,
-      DocumentOperationRetryRepository retries) {
+      DocumentOperationRetryRepository retries,
+      com.dealanalyzer.buyingcase.persistence.CaseRetentionService retention) {
+    this.retention = retention;
     this.documents = documents;
     this.pages = pages;
     this.operations = operations;
@@ -30,10 +33,11 @@ public class DocumentIntakePersistence {
   @Transactional
   public UploadRecords create(
       NewDocument document, String operationId, String idempotencyKey, Instant now) {
+    Instant deadline = retention.registerDocumentDeadline(document.caseId(), document.retentionDeadline());
     SourceDocumentEntity savedDocument = documents.save(new SourceDocumentEntity(
         document.id(), document.caseId(), document.originalFilename(), document.objectKey(),
         document.checksumSha256(), document.verifiedMediaType(), document.sizeBytes(),
-        document.retentionDeadline(), document.encryptionKeyReference(), now));
+        deadline, document.encryptionKeyReference(), now));
     savedDocument.pageCount = document.pageCount();
     for (int pageNumber = 1; pageNumber <= document.pageCount(); pageNumber++) {
       pages.save(new DocumentPageEntity(
@@ -263,7 +267,7 @@ public class DocumentIntakePersistence {
   public void markDeletionStarted(String documentId, Instant now) {
     SourceDocumentEntity document = documents.findById(documentId).orElseThrow();
     if (document.lifecycle.equals("ACTIVE")) {
-      document.lifecycle = "DELETION_IN_PROGRESS";
+      document.lifecycle = "DELETION_PENDING";
       document.updatedAt = now;
     }
   }

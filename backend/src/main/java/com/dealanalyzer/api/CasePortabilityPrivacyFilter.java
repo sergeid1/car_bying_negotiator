@@ -9,8 +9,7 @@ class CasePortabilityPrivacyFilter extends OncePerRequestFilter {
   @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain)
       throws ServletException,IOException {
     String path=request.getRequestURI();
-    if(path.startsWith("/api/v1/recovery/") || path.startsWith("/api/v1/cases/")
-        && (path.contains("/exports") || path.endsWith("/recovery-email"))) {
+    if(path.startsWith("/api/v1/recovery/") || path.startsWith("/api/v1/cases/")) {
       response.setHeader("Cache-Control","no-store");
       response.setHeader("Referrer-Policy","no-referrer");
     }

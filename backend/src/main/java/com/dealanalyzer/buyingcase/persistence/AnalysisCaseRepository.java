@@ -6,6 +6,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 
 interface AnalysisCaseRepository extends JpaRepository<AnalysisCaseEntity, String> {
+  @org.springframework.data.jpa.repository.Query("select c.id from AnalysisCaseEntity c where c.lifecycle = 'ACTIVE' and c.accessExpiresAt <= :now")
+  java.util.List<String> findExpiredIds(java.time.Instant now);
+
   Optional<AnalysisCaseEntity> findByCreationIdempotencyKey(String creationIdempotencyKey);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)

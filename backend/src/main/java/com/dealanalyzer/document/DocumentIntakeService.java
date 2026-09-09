@@ -39,7 +39,7 @@ public class DocumentIntakeService {
   private final TaskExecutor taskExecutor;
   private final DocumentPageNormalizer pageNormalizer;
   private final DocumentExtractionService extractionService;
-  private final Duration retention;
+  private final com.dealanalyzer.buyingcase.persistence.CaseRetentionService retentionPolicy;
   private final boolean workerEnabled;
 
   DocumentIntakeService(
@@ -53,6 +53,7 @@ public class DocumentIntakeService {
       DocumentPageNormalizer pageNormalizer,
       DocumentExtractionService extractionService,
       @Value("${document.retention:PT720H}") Duration retention,
+      com.dealanalyzer.buyingcase.persistence.CaseRetentionService retentionPolicy,
       @Value("${document.worker.enabled:true}") boolean workerEnabled) {
     if (retention.isNegative() || retention.isZero() || retention.compareTo(Duration.ofDays(30)) > 0) {
       throw new IllegalArgumentException("Document retention must be between zero and 30 days");
@@ -66,7 +67,7 @@ public class DocumentIntakeService {
     this.taskExecutor = taskExecutor;
     this.pageNormalizer = pageNormalizer;
     this.extractionService = extractionService;
-    this.retention = retention;
+    this.retentionPolicy = retentionPolicy;
     this.workerEnabled = workerEnabled;
   }
 
@@ -112,7 +113,7 @@ public class DocumentIntakeService {
               checksum,
               inspected.mediaType(),
               bytes.length,
-              now.plus(retention),
+              retentionPolicy.documentDeadline(caseId, now),
               stored.keyReference(),
               inspected.pageCount(),
               inspected.width(),
@@ -133,6 +134,9 @@ public class DocumentIntakeService {
         throw new IdempotencyConflictException();
       }
       return started(records);
+    } catch (RuntimeException failure) {
+      objectStorage.delete(stored.objectKey());
+      throw failure;
     }
     casePersistence.updateStatus(caseId, "DOCUMENT_PROCESSING", now);
     dispatch(operationId);

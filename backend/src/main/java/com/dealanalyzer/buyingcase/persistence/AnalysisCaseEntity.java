@@ -10,6 +10,11 @@ import java.time.Instant;
 @Entity
 @Table(name = "analysis_cases")
 class AnalysisCaseEntity {
+  @Column(nullable = false)
+  String lifecycle = "ACTIVE";
+
+  @Column(name = "document_retention_days")
+  Integer documentRetentionDays;
   @Column(name = "core_review_blocked", nullable = false)
   boolean coreReviewBlocked;
   @Id

@@ -44,7 +44,7 @@ no analysis or regeneration call in the download path. Failed assembly/rendering
 the export job, leaving case and report versions intact. Retry the same request key after
 restoring availability. Expired jobs require a new key; the UI offers **Start a new export**.
 Jobs are downloadable for at most 24 hours and never beyond case access or the earliest
-included document retention deadline. Physical expiry/deletion is the lifecycle work in ticket 17.
+included document retention deadline. Physical expiry/deletion follows the [complete case lifecycle policy](case-deletion-policy.md).
 
 Archives contain:
 
