@@ -131,6 +131,37 @@ class DocumentExtractionAcceptanceTest {
       assertThat(thirdReview.path("previousOfferId").asText()).isEqualTo(revisedOffer.get("id").asText());
       assertThat(thirdReview.path("currentOfferId").asText()).isEqualTo(thirdOffer.get("id").asText());
       assertThat(thirdReview.path("status").asText()).isEqualTo("UNABLE_TO_VERIFY");
+      Path documentObjects = temporaryDirectory.resolve("revised-objects");
+      Path unavailableObjects = temporaryDirectory.resolve("temporarily-unavailable-objects");
+      java.nio.file.Files.move(documentObjects, unavailableObjects);
+      try {
+        assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), casePath + "/exports",
+            Map.of("format", "ZIP", "reportVersion", 0), "retained-archive", token))
+            .isInstanceOf(org.springframework.web.client.HttpServerErrorException.class);
+      } finally { java.nio.file.Files.move(unavailableObjects, documentObjects); }
+      JsonNode archive = HttpAcceptanceHarness.post(application.client(), casePath + "/exports",
+          Map.of("format", "ZIP", "reportVersion", 0), "retained-archive", token);
+      byte[] exported = application.client().get().uri(casePath + "/exports/" + archive.path("id").asText())
+          .header("Case-Access-Token", token).retrieve().body(byte[].class);
+      var entries = new java.util.HashMap<String, byte[]>();
+      try (var zip = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(exported))) {
+        for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry())
+          entries.put(entry.getName(), zip.readAllBytes());
+      }
+      JsonNode retained = new com.fasterxml.jackson.databind.ObjectMapper().readTree(entries.get("case-data.json"));
+      assertThat(retained.path("dealer_offers")).hasSize(3);
+      assertThat(retained.path("analysis_reports")).hasSize(3);
+      assertThat(retained.path("deal_reviews")).hasSize(2);
+      assertThat(retained.path("document_extractions")).hasSize(2);
+      assertThat(retained.path("deal_term_corrections")).isNotEmpty();
+      assertThat(retained.path("price_plan_snapshots")).isNotEmpty();
+      assertThat(entries).containsKeys("reports/report-1.html", "reports/report-3.html",
+          "documents/" + upload.at("/document/id").asText(),
+          "documents/" + upload.at("/document/id").asText() + "-page-1.png");
+      try (var original = org.apache.pdfbox.Loader.loadPDF(entries.get("documents/" + upload.at("/document/id").asText()))) {
+        assertThat(original.getNumberOfPages()).isEqualTo(2);
+      }
+      assertThat(retained.toString()).doesNotContain(token, "object_key", "access_token_hash");
       savedCase = caseId; savedToken = token; savedReview = review;
     }
     try (RunningApplication restarted = harness.startWithConfiguration(

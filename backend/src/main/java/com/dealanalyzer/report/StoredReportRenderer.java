@@ -1,0 +1,106 @@
+package com.dealanalyzer.report;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.pdfbox.pdmodel.*;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.springframework.stereotype.Component;
+/** Both formats traverse exactly the stored payload; this renderer has no analysis dependencies. */
+@Component
+public class StoredReportRenderer {
+  private record Line(String text, boolean heading) {}
+  private List<Line> lines(JsonNode payload) {
+    var lines=new ArrayList<Line>();
+    lines.add(new Line("Deal Analysis Report - version " + payload.path("version").asText(), true));
+    lines.add(new Line("Saved immutable report. Amounts in minor units represent cents for USD. Evidence paths refer to this report.", false));
+    var analysis=payload.path("analysis");
+    lines.add(new Line(analysis.path("reviewLabel").asText(analysis.path("reviewStatus").asText()), true));
+    lines.add(new Line("Rating: " + analysis.path("dealRating").asText().replace('_',' '), false));
+    lines.add(new Line("As of: " + payload.path("asOf").asText(payload.path("generatedAt").asText()), false));
+    for(var reason:analysis.path("topReasons")) lines.add(new Line(reason.asText(),false));
+    lines.add(new Line("Next action",true));
+    lines.add(new Line(analysis.path("nextAction").asText(),false));
+    lines.add(new Line("Material amounts",true));
+    for(var amount:analysis.path("materialAmounts")) {
+      String value=amount.path("minorUnits").isNumber()
+          ? java.math.BigDecimal.valueOf(amount.path("minorUnits").asLong(),2).toPlainString()+" "+amount.path("currency").asText()
+          : "Unavailable";
+      lines.add(new Line(amount.path("label").asText()+": "+value+" ("+amount.path("precision").asText()+")",false));
+      lines.add(new Line("Evidence: "+amount.path("source").asText()+" "+amount.path("pointer").asText(),false));
+    }
+    lines.add(new Line("Limitations",true));
+    for(var limitation:analysis.path("limitations")) lines.add(new Line(limitation.asText(),false));
+    lines.add(new Line("Complete saved payload and evidence",true));
+    lines.add(new Line("The following reference paths preserve all recorded fields. Unsupported font characters are identified by their Unicode code point.",false));
+    walk(payload, "", lines);
+    return lines;
+  }
+  private void walk(JsonNode node, String path, List<Line> lines) {
+    if (node.isObject()) node.fields().forEachRemaining(field -> {
+      String child=path + "/" + field.getKey();
+      if (path.isEmpty() && field.getValue().isContainerNode()) lines.add(new Line(field.getKey(), true));
+      walk(field.getValue(), child, lines);
+    });
+    else if (node.isArray()) {
+      if (node.isEmpty()) lines.add(new Line(path + ": none recorded", false));
+      for (int i=0;i<node.size();i++) walk(node.get(i), path + "/" + i, lines);
+    } else lines.add(new Line(path + ": " + (node.isNull() ? "Unavailable" : node.asText()), false));
+  }
+  public byte[] html(JsonNode payload) {
+    var out=new StringBuilder("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Saved Deal Analysis Report</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:72ch;margin:2rem auto;padding:0 1rem;color:#172b3a}p{overflow-wrap:anywhere}h1,h2{break-after:avoid}@media print{body{font-size:10pt;margin:0}p{orphans:3;widows:3}}</style><main>");
+    boolean first=true;
+    for (var line:lines(payload)) {
+      String tag=line.heading() ? first ? "h1" : "h2" : "p";
+      out.append('<').append(tag).append('>').append(escape(line.text())).append("</").append(tag).append('>');
+      first=false;
+    }
+    return out.append("</main></html>").toString().getBytes(StandardCharsets.UTF_8);
+  }
+  private String escape(String value) { return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;"); }
+  public byte[] pdf(JsonNode payload) {
+    try (var document=new PDDocument(); var output=new ByteArrayOutputStream()) {
+      var font=PDType0Font.load(document, StoredReportRenderer.class.getResourceAsStream("/org/apache/pdfbox/resources/ttf/LiberationSans-Regular.ttf"));
+      var bold=font;
+      PDPageContentStream stream=null; float y=0; int pageNumber=0;
+      try {
+        for (var line:lines(payload)) {
+          var selected=line.heading() ? bold : font; int size=line.heading() ? 14 : 10;
+          String remaining=printable(line.text(), selected);
+          do {
+            if (stream==null || y < (line.heading() ? 115 : 64)) {
+              if (stream!=null) stream.close();
+              var page=new PDPage(PDRectangle.LETTER); document.addPage(page);
+              stream=new PDPageContentStream(document, page); y=744; pageNumber++;
+              stream.beginText(); stream.setFont(font, 9); stream.newLineAtOffset(48, 30);
+              stream.showText("Saved Deal Analysis Report | Page " + pageNumber); stream.endText();
+            }
+            int end=remaining.length();
+            while (end>1 && selected.getStringWidth(remaining.substring(0,end))*size/1000 > 516) end--;
+            if (end<remaining.length()) { int space=remaining.lastIndexOf(' ',end); if(space>end/2) end=space; }
+            stream.beginText(); stream.setFont(selected,size); stream.newLineAtOffset(48,y);
+            stream.showText(remaining.substring(0,end)); stream.endText(); y-=size+5;
+            remaining=remaining.substring(end).stripLeading();
+          } while (!remaining.isEmpty());
+          y-=line.heading() ? 8 : 4;
+        }
+      } finally { if(stream!=null) stream.close(); }
+      document.save(output); return output.toByteArray();
+    } catch (java.io.IOException failure) { throw new IllegalStateException("Report rendering unavailable; retry safely", failure); }
+  }
+  private String printable(String value, PDFont font) {
+    var out=new StringBuilder();
+    value.codePoints().forEach(cp -> {
+      String character=new String(Character.toChars(cp));
+      if (Character.isISOControl(cp)) { out.append(' '); return; }
+      try { font.encode(character); out.append(character); }
+      catch (IllegalArgumentException | java.io.IOException unsupported) { out.append(String.format("[U+%04X]",cp)); }
+    });
+    return out.toString();
+  }
+}
