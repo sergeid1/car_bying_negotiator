@@ -213,7 +213,9 @@ public class DocumentIntakeService {
       }
       persistence.fail(
           operationId, stage,
-          stage.equals("EXTRACTING") ? "EXTRACTION_FAILED" : "NORMALIZATION_FAILED",
+          exception instanceof com.dealanalyzer.operations.ProviderMeter.Failure providerFailure
+              ? providerFailure.status().name()
+              : stage.equals("EXTRACTING") ? "EXTRACTION_FAILED" : "NORMALIZATION_FAILED",
           stage.equals("EXTRACTING")
               ? "Deal Terms extraction could not be completed. Retry this stage without uploading again."
               : "Document page normalization could not be completed. Retry this stage without uploading again.",

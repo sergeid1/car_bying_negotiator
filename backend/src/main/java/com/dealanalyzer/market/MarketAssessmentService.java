@@ -19,13 +19,15 @@ public class MarketAssessmentService {
   private final VehicleEvidenceService vehicles;
   private final MarketDataProvider provider;
   private final MarketAssessmentPersistence persistence;
+  private final com.dealanalyzer.operations.ProviderMeter meter;
   private final MarketAssessmentPolicy policy = new MarketAssessmentPolicy();
 
   public MarketAssessmentService(
       EphemeralBuyingCaseService cases,
       VehicleEvidenceService vehicles,
       MarketDataProvider provider,
-      MarketAssessmentPersistence persistence) {
+      MarketAssessmentPersistence persistence, com.dealanalyzer.operations.ProviderMeter meter) {
+    this.meter = meter;
     this.cases = cases;
     this.vehicles = vehicles;
     this.provider = provider;
@@ -46,8 +48,14 @@ public class MarketAssessmentService {
     Instant now = Instant.now();
     ProviderResult result;
     try {
-      result = provider.retrieve(query);
-      if (result.snapshot() == null) {
+      result = meter.call(caseId, com.dealanalyzer.operations.ProviderMeter.Operation.MARKET_RETRIEVAL,
+          provider, 1, () -> provider.retrieve(query), value -> {
+            if (value.snapshot() == null || !"market-provider.v1".equals(value.snapshot().schemaVersion()))
+              return com.dealanalyzer.operations.ProviderMeter.Status.CONTRACT_FAILURE;
+            return value.availability() == Availability.AVAILABLE ? com.dealanalyzer.operations.ProviderMeter.Status.SUCCESS
+                : com.dealanalyzer.operations.ProviderMeter.Status.PROVIDER_UNAVAILABLE;
+          });
+      if (result == null || result.snapshot() == null) {
         result = unavailable("Provider response did not include snapshot metadata.", now);
       } else if (!"market-provider.v1".equals(result.snapshot().schemaVersion())) {
         result = new ProviderResult(

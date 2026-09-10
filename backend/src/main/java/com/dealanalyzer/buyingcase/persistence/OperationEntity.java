@@ -23,6 +23,9 @@ class OperationEntity {
   @Column(nullable = false, length = 40)
   String stage;
 
+  @Column(name = "failure_category", nullable = false, length = 40)
+  String failureCategory = "NONE";
+
   @Column(name = "error_message", length = 500)
   String errorMessage;
 

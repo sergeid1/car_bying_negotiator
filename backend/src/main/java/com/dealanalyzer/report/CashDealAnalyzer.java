@@ -29,7 +29,17 @@ public class CashDealAnalyzer {
   }
 
   public DealAnalysis analyze(SyntheticAnalysisRequest input) {
-    var market = marketDataProvider.assess(input.vehicle());
+    return analyze(input, marketDataProvider.assess(input.vehicle()));
+  }
+
+  public DealAnalysis analyze(String caseId, SyntheticAnalysisRequest input, com.dealanalyzer.operations.ProviderMeter meter) {
+    var market = meter.call(caseId, com.dealanalyzer.operations.ProviderMeter.Operation.SYNTHETIC_MARKET,
+        marketDataProvider, 1, () -> marketDataProvider.assess(input.vehicle()),
+        value -> com.dealanalyzer.operations.ProviderMeter.Status.SUCCESS);
+    return analyze(input, market);
+  }
+
+  private DealAnalysis analyze(SyntheticAnalysisRequest input, com.dealanalyzer.market.MarketEvidence market) {
     var economics = calculator.calculate(input.dealerOffer());
     var rating = ratingPolicy.rate(economics, market);
 

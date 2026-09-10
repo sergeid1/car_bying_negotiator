@@ -85,3 +85,5 @@ use saved snapshots and require `DOCUMENT_STORAGE_ENCRYPTION_KEY` for encrypted 
 Buying Cases support [shorter retention and verified deletion](docs/case-deletion-policy.md).
 Deletion revokes case and recovery access immediately; a retryable worker removes the complete
 case graph and stored artifacts. Backup expiry remains unverified.
+
+Operators have [restricted diagnostics, provider usage and separately consented field review](docs/service-operations-policy.md). Operator accounts are disabled until individually configured.

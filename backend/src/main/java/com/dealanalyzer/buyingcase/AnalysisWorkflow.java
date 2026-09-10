@@ -30,6 +30,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 @Service
 public class AnalysisWorkflow {
+  private final com.dealanalyzer.operations.ProviderMeter meter;
   private final BuyingCaseStore store;
   private final CashDealAnalyzer analyzer;
   private final ObjectMapper json;
@@ -45,7 +46,8 @@ public class AnalysisWorkflow {
       ObjectMapper json,
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
       CaseAccessService caseAccess,
-      @Value("${analysis.worker.enabled:true}") boolean workerEnabled) {
+      @Value("${analysis.worker.enabled:true}") boolean workerEnabled, com.dealanalyzer.operations.ProviderMeter meter) {
+    this.meter = meter;
     this.store = store;
     this.analyzer = analyzer;
     this.json = json.copy().enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY);
@@ -174,7 +176,7 @@ public class AnalysisWorkflow {
       StoredCase buyingCase = store.requireCase(caseId);
       SyntheticAnalysisRequest input = json.readValue(buyingCase.inputJson(), SyntheticAnalysisRequest.class);
       store.updateStage(operationId, OperationStage.FETCHING_MARKET, Instant.now());
-      DealAnalysis analysis = analyzer.analyze(input);
+      DealAnalysis analysis = analyzer.analyze(caseId, input, meter);
       store.updateStage(operationId, OperationStage.CALCULATING, Instant.now());
       store.updateStage(operationId, OperationStage.ASSEMBLING_REPORT, Instant.now());
       int version = buyingCase.currentReportVersion() + 1;
@@ -184,7 +186,9 @@ public class AnalysisWorkflow {
           caseId, operationId, version, report.payloadJson(), report.analysisFingerprint(),
           report.generatedAt());
     } catch (Exception exception) {
-      store.fail(caseId, operationId, "Analysis could not be completed", Instant.now());
+      store.fail(caseId, operationId, "Analysis could not be completed", Instant.now(),
+          exception instanceof com.dealanalyzer.operations.ProviderMeter.Failure providerFailure
+              ? providerFailure.status() : com.dealanalyzer.operations.ProviderMeter.Status.INTERNAL);
     }
   }
 

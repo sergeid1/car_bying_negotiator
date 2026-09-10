@@ -14,9 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class EphemeralCasePersistence {
   private final AnalysisCaseRepository cases;
   private final ConsentRecordRepository consents;
+  private final com.dealanalyzer.operations.ReviewConsentLifecycle reviews;
 
   EphemeralCasePersistence(
-      AnalysisCaseRepository cases, ConsentRecordRepository consents) {
+      AnalysisCaseRepository cases, ConsentRecordRepository consents, com.dealanalyzer.operations.ReviewConsentLifecycle reviews) {
+    this.reviews = reviews;
     this.cases = cases;
     this.consents = consents;
   }
@@ -93,6 +95,9 @@ public class EphemeralCasePersistence {
       Instant now) {
     cases.findLockedById(caseId)
         .orElseThrow(() -> new IllegalArgumentException("Buying Case not found"));
+    if (purpose == ConsentPurpose.HUMAN_REVIEW || purpose == ConsentPurpose.SERVICE_PROCESSING && !granted) {
+      reviews.invalidate(caseId);
+    }
     Optional<ConsentRecordEntity> previous =
         consents.findTopByCaseIdAndPurposeOrderByConsentVersionDesc(caseId, purpose.name());
     int version = previous.map(record -> record.consentVersion + 1).orElse(1);
