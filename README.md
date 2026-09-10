@@ -81,3 +81,7 @@ Core reports also provide [grounded explanations and editable negotiation drafts
 Buying Cases also support [optional email recovery and retained-data downloads](docs/case-portability-policy.md).
 Configure SMTP and the public recovery URL to enable email delivery. ZIP, HTML and PDF downloads
 use saved snapshots and require `DOCUMENT_STORAGE_ENCRYPTION_KEY` for encrypted export storage.
+
+Buying Cases support [shorter retention and verified deletion](docs/case-deletion-policy.md).
+Deletion revokes case and recovery access immediately; a retryable worker removes the complete
+case graph and stored artifacts. Backup expiry remains unverified.

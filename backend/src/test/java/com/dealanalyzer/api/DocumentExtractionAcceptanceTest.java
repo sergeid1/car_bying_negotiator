@@ -171,6 +171,8 @@ class DocumentExtractionAcceptanceTest {
       assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCase + "/deal-reviews/1", savedToken)).isEqualTo(savedReview);
       assertThatThrownBy(() -> HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCase + "/deal-reviews/1", "invalid"))
           .isInstanceOf(HttpClientErrorException.class);
+      CaseDeletionAcceptanceTest.verifyCompleteRemoval(restarted, savedCase, savedToken,
+          temporaryDirectory.resolve("revised-objects"));
     }
   }
   @Test
@@ -671,6 +673,8 @@ class DocumentExtractionAcceptanceTest {
       var jdbc = new org.springframework.jdbc.core.JdbcTemplate(restarted.context().getBean(javax.sql.DataSource.class));
       assertThat(jdbc.queryForObject("select count(*) from finance_offers where case_id = ?", Integer.class, savedCaseId)).isEqualTo(4);
       assertThat(jdbc.queryForObject("select count(*) from financing_results where case_id = ?", Integer.class, savedCaseId)).isEqualTo(4);
+      CaseDeletionAcceptanceTest.verifyCompleteRemoval(restarted, savedCaseId, savedToken,
+          temporaryDirectory.resolve("finance-objects"));
     }
   }
 

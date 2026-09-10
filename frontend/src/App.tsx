@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import "./styles.css";
 import { RecoveryAccess, RecoveryEmailOptIn, CaseDownloads } from "./CasePortability";
+import { CaseLifecycle } from "./CaseLifecycle";
 import { PricePlan } from "./PricePlan";
 import { CoreReportLoader } from "./CoreDealReport";
 
@@ -95,6 +96,7 @@ function humanize(value: string) {
 }
 
 export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
+  const [caseRevoked, setCaseRevoked] = useState(false);
   const [stage, setStage] = useState<string>();
   const [report, setReport] = useState<Report>();
   const [error, setError] = useState<string>();
@@ -152,11 +154,12 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         </p>
       </header>
 
-      <RecoveryAccess onRecovered={setCaseCredentials} />
+      <RecoveryAccess onRecovered={value => { setCaseRevoked(false); setCaseCredentials(value); }} />
       <section className="panel" aria-label="Open an existing Buying Case">
         <form onSubmit={event => {
           event.preventDefault();
           const values = new FormData(event.currentTarget);
+          setCaseRevoked(false);
           setCaseCredentials({ caseId: String(values.get("caseId")), token: String(values.get("token")) });
         }}>
           <label>Buying Case ID<input name="caseId" required /></label>
@@ -164,10 +167,12 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
           <button>Open price plan</button>
         </form>
       </section>
-      {caseCredentials && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
-      {caseCredentials && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
-      {caseCredentials && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
-      {caseCredentials && <CoreReportLoader key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
+      {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
+        onRevoked={() => { setCaseRevoked(true); setReport(undefined); setStage(undefined); setError(undefined); }} />}
+      {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
+      {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
+      {caseCredentials && !caseRevoked && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
+      {caseCredentials && !caseRevoked && <CoreReportLoader key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
 
       {!report && (
         <section className="panel" aria-labelledby="case-heading">

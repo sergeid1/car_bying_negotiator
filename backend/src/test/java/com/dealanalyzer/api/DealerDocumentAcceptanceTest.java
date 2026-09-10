@@ -1,6 +1,8 @@
 package com.dealanalyzer.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.springframework.web.client.HttpClientErrorException;
 
 import com.dealanalyzer.api.HttpAcceptanceHarness.RunningApplication;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -304,11 +306,44 @@ class DealerDocumentAcceptanceTest {
       try (var stored = Files.list(objects)) {
         assertThat(stored.count()).isZero();
       }
-      JsonNode document = HttpAcceptanceHarness.get(
-          application.client(),
-          "/api/v1/cases/" + caseId + "/documents/" + upload.at("/document/id").asText(),
-          token);
-      assertThat(document.get("lifecycle").asText()).isEqualTo("DELETED");
+      assertThatThrownBy(() -> HttpAcceptanceHarness.get(application.client(),
+          "/api/v1/cases/" + caseId + "/documents/" + upload.at("/document/id").asText(), token))
+          .isInstanceOf(HttpClientErrorException.NotFound.class);
+      application.context().getBean(com.dealanalyzer.buyingcase.persistence.CaseDeletionWorker.class).runOnce();
+      var jdbc = new org.springframework.jdbc.core.JdbcTemplate(application.context().getBean(javax.sql.DataSource.class));
+      assertThat(jdbc.queryForObject("select count(*) from source_documents where case_id = ?", Long.class, caseId)).isZero();
+    }
+  }
+
+  @Test
+  void unavailableStorageCannotVerifyDeletionAfterOnlyTheOriginalWasRemoved() throws Exception {
+    Path objects = temporaryDirectory.resolve("partial-page-objects");
+    Path unavailable = temporaryDirectory.resolve("unavailable-page-objects");
+    try (RunningApplication application = new HttpAcceptanceHarness(temporaryDirectory).start(
+        "partial-page", true, "--case.deletion.delay=PT1H", "--document.storage.path=" + objects,
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
+      JsonNode created = HttpAcceptanceHarness.post(application.client(), "/api/v1/cases", validCase());
+      String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+      JsonNode uploaded = upload(application, caseId, token, "quote.png", onePixelPng(), "partial-page-upload");
+      awaitTerminal(application, uploaded.at("/operation/id").asText(), token);
+      String documentId = uploaded.at("/document/id").asText();
+      // Model the persisted state after original deletion succeeds but page deletion fails.
+      Files.delete(objects.resolve(caseId + "-" + documentId + ".enc"));
+      application.context().getBean(com.dealanalyzer.document.persistence.DocumentIntakePersistence.class)
+          .markOriginalDeleted(documentId, java.time.Instant.now());
+      Files.move(objects, unavailable);
+      String deletionPath = "/api/v1/cases/" + caseId + "/deletion";
+      HttpAcceptanceHarness.post(application.client(), deletionPath, java.util.Map.of(), "delete", token);
+      var worker = application.context().getBean(com.dealanalyzer.buyingcase.persistence.CaseDeletionWorker.class);
+      try {
+        worker.runOnce();
+        assertThat(HttpAcceptanceHarness.get(application.client(), deletionPath, token).path("state").asText())
+            .isEqualTo("DELETION_PENDING");
+      } finally { Files.move(unavailable, objects); }
+      worker.runOnce();
+      assertThat(HttpAcceptanceHarness.get(application.client(), deletionPath, token).path("state").asText())
+          .isEqualTo("DELETED");
+      try (var files = Files.list(objects)) { assertThat(files.toList()).isEmpty(); }
     }
   }
 
