@@ -95,8 +95,10 @@ class CaseDeletionAcceptanceTest {
     // Physical removal is part of this fixture's contract: access denial alone cannot prove it.
     var jdbc = new org.springframework.jdbc.core.JdbcTemplate(app.context().getBean(javax.sql.DataSource.class));
     var tables = jdbc.queryForList("select table_name from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'", String.class);
+    // Pilot protocol, anonymous totals and operator-supplied aggregate evidence have no case references.
     for (String table : tables) {
-      if (java.util.Set.of("flyway_schema_history", "jurisdiction_policies", "case_deletion_jobs", "case_deletion_attempts").contains(table)) continue;
+      if (java.util.Set.of("flyway_schema_history", "jurisdiction_policies", "case_deletion_jobs", "case_deletion_attempts",
+          "pilot_protocol", "pilot_cohort_totals", "pilot_observations").contains(table)) continue;
       assertThat(jdbc.queryForObject("select count(*) from " + table, Long.class)).as(table).isZero();
     }
     try (var files = java.nio.file.Files.list(objects)) { assertThat(files.toList()).isEmpty(); }

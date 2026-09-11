@@ -9,6 +9,10 @@ import org.springframework.stereotype.Repository;
 class CaseGraphDeletionPlan {
   private record Step(String table, String predicate) {}
   private static final List<Step> STEPS = List.of(
+      new Step("experiment_assignments", "case_id = :caseId"),
+      new Step("outcome_feedback", "case_id = :caseId"),
+      new Step("pilot_events", "case_id = :caseId"),
+      new Step("finding_feedback", "case_id = :caseId"),
       new Step("operator_audit", "case_id = :caseId"),
       new Step("human_review_requests", "case_id = :caseId"),
       new Step("provider_usage", "case_id = :caseId"),
@@ -54,6 +58,19 @@ class CaseGraphDeletionPlan {
     manager.flush();
     manager.createNativeQuery("update dealer_offers set previous_offer_id = null where case_id = :caseId")
         .setParameter("caseId", caseId).executeUpdate();
+    // Preserve only anonymous cohort counters before erasing every case-linked pilot record.
+    manager.createNativeQuery("""
+        update pilot_cohort_totals set
+          removed_count = removed_count + (select count(*) from experiment_assignments where case_id = :caseId),
+          removed_completed_count = removed_completed_count + (select count(*) from experiment_assignments a where a.case_id = :caseId
+            and exists (select 1 from pilot_events e where e.case_id = a.case_id and e.event_type = 'REPORT_COMPLETED' and e.category = 'COMPLETE')),
+          removed_understood_count = removed_understood_count + (select count(*) from experiment_assignments a where a.case_id = :caseId
+            and exists (select 1 from analysis_cases c where c.id = a.case_id and c.status = 'COMPLETE' and c.core_review_blocked = false)
+            and exists (select 1 from outcome_feedback o where o.case_id = a.case_id and o.stage = 'FINAL' and o.understood_decision = true)
+            and exists (select 1 from pilot_events e where e.case_id = a.case_id and e.event_type = 'REVIEW_STATUS' and e.category = 'MATCHES_APPROVED_BASELINE'
+              and not exists (select 1 from pilot_events n where n.case_id = e.case_id and n.event_type = 'REVIEW_STATUS' and n.created_at > e.created_at)))
+        where id = 1
+        """).setParameter("caseId", caseId).executeUpdate();
     long removed = 0;
     for (var step : STEPS) {
       removed += manager.createNativeQuery("delete from " + step.table + " where " + step.predicate)
