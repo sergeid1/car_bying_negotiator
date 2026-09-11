@@ -15,6 +15,10 @@ class CaseExportProjection {
     result.set("analysis_cases", rows("analysis_cases", "id, buyer_zip, dealer_zip, purchase_method, status, vehicle_json, dealer_offer_json, input_json, input_fingerprint, current_report_version, created_at, updated_at, buyer_jurisdiction, dealer_location, max_selling_price_minor, max_out_the_door_price_minor, access_expires_at, core_review_blocked", "id = :caseId", caseId));
     result.set("operations", rows("operations", "id, case_id, stage, error_message, created_at, updated_at", "case_id = :caseId", caseId));
     result.set("analysis_reports", rows("analysis_reports", "case_id, report_version, payload_json, analysis_fingerprint, created_at, operation_id", "case_id = :caseId", caseId));
+    result.set("experiment_assignments", rows("experiment_assignments", "id, case_id, variant, price_minor, qualified, created_at", "case_id = :caseId", caseId));
+    result.set("finding_feedback", rows("finding_feedback", "id, case_id, report_version, finding_pointer, accurate, understandable, useful, created_at", "case_id = :caseId", caseId));
+    result.set("outcome_feedback", rows("outcome_feedback", "id, case_id, payload_json, created_at", "case_id = :caseId", caseId));
+    result.set("pilot_events", rows("pilot_events", "id, case_id, event_type, category, duration_millis, created_at", "case_id = :caseId", caseId));
     result.set("consent_records", rows("consent_records", "id, case_id, purpose, consent_version, action, policy_version, occurred_at, actor, source, schema_version", "case_id = :caseId", caseId));
     result.set("vehicles", rows("vehicles", "id, case_id, vin, model_year, make, model, trim_name, mileage, confirmation_source, confirmed_at, updated_at", "case_id = :caseId", caseId));
     result.set("dealers", rows("dealers", "id, case_id, source, provider_dealer_id, name, city, state_code, created_at", "case_id = :caseId", caseId));

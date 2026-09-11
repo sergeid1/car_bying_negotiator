@@ -118,3 +118,7 @@ Local full-graph fixture measurements (2026-09-09): revised-offer history remove
 working-state snapshot found a missing-storage/normalized-page verification gap;
 a regression fixture reproduced false completion and the check was corrected.
 The explicit deletion order and documented standards review had no findings.
+
+Ticket 19 adds finding/outcome feedback, pilot events, and experiment assignments to the
+verified deletion graph. Only anonymous cohort totals remain, without Buyer, case,
+Dealer, price, or variant references; see [the pilot metrics policy](pilot-metrics-policy.md).

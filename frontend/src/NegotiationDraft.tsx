@@ -1,3 +1,4 @@
+import { FindingFeedback } from "./PilotFeedback";
 import { useEffect, useState } from "react";
 
 export type NegotiationVersion = {
@@ -26,10 +27,10 @@ export function NegotiationLoader({ caseId, token, reportVersion }: { caseId: st
   }, [caseId, token, reportVersion, attempt]);
   if (error) return <section className="panel"><p role="alert">Saved draft unavailable for this report. Older reports may need regeneration.</p><button onClick={() => setAttempt(attempt + 1)}>Retry loading draft</button></section>;
   if (!version) return <p role="status">Loading saved negotiation draft…</p>;
-  return <NegotiationDraft key={`${caseId}-${reportVersion}`} version={version} />;
+  return <NegotiationDraft key={`${caseId}-${reportVersion}`} version={version} credentials={{ caseId, token }} />;
 }
 
-export function NegotiationDraft({ version }: { version: NegotiationVersion }) {
+export function NegotiationDraft({ version, credentials }: { version: NegotiationVersion; credentials?: { caseId: string; token: string } }) {
   const [draft, setDraft] = useState(version.language.draft);
   const [status, setStatus] = useState("");
   async function copy() {
@@ -44,6 +45,7 @@ export function NegotiationDraft({ version }: { version: NegotiationVersion }) {
       <details><summary>Supporting finding: {item.sourcePointer.replace("/analysis/", "")}</summary>
         <p>Report {version.reportVersion} · <code>{item.sourcePointer}</code></p><pre>{item.sourceValue}</pre>
       </details>
+      {credentials && <FindingFeedback {...credentials} reportVersion={version.reportVersion} findingPointer={item.sourcePointer} />}
     </li>)}</ol>
     <p>{version.language.scope}</p>
     <label htmlFor="negotiation-draft">Your negotiation draft</label>

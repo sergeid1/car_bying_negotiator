@@ -87,3 +87,6 @@ Deletion revokes case and recovery access immediately; a retryable worker remove
 case graph and stored artifacts. Backup expiry remains unverified.
 
 Operators have [restricted diagnostics, provider usage and separately consented field review](docs/service-operations-policy.md). Operator accounts are disabled until individually configured.
+
+Buyers can provide [optional feedback, with privacy-minimized pilot measurements](docs/pilot-metrics-policy.md).
+Pilot operators must freeze thresholds and price variants before enrollment or metric review.

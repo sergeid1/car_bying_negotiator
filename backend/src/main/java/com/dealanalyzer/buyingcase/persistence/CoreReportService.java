@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** One short transaction freezes all locally persisted evidence and inserts one report per operation. */
 @Service
 public class CoreReportService {
+  private final com.dealanalyzer.pilot.PilotEvents pilotEvents;
   private final NegotiationService negotiation;
   private final EphemeralBuyingCaseService access;
   private final AnalysisCaseRepository cases;
@@ -42,7 +43,8 @@ public class CoreReportService {
   public CoreReportService(EphemeralBuyingCaseService access, AnalysisCaseRepository cases,
       OperationRepository operations, AnalysisReportRepository reports, BuyingCaseStore store,
       DealerOfferPersistence offers, CashEconomicsPersistence economics, MarketAssessmentPersistence market,
-      PricePlanService plans, VehicleEvidenceService vehicles, ObjectMapper json, FinancingService financing, com.dealanalyzer.review.DealReviewService reviews, NegotiationService negotiation) {
+      PricePlanService plans, VehicleEvidenceService vehicles, ObjectMapper json, FinancingService financing, com.dealanalyzer.review.DealReviewService reviews, NegotiationService negotiation, com.dealanalyzer.pilot.PilotEvents pilotEvents) {
+    this.pilotEvents = pilotEvents;
     this.negotiation = negotiation;
     this.reviews = reviews;
     this.access = access; this.cases = cases; this.operations = operations; this.reports = reports;
@@ -52,6 +54,7 @@ public class CoreReportService {
 
   @Transactional
   public StartedReport analyze(String caseId, String token, String key) {
+    Instant startedAt = Instant.now();
     var buyingCase = cases.findLockedById(caseId)
         .orElseThrow(() -> new com.dealanalyzer.buyingcase.ResourceNotFoundException("Buying Case not found"));
     access.reopen(caseId, token);
@@ -206,6 +209,12 @@ public class CoreReportService {
     operations.saveAndFlush(new OperationEntity(operationId, caseId, key, "COMPLETE", now));
     reports.saveAndFlush(new AnalysisReportEntity(caseId, version, write(payload), fingerprint, now, operationId));
     negotiation.append(caseId, version);
+    pilotEvents.record(caseId, com.dealanalyzer.pilot.PilotEvents.Type.REPORT_COMPLETED,
+        com.dealanalyzer.pilot.PilotEvents.Category.valueOf(completion), java.time.Duration.between(startedAt, Instant.now()).toMillis());
+    pilotEvents.record(caseId, com.dealanalyzer.pilot.PilotEvents.Type.REVIEW_STATUS,
+        com.dealanalyzer.pilot.PilotEvents.Category.valueOf(status), null);
+    pilotEvents.record(caseId, com.dealanalyzer.pilot.PilotEvents.Type.MARKET_COVERAGE,
+        available ? com.dealanalyzer.pilot.PilotEvents.Category.AVAILABLE : com.dealanalyzer.pilot.PilotEvents.Category.UNAVAILABLE, null);
     buyingCase.currentReportVersion = version; buyingCase.status = completion; buyingCase.updatedAt = now;
     buyingCase.coreReviewBlocked = financeCase ? !dealerCurrent : !current;
     return new StartedReport(store.requireOperation(operationId));
