@@ -10,6 +10,9 @@ import java.time.Instant;
 @org.hibernate.annotations.Immutable
 @Table(name = "analysis_reports")
 class AnalysisReportEntity {
+  @Column(name = "policy_metadata", nullable = false, updatable = false, columnDefinition = "text")
+  String policyMetadata;
+
   @Column(name = "operation_id", updatable = false, length = 36)
   String operationId;
   @EmbeddedId
@@ -40,6 +43,7 @@ class AnalysisReportEntity {
       String analysisFingerprint, Instant createdAt, String operationId) {
     this.id = new AnalysisReportKey(caseId, reportVersion);
     this.payloadJson = payloadJson;
+    this.policyMetadata = com.dealanalyzer.operations.ReportPolicyMetadata.snapshot(payloadJson);
     this.analysisFingerprint = analysisFingerprint;
     this.createdAt = createdAt;
     this.operationId = operationId;

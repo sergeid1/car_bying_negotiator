@@ -129,6 +129,12 @@ public class BuyingCaseStore {
 
   @Transactional
   public void fail(String caseId, String operationId, String safeMessage, Instant now) {
+    fail(caseId, operationId, safeMessage, now, com.dealanalyzer.operations.ProviderMeter.Status.INTERNAL);
+  }
+
+  @Transactional
+  public void fail(String caseId, String operationId, String safeMessage, Instant now,
+      com.dealanalyzer.operations.ProviderMeter.Status category) {
     AnalysisCaseEntity buyingCase = requireLockedCase(caseId);
     OperationEntity operation = operations.findById(operationId)
         .orElseThrow(() -> new ResourceNotFoundException("Operation not found"));
@@ -136,6 +142,7 @@ public class BuyingCaseStore {
     buyingCase.updatedAt = now;
     operation.stage = OperationStage.FAILED.name();
     operation.errorMessage = safeMessage;
+    operation.failureCategory = category.name();
     operation.updatedAt = now;
   }
 

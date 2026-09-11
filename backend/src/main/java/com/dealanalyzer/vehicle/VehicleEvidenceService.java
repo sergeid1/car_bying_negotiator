@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class VehicleEvidenceService {
+  private final com.dealanalyzer.operations.ProviderMeter meter;
   private final EphemeralBuyingCaseService cases;
   private final VehicleEvidencePersistence persistence;
   private final ListingEvidenceProvider listingProvider;
@@ -24,7 +25,8 @@ public class VehicleEvidenceService {
       VehicleEvidencePersistence persistence,
       ListingEvidenceProvider listingProvider,
       ListingEvidencePersistence listingPersistence,
-      VehicleIdentityConflictPersistence conflictPersistence) {
+      VehicleIdentityConflictPersistence conflictPersistence, com.dealanalyzer.operations.ProviderMeter meter) {
+    this.meter = meter;
     this.cases = cases;
     this.persistence = persistence;
     this.listingProvider = listingProvider;
@@ -52,7 +54,11 @@ public class VehicleEvidenceService {
     ListingRetrievalView retrieval = null;
     List<IdentityConflictView> conflicts = List.of();
     if (request.listingUrl() != null && !request.listingUrl().isBlank()) {
-      var providerResult = listingProvider.retrieve(request.listingUrl());
+      var providerResult = meter.call(caseId, com.dealanalyzer.operations.ProviderMeter.Operation.LISTING_RETRIEVAL,
+          listingProvider, 1, () -> listingProvider.retrieve(request.listingUrl()), value ->
+              value.status() == ListingEvidenceProvider.RetrievalStatus.UNSUPPORTED ? com.dealanalyzer.operations.ProviderMeter.Status.BUYER_INPUT
+              : value.listing() == null ? com.dealanalyzer.operations.ProviderMeter.Status.CONTRACT_FAILURE
+              : com.dealanalyzer.operations.ProviderMeter.Status.SUCCESS);
       if (providerResult.status() == ListingEvidenceProvider.RetrievalStatus.SUPPORTED) {
         snapshot = listingPersistence.appendSnapshot(caseId, providerResult.listing());
         retrieval = new ListingRetrievalView("SNAPSHOT_CREATED", null, null);

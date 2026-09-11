@@ -17,13 +17,15 @@ public class DocumentExtractionService {
   private final DocumentExtractionPersistence persistence;
   private final EphemeralBuyingCaseService cases;
   private final DealTermsValidator validator;
+  private final com.dealanalyzer.operations.ProviderMeter meter;
 
   DocumentExtractionService(
       DealTermsExtractionProvider provider,
       DocumentExtractionSource source,
       DocumentExtractionPersistence persistence,
       EphemeralBuyingCaseService cases,
-      @Value("${extraction.material-confidence-threshold:0.85}") double threshold) {
+      @Value("${extraction.material-confidence-threshold:0.85}") double threshold, com.dealanalyzer.operations.ProviderMeter meter) {
+    this.meter = meter;
     this.provider = provider;
     this.source = source;
     this.persistence = persistence;
@@ -33,12 +35,14 @@ public class DocumentExtractionService {
 
   public ExtractionView extract(String documentId) {
     DocumentExtractionSource.ExtractionSourceDocument document = source.load(documentId);
-    DealTermsExtractionProvider.ProviderExtraction providerResult =
-        provider.extract(new ExtractionDocument(documentId, document.pages()));
     boolean pageWarning = document.pages().stream().anyMatch(page ->
         page.likelyMissing() || page.likelyDuplicate() || page.likelyCropped());
-    DealTermsValidator.ValidatedExtraction validated =
-        validator.validate(providerResult, document.pages().size(), pageWarning);
+    var providerResult = meter.call(document.caseId(), com.dealanalyzer.operations.ProviderMeter.Operation.EXTRACTION,
+        provider, document.pages().size(), () -> provider.extract(new ExtractionDocument(documentId, document.pages())), value -> {
+          validator.validate(value, document.pages().size(), pageWarning);
+          return com.dealanalyzer.operations.ProviderMeter.Status.SUCCESS;
+        });
+    DealTermsValidator.ValidatedExtraction validated = validator.validate(providerResult, document.pages().size(), pageWarning);
     return persistence.append(
         document.caseId(), documentId,
         providerResult.extractorVersion(), providerResult.modelVersion(),
