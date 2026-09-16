@@ -1,0 +1,23 @@
+rules:
+  - id: no-react-raw-html
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: Render untrusted report and provider content as text.
+    pattern: <$TAG dangerouslySetInnerHTML={$VALUE} ... />
+  - id: no-eval
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: Do not execute strings as browser code.
+    pattern: eval(...)
+  - id: no-weak-digest
+    languages: [java]
+    severity: ERROR
+    message: Use the approved SHA-256 credential protection boundary.
+    pattern-either:
+      - pattern: MessageDigest.getInstance("MD5")
+      - pattern: MessageDigest.getInstance("SHA-1")
+  - id: no-shell-runtime-exec
+    languages: [java]
+    severity: ERROR
+    message: Use the isolated parser with a fixed argument vector.
+    pattern: Runtime.getRuntime().exec(...)

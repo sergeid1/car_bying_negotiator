@@ -1,0 +1,84 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: deal_analyzer
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: ci
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: mvn -B verify
+        working-directory: backend
+      - name: Preserve full-suite reports before PostgreSQL verification
+        run: mv backend/target/surefire-reports backend/target/full-suite-reports
+      - run: mvn -B -Dtest=PersistenceHardeningTest test
+        working-directory: backend
+        env:
+          HARDENING_DATABASE_URL: jdbc:postgresql://localhost:5432/ci
+          DATABASE_PASSWORD: ci-only-password
+      - run: npm ci && npm test && npm run build
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-evidence
+          path: |
+            backend/target/full-suite-reports
+            backend/target/surefire-reports
+            backend/target/hardening
+          retention-days: 14
+  scans:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          python3 -m venv /tmp/scanners
+          /tmp/scanners/bin/pip install semgrep==1.177.0
+          echo /tmp/scanners/bin >> "$GITHUB_PATH"
+          curl -fsSLO https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_Linux-64bit.tar.gz
+          curl -fsSLO https://github.com/aquasecurity/trivy/releases/download/v0.74.0/trivy_0.74.0_checksums.txt
+          sha256sum --check --ignore-missing trivy_0.74.0_checksums.txt
+          tar -xzf trivy_0.74.0_Linux-64bit.tar.gz trivy
+          sudo install trivy /usr/local/bin/trivy
+          rm trivy trivy_0.74.0_Linux-64bit.tar.gz trivy_0.74.0_checksums.txt
+      - run: mvn -B -DskipTests package
+        working-directory: backend
+      - run: npm ci
+        working-directory: frontend
+      - run: docker build -t deal-analyzer:ci backend
+      - run: bash scripts/security-checks.sh
+        env:
+          RELEASE_IMAGE: deal-analyzer:ci

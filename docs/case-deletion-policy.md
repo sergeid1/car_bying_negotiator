@@ -55,11 +55,16 @@ exists; case responses use `no-store`, and the UI removes displayed case panels
 when deletion is accepted. This does not erase previously downloaded copies.
 
 Backup evidence is deliberately `UNKNOWN` with a null `backup_expires_at`.
-This repository does not establish a backup rotation, physical purge deadline or
-verified restore process. Active-system deletion is not a backup-erasure claim.
-Before any restore is made accessible, operators must replay deletion tombstones
-and original retention deadlines; ticket 20 owns exercising backup restoration.
-Do not advertise a backup expiry date without verified infrastructure evidence.
+This repository does not establish a backup rotation or physical purge deadline.
+Active-system deletion is not a backup-erasure claim. Restore mode fences all API
+access while a separately retained, current UUID deletion ledger is replayed and
+original retention deadlines are applied. Ledger IDs are processed even when the
+restored database has no case row, so orphaned encrypted artifacts are removed too.
+`BackupRestoreAcceptanceTest` verifies this behavior against an older file-backed
+H2 snapshot and application restart. Production PostgreSQL backup tooling, ledger
+freshness, RPO/RTO and physical backup expiry remain infrastructure obligations.
+Follow the [quarantined restoration procedure](hardening-runbook.md) before opening
+ingress. Do not advertise a backup expiry date without verified infrastructure evidence.
 
 ## Explicit repository deletion plan
 

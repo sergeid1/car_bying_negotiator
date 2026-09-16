@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class BuyingCaseStore {
   private static final List<String> TERMINAL_STAGES = List.of("COMPLETE", "FAILED");
+  @jakarta.persistence.PersistenceContext
+  private jakarta.persistence.EntityManager entityManager;
 
   private final AnalysisCaseRepository cases;
   private final OperationRepository operations;
@@ -89,8 +91,9 @@ public class BuyingCaseStore {
   }
 
   @Transactional(readOnly = true)
-  public List<OperationView> findRecoverableOperations() {
-    return operations.findByStageNotInOrderByCreatedAt(TERMINAL_STAGES).stream()
+  public List<OperationView> findRecoverableOperations(String afterId) {
+    return operations.findRecoverableAfter(TERMINAL_STAGES, afterId,
+        org.springframework.data.domain.PageRequest.of(0, 100)).stream()
         .map(this::operationView)
         .toList();
   }
@@ -99,6 +102,10 @@ public class BuyingCaseStore {
   public void updateStage(String operationId, OperationStage stage, Instant now) {
     OperationEntity operation = operations.findById(operationId)
         .orElseThrow(() -> new ResourceNotFoundException("Operation not found"));
+    requireLockedCase(operation.caseId);
+    // A worker may have completed while this transaction waited for the case lock.
+    entityManager.refresh(operation);
+    if ("COMPLETE".equals(operation.stage)) return;
     operation.stage = stage.name();
     operation.updatedAt = now;
   }
@@ -114,6 +121,7 @@ public class BuyingCaseStore {
     AnalysisCaseEntity buyingCase = requireLockedCase(caseId);
     OperationEntity operation = operations.findById(operationId)
         .orElseThrow(() -> new ResourceNotFoundException("Operation not found"));
+    if (!caseId.equals(operation.caseId)) throw new ResourceNotFoundException("Operation not found");
     if ("COMPLETE".equals(operation.stage)) return;
     version = buyingCase.currentReportVersion + 1;
     var payload = (com.fasterxml.jackson.databind.node.ObjectNode) readTree(payloadJson);
@@ -138,6 +146,8 @@ public class BuyingCaseStore {
     AnalysisCaseEntity buyingCase = requireLockedCase(caseId);
     OperationEntity operation = operations.findById(operationId)
         .orElseThrow(() -> new ResourceNotFoundException("Operation not found"));
+    if (!caseId.equals(operation.caseId)) throw new ResourceNotFoundException("Operation not found");
+    if ("COMPLETE".equals(operation.stage)) return;
     buyingCase.status = "FAILED";
     buyingCase.updatedAt = now;
     operation.stage = OperationStage.FAILED.name();

@@ -55,6 +55,13 @@ The backend acceptance suite exercises the public HTTP workflow, immutable regen
 a full application restart against a file-backed test database using the production Flyway
 migration.
 
+The [CI workflow](.github/workflows/ci.yml) runs backend and frontend checks, PostgreSQL
+persistence tests, dependency/source/secret scans, and a built-container scan. Performance
+fixtures emit percentile evidence under `backend/target/hardening`. See the
+[threat model](docs/hardening-threat-model.md) and [incident and restore runbook](docs/hardening-runbook.md)
+for tested controls and the remaining pilot release gates. CI configuration alone is not
+an executed release approval.
+
 ## Contract evaluation fixtures
 
 Frozen JSON fixtures under `backend/src/test/resources/fixtures` establish reusable quality contracts:

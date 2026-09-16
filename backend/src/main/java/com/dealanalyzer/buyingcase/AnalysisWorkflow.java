@@ -159,8 +159,21 @@ public class AnalysisWorkflow {
   @EventListener(ApplicationReadyEvent.class)
   public void recoverInterruptedOperations() {
     if (workerEnabled) {
-      store.findRecoverableOperations().forEach(operation ->
-          taskExecutor.execute(() -> run(operation.caseId(), operation.id())));
+      // One recovery task bounds both database materialization and executor queue growth.
+      taskExecutor.execute(() -> {
+        String afterId = "";
+        while (true) {
+          var batch = store.findRecoverableOperations(afterId);
+          if (batch.isEmpty()) return;
+          for (var operation : batch) {
+            try { run(operation.caseId(), operation.id()); }
+            catch (com.dealanalyzer.buyingcase.ResourceNotFoundException deleted) {
+              // Concurrent retention deletion must not strand the rest of the recovery backlog.
+            }
+          }
+          afterId = batch.get(batch.size() - 1).id();
+        }
+      });
     }
   }
 
