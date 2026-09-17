@@ -175,8 +175,20 @@ public class DocumentIntakeService {
   @EventListener(ApplicationReadyEvent.class)
   public void recoverInterruptedOperations() {
     if (workerEnabled) {
-      persistence.recoverInterruptedOperations(Instant.now())
-          .forEach(operation -> dispatch(operation.id()));
+      taskExecutor.execute(() -> {
+        String afterId = "";
+        while (true) {
+          var batch = persistence.recoverInterruptedOperations(afterId, Instant.now());
+          if (batch.isEmpty()) return;
+          for (var operation : batch) {
+            try { process(operation.id()); }
+            catch (com.dealanalyzer.buyingcase.ResourceNotFoundException deleted) {
+              // Concurrent retention deletion must not strand the rest of the recovery backlog.
+            }
+          }
+          afterId = batch.get(batch.size() - 1).id();
+        }
+      });
     }
   }
 

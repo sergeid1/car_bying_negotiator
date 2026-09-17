@@ -1,0 +1,10 @@
+*
+!Dockerfile
+!Dockerfile.parser
+!target/
+target/*
+!target/ai-deal-analyzer-0.1.0-SNAPSHOT.jar
+!src/
+!src/test/
+!src/test/resources/
+!src/test/resources/parser-confinement-probe.sh

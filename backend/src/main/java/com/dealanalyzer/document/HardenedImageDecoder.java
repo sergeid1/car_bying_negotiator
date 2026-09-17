@@ -12,17 +12,14 @@ import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32;
 import javax.imageio.ImageIO;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
-@Component
 class HardenedImageDecoder {
   private final String heicDecoderCommand;
   private final Duration timeout;
 
   HardenedImageDecoder(
-      @Value("${document.heic.decoder-command:heif-dec}") String heicDecoderCommand,
-      @Value("${document.decoder.timeout:PT10S}") Duration timeout) {
+      String heicDecoderCommand,
+      Duration timeout) {
     this.heicDecoderCommand = heicDecoderCommand;
     this.timeout = timeout;
   }
@@ -57,18 +54,20 @@ class HardenedImageDecoder {
       Path input = directory.resolve("input.heic");
       Path output = directory.resolve("output.png");
       Files.write(input, bytes);
-      Process process = new ProcessBuilder(
-          heicDecoderCommand, input.toString(), output.toString())
-          .redirectErrorStream(true)
-          .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-          .start();
+      ProcessBuilder builder = new ProcessBuilder(heicDecoderCommand, input.toString(), output.toString())
+          .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
+      builder.environment().clear();
+      Process process = builder.start();
       if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
+        process.descendants().forEach(ProcessHandle::destroyForcibly);
         process.destroyForcibly();
+        process.waitFor(1, TimeUnit.SECONDS);
         throw malformed("image/heic");
       }
       if (process.exitValue() != 0 || !Files.isRegularFile(output)) {
         throw malformed("image/heic");
       }
+      if (Files.size(output) > DocumentParserProcess.MAX_PAGE_BYTES) throw malformed("image/heic");
       BufferedImage image = ImageIO.read(output.toFile());
       if (image == null) {
         throw malformed("image/heic");

@@ -106,10 +106,11 @@ public class DocumentIntakePersistence {
   }
 
   @Transactional
-  public List<DocumentOperationView> recoverInterruptedOperations(Instant now) {
+  public List<DocumentOperationView> recoverInterruptedOperations(String afterId, Instant now) {
     List<DocumentOperationEntity> recoverable =
-        operations.findByStageInOrderByCreatedAt(
-            List.of("QUEUED", "NORMALIZING", "READY_FOR_EXTRACTION", "EXTRACTING"));
+        operations.findRecoverableAfter(
+            List.of("QUEUED", "NORMALIZING", "READY_FOR_EXTRACTION", "EXTRACTING"), afterId,
+            org.springframework.data.domain.PageRequest.of(0, 100));
     recoverable.forEach(operation -> {
       operation.stage = operation.stage.equals("READY_FOR_EXTRACTION")
           || operation.stage.equals("EXTRACTING") ? "READY_FOR_EXTRACTION" : "QUEUED";

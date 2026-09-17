@@ -825,7 +825,7 @@ class DocumentExtractionAcceptanceTest {
     }
   }
 
-  private static byte[] supportedDealerQuotePdf() throws Exception {
+  static byte[] supportedDealerQuotePdf() throws Exception {
     try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
       writePage(document, List.of(
           "DEALER QUOTE",

@@ -12,9 +12,10 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 class DocumentIntakeExceptionHandler {
   @ExceptionHandler(InvalidDocumentException.class)
   ProblemDetail invalidDocument(InvalidDocumentException exception) {
+    boolean unavailable = exception.code().equals("PARSER_BUSY") || exception.code().equals("PARSER_UNAVAILABLE");
     ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-        HttpStatus.UNPROCESSABLE_ENTITY, exception.getMessage());
-    problem.setTitle("Dealer document was rejected");
+        unavailable ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.UNPROCESSABLE_ENTITY, exception.getMessage());
+    problem.setTitle(unavailable ? "Document processing is temporarily unavailable" : "Dealer document was rejected");
     problem.setProperty("code", exception.code());
     problem.setProperty("retryable", true);
     return problem;

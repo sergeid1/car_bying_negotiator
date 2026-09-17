@@ -1,5 +1,6 @@
 package com.dealanalyzer.pilot;
 
+import com.dealanalyzer.time.PersistedInstant;
 import com.dealanalyzer.buyingcase.ResourceNotFoundException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
@@ -104,8 +105,8 @@ public class PilotService {
   private Assignment assignmentView(ExperimentAssignmentEntity row) { return new Assignment(row.variant, row.priceMinor, "USD", row.createdAt); }
   private Object protocolView(PilotProtocolEntity row) {
     var value = (com.fasterxml.jackson.databind.node.ObjectNode) read(row.protocolJson);
-    value.put("schemaVersion", "pilot-protocol.v1"); value.put("frozenAt", row.frozenAt.toString());
-    value.put("frozenBy", row.frozenBy); if (row.reviewedAt != null) value.put("reviewedAt", row.reviewedAt.toString());
+    value.put("schemaVersion", "pilot-protocol.v1"); value.put("frozenAt", PersistedInstant.format(row.frozenAt));
+    value.put("frozenBy", row.frozenBy); if (row.reviewedAt != null) value.put("reviewedAt", PersistedInstant.format(row.reviewedAt));
     return value;
   }
   private com.fasterxml.jackson.databind.JsonNode read(String value) {

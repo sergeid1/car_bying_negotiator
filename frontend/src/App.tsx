@@ -145,6 +145,9 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 
   return (
     <main>
+      <a className="skip-link" href="#case-workflow" onClick={event => {
+        event.preventDefault(); document.getElementById("case-workflow")?.focus();
+      }}>Skip to case workflow</a>
       <header className="hero">
         <p className="eyebrow">Buyer-aligned deal analysis</p>
         <h1>See the whole deal before you decide.</h1>
@@ -155,7 +158,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       </header>
 
       <RecoveryAccess onRecovered={value => { setCaseRevoked(false); setCaseCredentials(value); }} />
-      <section className="panel" aria-label="Open an existing Buying Case">
+      <section id="case-workflow" tabIndex={-1} className="panel" aria-label="Open an existing Buying Case">
         <form onSubmit={event => {
           event.preventDefault();
           const values = new FormData(event.currentTarget);

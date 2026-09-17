@@ -1,0 +1,13 @@
+FROM eclipse-temurin:21-jre AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends libheif-examples libheif-plugin-libde265 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 parser && useradd --uid 10001 --gid parser --no-create-home parser
+WORKDIR /app
+COPY target/ai-deal-analyzer-0.1.0-SNAPSHOT.jar /app/application.jar
+USER 10001:10001
+ENTRYPOINT ["/opt/java/openjdk/bin/java", "-Dloader.main=com.dealanalyzer.document.DocumentParserWorker", "-cp", "/app/application.jar", "org.springframework.boot.loader.launch.PropertiesLauncher"]
+
+FROM runtime AS test-probe
+COPY --chmod=0555 src/test/resources/parser-confinement-probe.sh /app/confinement-probe
+
+FROM runtime AS release

@@ -10,6 +10,28 @@ import org.junit.jupiter.api.io.TempDir;
 class CaseDeletionAcceptanceTest {
   @TempDir Path directory;
 
+  @Test void deletionProcessesBoundedBatchesWithoutLosingTheBacklog() throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).start("bounded-deletion", false,
+        "--case.deletion.batch-size=2", "--case.deletion.delay=PT1H")) {
+      var credentials = new java.util.ArrayList<String[]>();
+      for (int i = 0; i < 5; i++) {
+        var created = post(app.client(), "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase());
+        String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+        post(app.client(), "/api/v1/cases/" + id + "/deletion", Map.of(), "delete-" + i, token);
+        credentials.add(new String[] {id, token});
+      }
+      var worker = app.context().getBean(com.dealanalyzer.buyingcase.persistence.CaseDeletionWorker.class);
+      for (int expected : new int[] {2, 4, 5}) {
+        worker.runOnce();
+        int completed = 0;
+        for (var c : credentials) {
+          if (get(app.client(), "/api/v1/cases/" + c[0] + "/deletion", c[1]).path("state").asText().equals("DELETED")) completed++;
+        }
+        assertThat(completed).isEqualTo(expected);
+      }
+    }
+  }
+
   @Test void deletionImmediatelyRevokesAccessAndCanBeRetried() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).start("deletion", false,
         "--case.deletion.delay=PT1H", "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {

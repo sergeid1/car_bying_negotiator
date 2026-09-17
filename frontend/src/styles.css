@@ -25,7 +25,9 @@ body::before {
 
 button, input { font: inherit; }
 
-button:focus-visible { outline: 3px solid #ef9c69; outline-offset: 3px; }
+button:focus-visible { outline: 3px solid #2057b5; outline-offset: 3px; }
+.skip-link { position: absolute; top: 8px; left: 0; padding: 12px; background: #fff; color: #164f98; transform: translateY(-200%); }
+.skip-link:focus { transform: none; z-index: 2; }
 
 main { position: relative; width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 72px 0; }
 

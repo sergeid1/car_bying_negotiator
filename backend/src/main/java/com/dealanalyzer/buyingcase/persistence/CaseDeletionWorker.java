@@ -17,10 +17,14 @@ public class CaseDeletionWorker {
   private final CaseGraphDeletionPlan graph;
   private final List<CaseArtifactErasure> artifacts;
   private final TransactionTemplate transaction;
+  private final org.springframework.data.domain.Pageable batch;
 
   CaseDeletionWorker(AnalysisCaseRepository cases, DeletionJobRepository jobs, CaseDeletionService deletion,
       CaseGraphDeletionPlan graph, List<CaseArtifactErasure> artifacts, PlatformTransactionManager manager,
-      DeletionAttemptRepository attempts) {
+      DeletionAttemptRepository attempts,
+      @org.springframework.beans.factory.annotation.Value("${case.deletion.batch-size:100}") int batchSize) {
+    if (batchSize < 1 || batchSize > 1000) throw new IllegalArgumentException("Deletion batch must be between 1 and 1000");
+    this.batch = org.springframework.data.domain.PageRequest.of(0, batchSize);
     this.attempts = attempts;
     this.cases = cases; this.jobs = jobs; this.deletion = deletion; this.graph = graph;
     this.artifacts = artifacts; this.transaction = new TransactionTemplate(manager);
@@ -29,7 +33,7 @@ public class CaseDeletionWorker {
   @Scheduled(fixedDelayString = "${case.deletion.delay:PT5M}", initialDelayString = "${case.deletion.delay:PT5M}")
   public void runOnce() {
     Instant now = Instant.now();
-    for (String id : cases.findExpiredIds(now)) {
+    for (String id : cases.findExpiredIds(now, batch)) {
       transaction.executeWithoutResult(status -> {
         var c = cases.findLockedById(id).orElse(null);
         if (c != null && "ACTIVE".equals(c.lifecycle) && !c.accessExpiresAt.isAfter(now))
@@ -37,7 +41,7 @@ public class CaseDeletionWorker {
       });
     }
     transaction.executeWithoutResult(status -> graph.deleteExpiredExports(now));
-    for (var candidate : jobs.findByStateOrderByRequestedAt("DELETION_PENDING")) {
+    for (var candidate : jobs.findPendingBatch("DELETION_PENDING", batch)) {
       String attemptId = java.util.UUID.randomUUID().toString();
       // Commit attempts before external I/O, so a crash is visible and retryable.
       transaction.executeWithoutResult(status -> {
