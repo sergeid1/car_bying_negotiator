@@ -3,22 +3,20 @@ package com.dealanalyzer.document;
 import com.dealanalyzer.document.persistence.DocumentIntakePersistence;
 import com.dealanalyzer.extraction.DocumentExtractionSource;
 import com.dealanalyzer.extraction.NormalizedDocumentPage;
-import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Component;
 
 @Component
 class StoredNormalizedDocumentSource implements DocumentExtractionSource {
   private final DocumentIntakePersistence persistence;
   private final DocumentObjectStorage storage;
+  private final DocumentParserProcess parser;
 
   StoredNormalizedDocumentSource(
-      DocumentIntakePersistence persistence, DocumentObjectStorage storage) {
+      DocumentIntakePersistence persistence, DocumentObjectStorage storage, DocumentParserProcess parser) {
     this.persistence = persistence;
     this.storage = storage;
+    this.parser = parser;
   }
 
   @Override
@@ -45,18 +43,6 @@ class StoredNormalizedDocumentSource implements DocumentExtractionSource {
     }
     byte[] original = storage.readOriginal(
         document.caseId(), document.documentId(), document.originalObjectKey());
-    try (var pdf = Loader.loadPDF(original)) {
-      List<String> pages = new ArrayList<>();
-      for (int pageNumber = 1; pageNumber <= pdf.getNumberOfPages(); pageNumber++) {
-        PDFTextStripper stripper = new PDFTextStripper();
-        stripper.setStartPage(pageNumber);
-        stripper.setEndPage(pageNumber);
-        String text = stripper.getText(pdf);
-        pages.add(text.length() > 100_000 ? text.substring(0, 100_000) : text);
-      }
-      return pages;
-    } catch (IOException exception) {
-      throw new IllegalStateException("Unable to recover normalized page text", exception);
-    }
+    return parser.text(original, document.pages().size());
   }
 }

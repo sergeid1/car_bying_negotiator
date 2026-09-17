@@ -15,3 +15,6 @@ semgrep scan --config scripts/security-rules.yml --metrics=off --error \
 : "${RELEASE_IMAGE:?Set RELEASE_IMAGE to the built release image reference}"
 trivy image --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 \
   --format json --output target/hardening/container-security.json "$RELEASE_IMAGE"
+: "${PARSER_IMAGE:?Set PARSER_IMAGE to the confined parser release image reference}"
+trivy image --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 \
+  --format json --output target/hardening/parser-security.json "$PARSER_IMAGE"

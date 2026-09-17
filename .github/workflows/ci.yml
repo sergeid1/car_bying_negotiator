@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 30
     services:
       postgres:
-        image: postgres:18
+        image: postgres:17
         env:
           POSTGRES_USER: deal_analyzer
           POSTGRES_PASSWORD: ci-only-password
@@ -47,6 +47,7 @@ jobs:
           name: test-evidence
           path: |
             backend/target/full-suite-reports
+            backend/target/failsafe-reports
             backend/target/surefire-reports
             backend/target/hardening
           retention-days: 14
@@ -79,6 +80,31 @@ jobs:
       - run: npm ci
         working-directory: frontend
       - run: docker build -t deal-analyzer:ci backend
+      - run: docker build -f backend/Dockerfile.parser -t deal-analyzer-parser:ci backend
+      - run: docker build -f backend/Dockerfile.parser --target test-probe -t deal-analyzer-parser-probe:ci backend
+      - name: Verify application dispatch and native decoder confinement
+        working-directory: backend
+        run: >-
+          mvn -B -Dit.test=ContainerParserIT
+          -Dparser.test.image="$(docker image inspect deal-analyzer-parser:ci --format '{{.Id}}')"
+          -Dparser.probe.image="$(docker image inspect deal-analyzer-parser-probe:ci --format '{{.Id}}')"
+          failsafe:integration-test failsafe:verify
+      - name: Measure document latency through confined parser
+        working-directory: backend
+        run: >-
+          mvn -B -Dtest=DocumentPerformanceAcceptanceTest
+          -Dparser.performance.image="$(docker image inspect deal-analyzer-parser:ci --format '{{.Id}}')"
+          test
+      - run: python3 scripts/check-parser-container.py deal-analyzer:ci
       - run: bash scripts/security-checks.sh
         env:
           RELEASE_IMAGE: deal-analyzer:ci
+          PARSER_IMAGE: deal-analyzer-parser:ci
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-and-parser-evidence
+          path: |
+            target/hardening
+            backend/target/failsafe-reports
+          retention-days: 14

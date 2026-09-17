@@ -21,3 +21,17 @@ rules:
     severity: ERROR
     message: Use the isolated parser with a fixed argument vector.
     pattern: Runtime.getRuntime().exec(...)
+  - id: document-parsing-only-in-disposable-worker
+    languages: [java]
+    severity: ERROR
+    message: Parse untrusted documents only inside the disposable parser worker.
+    pattern-either:
+      - pattern: org.apache.pdfbox.Loader.loadPDF(...)
+      - pattern: javax.imageio.ImageIO.read(...)
+      - pattern: new com.dealanalyzer.document.LocalDocumentInspector(...)
+      - pattern: new com.dealanalyzer.document.HardenedImageDecoder(...)
+    paths:
+      exclude:
+        - '**/DocumentParserWorker.java'
+        - '**/LocalDocumentInspector.java'
+        - '**/HardenedImageDecoder.java'

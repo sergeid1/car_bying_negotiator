@@ -4,7 +4,7 @@
 
 **Blocked by:** 17 — Expire and delete the complete Buying Case lifecycle; 18 — Operate the service without broad document access.
 
-**Status:** in-progress — resumed on 2026-09-16; current evidence below
+**Status:** in progress — implementation and local verification continued on 2026-09-17; pilot approval remains open
 
 - [x] Threat modeling covers case-link access, tenant isolation, object keys, signed URLs, uploads, parsing, worker boundaries, providers, support access, and deletion.
 - [ ] Automated checks cover dependencies, containers, source, secrets, MIME confusion, malicious files, decompression limits, rate limits, and cross-case isolation.
@@ -15,9 +15,172 @@
 - [ ] An incident runbook, escalation path, access policy, and release rollback criteria are exercised before pilot approval.
 - [x] JPA behavior is covered by integration tests for transaction rollback, optimistic or pessimistic locking, idempotency races, tenant predicates, N+1 queries, bounded fetch sizes, and migration-to-entity validation; measured hot paths may use documented native SQL or JDBC.
 
+## Current checkpoint — 2026-09-17
+
+Branch: `feature/security-resilience-performance-accessibility`. The 2026-09-16 checkpoint
+below is historical and its instructions about not resuming have been superseded by the user's
+request to continue.
+
+### Follow-up verification on 2026-09-17
+
+- Corrected the document percentile fixture to configure container dispatch in the launched
+  application from an immutable `parser.performance.image` test property, and record that image
+  ID in its evidence. CI now runs this fixture against its just-built parser image. The local
+  20-document H2/test-provider fixture passed: process p50 2458 ms / p95 2541 ms; confined
+  container p50 3170 ms / p95 3560 ms. The latter used image
+  `sha256:48ef7189c5d1ccfed5fac79fee0baab71e1256dc4f62713bfa06a5c462432e3c`.
+  These sequential local values do not establish deployed concurrent-load latency.
+- PostgreSQL 17.11 migration startup and all seven `PersistenceHardeningTest` cases passed
+  against a disposable local container. The rebuilt parser image scan with refreshed Trivy
+  databases found zero high/critical vulnerabilities and zero secrets. The updated application
+  image parser smoke check passed. `git diff --check` passed.
+- Final `mvn -q verify` exited 0 after these changes: 124 Surefire tests and one packaged-JAR
+  Failsafe test passed, with zero failures/errors/skips. The three opt-in container tests were
+  skipped in this ordinary run; they passed separately earlier against immutable image IDs.
+
+### Implemented this session
+
+- Added `ContainerParserRuntime` and a `container` parser mode. The `pilot` profile rejects
+  local process mode. A request launches an immutable local image ID with no network or host
+  mounts, read-only root, UID/GID 10001, no capabilities, no-new-privileges, 1536 MiB total
+  memory/no swap, one CPU, 64 processes, and a 128 MiB temporary filesystem. Every exit
+  force-removes the named container and verifies its absence. Failed cleanup retains the
+  concurrency slot. The in-container deadline also applies if the application dies.
+- Added `backend/Dockerfile.parser` with `heif-dec` and its HEVC decoder plugin. The real
+  application dispatch now processes synthetic PNG, PDF and HEIC in confined containers.
+  A test-only image runs a native HEIC decoder probe for filesystem, network, capability,
+  cgroup and temporary-space restrictions. `ContainerParserIT` also tests timeout cleanup
+  and successful processing afterward. CI builds and checks both images; the release image
+  excludes the probe. See `docs/document-parser-policy.md` for deployment requirements.
+- CI now uses PostgreSQL 17, matching `compose.yaml` and the bundled Flyway support range,
+  and scans the parser image. Updated the incident runbook to reflect that the user is the
+  sole operator, with all incident, privacy, recovery and release responsibilities.
+
+### Verified evidence and limits
+
+- A completed `mvn -q verify` **before the container-mode additions** passed 122 Surefire
+  tests plus `DocumentParserPackagingIT` (one Failsafe test), with zero failures/errors/skips.
+  The frontend passed 17 tests and its production build.
+- The focused parser tests and packaged-JAR integration test passed. The container integration
+  suite passed all three tests, including real synthetic HEIC decode, native quota probe and
+  timeout recovery. No `document-parser-*` containers remained after the suite.
+- Trivy 0.74.0 with a refreshed database reported zero high/critical vulnerabilities and zero
+  secrets for `deal-analyzer-parser:ticket20`. `git diff --check` passed.
+- Local fixture measurements in `backend/target/hardening`: 20 sequential two-page PDFs had
+  p50 2440 ms and p95 2970 ms using disposable local parser JVMs, H2, a test scanner and
+  deterministic extraction. Cash recalculation p95 was 0.005667 ms for 1,000 warm samples.
+  These are not confined-container, deployed-load or production-provider measurements.
+- The final `mvn -q verify` completed with exit code 0 after the container-mode changes.
+  It ran 124 Surefire tests with zero failures/errors/skips, plus the packaged-JAR Failsafe
+  test. The three opt-in container tests were skipped in that ordinary run and passed
+  separately against immutable local image IDs. Captured log: `/tmp/ticket20-final-verify.log`.
+- Browser keyboard inspection reached and focused the skip link. Further Chrome control was
+  denied, so no complete keyboard, contrast, reflow or screen-reader walkthrough is claimed.
+  No remote GitHub CI, push, PR, deployment, restore/rollback exercise or pilot approval ran.
+
+### Next steps
+
+1. Run the confined-container document percentile fixture and targeted PostgreSQL 17
+   persistence/migration checks. Rebuild the parser image after any Java changes, since
+   the current local image contains the earlier packaged JAR.
+2. Check the CI workflow end to end, including image build, opt-in container integration,
+   scanner output and artifact retention. Run the updated smoke script. Keep scanner and
+   test evidence tied to the exact image digest; the image scan above predates any rebuild.
+3. Exercise daemon/host and worker crash recovery and concurrent load on the intended
+   deployment. The current host-run application requires a dedicated local container daemon;
+   the application Dockerfile does not itself supply that control plane. Confirm HEIC and
+   OS quotas on the deployed architecture.
+4. Complete browser contrast, keyboard and screen-reader walkthroughs, then practice alert
+   delivery, restoration and compatible-image rollback with the sole operator. Record a
+   support plan for Spring Boot 3.5.16. Do not mark the ticket complete or approve a pilot
+   before those release gates pass.
+
 ## Current checkpoint — 2026-09-16
 
-Continued on the existing ticket branch; changes remain uncommitted.
+Checkpoint committed as `96c5c9a` ("Add security controls, bounded recovery, and CI validation").
+The subsequent parser/container work below is **uncommitted**, including untracked files.
+Branch: `feature/security-resilience-performance-accessibility`. User explicitly requested
+stopping work and updating this ticket. Do not resume implementation until asked.
+
+### Stop point and verified evidence
+
+- Stopped the final `mvn -q verify` run (exec session 10089) with Ctrl-C; it exited 130.
+  **The current parser changes do not have a completed final full-suite pass.** Surefire
+  reports contain a mix of runs; their aggregate is not evidence of one passing full run.
+- The first full run executed 122 tests and found two regressions: a rejection message lacked
+  retry guidance, and the document performance fixture's 50 ms polling hit the API rate limit.
+  The message was fixed; the fixture now uses the Buyer's 250 ms polling cadence.
+- The subsequent focused run passed the parser and performance checks but had one localhost
+  connection failure on the initial create-case POST in
+  `DealerDocumentAcceptanceTest.signaturesDetermineSupportedMediaAndPdfPageWarningsPreserveOrder`.
+  That exact test passed on rerun, along with the packaged parser integration test. No
+  speculative change was made to the HTTP harness; investigate if the connection failure recurs.
+- All four `DocumentParserProcessTest` adversarial tests passed. `DocumentParserPackagingIT`
+  passed against the executable Boot JAR. Both are now included in `mvn verify`.
+- Completed performance fixtures in the interrupted final run measured document p50 **2443 ms**
+  and p95 **2459 ms** (20 sequential two-page PDFs, H2, test scanner, disposable parser JVMs,
+  deterministic extraction), and cash recalculation p95 **0.006125 ms** (1,000 warm samples).
+  These are local fixture results, not production/load guarantees.
+- Docker became available. Built `deal-analyzer:ticket20`, running as UID/GID `10001:10001`,
+  image ID `sha256:4d3fb5f13a6be8eddbc7220a678a7f91101dd7c36266aae3b7e2fa3f3bd99c18`.
+  Added `backend/.dockerignore` so the build context contains the packaged JAR rather than
+  development storage, test reports or other backend files.
+- The built image's PNG parser smoke check passed with networking disabled, read-only root,
+  all capabilities dropped, no-new-privileges, and memory/CPU/process/tmpfs quotas. Added
+  `scripts/check-parser-container.py` and wired it into `ci.yml`. A subsequent small script
+  edit adds named-container cleanup on timeout; that final edit has not been rerun.
+- Trivy 0.74.0, with refreshed databases, found **zero high/critical vulnerabilities and zero
+  secrets** in the actual image. The repository scan found **zero high/critical vulnerabilities,
+  secrets or misconfigurations**. Five local Semgrep rules passed with zero findings, including
+  the new parser-placement rule. `npm audit --audit-level=high` reported zero vulnerabilities.
+- Remote GitHub CI has not run, and no PR, push, deployment or pilot approval was performed.
+
+### First actions when resuming
+
+1. Preserve the uncommitted parser/container changes and inspect `git status`; do not restart
+   from the earlier checkpoint or lose the new untracked files.
+2. Run `cd backend && mvn -q verify` to completion. Expected suites include 122 regular tests
+   plus the packaged parser integration test; confirm actual reports from the completed run.
+   Maven tests and local HTTP servers remain pre-approved. Do not treat the interrupted run
+   or mixed reports as a pass.
+3. Recheck the final container smoke script and CI configuration, then reconcile the runbook's
+   older Docker-unavailable statements with the successful local image validation above.
+   Run `git diff --check` before the next commit.
+4. Production parser dispatch still launches a JVM as the application OS user. The isolated
+   container smoke test proves packaging compatibility, **not integration of deployment
+   confinement**. Implement/test filesystem and network isolation and OS-enforced aggregate
+   memory, CPU, process and scratch-space quotas, including the native HEIC decoder. The PNG
+   container smoke test does not establish HEIC runtime provisioning or containment.
+5. Continue deployed crash/recovery/load testing, remote CI, accessibility walkthroughs and
+   operator/restore/rollback drills. Framework support and Flyway/PostgreSQL compatibility
+   decisions remain open. Do not mark the ticket complete or approve a pilot.
+
+Current evidence locations (temporary files may disappear):
+
+- `backend/target/surefire-reports`, `backend/target/failsafe-reports` — mixed/interrupted-run
+  caveat above applies; inspect timestamps and test names.
+- `backend/target/hardening/documents.json`, `backend/target/hardening/recalculation.json`.
+- `/tmp/ticket20-container-security.json`, `/tmp/ticket20-parser-repository-security.json`,
+  `/tmp/ticket20-parser-source.json`.
+- `/tmp/ticket20-scanners/trivy`, `/tmp/ticket20-semgrep-current/bin/semgrep`,
+  `/tmp/ticket20-trivy-cache`, `/tmp/ticket20-public-registry`.
+- The local Docker image is retained. No smoke-test container was left running. The existing
+  PostgreSQL cluster/dev-server from earlier work were not stopped as part of this pause.
+
+### Parser continuation
+
+- Moved upload inspection, PDF/image rendering and PDF text extraction into disposable JVMs
+  with bounded heap, deadlines, concurrency, protocol lengths and page/text output sizes.
+  Removed the in-process parsing paths; worker requests receive no application environment.
+- Added incremental PDF page-content expansion limits, safe capacity failures, temporary
+  directory cleanup and process/descendant termination. Existing HEIC deadlines still apply.
+- Added real adversarial tests for compressed PDF content, child heap exhaustion, endless
+  native decoder CPU use, concurrency saturation, environment isolation and recovery after
+  failure. Added a Maven verification test for worker launch from the packaged Boot JAR.
+- Added a source rule guarding parser calls and documented the limits and remaining OS
+  confinement work in [the parser policy](../document-parser-policy.md).
+
+### Earlier validation
 
 - Renamed the workflow to `.github/workflows/ci.yml`, display name `CI`; CI database,
   image tag and evidence artifact use neutral names too.
@@ -39,10 +202,10 @@ Continued on the existing ticket branch; changes remain uncommitted.
   p50 121 ms / p95 128 ms (20 sequential two-page PDFs, H2, test scanner, deterministic
   extraction). These are fixture measurements, not production load or parser-isolation proof.
   Corrected the performance fixture's output description to say in-process PDF normalization.
-- Frontend: all 17 tests and production build passed. Docker remains unavailable locally.
+- Frontend: all 17 tests and production build passed. Docker was unavailable at that earlier checkpoint; current image evidence is recorded above.
 
-Remaining: parser process confinement and adversarial CPU/heap/decompression tests; deployed
-worker/load and kill-during-work tests; container scan and remote CI execution; browser contrast,
+Remaining: deployment OS filesystem/network confinement and total native memory/CPU/process/scratch-space quotas; deployed
+worker/load and kill-during-work tests; final full-suite verification and remote CI execution; browser contrast,
 keyboard and screen-reader walkthrough; operator roster and production restore/rollback/paging
 drills; supported framework/Flyway decisions. Provider adapters still need transport deadlines
 and must honor interruption; arbitrary in-process code cannot be forcibly stopped safely.
@@ -120,4 +283,4 @@ Useful local evidence/tooling (temporary files may not survive until resumption)
 - Frontend dev server may still be running on `127.0.0.1:5173` (exec session 29778); temporary
   PostgreSQL may still be running. Stop only these task-owned processes when no longer needed.
 
-No commit, PR, deployment or pilot approval has been performed.
+At this historical checkpoint, no commit, PR, deployment or pilot approval had been performed.

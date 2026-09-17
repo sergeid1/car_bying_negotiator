@@ -15,9 +15,24 @@ class DocumentPerformanceAcceptanceTest {
 
   @Test void supportedTextDocumentsReachReviewReadyWithinPercentileTargets() throws Exception {
     long[] samples = new long[20];
-    try (var app = new HttpAcceptanceHarness(directory).start("document-performance", true,
+    String parserImage = System.getProperty("parser.performance.image");
+    boolean confined = parserImage != null;
+    if (confined) {
+      assertThat(parserImage).matches("sha256:[0-9a-f]{64}");
+    }
+    List<String> properties = new ArrayList<>(List.of(
         "--document.storage.path=" + directory.resolve("objects"),
-        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef"));
+    if (confined) {
+      properties.add("--document.parser.mode=container");
+      properties.add("--document.parser.container.image=" + parserImage);
+      properties.add("--document.parser.container.executable="
+          + System.getProperty("parser.test.docker", "/usr/bin/docker"));
+      properties.add("--document.parser.container.endpoint="
+          + System.getProperty("parser.test.endpoint", "unix:///var/run/docker.sock"));
+    }
+    try (var app = new HttpAcceptanceHarness(directory).start("document-performance", true,
+        properties.toArray(String[]::new))) {
       byte[] pdf = DocumentExtractionAcceptanceTest.supportedDealerQuotePdf();
       for (int i = 0; i < samples.length; i++) {
         var created = post(app.client(), "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase());
@@ -36,7 +51,8 @@ class DocumentPerformanceAcceptanceTest {
           assertThat(op.path("stage").asText()).isNotEqualTo("FAILED");
           if (op.path("stage").asText().equals("EXTRACTION_COMPLETE")) break;
           assertThat((System.nanoTime() - start) / 1_000_000).isLessThan(180_000);
-          Thread.sleep(50);
+          // Match the Buyer client cadence instead of generating an artificial polling flood.
+          Thread.sleep(250);
         }
         var extraction = get(app.client(), "/api/v1/cases/" + id + "/documents/"
             + upload.at("/document/id").asText() + "/extractions/latest", token);
@@ -46,8 +62,10 @@ class DocumentPerformanceAcceptanceTest {
     }
     Arrays.sort(samples);
     Files.createDirectories(Path.of("target/hardening"));
-    Files.writeString(Path.of("target/hardening/documents.json"),
-        "{\"scope\":\"20 sequential two-page PDFs, H2, test scanner, in-process PDF normalizer and deterministic extractor\","
+    Files.writeString(Path.of("target/hardening/" + (confined ? "documents-container.json" : "documents.json")),
+        "{\"scope\":\"20 sequential two-page PDFs, H2, test scanner, "
+        + (confined ? "confined parser containers" : "disposable parser JVMs") + " and deterministic extractor\","
+        + "\"parserImage\":\"" + (confined ? parserImage : "none") + "\","
         + "\"samples\":20,\"p50Ms\":" + samples[9] + ",\"p95Ms\":" + samples[18] + "}");
     assertThat(samples[9]).isLessThan(60_000);
     assertThat(samples[18]).isLessThan(180_000);
