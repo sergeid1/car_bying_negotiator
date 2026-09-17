@@ -1,5 +1,7 @@
 package com.dealanalyzer.pilot;
 
+import com.dealanalyzer.time.PersistedInstant;
+
 import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService;
 import com.dealanalyzer.buyingcase.IdempotencyConflictException;
 import com.dealanalyzer.buyingcase.ResourceNotFoundException;
@@ -105,7 +107,7 @@ public class FeedbackService {
   private com.fasterxml.jackson.databind.JsonNode outcomeView(OutcomeFeedbackEntity row) {
     try {
       var result = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(row.payloadJson);
-      result.put("id", row.id); result.put("createdAt", row.createdAt.toString());
+      result.put("id", row.id); result.put("createdAt", PersistedInstant.format(row.createdAt));
       result.put("verification", "BUYER_REPORTED_UNVERIFIED"); return result;
     } catch (java.io.IOException error) { throw new IllegalStateException("Stored outcome unavailable"); }
   }

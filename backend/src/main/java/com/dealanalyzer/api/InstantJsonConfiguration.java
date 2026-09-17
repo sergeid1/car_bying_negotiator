@@ -1,5 +1,6 @@
 package com.dealanalyzer.api;
 
+import com.dealanalyzer.time.PersistedInstant;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
@@ -18,8 +19,7 @@ class InstantJsonConfiguration {
       @Override
       public void serialize(Instant value, JsonGenerator output, SerializerProvider provider)
           throws IOException {
-        long roundedMicros = (value.getNano() + 500L) / 1_000L;
-        output.writeString(Instant.ofEpochSecond(value.getEpochSecond(), roundedMicros * 1_000L).toString());
+        output.writeString(PersistedInstant.format(value));
       }
     });
   }
