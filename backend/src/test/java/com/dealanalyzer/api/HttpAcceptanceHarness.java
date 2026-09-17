@@ -44,6 +44,9 @@ final class HttpAcceptanceHarness {
       boolean workerEnabled,
       Class<?> additionalConfiguration,
       String... additionalProperties) {
+    // Initialize RestClient's observation classes before scheduled workers start; concurrent
+    // first use can deadlock ObservationRegistry and NoopObservationRegistry initialization.
+    RestClient.create("http://localhost");
     String dataSourceUrl = "jdbc:h2:file:"
         + temporaryDirectory.resolve(databaseName).toAbsolutePath()
         + ";MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_ON_EXIT=FALSE";

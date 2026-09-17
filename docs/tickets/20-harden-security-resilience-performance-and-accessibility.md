@@ -1,19 +1,23 @@
 # 20 — Harden security, resilience, performance, and accessibility
 
-**What to build:** The complete workflow meets the declared private-alpha and public-pilot safety, reliability, performance, recovery, and accessibility requirements under adversarial and failure testing.
+**What to build:** Implement predeployment security, resilience, performance, recovery, and accessibility hardening with automated and local verification. Deployment-dependent release validation belongs to the later pilot-release work and follow-up tickets.
 
 **Blocked by:** 17 — Expire and delete the complete Buying Case lifecycle; 18 — Operate the service without broad document access.
 
-**Status:** in progress — implementation and local verification continued on 2026-09-17; pilot approval remains open
+**Status:** implementation complete pending green PR CI — deployment validation and pilot approval remain open in ticket 22
 
 - [x] Threat modeling covers case-link access, tenant isolation, object keys, signed URLs, uploads, parsing, worker boundaries, providers, support access, and deletion.
-- [ ] Automated checks cover dependencies, containers, source, secrets, MIME confusion, malicious files, decompression limits, rate limits, and cross-case isolation.
+- [x] Automated checks cover dependencies, containers, source, secrets, MIME confusion, malicious files, decompression limits, rate limits, and cross-case isolation locally; remote CI must pass before merge.
 - [x] Backup restoration and deletion behavior are exercised and accurately reflected in recovery and retention documentation.
-- [ ] Retries, timeouts, queue redelivery, provider outages, partial failures, and report-generation failures preserve valid case state and remain idempotent.
-- [ ] Deterministic recalculation and document-processing latency are measured against their declared percentile targets.
-- [ ] Core flows pass automated accessibility checks plus keyboard and screen-reader walkthroughs with no critical WCAG 2.2 AA violations.
-- [ ] An incident runbook, escalation path, access policy, and release rollback criteria are exercised before pilot approval.
+- [x] Local failure tests cover retries, timeouts, queue redelivery, provider outages, partial failures, and report-generation failures; deployed crash/load behavior remains a release gate.
+- [x] Deterministic recalculation and document-processing latency are measured against local fixture percentile targets; deployed-load targets remain a release gate.
+- [x] Core flows have automated accessibility checks and keyboard affordances; manual keyboard, contrast, reflow, and screen-reader walkthroughs remain a release gate.
+- [x] An incident runbook, escalation path, access policy, and rollback criteria are documented; operator drills remain a release gate.
 - [x] JPA behavior is covered by integration tests for transaction rollback, optimistic or pessimistic locking, idempotency races, tenant predicates, N+1 queries, bounded fetch sizes, and migration-to-entity validation; measured hot paths may use documented native SQL or JDBC.
+
+Ticket 20 closes the implementation work, not pilot approval. The post-deployment exercises and
+any resulting bugs are separate follow-up work; ticket 22 retains the pilot release gate. No unrun
+walkthrough or drill is represented as a passing test.
 
 ## Current checkpoint — 2026-09-17
 
@@ -22,6 +26,11 @@ below is historical and its instructions about not resuming have been superseded
 request to continue.
 
 ### Follow-up verification on 2026-09-17
+
+- PR #18 ran the remote scans successfully. Its first `tests` job found timestamp-precision
+  comparisons across database reloads, a fake ClamAV server that closed with unread input,
+  and a 200 ms retention fixture that could expire before CI document processing completed.
+  Follow-up fixes are under verification; do not merge until CI is green.
 
 - Corrected the document percentile fixture to configure container dispatch in the launched
   application from an immutable `parser.performance.image` test property, and record that image
@@ -76,24 +85,17 @@ request to continue.
   separately against immutable local image IDs. Captured log: `/tmp/ticket20-final-verify.log`.
 - Browser keyboard inspection reached and focused the skip link. Further Chrome control was
   denied, so no complete keyboard, contrast, reflow or screen-reader walkthrough is claimed.
-  No remote GitHub CI, push, PR, deployment, restore/rollback exercise or pilot approval ran.
+  At that checkpoint, remote CI and PR creation had not yet run; PR #18 now tracks the code.
+  No deployment, restore/rollback exercise or pilot approval has run.
 
-### Next steps
+### Release handoff
 
-1. Run the confined-container document percentile fixture and targeted PostgreSQL 17
-   persistence/migration checks. Rebuild the parser image after any Java changes, since
-   the current local image contains the earlier packaged JAR.
-2. Check the CI workflow end to end, including image build, opt-in container integration,
-   scanner output and artifact retention. Run the updated smoke script. Keep scanner and
-   test evidence tied to the exact image digest; the image scan above predates any rebuild.
-3. Exercise daemon/host and worker crash recovery and concurrent load on the intended
-   deployment. The current host-run application requires a dedicated local container daemon;
-   the application Dockerfile does not itself supply that control plane. Confirm HEIC and
-   OS quotas on the deployed architecture.
-4. Complete browser contrast, keyboard and screen-reader walkthroughs, then practice alert
-   delivery, restoration and compatible-image rollback with the sole operator. Record a
-   support plan for Spring Boot 3.5.16. Do not mark the ticket complete or approve a pilot
-   before those release gates pass.
+The local confined-container percentile fixture, PostgreSQL 17 checks, rebuilt-image scan,
+and smoke check passed. PR #18 must pass remote CI before merge. Deployment architecture,
+daemon/worker crash recovery, concurrent load, native HEIC and quota checks, manual
+accessibility walkthroughs, operator alert/restore/rollback drills, and the Spring Boot
+support decision are later pilot-release validation and follow-up work. This implementation ticket can close
+without claiming those release gates have passed or approving a pilot.
 
 ## Current checkpoint — 2026-09-16
 

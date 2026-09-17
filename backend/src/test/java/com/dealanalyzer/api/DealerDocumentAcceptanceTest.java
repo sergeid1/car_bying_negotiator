@@ -286,7 +286,7 @@ class DealerDocumentAcceptanceTest {
         "document-retention", true,
         "--document.storage.path=" + objects,
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef",
-        "--document.retention=PT0.2S",
+        "--document.retention=PT10S",
         "--document.retention-cleanup-delay=PT1H")) {
       JsonNode created = HttpAcceptanceHarness.post(
           application.client(), "/api/v1/cases", validCase(), "create-retention-case");
@@ -299,7 +299,7 @@ class DealerDocumentAcceptanceTest {
         assertThat(stored.count()).isEqualTo(2);
       }
 
-      Thread.sleep(250);
+      Thread.sleep(10_250);
       application.context().getBean(DocumentRetentionService.class).deleteExpiredArtifacts();
       application.context().getBean(DocumentRetentionService.class).deleteExpiredArtifacts();
 
