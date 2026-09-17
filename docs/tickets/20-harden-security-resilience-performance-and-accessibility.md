@@ -4,10 +4,10 @@
 
 **Blocked by:** 17 — Expire and delete the complete Buying Case lifecycle; 18 — Operate the service without broad document access.
 
-**Status:** implementation complete pending green PR CI — deployment validation and pilot approval remain open in ticket 22
+**Status:** complete — implementation and PR CI verified on 2026-09-17; deployment validation and pilot approval remain separate release work
 
 - [x] Threat modeling covers case-link access, tenant isolation, object keys, signed URLs, uploads, parsing, worker boundaries, providers, support access, and deletion.
-- [x] Automated checks cover dependencies, containers, source, secrets, MIME confusion, malicious files, decompression limits, rate limits, and cross-case isolation locally; remote CI must pass before merge.
+- [x] Automated checks cover dependencies, containers, source, secrets, MIME confusion, malicious files, decompression limits, rate limits, and cross-case isolation locally and in PR CI.
 - [x] Backup restoration and deletion behavior are exercised and accurately reflected in recovery and retention documentation.
 - [x] Local failure tests cover retries, timeouts, queue redelivery, provider outages, partial failures, and report-generation failures; deployed crash/load behavior remains a release gate.
 - [x] Deterministic recalculation and document-processing latency are measured against local fixture percentile targets; deployed-load targets remain a release gate.
@@ -30,7 +30,10 @@ request to continue.
 - PR #18 ran the remote scans successfully. Its first `tests` job found timestamp-precision
   comparisons across database reloads, a fake ClamAV server that closed with unread input,
   and a 200 ms retention fixture that could expire before CI document processing completed.
-  Follow-up fixes are under verification; do not merge until CI is green.
+  The second run narrowed the failures to two pilot-feedback timestamps assembled manually.
+  Those responses now use the same persisted microsecond precision as typed API timestamps.
+  On commit `1a33f37`, PR #18's `tests` and `scans` jobs both passed. The PR remains open for
+  normal review and merge.
 
 - Corrected the document percentile fixture to configure container dispatch in the launched
   application from an immutable `parser.performance.image` test property, and record that image
@@ -91,7 +94,7 @@ request to continue.
 ### Release handoff
 
 The local confined-container percentile fixture, PostgreSQL 17 checks, rebuilt-image scan,
-and smoke check passed. PR #18 must pass remote CI before merge. Deployment architecture,
+smoke check, and PR #18 remote CI passed. Deployment architecture,
 daemon/worker crash recovery, concurrent load, native HEIC and quota checks, manual
 accessibility walkthroughs, operator alert/restore/rollback drills, and the Spring Boot
 support decision are later pilot-release validation and follow-up work. This implementation ticket can close
