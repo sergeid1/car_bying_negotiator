@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "pilot-readiness.v1",
+  "prerequisites": [
+    {
+      "id": "jurisdiction-pack",
+      "requirement": "One pilot jurisdiction is selected and represented by an effective-dated, sourced, versioned pack reviewed by qualified counsel.",
+      "status": "BLOCKED",
+      "blocker": "No pilot state has been selected and no jurisdiction pack has been reviewed by qualified counsel. The engine reads effective-dated versioned packs, but the shipped values are synthetic development fixtures, not sourced law.",
+      "evidence": [
+        "backend/src/main/resources/db/migration/V10__create_cash_deal_economics.sql",
+        "backend/src/main/java/com/dealanalyzer/economics/persistence/JurisdictionPolicyEntity.java"
+      ],
+      "notes": "Counsel review of Buyer-facing legal copy is part of this blocked scope; legal-and-product-copy verifies only the mechanical claim properties."
+    },
+    {
+      "id": "provider-terms",
+      "requirement": "Automotive and processing provider terms document display, caching, attribution, derived-value, retention, deletion, training, regional-processing, coverage, and cost rights.",
+      "status": "BLOCKED",
+      "blocker": "No automotive or processing provider terms have been executed. Every provider in the inventory is a deterministic local fake or an unselected candidate, so no display, caching, attribution, derived-value, retention, deletion, training, regional-processing, coverage or cost right has been contractually established.",
+      "evidence": ["docs/provider-inventory.md"]
+    },
+    {
+      "id": "document-corpus",
+      "requirement": "At least 100 permissioned representative Dealer documents are acquired, de-identified as appropriate, and split before evaluation into development and frozen held-out subsets.",
+      "status": "BLOCKED",
+      "blocker": "No permissioned Dealer documents have been acquired. The extraction and review corpora are synthetic fixtures authored for contract evaluation, so neither the 100-document minimum nor a frozen held-out split exists.",
+      "evidence": [
+        "backend/src/test/resources/fixtures/extraction/supported-layout-corpus.json",
+        "backend/src/test/resources/fixtures/review/review-safety-corpus.json"
+      ]
+    },
+    {
+      "id": "expert-policy-validation",
+      "requirement": "A consumer-side automotive expert validates opening, target, and walk-away policy behavior against representative retrospective cases.",
+      "status": "BLOCKED",
+      "blocker": "No consumer-side automotive expert has reviewed the boundary policy. Its arithmetic is unit-tested against synthetic market ranges, which does not establish that the resulting opening, target and walk-away values are sound negotiating advice.",
+      "evidence": [
+        "backend/src/main/java/com/dealanalyzer/plan/PriceBoundaryPolicy.java",
+        "backend/src/test/java/com/dealanalyzer/plan/PriceBoundaryPolicyTest.java",
+        "docs/price-boundary-policy.md"
+      ]
+    },
+    {
+      "id": "frozen-parameters",
+      "requirement": "Upload limits, materiality tolerances, confidence thresholds, market freshness/sample rules, and report-schema fixtures are frozen and versioned.",
+      "status": "APPROVED",
+      "checks": ["FrozenPilotParametersTest", "com.dealanalyzer.document.FrozenDocumentMediaTest",
+        "com.dealanalyzer.api.GoldenCashDealContractTest", "com.dealanalyzer.api.DocumentExtractionAcceptanceTest"],
+      "evidence": [
+        "backend/src/main/resources/pilot/pilot-parameters.v1.json",
+        "backend/src/test/java/com/dealanalyzer/pilot/FrozenPilotParametersTest.java"
+      ],
+      "notes": "Freezing pins the current engineering defaults under a version and fails the build on undeclared drift. It does not assert that the pinned values are the commercially correct pilot settings; changing one requires a new parameter version."
+    },
+    {
+      "id": "infrastructure-and-privacy-inventory",
+      "requirement": "Recovery mechanism, infrastructure/provider choices, provider inventory, purposes, subprocessors, regions, retention, and deletion behavior are documented.",
+      "status": "BLOCKED",
+      "blocker": "The recovery mechanism, purposes, retention and deletion behavior are documented and implemented, but no hosting, object-storage, queue, mail or model provider has been selected. Subprocessors and processing regions therefore cannot be stated, so the inventory is incomplete.",
+      "evidence": [
+        "docs/provider-inventory.md",
+        "docs/case-portability-policy.md",
+        "docs/case-deletion-policy.md"
+      ]
+    },
+    {
+      "id": "legal-and-product-copy",
+      "requirement": "Legal and product copy avoids unsupported law, advice, safety, fraud, guarantee, and savings claims and discloses relevant commercial relationships.",
+      "status": "APPROVED",
+      "checks": ["PilotCopyClaimsTest"],
+      "evidence": [
+        "backend/src/test/java/com/dealanalyzer/pilot/PilotCopyClaimsTest.java",
+        "docs/grounded-language-policy.md"
+      ],
+      "notes": "The check scans shipped Buyer-facing copy and generated language for prohibited claim patterns and requires the commercial-relationship disclosure. It is a mechanical property, not counsel approval of the copy, which remains inside the blocked jurisdiction-pack scope."
+    },
+    {
+      "id": "preregistered-thresholds",
+      "requirement": "Pilot success and safety thresholds are preregistered before pilot outcomes are reviewed; any unmet prerequisite explicitly blocks release.",
+      "status": "BLOCKED",
+      "blocker": "No approved thresholds have been frozen. The freeze endpoint and this readiness gate enforce preregistration and block release, but the operator has not yet frozen approved success, safety and price-variant values, and the documented defaults are explicitly illustrative.",
+      "evidence": [
+        "backend/src/main/java/com/dealanalyzer/pilot/PilotService.java",
+        "backend/src/main/java/com/dealanalyzer/pilot/PilotReadiness.java",
+        "docs/pilot-metrics-policy.md"
+      ]
+    },
+    {
+      "id": "schema-and-orm-evidence",
+      "requirement": "The readiness record includes reviewed Flyway migrations, Hibernate schema-validation results, entity ownership and fetch rules, database constraints, and evidence that no production schema depends on Hibernate auto-generation.",
+      "status": "APPROVED",
+      "checks": ["SchemaAndOrmEvidenceTest"],
+      "evidence": [
+        "backend/src/test/java/com/dealanalyzer/pilot/SchemaAndOrmEvidenceTest.java",
+        "backend/src/test/java/com/dealanalyzer/buyingcase/persistence/PersistenceHardeningTest.java"
+      ],
+      "notes": "The check applies every migration, runs Hibernate in validate mode against the migrated schema, asserts no configuration selects an auto-generating ddl-auto value, and writes the constraint and fetch inventory to backend/target/readiness/schema-evidence.json."
+    }
+  ]
+}

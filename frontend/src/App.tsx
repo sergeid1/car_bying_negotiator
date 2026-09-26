@@ -157,6 +157,20 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         </p>
       </header>
 
+      <aside className="limitations" aria-label="Commercial relationships and scope">
+        <strong>What this is, and what it is not</strong>
+        <p>
+          This product represents you, the Buyer. No dealer, lender, or other commercial party
+          pays for placement, leads, or referrals, and no commercial relationship affects any
+          market range, rating, finding, or suggested boundary.
+        </p>
+        <p>
+          It reviews the dealer's own paperwork for financial consistency. It is not legal, tax,
+          or mechanical advice, it does not establish that a document is safe to sign, and it
+          does not guarantee savings or any negotiating outcome.
+        </p>
+      </aside>
+
       <RecoveryAccess onRecovered={value => { setCaseRevoked(false); setCaseCredentials(value); }} />
       <section id="case-workflow" tabIndex={-1} className="panel" aria-label="Open an existing Buying Case">
         <form onSubmit={event => {

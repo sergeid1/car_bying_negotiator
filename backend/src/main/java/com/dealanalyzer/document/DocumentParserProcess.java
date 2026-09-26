@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 class DocumentParserProcess {
   static final int MAX_INPUT_BYTES = 20 * 1024 * 1024;
   static final int MAX_PAGE_BYTES = 64 * 1024 * 1024;
+  static final Set<String> SUPPORTED_MEDIA_TYPES = Set.of("application/pdf", "image/png", "image/jpeg", "image/heic");
   private final Settings settings;
   private final Duration timeout;
   private final int heapMb;
@@ -201,7 +202,7 @@ class DocumentParserProcess {
   }
   private static Integer nullablePositive(int value) throws IOException { return value == 0 ? null : bounded(value, 1, 40_000_000); }
   private static String mediaType(String value) throws IOException {
-    if (!Set.of("application/pdf", "image/png", "image/jpeg", "image/heic").contains(value)) throw new IOException("Invalid media type");
+    if (!SUPPORTED_MEDIA_TYPES.contains(value)) throw new IOException("Invalid media type");
     return value;
   }
   static InvalidDocumentException rejected(String code) {

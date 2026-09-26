@@ -99,3 +99,11 @@ Operators have [restricted diagnostics, provider usage and separately consented 
 
 Buyers can provide [optional feedback, with privacy-minimized pilot measurements](docs/pilot-metrics-policy.md).
 Pilot operators must freeze thresholds and price variants before enrollment or metric review.
+
+The [public-pilot readiness record](docs/pilot-readiness-record.md) states whether each pilot
+prerequisite is approved or blocks release, and is enforced rather than advisory: the application
+refuses to start under the `pilot` profile while any prerequisite is blocked. Six of nine are
+currently blocked, so **the public pilot is blocked**. Frozen pilot parameters, Buyer-facing claim
+limits, and Flyway/Hibernate schema evidence are verified by tests in `mvn verify`, which writes
+schema evidence to `backend/target/readiness`. See also the
+[provider and subprocessor inventory](docs/provider-inventory.md).

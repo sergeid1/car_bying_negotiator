@@ -1,0 +1,14 @@
+[
+  {"setting":"spring.jpa.hibernate.ddl-auto=update", "generating":true},
+  {"setting":"ddl-auto: create", "generating":true},
+  {"setting":"SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop", "generating":true},
+  {"setting":"hibernate.hbm2ddl.auto=create-only", "generating":true},
+  {"setting":"\"spring.jpa.hibernate.ddl-auto=create-drop\",", "generating":true},
+  {"setting":"\"hibernate.hbm2ddl.auto=update\"})", "generating":true},
+  {"setting":"spring.jpa.hibernate.ddl-auto=${DDL_MODE:update}", "generating":true},
+  {"setting":"ddl-auto: 'create'", "generating":true},
+  {"setting":"ddl-auto: validate", "generating":false},
+  {"setting":"SPRING_JPA_HIBERNATE_DDL_AUTO=none", "generating":false},
+  {"setting":"spring.jpa.hibernate.ddl-auto=${DDL_MODE:validate}", "generating":false},
+  {"setting":"# ddl-auto=create", "generating":false}
+]
