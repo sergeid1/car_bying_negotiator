@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "core-deal-analysis-report.v1",
+  "scenario": "buyerCanCorrectAndVerifyMaterialTermsIntoOneImmutableDealerOffer",
+  "expected": {
+    "/status": "COMPLETE",
+    "/analysis/reviewStatus": "UNABLE_TO_VERIFY"
+  },
+  "requiredObjectPointers": ["/analysis", "/evidence", "/reproduction"],
+  "requiredArrayPointers": ["/analysis/topReasons", "/analysis/materialAmounts", "/analysis/limitations"]
+}

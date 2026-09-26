@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "pilot-parameters.v1",
+  "frozenOn": "2026-09-26",
+  "intent": "Frozen public-pilot defaults and policy parameters, checked by the named readiness tests. Deployment environment overrides require separate release review. After this initial version is committed, changing a value requires a new schemaVersion, not an edit in place.",
+  "uploadLimits": {
+    "maxFileBytes": 20971520,
+    "maxPages": 25,
+    "maxPixels": 40000000,
+    "minWidth": 1,
+    "minHeight": 1,
+    "maxExpansionRatio": 10000,
+    "normalizationDpi": 144,
+    "normalizationMaxPagePixels": 40000000,
+    "supportedMediaTypes": ["application/pdf", "image/jpeg", "image/png", "image/heic"],
+    "supportedMediaTypesVerifiedBy": "FrozenDocumentMediaTest and DealerDocumentAcceptanceTest"
+  },
+  "confidenceThresholds": {
+    "materialExtractionConfidence": 0.85
+  },
+  "materialityTolerances": {
+    "revisedOfferTolerance": "revised-materiality.v1: USD 1.00; APR 0.1 percentage points; other changes material; approved limits zero tolerance",
+    "usdMinorThreshold": 100,
+    "percentagePointThreshold": 0.1,
+    "coreReviewTolerance": "zero"
+  },
+  "marketRules": {
+    "maxObservationAgeDays": 45,
+    "minIncludedComparables": 3,
+    "minObservationPriceMinor": 500000,
+    "maxObservationPriceMinor": 20000000
+  },
+  "reportSchema": {
+    "reportSchemaVersion": "core-deal-analysis-report.v1",
+    "policyVersions": {
+      "priceBoundaries": "price-boundaries.v1",
+      "revisedOffer": "revised-offer.v1",
+      "coreReview": "core-review.v1",
+      "marketSelection": "market-selection.v1",
+      "dealerFinancing": "dealer-financing.v1",
+      "outsideFinancingComparison": "outside-financing-comparison.v1",
+      "groundedLanguage": "grounded-language.v1"
+    },
+    "coreReportFixture": "fixtures/golden/core-report-contract.v1.json",
+    "syntheticReportSchemaVersion": "deal-analysis-report.v1",
+    "syntheticGoldenFixtures": [
+      "fixtures/golden/cash-deal-standard.json",
+      "fixtures/golden/cash-deal-no-extras.json"
+    ]
+  }
+}

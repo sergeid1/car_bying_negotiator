@@ -344,7 +344,21 @@ class DocumentExtractionAcceptanceTest {
       String analysisPath = "/api/v1/cases/" + caseId + "/analyses";
       JsonNode analyzed = HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "core-analysis", token);
       JsonNode report = HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/latest", token);
-      assertThat(report.get("schemaVersion").asText()).isEqualTo("core-deal-analysis-report.v1");
+      try (var parameters = getClass().getResourceAsStream("/pilot/pilot-parameters.v1.json")) {
+        var json = new com.fasterxml.jackson.databind.ObjectMapper();
+        var frozen = json.readTree(parameters).path("reportSchema");
+        assertThat(report.path("schemaVersion").asText()).isEqualTo(frozen.path("reportSchemaVersion").asText());
+        try (var source = getClass().getClassLoader().getResourceAsStream(frozen.path("coreReportFixture").asText())) {
+          var fixture = json.readTree(source);
+          assertThat(report.path("schemaVersion")).isEqualTo(fixture.path("schemaVersion"));
+          fixture.path("expected").fields().forEachRemaining(expected ->
+              assertThat(report.at(expected.getKey())).as(expected.getKey()).isEqualTo(expected.getValue()));
+          fixture.path("requiredObjectPointers").forEach(pointer ->
+              assertThat(report.at(pointer.asText()).isObject()).as(pointer.asText()).isTrue());
+          fixture.path("requiredArrayPointers").forEach(pointer ->
+              assertThat(report.at(pointer.asText()).isArray()).as(pointer.asText()).isTrue());
+        }
+      }
       String languagePath = "/api/v1/cases/" + caseId + "/reports/1/negotiation";
       JsonNode language = HttpAcceptanceHarness.get(application.client(), languagePath, token);
       assertThat(language.path("reportVersion").asInt()).isEqualTo(1);

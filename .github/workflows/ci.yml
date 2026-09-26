@@ -30,11 +30,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: mvn -B verify
+      - run: mvn -B clean verify
         working-directory: backend
       - name: Preserve full-suite reports before PostgreSQL verification
         run: mv backend/target/surefire-reports backend/target/full-suite-reports
-      - run: mvn -B -Dtest=PersistenceHardeningTest test
+      - run: mvn -B -Dtest=PersistenceHardeningTest,SchemaAndOrmEvidenceTest test
         working-directory: backend
         env:
           HARDENING_DATABASE_URL: jdbc:postgresql://localhost:5432/ci
@@ -50,6 +50,7 @@ jobs:
             backend/target/failsafe-reports
             backend/target/surefire-reports
             backend/target/hardening
+            backend/target/readiness
           retention-days: 14
   scans:
     runs-on: ubuntu-latest

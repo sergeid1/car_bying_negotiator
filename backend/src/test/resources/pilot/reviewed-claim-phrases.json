@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "reviewed-claim-phrases.v1",
+  "intent": "Every risky claim phrase in shipped Buyer-facing copy must appear here with a justification. A new occurrence fails PilotCopyClaimsTest until it is reviewed and recorded, so the claim surface cannot grow silently.",
+  "reviewed": [
+    {
+      "file": "backend/src/main/java/com/dealanalyzer/buyingcase/persistence/CoreReportService.java",
+      "pattern": "guarantee",
+      "contains": "Savings are not guaranteed.",
+      "justification": "Negated savings disclaimer included in the stored core report limitations."
+    },
+    {
+      "file": "backend/src/main/java/com/dealanalyzer/report/CashDealAnalyzer.java",
+      "pattern": "advice",
+      "contains": "This is not legal, mechanical, title, or purchase-safety advice.",
+      "justification": "Negated advice disclaimer included in the synthetic report limitations."
+    },
+    {
+      "file": "backend/src/main/java/com/dealanalyzer/negotiation/GroundedLanguage.java",
+      "pattern": "guarantee",
+      "contains": "Savings are not guaranteed.",
+      "justification": "Negated scope disclaimer on every generated explanation; it withdraws a savings claim rather than making one."
+    },
+    {
+      "file": "backend/src/main/java/com/dealanalyzer/plan/PriceBoundaryPolicy.java",
+      "pattern": "guarantee",
+      "contains": "Negotiation outcomes are uncertain; savings are not guaranteed.",
+      "justification": "Negated uncertainty disclosure attached to the estimated-savings figure, required by DEVELOPMENT_SPEC.md PLAN-05."
+    },
+    {
+      "file": "frontend/src/App.tsx",
+      "pattern": "safe to sign",
+      "contains": "it does not establish that a document is safe to sign",
+      "justification": "Negated standing disclosure. DEVELOPMENT_SPEC.md section 1.2 forbids the positive claim; stating its absence is the disclosure the pilot requires."
+    },
+    {
+      "file": "frontend/src/App.tsx",
+      "pattern": "guarantee",
+      "contains": "does not guarantee savings or any negotiating outcome",
+      "justification": "Negated standing disclosure withdrawing savings and outcome guarantees."
+    },
+    {
+      "file": "frontend/src/App.tsx",
+      "pattern": "advice",
+      "contains": "or mechanical advice, it does not establish that a document is safe to sign",
+      "justification": "Negated advice-boundary disclosure required by DEVELOPMENT_SPEC.md section 13."
+    }
+  ]
+}

@@ -49,6 +49,12 @@ fallback bypasses these limits.
 The `pilot` Spring profile refuses to start in local process mode. Configure a host-run
 application with a dedicated local container daemon and an already-built immutable parser image:
 
+The profile also enforces the [pilot readiness record](pilot-readiness-record.md): while any
+prerequisite is blocked, the application cannot start with `pilot` active. For pre-release staging
+and parser drills, use the same container settings below without activating `pilot`. Container
+mode still applies its confinement checks. That staging configuration does not authorize public
+pilot traffic; public release requires the approved record and the `pilot` profile.
+
 ```sh
 docker build -f backend/Dockerfile.parser -t deal-analyzer-parser:release backend
 docker image inspect deal-analyzer-parser:release --format '{{.Id}}'
