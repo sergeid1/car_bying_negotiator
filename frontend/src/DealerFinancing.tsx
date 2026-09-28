@@ -70,7 +70,7 @@ export function DealerFinancingForm({ caseId, token, outside = false, onSaved }:
   return <details className="panel"><summary>{outside ? "Compare one outside financing offer" : "Verify dealer financing (finance purchases)"}</summary>
     <form onSubmit={save} aria-label={outside ? "Compare outside financing" : "Verify dealer financing"}><fieldset disabled={busy}><legend>Buyer-confirmed loan terms</legend>
       {outside && <><p>Buyer-selected outside financing is not a dealer discount. Purchase price, OTD, net due, cash contribution excluding lender fees, deferred charges and add-ons must match before a cost delta is shown. Resolve financing-dependent rebates with the dealer before confirming matching assumptions.</p>
-        <button type="button" onClick={copyPurchase}>Copy dealer purchase assumptions</button></>}
+        <button className="btn-secondary" type="button" onClick={copyPurchase}>Copy dealer purchase assumptions</button></>}
       <p>Enter USD amounts from the current offer. Enter 0 for confirmed zero fees or charges; leave unknown values blank. Add-ons must already be included in the principal. Cash paid includes upfront fees. Known deferred charges exclude scheduled loan payments.</p>
       {fields.map(([name, label]) => <label key={name}>{label} (USD)<input type="number" min="0" step="0.01" value={values[name] || ""} onChange={e => update(name, e.target.value)} /></label>)}
       <label>APR (%)<input type="number" min="0" max="100" step="0.00000001" value={values.apr || ""} onChange={e => update("apr", e.target.value)} /></label>
@@ -80,8 +80,8 @@ export function DealerFinancingForm({ caseId, token, outside = false, onSaved }:
       <h4>Financed add-ons</h4>
       {addons.map((addon, index) => <div key={index}><label>Add-on {index + 1} name<input required value={addon.label} onChange={e => { setAddons(addons.map((item, i) => i === index ? { ...item, label: e.target.value } : item)); setConfirmed(false); setKey(crypto.randomUUID()); }} /></label>
         <label>Add-on {index + 1} cash price (USD)<input required type="number" min="0" step="0.01" value={addon.price} onChange={e => { setAddons(addons.map((item, i) => i === index ? { ...item, price: e.target.value } : item)); setConfirmed(false); setKey(crypto.randomUUID()); }} /></label>
-        <button type="button" onClick={() => { setAddons(addons.filter((_, i) => i !== index)); setConfirmed(false); setKey(crypto.randomUUID()); }}>Remove add-on {index + 1}</button></div>)}
-      <button type="button" onClick={() => { setAddons([...addons, { label: "", price: "" }]); setConfirmed(false); setKey(crypto.randomUUID()); }}>Add financed add-on</button>
+        <button className="btn-ghost" type="button" onClick={() => { setAddons(addons.filter((_, i) => i !== index)); setConfirmed(false); setKey(crypto.randomUUID()); }}>Remove add-on {index + 1}</button></div>)}
+      <button className="btn-secondary" type="button" onClick={() => { setAddons([...addons, { label: "", price: "" }]); setConfirmed(false); setKey(crypto.randomUUID()); }}>Add financed add-on</button>
       <label><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />{outside ? "I confirm this Buyer-selected outside offer and its purchase assumptions, fees, timing and complete add-on list; blank fields are unknown." : "I verified these values, fees, timing and the complete financed add-on list against the current offer; blank fields are unknown."}</label>
       <button disabled={!confirmed} type="submit">{outside ? "Save and compare outside financing" : "Save verified Finance Offer"}</button>
     </fieldset></form>{message && <p role="status">{message}</p>}
@@ -92,7 +92,7 @@ export function DealerFinancingResult({ result, availability, terms }: { result:
   const available = availability === "AVAILABLE";
   return <section className="panel" id="core-financing" tabIndex={-1}><h3>Dealer financing</h3>
     <p>Financing: {availability}. <a href="#evidence-financing">Verified inputs and calculation</a></p>
-    {result && <>{result.issues.map(issue => <p key={issue}>{issue}</p>)}
+    {result && <>{result.issues.map(issue => <p className="notice" key={issue}>{issue}</p>)}
       {available && <>{terms && <p>Verified APR: {terms.aprPercent ?? "Unavailable"}%. Term: {terms.termMonths ?? "Unavailable"} months.</p>}<dl className="money-list">
         <div><dt>Quoted monthly payment</dt><dd>{money(result.quotedPaymentMinor)}</dd></div>
         <div><dt>Calculated monthly payment</dt><dd>{money(result.paymentMinor)}</dd></div>

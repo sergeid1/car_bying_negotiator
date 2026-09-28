@@ -22,7 +22,7 @@ export function CaseLifecycle({ caseId, token, onRevoked }: { caseId: string; to
       <p role="status">{receipt.state === "DELETED" ? "Active-system removal verified." : "Case access has been revoked. Removal is pending."}</p>
       {receipt.failureCode && <p>Removal needs another attempt. The background worker will retry.</p>}
       <p>Backup expiry is unverified. Active-system completion does not confirm removal from backups or copies you downloaded.</p>
-      <button disabled={busy} onClick={() => deletion("GET")}>Check deletion progress</button>
+      <button className="btn-secondary" disabled={busy} onClick={() => deletion("GET")}>Check deletion progress</button>
     </> : <>
       <p>Original documents are retained for at most 30 days by default; server settings may shorten this.
         Expiry removes the case and its derived data. You can choose a shorter period measured from case creation.
@@ -39,12 +39,12 @@ export function CaseLifecycle({ caseId, token, onRevoked }: { caseId: string; to
         } catch (failure) { setError(String(failure)); } finally { setBusy(false); }
       }}>
         <label>Retain for days<input name="days" type="number" required min={1} max={30} defaultValue={7} /></label>
-        <button disabled={busy}>Shorten retention</button>
+        <button className="btn-secondary" disabled={busy}>Shorten retention</button>
       </form>
       {message && <p role="status">{message}</p>}
       <p>Deletion immediately revokes case and recovery access, then removes original documents, reports, exports and derived data. This cannot be undone.</p>
       <label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I want to permanently delete this Buying Case.</label>
-      <button disabled={busy || !confirmed} onClick={() => deletion("POST")}>Delete Buying Case</button>
+      <button className="btn-danger" disabled={busy || !confirmed} onClick={() => deletion("POST")}>Delete Buying Case</button>
     </>}
     {error && <p role="alert">{error}</p>}
   </section>;

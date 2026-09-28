@@ -91,7 +91,7 @@ export function OutcomeFeedback(props: Credentials) {
             <label key={key}>{label}<input type="number" min={key === "termMonths" ? 1 : 0} max={key === "termMonths" ? 120 : key === "aprPercent" ? 100 : 1000000}
               step={key === "termMonths" ? 1 : 0.01} value={values[key] ?? ""} onChange={e => set(key)(e.target.value)} /></label>)}
         </details>
-        <button type="button" onClick={loadPrice}>View optional price question</button>
+        <button className="btn-secondary" type="button" onClick={loadPrice}>View optional price question</button>
         {price && optional(`Would you pay $${(price.priceMinor / 100).toFixed(2)} once for this service? (optional)`, "willingToPay", answers.slice(0, 2))}
         {priceMessage && <p role="status">{priceMessage}</p>}
         <p>Each outcome stage can be submitted once. Leave any question blank to skip it.</p>

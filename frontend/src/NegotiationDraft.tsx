@@ -25,7 +25,7 @@ export function NegotiationLoader({ caseId, token, reportVersion }: { caseId: st
     }).catch(() => { if (!controller.signal.aborted) setError(true); });
     return () => controller.abort();
   }, [caseId, token, reportVersion, attempt]);
-  if (error) return <section className="panel"><p role="alert">Saved draft unavailable for this report. Older reports may need regeneration.</p><button onClick={() => setAttempt(attempt + 1)}>Retry loading draft</button></section>;
+  if (error) return <section className="panel"><p role="alert">Saved draft unavailable for this report. Older reports may need regeneration.</p><button className="btn-secondary" onClick={() => setAttempt(attempt + 1)}>Retry loading draft</button></section>;
   if (!version) return <p role="status">Loading saved negotiation draft…</p>;
   return <NegotiationDraft key={`${caseId}-${reportVersion}`} version={version} credentials={{ caseId, token }} />;
 }
@@ -51,8 +51,10 @@ export function NegotiationDraft({ version, credentials }: { version: Negotiatio
     <label htmlFor="negotiation-draft">Your negotiation draft</label>
     <textarea id="negotiation-draft" rows={12} value={draft} onChange={event => { setDraft(event.target.value); setStatus(""); }} />
     <p>Buyer edits are not verified and stay in this editor until you leave or load another report. Copy or download to keep them.</p>
-    <button onClick={copy}>Copy draft</button>{" "}
-    <a download={`negotiation-report-${version.reportVersion}.txt`} href={`data:text/plain;charset=utf-8,${encodeURIComponent(draft)}`}>Download draft</a>
+    <div className="actions">
+      <button onClick={copy}>Copy draft</button>
+      <a download={`negotiation-report-${version.reportVersion}.txt`} href={`data:text/plain;charset=utf-8,${encodeURIComponent(draft)}`}>Download draft</a>
+    </div>
     <p role="status">{status}</p>
   </section>;
 }

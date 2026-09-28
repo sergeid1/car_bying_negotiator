@@ -75,6 +75,9 @@ const stageLabels: Record<string, string> = {
   FAILED: "Failed",
 };
 
+/** Ordered so the progress meter can show how far a running analysis has come. */
+const stageOrder = ["QUEUED", "LOADING_INPUTS", "FETCHING_MARKET", "CALCULATING", "ASSEMBLING_REPORT", "COMPLETE"];
+
 async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, options);
   if (!response.ok) {
@@ -143,97 +146,148 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
     }
   }
 
+  const running = Boolean(stage && stage !== "COMPLETE");
+
   return (
-    <main>
+    <>
       <a className="skip-link" href="#case-workflow" onClick={event => {
         event.preventDefault(); document.getElementById("case-workflow")?.focus();
       }}>Skip to case workflow</a>
-      <header className="hero">
-        <p className="eyebrow">Buyer-aligned deal analysis</p>
-        <h1>See the whole deal before you decide.</h1>
-        <p className="lede">
-          Run a transparent Deal X-Ray on one synthetic cash offer. Every dollar stays
-          connected to its input or calculation.
-        </p>
+
+      <header className="masthead">
+        <div className="masthead-inner">
+          <span className="wordmark"><span className="mark" aria-hidden="true" />Deal X-Ray</span>
+          <nav aria-label="Page sections">
+            <a href="#case-workflow">Your case</a>
+            <a href="#scope">Scope</a>
+          </nav>
+        </div>
       </header>
 
-      <aside className="limitations" aria-label="Commercial relationships and scope">
-        <strong>What this is, and what it is not</strong>
-        <p>
-          This product represents you, the Buyer. No dealer, lender, or other commercial party
-          pays for placement, leads, or referrals, and no commercial relationship affects any
-          market range, rating, finding, or suggested boundary.
-        </p>
-        <p>
-          It reviews the dealer's own paperwork for financial consistency. It is not legal, tax,
-          or mechanical advice, it does not establish that a document is safe to sign, and it
-          does not guarantee savings or any negotiating outcome.
-        </p>
-      </aside>
+      <main>
+        <div className="hero">
+          <p className="eyebrow">Buyer-aligned deal analysis</p>
+          <h1>See the whole deal before you decide.</h1>
+          <p className="lede">
+            Run a transparent Deal X-Ray on one synthetic cash offer. Every dollar stays
+            connected to its input or calculation.
+          </p>
+          <ul className="trust-strip">
+            <li>Every amount linked to its source</li>
+            <li>Deterministic, versioned math</li>
+            <li>No account required</li>
+            <li>Ephemeral by default</li>
+          </ul>
+        </div>
 
-      <RecoveryAccess onRecovered={value => { setCaseRevoked(false); setCaseCredentials(value); }} />
-      <section id="case-workflow" tabIndex={-1} className="panel" aria-label="Open an existing Buying Case">
-        <form onSubmit={event => {
-          event.preventDefault();
-          const values = new FormData(event.currentTarget);
-          setCaseRevoked(false);
-          setCaseCredentials({ caseId: String(values.get("caseId")), token: String(values.get("token")) });
-        }}>
-          <label>Buying Case ID<input name="caseId" required /></label>
-          <label>Case access token<input name="token" type="password" required autoComplete="off" /></label>
-          <button>Open price plan</button>
-        </form>
-      </section>
-      {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
-        onRevoked={() => { setCaseRevoked(true); setReport(undefined); setStage(undefined); setError(undefined); }} />}
-      {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
-      {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
-      {caseCredentials && !caseRevoked && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
-      {caseCredentials && !caseRevoked && <CoreReportLoader key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
+        <div className="workspace">
+          <div className="column">
+            {!report && (
+              <section className="panel" aria-labelledby="case-heading">
+                <div className="section-heading">
+                  <div>
+                    <p className="step">Synthetic fixture</p>
+                    <h2 id="case-heading">2021 Honda Accord EX-L</h2>
+                  </div>
+                  <span className="cash-badge">Cash purchase</span>
+                </div>
 
-      {!report && (
-        <section className="panel" aria-labelledby="case-heading">
-          <div className="section-heading">
-            <div>
-              <p className="step">Synthetic fixture</p>
-              <h2 id="case-heading">2021 Honda Accord EX-L</h2>
-            </div>
-            <span className="cash-badge">Cash purchase</span>
+                <dl className="facts">
+                  <div><dt>VIN</dt><dd>1HGCM82633A004352</dd></div>
+                  <div><dt>Mileage</dt><dd>38,000 mi</dd></div>
+                  <div><dt>Buyer ZIP</dt><dd>27601</dd></div>
+                  <div><dt>Dealer ZIP</dt><dd>27604</dd></div>
+                  <div><dt>Selling price</dt><dd>$25,000.00</dd></div>
+                  <div><dt>Quoted components</dt><dd>Fees, add-ons, taxes, government charges</dd></div>
+                </dl>
+
+                <form onSubmit={startAnalysis}>
+                  <button type="submit" disabled={running}>
+                    {running ? "Analyzing…" : "Analyze synthetic deal"}
+                  </button>
+                </form>
+
+                {running && (
+                  <>
+                    <p className="operation" role="status" aria-live="polite">
+                      <span className="spinner" aria-hidden="true" />
+                      {stageLabels[stage!] ?? stage}
+                    </p>
+                    <ol className="stage-track" aria-hidden="true">
+                      {stageOrder.slice(0, -1).map((name, index) => (
+                        <li key={name} data-done={index <= stageOrder.indexOf(stage!)} />
+                      ))}
+                    </ol>
+                  </>
+                )}
+                {error && <p className="error" role="alert">{error}</p>}
+              </section>
+            )}
+
+            {report && <DealReport report={report} />}
+
+            {caseCredentials && !caseRevoked && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
+            {caseCredentials && !caseRevoked && <CoreReportLoader key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
           </div>
 
-          <dl className="facts">
-            <div><dt>VIN</dt><dd>1HGCM82633A004352</dd></div>
-            <div><dt>Mileage</dt><dd>38,000 mi</dd></div>
-            <div><dt>Buyer ZIP</dt><dd>27601</dd></div>
-            <div><dt>Dealer ZIP</dt><dd>27604</dd></div>
-            <div><dt>Selling price</dt><dd>$25,000.00</dd></div>
-            <div><dt>Quoted components</dt><dd>Fees, add-ons, taxes, government charges</dd></div>
-          </dl>
+          <aside className="rail" aria-label="Case access and retention">
+            <p className="rail-title">Your Buying Case</p>
 
-          <form onSubmit={startAnalysis}>
-            <button type="submit" disabled={Boolean(stage && stage !== "COMPLETE")}>
-              {stage && stage !== "COMPLETE" ? "Analyzing…" : "Analyze synthetic deal"}
-            </button>
-          </form>
+            <section id="case-workflow" tabIndex={-1} className="panel" aria-label="Open an existing Buying Case">
+              <h2>Open a saved case</h2>
+              <p className="muted">Enter the Case ID and access token you saved when the case was created.</p>
+              <form onSubmit={event => {
+                event.preventDefault();
+                const values = new FormData(event.currentTarget);
+                setCaseRevoked(false);
+                setCaseCredentials({ caseId: String(values.get("caseId")), token: String(values.get("token")) });
+              }}>
+                <label>Buying Case ID<input name="caseId" required /></label>
+                <label>Case access token<input name="token" type="password" required autoComplete="off" /></label>
+                <button>Open price plan</button>
+              </form>
+            </section>
 
-          {stage && stage !== "COMPLETE" && (
-            <p className="operation" role="status" aria-live="polite">
-              <span className="spinner" aria-hidden="true" />
-              {stageLabels[stage] ?? stage}
-            </p>
-          )}
-          {error && <p className="error" role="alert">{error}</p>}
-        </section>
-      )}
+            <RecoveryAccess onRecovered={value => { setCaseRevoked(false); setCaseCredentials(value); }} />
+            {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
+            {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
+            {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
+              onRevoked={() => { setCaseRevoked(true); setReport(undefined); setStage(undefined); setError(undefined); }} />}
+          </aside>
+        </div>
+      </main>
 
-      {report && <DealReport report={report} />}
-    </main>
+      <footer className="page-footer">
+        <div className="page-footer-inner">
+          <section className="limitations" id="scope" aria-label="Commercial relationships and scope">
+            <strong>What this is, and what it is not</strong>
+            <div className="scope-columns">
+              <p>
+                This product represents you, the Buyer. No dealer, lender, or other commercial party
+                pays for placement, leads, or referrals, and no commercial relationship affects any
+                market range, rating, finding, or suggested boundary.
+              </p>
+              <p>
+                It reviews the dealer's own paperwork for financial consistency. It is not legal, tax,
+                or mechanical advice, it does not establish that a document is safe to sign, and it
+                does not guarantee savings or any negotiating outcome.
+              </p>
+            </div>
+          </section>
+        </div>
+      </footer>
+    </>
   );
 }
 
 function DealReport({ report }: { report: Report }) {
   const { analysis } = report;
   const economics = analysis.economics;
+  const market = analysis.marketAssessment;
+  const span = market.high.minorUnits - market.low.minorUnits;
+  const position = span > 0
+    ? Math.min(1, Math.max(0, (economics.sellingPrice.minorUnits - market.low.minorUnits) / span))
+    : null;
   return (
     <article className="report" aria-labelledby="report-heading">
       <div className="report-meta">
@@ -259,10 +313,15 @@ function DealReport({ report }: { report: Report }) {
         <div className="market-card">
           <span>Synthetic market range</span>
           <strong>
-            {formatMoney(analysis.marketAssessment.low)}–
-            {formatMoney(analysis.marketAssessment.high)}
+            {formatMoney(market.low)}–
+            {formatMoney(market.high)}
           </strong>
-          <small>{humanize(analysis.marketAssessment.confidence)} confidence · estimated</small>
+          {position !== null && (
+            <div className="range" aria-hidden="true">
+              <span className="range-marker" style={{ left: `${position * 100}%` }} />
+            </div>
+          )}
+          <small>{humanize(market.confidence)} confidence · estimated</small>
         </div>
       </section>
 

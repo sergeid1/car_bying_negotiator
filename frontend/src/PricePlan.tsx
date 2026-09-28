@@ -56,7 +56,7 @@ export function PricePlan({ caseId, token }: { caseId: string; token: string }) 
           <div><dt>Policy maximum</dt><dd>{money(boundary.policyMaximumMinor)}</dd></div>
           <div><dt>Walk-away ceiling</dt><dd>{money(boundary.walkAwayMinor)}</dd></div>
         </dl> : <p>Unavailable: jurisdiction inputs do not support conversion.</p>}</section>)}
-      {plan.payload.plan.warnings.map(warning => <p key={warning}>Warning: {warning}</p>)}
+      {plan.payload.plan.warnings.map(warning => <p className="notice" key={warning}>Warning: {warning}</p>)}
       <p>Estimated savings: {money(plan.payload.plan.savings.amountMinor)} against {plan.payload.plan.savings.baseline}. {plan.payload.plan.savings.uncertainty}</p>
       <label><input type="checkbox" checked={approved} onChange={event => setApproved(event.target.checked)} />I approve these Deal Terms and price limits as my comparison baseline.</label>
       <button onClick={approve} disabled={busy || !approved || Boolean(baseline)}>Approve immutable baseline</button>
