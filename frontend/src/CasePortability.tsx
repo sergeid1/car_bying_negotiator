@@ -88,13 +88,15 @@ export function CaseDownloads({ caseId, token, reportVersion }: Credentials & { 
   return <section className="panel" aria-label="Case downloads">
     <h2>Save a copy</h2>
     <p>Export retained case data and version history. Saved reports include their evidence and limitations.</p>
-    <button disabled={busy} onClick={() => download("ZIP")}>Export retained case data</button>
-    {reportVersion !== undefined && <>
-      <button disabled={busy} onClick={() => download("HTML")}>Download HTML report</button>
-      <button disabled={busy} onClick={() => download("PDF")}>Download PDF report</button>
-      <p>Saved report version {reportVersion}</p>
-    </>}
-    <button disabled={busy} onClick={() => { keys.current = {}; setMessage("Next download will create a new snapshot."); setError(""); }}>Start a new export</button>
+    <div className="actions">
+      <button disabled={busy} onClick={() => download("ZIP")}>Export retained case data</button>
+      {reportVersion !== undefined && <>
+        <button className="btn-secondary" disabled={busy} onClick={() => download("HTML")}>Download HTML report</button>
+        <button className="btn-secondary" disabled={busy} onClick={() => download("PDF")}>Download PDF report</button>
+      </>}
+      <button className="btn-ghost" disabled={busy} onClick={() => { keys.current = {}; setMessage("Next download will create a new snapshot."); setError(""); }}>Start a new export</button>
+    </div>
+    {reportVersion !== undefined && <p className="muted"><small>Saved report version {reportVersion}</small></p>}
     {message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
   </section>;
 }

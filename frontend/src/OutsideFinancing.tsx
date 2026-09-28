@@ -27,10 +27,12 @@ export function OutsideFinancing({ caseId, token }: { caseId: string; token: str
       setSaved(await response.json());
     } catch (error) { setError(String(error)); } finally { setBusy(false); }
   }
-  return <section aria-label="Outside financing">
+  return <section className="stack" aria-label="Outside financing">
     <DealerFinancingForm caseId={caseId} token={token} outside onSaved={value => { setSaved(value as Comparison); setError(""); }} />
-    <button onClick={load} disabled={busy}>Open saved outside comparison</button>
-    {error && <p role="alert">{error}</p>}
+    <div className="panel">
+      <button className="btn-secondary" onClick={load} disabled={busy}>Open saved outside comparison</button>
+      {error && <p role="alert">{error}</p>}
+    </div>
     {saved && <OutsideFinancingResult comparison={saved} />}
   </section>;
 }
@@ -41,7 +43,7 @@ export function OutsideFinancingResult({ comparison }: { comparison: Comparison 
   return <section className="panel" aria-label="Saved financing comparison"><h3>Outside financing comparison — version {comparison.version}</h3>
     <p>Buyer-selected financing, not a dealer discount. Saved estimate as of {comparison.createdAt}, using dealer financing {comparison.dealerFinancing.id}. This historical snapshot does not reflect later offer or vehicle changes. Save a new comparison against current verified financing to update it.</p>
     <p>Comparison: {result.status}</p>
-    {[...result.issues, ...result.purchaseDifferences].map((issue, index) => <p key={index}>{issue}</p>)}
+    {[...result.issues, ...result.purchaseDifferences].map((issue, index) => <p className="notice" key={index}>{issue}</p>)}
     <table><caption>Full-term economics under each saved scenario’s purchase assumptions</caption>
       <thead><tr><th scope="col">Amount or term</th><th scope="col">Dealer financing</th><th scope="col">Outside financing</th></tr></thead>
       <tbody>

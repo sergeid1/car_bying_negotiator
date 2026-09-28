@@ -43,12 +43,14 @@ export function CoreReportLoader({ caseId, token }: { caseId: string; token: str
       if (generate) setKey(crypto.randomUUID());
     } catch (caught) { setError(String(caught)); } finally { setBusy(false); }
   }
-  return <section aria-label="Core deal report">
+  return <section className="stack" aria-label="Core deal report">
     <DealerFinancingForm key={`dealer-${caseId}-${token}`} caseId={caseId} token={token} />
     <OutsideFinancing key={`outside-${caseId}-${token}`} caseId={caseId} token={token} />
     <div className="panel">
-      <button onClick={() => load(true)} disabled={busy}>Generate core deal report</button>
-      <button onClick={() => load(false)} disabled={busy}>Open latest saved report</button>
+      <div className="actions">
+        <button onClick={() => load(true)} disabled={busy}>Generate core deal report</button>
+        <button className="btn-secondary" onClick={() => load(false)} disabled={busy}>Open latest saved report</button>
+      </div>
       {busy && <p role="status">Loading report…</p>}
       {error && <p role="alert">{error}</p>}
     </div>
@@ -76,7 +78,7 @@ export function CoreDealReport({ report }: { report: CoreReport }) {
       <p className="next-action">Next action: {analysis.nextAction}</p>
     </section>
     <p>Version {report.version} · {report.status} · As of <time dateTime={report.asOf}>{report.asOf}</time></p>
-    {report.status === "PARTIAL" && <p>Warning: this report is partial. One or more analysis areas are unavailable.</p>}
+    {report.status === "PARTIAL" && <p className="notice">Warning: this report is partial. One or more analysis areas are unavailable.</p>}
     <nav aria-label="Report sections">{analysis.dealReview && <><a href="#revised-offer-review">Revised offer comparison</a> · </>}<a href="#core-amounts">Amounts</a> · {analysis.financingAvailability && analysis.financingAvailability !== "NOT_APPLICABLE" && <><a href="#core-financing">Financing</a> · </>} <a href="#core-evidence">Evidence and calculations</a> · <a href="#core-scope">Scope and policies</a></nav>
     {analysis.dealReview && <RevisedOfferReview review={analysis.dealReview} />}
     <section className="panel" id="core-amounts" tabIndex={-1}>
