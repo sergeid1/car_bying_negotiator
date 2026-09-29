@@ -14,6 +14,7 @@ import com.dealanalyzer.vehicle.VehicleEvidenceService;
 import com.dealanalyzer.vehicle.VehicleEvidenceService.VehicleEvidenceView;
 import com.dealanalyzer.document.DocumentIntakeService;
 import com.dealanalyzer.document.DocumentIntakeService.StartedDocumentUpload;
+import com.dealanalyzer.document.DocumentUploadLimits;
 import com.dealanalyzer.document.persistence.DocumentIntakePersistence.DocumentOperationView;
 import com.dealanalyzer.document.persistence.DocumentIntakePersistence.SourceDocumentView;
 import com.dealanalyzer.extraction.DocumentExtractionService;
@@ -57,6 +58,7 @@ public class DealAnalysisController {
   private final EphemeralBuyingCaseService ephemeralCases;
   private final VehicleEvidenceService vehicleEvidence;
   private final DocumentIntakeService documentIntake;
+  private final DocumentUploadLimits documentUploadLimits;
   private final DocumentExtractionService documentExtractions;
   private final DealerOfferVerificationService dealerOfferVerification;
   private final CashEconomicsService cashEconomics;
@@ -70,6 +72,7 @@ public class DealAnalysisController {
       EphemeralBuyingCaseService ephemeralCases,
       VehicleEvidenceService vehicleEvidence,
       DocumentIntakeService documentIntake,
+      DocumentUploadLimits documentUploadLimits,
       DocumentExtractionService documentExtractions,
       DealerOfferVerificationService dealerOfferVerification,
       CashEconomicsService cashEconomics,
@@ -81,6 +84,7 @@ public class DealAnalysisController {
     this.ephemeralCases = ephemeralCases;
     this.vehicleEvidence = vehicleEvidence;
     this.documentIntake = documentIntake;
+    this.documentUploadLimits = documentUploadLimits;
     this.documentExtractions = documentExtractions;
     this.dealerOfferVerification = dealerOfferVerification;
     this.cashEconomics = cashEconomics;
@@ -205,6 +209,11 @@ public class DealAnalysisController {
       @RequestParam(defaultValue = "10") int limit,
       @RequestHeader("Case-Access-Token") String accessToken) {
     return documentExtractions.history(caseId, documentId, limit, accessToken);
+  }
+
+  @GetMapping("/document-limits")
+  public DocumentUploadLimits.View documentLimits() {
+    return documentUploadLimits.current();
   }
 
   @PostMapping(value = "/cases/{caseId}/documents", consumes = "multipart/form-data")

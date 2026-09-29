@@ -901,6 +901,55 @@ nav[aria-label="Report sections"] a:hover { background: var(--card-sunk); }
   font-weight: 600;
 }
 
+/* Document intake: the file controls and one row per uploaded document. */
+input[type="file"] {
+  padding: 9px 12px;
+  background: var(--card-sunk);
+  cursor: pointer;
+}
+/* A file control is only ever focused deliberately, so it rings on :focus as well. */
+input[type="file"]:focus {
+  border-color: var(--focus);
+  outline: 2px solid var(--focus);
+  outline-offset: 0;
+}
+input[type="file"]::file-selector-button {
+  margin-right: 12px;
+  padding: 7px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--card-raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+input[type="file"]::file-selector-button:hover { background: var(--card); border-color: var(--ink-faint); }
+
+.upload-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.upload-item {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card-sunk);
+}
+.upload-item > .notice > div > ul { margin: 6px 0; }
+.upload-name {
+  margin: 0;
+  color: var(--ink-strong);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 /* Segmented progress for the running analysis, beside the stage name. */
 .stage-track {
   display: flex;
