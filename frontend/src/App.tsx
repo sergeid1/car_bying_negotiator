@@ -5,6 +5,7 @@ import { CaseLifecycle } from "./CaseLifecycle";
 import { PricePlan } from "./PricePlan";
 import { CoreReportLoader } from "./CoreDealReport";
 import { BuyingCaseIntake } from "./BuyingCaseIntake";
+import { DealerDocumentUpload } from "./DealerDocumentUpload";
 
 type MoneyAmount = {
   minorUnits: number;
@@ -236,6 +237,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 
             {report && <DealReport report={report} />}
 
+            {caseCredentials && !caseRevoked && <DealerDocumentUpload key={`documents-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <CoreReportLoader key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
           </div>

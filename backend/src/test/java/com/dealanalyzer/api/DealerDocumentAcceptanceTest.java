@@ -69,6 +69,10 @@ class DealerDocumentAcceptanceTest {
       assertThat(upload.at("/document/encryption/algorithm").asText()).isEqualTo("AES-256-GCM");
       assertThat(upload.at("/operation/stage").asText()).isNotBlank();
       assertThat(upload.at("/document/rawContent").isMissingNode()).isTrue();
+      // The client shows page-quality flags before extraction runs, so the upload reply carries them.
+      assertThat(upload.at("/document/pages/0/pageNumber").asInt()).isEqualTo(1);
+      assertThat(upload.at("/document/pages/0/likelyMissing").asBoolean()).isFalse();
+      assertThat(upload.at("/document/pages/0/likelyCropped").isMissingNode()).isFalse();
       Path encrypted;
       try (var stored = Files.list(temporaryDirectory.resolve("objects"))) {
         encrypted = stored.findFirst().orElseThrow();
@@ -197,6 +201,47 @@ class DealerDocumentAcceptanceTest {
           "limit-resolution", "RESOLUTION_TOO_LOW");
       assertRejected(application, caseId, token, "expansion.png", pngWithDimensions(20, 2),
           "limit-expansion", "DECOMPRESSION_RISK");
+    }
+  }
+
+  @Test
+  void publishedUploadLimitsAreTheLimitsIntakeEnforces() throws Exception {
+    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+    try (RunningApplication application = harness.start(
+        "published-document-limits",
+        false,
+        "--document.storage.path=" + temporaryDirectory.resolve("published-limit-objects"),
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef",
+        "--document.limits.max-file-bytes=4096",
+        "--document.limits.max-pages=3",
+        "--document.limits.max-pixels=100",
+        "--document.limits.min-width=2",
+        "--document.limits.min-height=2")) {
+      JsonNode limits = HttpAcceptanceHarness.get(application.client(), "/api/v1/document-limits");
+
+      assertThat(limits.get("acceptedMediaTypes")).map(JsonNode::asText)
+          .containsExactly("application/pdf", "image/heic", "image/jpeg", "image/png");
+      assertThat(limits.get("maxFileBytes").asLong()).isEqualTo(4096);
+      assertThat(limits.get("maxPages").asInt()).isEqualTo(3);
+      assertThat(limits.get("maxPixels").asLong()).isEqualTo(100);
+      assertThat(limits.get("minWidth").asInt()).isEqualTo(2);
+      assertThat(limits.get("minHeight").asInt()).isEqualTo(2);
+
+      JsonNode created = HttpAcceptanceHarness.post(
+          application.client(), "/api/v1/cases", validCase(), "create-published-limits");
+      String caseId = created.at("/case/id").asText();
+      String token = created.get("accessToken").asText();
+      // A client that pre-checks against the published numbers refuses exactly what intake refuses.
+      assertRejected(
+          application, caseId, token, "one-over.pdf",
+          new byte[(int) limits.get("maxFileBytes").asLong() + 1],
+          "published-limit-size", "FILE_TOO_LARGE");
+      assertRejected(
+          application, caseId, token, "one-over.png",
+          pngWithDimensions(11, 10), "published-limit-pixels", "PIXEL_LIMIT_EXCEEDED");
+      assertRejected(
+          application, caseId, token, "too-small.png",
+          onePixelPng(), "published-limit-resolution", "RESOLUTION_TOO_LOW");
     }
   }
 
