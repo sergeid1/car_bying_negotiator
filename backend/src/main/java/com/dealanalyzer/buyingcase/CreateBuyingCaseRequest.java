@@ -7,8 +7,10 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.AssertTrue;
 
 public record CreateBuyingCaseRequest(
-    @NotBlank String buyerJurisdiction,
-    @NotBlank String dealerLocation,
+    @NotBlank String buyerPostalCode,
+    @NotBlank String dealerPostalCode,
+    /** Only needed when the Buyer's postal code spans a state line and must be disambiguated. */
+    String buyerJurisdiction,
     @NotNull PurchaseMethod purchaseMethod,
     @Valid BuyerLimits buyerLimits,
     @NotNull @Valid InitialConsents consents) {

@@ -11,7 +11,7 @@ import org.springframework.web.client.HttpClientErrorException;
 class PilotFeedbackAcceptanceTest {
   @TempDir Path directory;
   static Map<String, Object> buyingCase() {
-    return Map.of("buyerJurisdiction", "US-NC", "dealerLocation", "27604", "purchaseMethod", "CASH",
+    return Map.of("buyerPostalCode", "27601", "dealerPostalCode", "27604", "purchaseMethod", "CASH",
         "consents", Map.of("serviceProcessing", Map.of("granted", true, "policyVersion", "v1"),
             "humanReview", Map.of("granted", false, "policyVersion", "v1"),
             "anonymizedResearch", Map.of("granted", false, "policyVersion", "v1")));

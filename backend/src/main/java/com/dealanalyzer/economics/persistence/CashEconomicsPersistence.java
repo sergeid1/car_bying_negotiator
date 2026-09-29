@@ -35,6 +35,22 @@ public class CashEconomicsPersistence {
     this.json = json;
   }
 
+  /** Whether any effective policy pack exists for a jurisdiction, which is what makes it usable. */
+  @Transactional(readOnly = true)
+  public boolean hasPolicy(String jurisdiction) {
+    return policies.findTopByJurisdictionOrderByEffectiveAtDesc(jurisdiction).isPresent();
+  }
+
+  /** Every jurisdiction with a policy pack, so intake can say which are supported. */
+  @Transactional(readOnly = true)
+  public java.util.List<String> policyJurisdictions() {
+    return policies.findAll().stream()
+        .map(policy -> policy.jurisdiction)
+        .distinct()
+        .sorted()
+        .toList();
+  }
+
   public Policy requirePolicy(String jurisdiction) {
     JurisdictionPolicyEntity value = policies.findTopByJurisdictionOrderByEffectiveAtDesc(jurisdiction)
         .orElseThrow(() -> new InvalidCashEconomicsException(

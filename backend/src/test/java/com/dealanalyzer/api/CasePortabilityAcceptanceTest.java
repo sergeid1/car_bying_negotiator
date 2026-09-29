@@ -19,7 +19,7 @@ class CasePortabilityAcceptanceTest {
   }
   static Map<String, Object> buyingCase() {
     var decision = Map.of("granted", true, "policyVersion", "v1");
-    return Map.of("buyerJurisdiction", "US-NC", "dealerLocation", "27604", "purchaseMethod", "CASH",
+    return Map.of("buyerPostalCode", "27601", "dealerPostalCode", "27604", "purchaseMethod", "CASH",
         "consents", Map.of("serviceProcessing", decision, "humanReview", decision, "anonymizedResearch", decision));
   }
   @Test void exportsAndDownloadsFreezeTheRetainedHistoryWithoutRegeneratingReports() throws Exception {

@@ -6,7 +6,6 @@ import com.dealanalyzer.buyingcase.ChangeConsentRequest;
 import com.dealanalyzer.buyingcase.CreateBuyingCaseRequest;
 import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService;
 import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService.CreatedBuyingCase;
-import com.dealanalyzer.buyingcase.SyntheticAnalysisRequest;
 import com.dealanalyzer.buyingcase.persistence.BuyingCaseStore.OperationView;
 import com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence.StoredConsent;
 import com.dealanalyzer.vehicle.EstablishVehicleRequest;
@@ -63,6 +62,7 @@ public class DealAnalysisController {
   private final CashEconomicsService cashEconomics;
   private final MarketAssessmentService marketAssessments;
   private final com.dealanalyzer.buyingcase.persistence.CoreReportService coreReports;
+  private final com.dealanalyzer.economics.SupportedJurisdictions supportedJurisdictions;
 
   public DealAnalysisController(
       com.dealanalyzer.buyingcase.persistence.FinancingService financing,
@@ -74,7 +74,8 @@ public class DealAnalysisController {
       DealerOfferVerificationService dealerOfferVerification,
       CashEconomicsService cashEconomics,
       MarketAssessmentService marketAssessments,
-      com.dealanalyzer.buyingcase.persistence.CoreReportService coreReports) {
+      com.dealanalyzer.buyingcase.persistence.CoreReportService coreReports,
+      com.dealanalyzer.economics.SupportedJurisdictions supportedJurisdictions) {
     this.financing = financing;
     this.workflow = workflow;
     this.ephemeralCases = ephemeralCases;
@@ -85,6 +86,7 @@ public class DealAnalysisController {
     this.cashEconomics = cashEconomics;
     this.marketAssessments = marketAssessments;
     this.coreReports = coreReports;
+    this.supportedJurisdictions = supportedJurisdictions;
   }
 
   @PostMapping("/cases/{caseId}/finance-offers")
@@ -283,14 +285,16 @@ public class DealAnalysisController {
     return ephemeralCases.changeConsent(caseId, accessToken, request);
   }
 
-  @PostMapping("/cases/synthetic")
-  @ResponseStatus(HttpStatus.ACCEPTED)
-  public StartedAnalysis start(
-      @NotBlank @Size(max = 200) @RequestHeader("Idempotency-Key") String idempotencyKey,
-      @RequestHeader(value = "Case-Access-Token", required = false) String accessToken,
-      @Valid @RequestBody SyntheticAnalysisRequest request) {
-    return workflow.start(request, idempotencyKey, accessToken);
+  @GetMapping("/intake-options")
+  public IntakeOptionsView intakeOptions() {
+    return new IntakeOptionsView(
+        supportedJurisdictions.all(),
+        com.dealanalyzer.buyingcase.ConsentPolicies.current());
   }
+
+  /** Lets the intake form state served jurisdictions and consent policy versions it was shown. */
+  public record IntakeOptionsView(
+      java.util.List<String> supported, java.util.Map<String, String> consentPolicies) {}
 
   @PostMapping("/cases/{caseId}/analyses")
   @ResponseStatus(HttpStatus.ACCEPTED)

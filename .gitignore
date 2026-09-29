@@ -16,3 +16,5 @@ frontend/vite.config.d.ts
 data/
 var/
 *.log
+frontend/playwright-report/
+frontend/test-results/

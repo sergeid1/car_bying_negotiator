@@ -11,5 +11,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: "./src/test-setup.ts",
+    // e2e/ belongs to Playwright, which drives a real browser rather than jsdom.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
 });

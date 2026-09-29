@@ -55,6 +55,8 @@ public class EphemeralCasePersistence {
       String caseId,
       String idempotencyKey,
       CreateBuyingCaseRequest request,
+      String buyerJurisdiction,
+      String dealerLocation,
       String accessTokenHash,
       Instant expiresAt,
       String consentActor,
@@ -64,8 +66,8 @@ public class EphemeralCasePersistence {
     var limits = request.buyerLimits();
     AnalysisCaseEntity saved = cases.saveAndFlush(AnalysisCaseEntity.ephemeral(
         caseId,
-        request.buyerJurisdiction(),
-        request.dealerLocation(),
+        buyerJurisdiction,
+        dealerLocation,
         request.purchaseMethod().name(),
         limits == null ? null : limits.maxSellingPriceMinor(),
         limits == null ? null : limits.maxOutTheDoorPriceMinor(),

@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -15,6 +17,8 @@
     "vite": "latest"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
     "@testing-library/user-event": "^14.6.7",
