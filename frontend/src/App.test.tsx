@@ -37,12 +37,16 @@ test("buyer can start a synthetic cash analysis and reach the rendered report", 
       },
     },
   ];
-  vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
-    new Response(JSON.stringify(responses.shift()), {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => {
+    // The intake form reads its options on mount; the fixture flow owns the remaining replies.
+    const body = String(input).endsWith("/intake-options")
+      ? { supported: ["US-NC"], consentPolicies: { serviceProcessing: "service-processing.v1" } }
+      : responses.shift();
+    return new Response(JSON.stringify(body), {
       status: 200,
       headers: { "Content-Type": "application/json" },
-    }),
-  );
+    });
+  });
 
   render(<App pollDelayMs={0} />);
   fireEvent.click(screen.getByRole("button", { name: /analyze synthetic deal/i }));

@@ -41,6 +41,12 @@ jobs:
           DATABASE_PASSWORD: ci-only-password
       - run: npm ci && npm test && npm run build
         working-directory: frontend
+      - name: Install the browser for the narrow-width accessibility gate
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Narrow-width layout and contrast gate
+        run: npm run test:e2e
+        working-directory: frontend
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -51,6 +57,8 @@ jobs:
             backend/target/surefire-reports
             backend/target/hardening
             backend/target/readiness
+            frontend/playwright-report
+            frontend/test-results
           retention-days: 14
   scans:
     runs-on: ubuntu-latest

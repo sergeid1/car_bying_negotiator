@@ -27,8 +27,27 @@ providers, and each one adds contractual and privacy obligations this table cann
 | Malware scanning | `ClamAvMalwareScanner` against an operator-run daemon | Document bytes | Operator-run; not a third party |
 | Object storage | `EncryptedFileDocumentStorage` on an operator-supplied path | Encrypted originals | Operator-run |
 | Database | PostgreSQL supplied by the operator | Case graph | Operator-run |
+| Postal-code location | `PostalJurisdictionResolver` over bundled Census reference data | In process | None — the dataset ships with the application and is never queried remotely |
 | Recovery email | `SmtpRecoveryEmail`, opt-in and unconfigured by default | Buyer email address | Operator's SMTP provider when enabled |
 | Human review | Internal queue behind separate consent | Redacted fields | None |
+
+## Bundled reference data
+
+Postal-code to jurisdiction resolution uses the U.S. Census Bureau 2020 ZCTA-to-county
+relationship file, retrieved 2026-09-29 and seeded by
+`V22__create_postal_jurisdictions.sql`. It is a work of the United States Government and is
+uncopyrighted under 17 U.S.C. 105, so display, caching, derived-value and retention rights need
+no contract and no attribution obligation is imposed. The table is queried locally, so a Buyer's
+postal code is never sent to a third party.
+
+Two limitations are recorded because they change Buyer-facing behavior rather than being
+incidental: a ZCTA is not a USPS ZIP code, so PO-box-only ZIPs are absent and are reported as
+unrecognized instead of unsupported; and 137 ZCTAs cross a state line, for which the Buyer is
+asked which state applies rather than having a tax jurisdiction inferred for them.
+
+Locating a postal code is separate from supporting it. A jurisdiction is usable only once it has
+an effective-dated policy pack in `jurisdiction_policies`, which remains counsel-reviewed work
+under the blocked `jurisdiction-pack` prerequisite.
 
 ## Purposes, retention, and deletion
 

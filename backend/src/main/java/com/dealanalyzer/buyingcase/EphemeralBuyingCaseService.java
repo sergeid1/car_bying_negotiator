@@ -17,12 +17,15 @@ public class EphemeralBuyingCaseService {
 
   private final EphemeralCasePersistence persistence;
   private final CaseAccessService caseAccess;
+  private final BuyingCaseLocation location;
 
   EphemeralBuyingCaseService(
       EphemeralCasePersistence persistence,
-      CaseAccessService caseAccess) {
+      CaseAccessService caseAccess,
+      BuyingCaseLocation location) {
     this.persistence = persistence;
     this.caseAccess = caseAccess;
+    this.location = location;
   }
 
   public CreatedBuyingCase create(
@@ -31,6 +34,9 @@ public class EphemeralBuyingCaseService {
     if (existing != null) {
       return created(requireAuthorized(existing, accessToken), null);
     }
+
+    // Refuse an unusable location before issuing a credential or storing anything.
+    var resolved = location.resolve(request);
 
     String caseId = UUID.randomUUID().toString();
     Instant now = Instant.now();
@@ -41,6 +47,8 @@ public class EphemeralBuyingCaseService {
           caseId,
           idempotencyKey,
           request,
+          resolved.buyerJurisdiction(),
+          resolved.dealerLocation(),
           credential.protectedHash(),
           credential.expiresAt(),
           CONSENT_ACTOR,

@@ -58,7 +58,7 @@ class MarketAssessmentAcceptanceTest {
       assertThat(assessment.at("/range/currency").asText()).isEqualTo("USD");
       assertThat(assessment.at("/range/lowMinor").asLong())
           .isLessThan(assessment.at("/range/highMinor").asLong());
-      assertThat(assessment.get("geography").asText()).isEqualTo("Raleigh, NC");
+      assertThat(assessment.get("geography").asText()).isEqualTo("27604");
       assertThat(assessment.at("/vintage/oldestObservationAt").asText()).isNotBlank();
       assertThat(assessment.at("/vintage/newestObservationAt").asText()).isNotBlank();
       assertThat(assessment.get("sampleSize").asInt()).isEqualTo(4);
@@ -156,8 +156,8 @@ class MarketAssessmentAcceptanceTest {
 
   private Map<String, Object> validCase() {
     return Map.of(
-        "buyerJurisdiction", "NC",
-        "dealerLocation", "Raleigh, NC",
+        "buyerPostalCode", "27601",
+        "dealerPostalCode", "27604",
         "purchaseMethod", "CASH",
         "consents", Map.of(
             "serviceProcessing", Map.of("granted", true, "policyVersion", "privacy-v1"),

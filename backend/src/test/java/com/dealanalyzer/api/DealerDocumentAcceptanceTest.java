@@ -495,8 +495,8 @@ class DealerDocumentAcceptanceTest {
 
   private static Map<String, Object> validCase() {
     return Map.of(
-        "buyerJurisdiction", "US-NC",
-        "dealerLocation", "27604",
+        "buyerPostalCode", "27601",
+        "dealerPostalCode", "27604",
         "purchaseMethod", "CASH",
         "consents", Map.of(
             "serviceProcessing", Map.of("granted", true, "policyVersion", "service.v1"),

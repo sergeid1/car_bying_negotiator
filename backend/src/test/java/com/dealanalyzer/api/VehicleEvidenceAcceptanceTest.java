@@ -272,8 +272,8 @@ class VehicleEvidenceAcceptanceTest {
 
   private Map<String, Object> validCase() {
     return Map.of(
-        "buyerJurisdiction", "NC",
-        "dealerLocation", "Raleigh, NC",
+        "buyerPostalCode", "27601",
+        "dealerPostalCode", "27604",
         "purchaseMethod", "CASH",
         "consents", Map.of(
             "serviceProcessing", Map.of("granted", true, "policyVersion", "privacy-v1"),

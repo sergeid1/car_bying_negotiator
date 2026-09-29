@@ -4,6 +4,7 @@ import { RecoveryAccess, RecoveryEmailOptIn, CaseDownloads } from "./CasePortabi
 import { CaseLifecycle } from "./CaseLifecycle";
 import { PricePlan } from "./PricePlan";
 import { CoreReportLoader } from "./CoreDealReport";
+import { BuyingCaseIntake } from "./BuyingCaseIntake";
 
 type MoneyAmount = {
   minorUnits: number;
@@ -169,8 +170,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
           <p className="eyebrow">Buyer-aligned deal analysis</p>
           <h1>See the whole deal before you decide.</h1>
           <p className="lede">
-            Run a transparent Deal X-Ray on one synthetic cash offer. Every dollar stays
-            connected to its input or calculation.
+            Enter the vehicle you are negotiating for and get a transparent Deal X-Ray. Every
+            dollar stays connected to its input or calculation.
           </p>
           <ul className="trust-strip">
             <li>Every amount linked to its source</li>
@@ -182,11 +183,20 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 
         <div className="workspace">
           <div className="column">
-            {!report && (
+            {!report && !caseCredentials && (
+              <BuyingCaseIntake
+                onCaseOpened={value => {
+                  setCaseRevoked(false);
+                  setCaseCredentials(value);
+                }}
+              />
+            )}
+
+            {!report && import.meta.env.DEV && (
               <section className="panel" aria-labelledby="case-heading">
                 <div className="section-heading">
                   <div>
-                    <p className="step">Synthetic fixture</p>
+                    <p className="step">Development fixture</p>
                     <h2 id="case-heading">2021 Honda Accord EX-L</h2>
                   </div>
                   <span className="cash-badge">Cash purchase</span>

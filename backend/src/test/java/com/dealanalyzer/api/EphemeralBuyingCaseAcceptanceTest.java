@@ -86,8 +86,8 @@ class EphemeralBuyingCaseAcceptanceTest {
   void serviceProcessingConsentIsRequiredButSecondaryConsentIsOptional() throws Exception {
     try (RunningApplication application = harness.start("required-service-consent")) {
       Map<String, Object> declinedService = Map.of(
-          "buyerJurisdiction", "US-NC",
-          "dealerLocation", "27604",
+          "buyerPostalCode", "27601",
+          "dealerPostalCode", "27604",
           "purchaseMethod", "FINANCE",
           "consents", Map.of(
               "serviceProcessing", Map.of("granted", false, "policyVersion", "service.v1"),
@@ -196,12 +196,12 @@ class EphemeralBuyingCaseAcceptanceTest {
   }
 
   @Test
-  void buyerJurisdictionDealerLocationAndPurchaseMethodAreRequired() throws Exception {
+  void buyerLocationDealerLocationAndPurchaseMethodAreRequired() throws Exception {
     try (RunningApplication application = harness.start("required-starting-facts")) {
       Map<String, Object> missingJurisdiction = new HashMap<>(validCase());
-      missingJurisdiction.remove("buyerJurisdiction");
+      missingJurisdiction.remove("buyerPostalCode");
       Map<String, Object> missingDealer = new HashMap<>(validCase());
-      missingDealer.remove("dealerLocation");
+      missingDealer.remove("dealerPostalCode");
       Map<String, Object> missingPurchaseMethod = new HashMap<>(validCase());
       missingPurchaseMethod.remove("purchaseMethod");
 
@@ -273,8 +273,8 @@ class EphemeralBuyingCaseAcceptanceTest {
 
   private static Map<String, Object> validCase() {
     return Map.of(
-        "buyerJurisdiction", "US-NC",
-        "dealerLocation", "27604",
+        "buyerPostalCode", "27601",
+        "dealerPostalCode", "27604",
         "purchaseMethod", "CASH",
         "buyerLimits", Map.of("maxSellingPriceMinor", 25_000_00L),
         "consents", Map.of(
@@ -285,8 +285,8 @@ class EphemeralBuyingCaseAcceptanceTest {
 
   private static Map<String, Object> validCaseWithoutLimits(String purchaseMethod) {
     return Map.of(
-        "buyerJurisdiction", "US-NC",
-        "dealerLocation", "27604",
+        "buyerPostalCode", "27601",
+        "dealerPostalCode", "27604",
         "purchaseMethod", purchaseMethod,
         "consents", Map.of(
             "serviceProcessing", Map.of("granted", true, "policyVersion", "service.v1"),
