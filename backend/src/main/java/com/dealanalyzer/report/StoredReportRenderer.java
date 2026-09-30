@@ -18,19 +18,31 @@ public class StoredReportRenderer {
   private List<Line> lines(JsonNode payload) {
     var lines=new ArrayList<Line>();
     lines.add(new Line("Deal Analysis Report - version " + payload.path("version").asText(), true));
-    lines.add(new Line("Saved immutable report. Amounts in minor units represent cents for USD. Evidence paths refer to this report.", false));
     var analysis=payload.path("analysis");
+    var total=ReportLead.total(payload);
+    lines.add(new Line("Out-the-door total", true));
+    lines.add(new Line(ReportLead.value(total) + " (" + total.path("precision").asText("UNAVAILABLE") + ")", false));
+    if (!total.isNull()) lines.add(new Line("Evidence: " + total.path("source").asText() + " " + total.path("pointer").asText(), false));
+    lines.add(new Line("Three material findings", true));
+    int count=0;
+    for(var reason:analysis.path("topReasons")) { if (count++ == 3) break; lines.add(new Line(reason.asText(),false)); }
+    if (analysis.path("topReasons").size() < 3) lines.add(new Line((3-analysis.path("topReasons").size()) + " further findings: unknown in this saved report.", false));
+    lines.add(new Line("Next action",true));
+    lines.add(new Line(analysis.path("nextAction").asText(),false));
+    lines.add(new Line("Questions to ask the dealer",true));
+    count=0;
+    for(var reason:analysis.path("topReasons")) {
+      if(count == 3) break;
+      lines.add(new Line("Could you explain this finding: " + reason.asText(),false));
+      lines.add(new Line("Source: /analysis/topReasons/" + count++ + "; /evidence",false));
+    }
+    lines.add(new Line("Saved immutable report. Screen edits to questions are not saved in this payload.", false));
     lines.add(new Line(analysis.path("reviewLabel").asText(analysis.path("reviewStatus").asText()), true));
     lines.add(new Line("Rating: " + analysis.path("dealRating").asText().replace('_',' '), false));
     lines.add(new Line("As of: " + payload.path("asOf").asText(payload.path("generatedAt").asText()), false));
-    for(var reason:analysis.path("topReasons")) lines.add(new Line(reason.asText(),false));
-    lines.add(new Line("Next action",true));
-    lines.add(new Line(analysis.path("nextAction").asText(),false));
     lines.add(new Line("Material amounts",true));
     for(var amount:analysis.path("materialAmounts")) {
-      String value=amount.path("minorUnits").isNumber()
-          ? java.math.BigDecimal.valueOf(amount.path("minorUnits").asLong(),2).toPlainString()+" "+amount.path("currency").asText()
-          : "Unavailable";
+      String value=ReportLead.value(amount);
       lines.add(new Line(amount.path("label").asText()+": "+value+" ("+amount.path("precision").asText()+")",false));
       lines.add(new Line("Evidence: "+amount.path("source").asText()+" "+amount.path("pointer").asText(),false));
     }

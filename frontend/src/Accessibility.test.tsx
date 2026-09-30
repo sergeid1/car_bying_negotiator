@@ -8,6 +8,8 @@ import { PricePlan } from "./PricePlan";
 import { CaseDownloads, RecoveryEmailOptIn, SaveCaseLink } from "./CasePortability";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
+import { CoreDealReport } from "./CoreDealReport";
+import { ReportTotalMeasure } from "./ReportTotalMeasure";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -76,4 +78,23 @@ test("term verification with source pages, trade terms, corrections and version 
   await userEvent.setup().click(screen.getByRole("button", { name: "Correct Selling price" }));
   const result = await axe.run(container, AA);
   expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
+});
+
+
+test("report leading section, editable questions and evidence links have no automated AA violations", async () => {
+  const { container } = render(<main><h1>Buying Case</h1><CoreDealReport report={{ version: 1, asOf: "2026-09-30", status: "PARTIAL", analysis: {
+    reviewLabel: "Review required", dealRating: "FAIR", ratingBasis: "Selling price comparison", nextAction: "Ask for the quote",
+    topReasons: ["Check fees", "Check market", "Check total"], marketAvailability: "UNAVAILABLE", cashAvailability: "AVAILABLE",
+    materialAmounts: [{ label: "Out-the-door total", minorUnits: 2850000, currency: "USD", precision: "ESTIMATED", source: "cashEconomics", pointer: "/result/outTheDoorTotal" }], policyVersions: {}, limitations: [],
+  }, evidence: { cashEconomics: { result: { outTheDoorTotal: { minorUnits: 2850000, currency: "USD" } } } }, reproduction: {} }} /></main>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  const user = userEvent.setup();
+  await user.tab(); expect(screen.getByRole("link", { name: "$28,500.00" })).toHaveFocus();
+});
+
+test("optional total-identification form has no automated AA violations", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "session" })));
+  const { container } = render(<main><h1>Pilot check</h1><ReportTotalMeasure caseId="case" token="token" report={{ version: 1 } as import("./CoreDealReport").CoreReport} /></main>);
+  await userEvent.setup().click(screen.getByText("Optional pilot check: find the total"));
+  expect((await axe.run(container, AA)).violations).toEqual([]);
 });

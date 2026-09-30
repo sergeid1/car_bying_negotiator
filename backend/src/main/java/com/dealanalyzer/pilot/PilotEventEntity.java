@@ -11,5 +11,6 @@ class PilotEventEntity {
   @Column(nullable = false, length = 32) String eventType;
   @Column(nullable = false, length = 40) String category;
   Long durationMillis;
+  Integer reportVersion;
   @Column(nullable = false) Instant createdAt;
 }
