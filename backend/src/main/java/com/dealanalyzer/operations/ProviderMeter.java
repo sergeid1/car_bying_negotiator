@@ -4,6 +4,7 @@ import com.dealanalyzer.ai.ModelProvenance;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import org.springframework.beans.factory.annotation.Value;
 import java.util.function.Supplier;
@@ -22,6 +23,7 @@ public class ProviderMeter {
   private final ProviderUsageStore store;
   private final Duration timeout;
   private final ThreadPoolExecutor executor;
+  private final Semaphore slots;
 
   public ProviderMeter(ProviderUsageStore store,
       @Value("${provider.call.timeout:PT30S}") Duration timeout,
@@ -32,13 +34,17 @@ public class ProviderMeter {
     }
     this.store = store;
     this.timeout = timeout;
-    // No backlog: an uninterruptible adapter can occupy only the fixed number of slots.
-    executor = new ThreadPoolExecutor(maxConcurrent, maxConcurrent, 0, TimeUnit.SECONDS,
+    // No backlog: a call takes a slot or is refused at once. The slot is released only when the
+    // adapter actually returns, so an uninterruptible adapter keeps holding it, while a finished call
+    // never blocks the next one (a pool without a queue refused calls whose predecessor's worker had
+    // not yet returned to it).
+    slots = new Semaphore(maxConcurrent);
+    executor = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60, TimeUnit.SECONDS,
         new SynchronousQueue<>(), runnable -> {
           var thread = new Thread(runnable, "provider-call");
           thread.setDaemon(true);
           return thread;
-        }, new ThreadPoolExecutor.AbortPolicy());
+        });
   }
 
   /** The wall-clock budget for one call; model clients use it as their own request timeout. */
@@ -73,7 +79,26 @@ public class ProviderMeter {
     T result;
     Future<T> pending = null;
     try {
-      pending = executor.submit(invocation::get);
+      if (!slots.tryAcquire()) throw new RejectedExecutionException("No provider slot free");
+      // The slot is freed inside the call, before its result becomes visible to the caller, so the
+      // caller's next call can never find it still taken. The outer release covers a call cancelled
+      // before it starts; the flag keeps the two from releasing twice.
+      var released = new AtomicBoolean();
+      Runnable free = () -> { if (released.compareAndSet(false, true)) slots.release(); };
+      var task = new FutureTask<T>(() -> {
+        try { return invocation.get(); }
+        finally { free.run(); }
+      });
+      try {
+        executor.execute(() -> {
+          try { task.run(); }
+          finally { free.run(); }
+        });
+      } catch (RejectedExecutionException closed) {
+        free.run();
+        throw closed;
+      }
+      pending = task;
       result = pending.get(timeout.toNanos(), TimeUnit.NANOSECONDS);
     } catch (TimeoutException | RejectedExecutionException unavailable) {
       if (pending != null) pending.cancel(true);
