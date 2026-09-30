@@ -6,6 +6,7 @@ import { PricePlan } from "./PricePlan";
 import { CoreReportLoader } from "./CoreDealReport";
 import { BuyingCaseIntake } from "./BuyingCaseIntake";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
+import { OfferVerification } from "./OfferVerification";
 
 type MoneyAmount = {
   minorUnits: number;
@@ -106,6 +107,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   const [report, setReport] = useState<Report>();
   const [error, setError] = useState<string>();
   const [caseCredentials, setCaseCredentials] = useState<{ caseId: string; token: string }>();
+  const [frozenOfferVersion, setFrozenOfferVersion] = useState<number>();
 
   async function startAnalysis(event: FormEvent) {
     event.preventDefault();
@@ -238,6 +240,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             {report && <DealReport report={report} />}
 
             {caseCredentials && !caseRevoked && <DealerDocumentUpload key={`documents-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
+            {caseCredentials && !caseRevoked && <OfferVerification key={`verify-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
+              onOfferFrozen={offer => setFrozenOfferVersion(offer.version)} />}
             {caseCredentials && !caseRevoked && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <CoreReportLoader key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
           </div>
