@@ -13,8 +13,8 @@ startup.
 2. Uploaded and provider content is passed as `UntrustedInput` (text or PNG page images) with a
    short code-owned label.
 3. `ModelHarness` builds the request from the task and configuration only, and routes it through
-   `ProviderMeter.callModel` under the existing `EXTRACTION` operation, timeout, concurrency bound,
-   usage store and `Failure` taxonomy.
+   `ProviderMeter.callModel` under the task's operation (`EXTRACTION`, or `REPLY_DRAFT` for Dealer
+   reply suggestions), with the existing timeout, concurrency bound, usage store and `Failure` taxonomy.
 4. The gateway for the configured provider sends it (see [Providers](#providers)) with
    structured output constrained to the task schema.
 5. The output is checked against the task schema, then the task parser. The caller receives a

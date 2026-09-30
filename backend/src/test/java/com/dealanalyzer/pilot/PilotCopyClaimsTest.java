@@ -140,6 +140,7 @@ class PilotCopyClaimsTest {
           .sorted().toList());
       for (String generated : List.of(
           "backend/src/main/java/com/dealanalyzer/negotiation/GroundedLanguage.java",
+          "backend/src/main/java/com/dealanalyzer/negotiation/GroundedReply.java",
           "backend/src/main/java/com/dealanalyzer/report/CoreReviewPolicy.java",
           "backend/src/main/java/com/dealanalyzer/plan/PriceBoundaryPolicy.java",
           "backend/src/main/java/com/dealanalyzer/review/RevisedOfferPolicy.java",
