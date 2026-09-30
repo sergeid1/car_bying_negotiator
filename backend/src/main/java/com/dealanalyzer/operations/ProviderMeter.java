@@ -22,6 +22,7 @@ public class ProviderMeter {
   private final ProviderUsageStore store;
   private final Duration timeout;
   private final ThreadPoolExecutor executor;
+  private final Semaphore slots;
 
   public ProviderMeter(ProviderUsageStore store,
       @Value("${provider.call.timeout:PT30S}") Duration timeout,
@@ -32,13 +33,17 @@ public class ProviderMeter {
     }
     this.store = store;
     this.timeout = timeout;
-    // No backlog: an uninterruptible adapter can occupy only the fixed number of slots.
-    executor = new ThreadPoolExecutor(maxConcurrent, maxConcurrent, 0, TimeUnit.SECONDS,
+    // No backlog: a call takes a slot or is refused at once. The slot is released only when the
+    // adapter actually returns, so an uninterruptible adapter keeps holding it, while a finished call
+    // never blocks the next one (a pool without a queue refused calls whose predecessor's worker had
+    // not yet returned to it).
+    slots = new Semaphore(maxConcurrent);
+    executor = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60, TimeUnit.SECONDS,
         new SynchronousQueue<>(), runnable -> {
           var thread = new Thread(runnable, "provider-call");
           thread.setDaemon(true);
           return thread;
-        }, new ThreadPoolExecutor.AbortPolicy());
+        });
   }
 
   /** The wall-clock budget for one call; model clients use it as their own request timeout. */
@@ -73,7 +78,19 @@ public class ProviderMeter {
     T result;
     Future<T> pending = null;
     try {
-      pending = executor.submit(invocation::get);
+      if (!slots.tryAcquire()) throw new RejectedExecutionException("No provider slot free");
+      var task = new FutureTask<T>(invocation::get);
+      try {
+        // Released around the whole task, so a call cancelled before it starts frees its slot too.
+        executor.execute(() -> {
+          try { task.run(); }
+          finally { slots.release(); }
+        });
+      } catch (RejectedExecutionException closed) {
+        slots.release();
+        throw closed;
+      }
+      pending = task;
       result = pending.get(timeout.toNanos(), TimeUnit.NANOSECONDS);
     } catch (TimeoutException | RejectedExecutionException unavailable) {
       if (pending != null) pending.cancel(true);

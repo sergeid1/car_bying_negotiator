@@ -80,6 +80,21 @@ class ProviderMeterTest {
     } finally { Thread.interrupted(); release.countDown(); meter.close(); }
   }
 
+  @Test void backToBackCallsAreNeverRejectedWhileNoOtherCallIsRunning() {
+    // A finished call's worker is briefly still returning to the pool after the caller sees the
+    // result; the next call must not mistake that for saturation.
+    var store = new UsageRecorder();
+    var meter = new ProviderMeter(store, Duration.ofSeconds(5), 1);
+    try {
+      for (int call = 0; call < 2_000; call++) {
+        assertThat(meter.call("case", ProviderMeter.Operation.EXTRACTION, this, 1,
+            () -> "result", value -> ProviderMeter.Status.SUCCESS)).as("call %d", call).isEqualTo("result");
+      }
+    } finally {
+      meter.close();
+    }
+  }
+
   private static class UsageRecorder extends ProviderUsageStore {
     final List<ProviderMeter.Status> statuses = new ArrayList<>();
     UsageRecorder() { super(null); }
