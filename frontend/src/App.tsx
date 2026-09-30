@@ -108,7 +108,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   const [report, setReport] = useState<Report>();
   const [error, setError] = useState<string>();
   const [caseCredentials, setCaseCredentials] = useState<{ caseId: string; token: string }>();
-  const [frozenOfferVersion, setFrozenOfferVersion] = useState<number>();
+  // Tied to its case so a version frozen in one case never reaches another.
+  const [frozenOffer, setFrozenOffer] = useState<{ caseId: string; version: number }>();
 
   async function startAnalysis(event: FormEvent) {
     event.preventDefault();
@@ -243,9 +244,10 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 
             {caseCredentials && !caseRevoked && <DealerDocumentUpload key={`documents-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <OfferVerification key={`verify-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
-              onOfferFrozen={offer => setFrozenOfferVersion(offer.version)} />}
+              onOfferFrozen={offer => setFrozenOffer({ caseId: caseCredentials.caseId, version: offer.version })} />}
             {caseCredentials && !caseRevoked && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
-            {caseCredentials && !caseRevoked && <VerifiedOfferAnalysis key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} pollDelayMs={pollDelayMs} />}
+            {caseCredentials && !caseRevoked && <VerifiedOfferAnalysis key={`analysis-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
+              offerVersion={frozenOffer?.caseId === caseCredentials.caseId ? frozenOffer.version : undefined} pollDelayMs={pollDelayMs} />}
           </div>
 
           <aside className="rail" aria-label="Case access and retention">
