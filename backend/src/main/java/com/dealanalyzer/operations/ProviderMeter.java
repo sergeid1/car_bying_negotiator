@@ -4,6 +4,7 @@ import com.dealanalyzer.ai.ModelProvenance;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import org.springframework.beans.factory.annotation.Value;
 import java.util.function.Supplier;
@@ -79,15 +80,22 @@ public class ProviderMeter {
     Future<T> pending = null;
     try {
       if (!slots.tryAcquire()) throw new RejectedExecutionException("No provider slot free");
-      var task = new FutureTask<T>(invocation::get);
+      // The slot is freed inside the call, before its result becomes visible to the caller, so the
+      // caller's next call can never find it still taken. The outer release covers a call cancelled
+      // before it starts; the flag keeps the two from releasing twice.
+      var released = new AtomicBoolean();
+      Runnable free = () -> { if (released.compareAndSet(false, true)) slots.release(); };
+      var task = new FutureTask<T>(() -> {
+        try { return invocation.get(); }
+        finally { free.run(); }
+      });
       try {
-        // Released around the whole task, so a call cancelled before it starts frees its slot too.
         executor.execute(() -> {
           try { task.run(); }
-          finally { slots.release(); }
+          finally { free.run(); }
         });
       } catch (RejectedExecutionException closed) {
-        slots.release();
+        free.run();
         throw closed;
       }
       pending = task;
