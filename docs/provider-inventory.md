@@ -8,8 +8,8 @@ prerequisites in [the pilot readiness record](pilot-readiness-record.md). Both a
 
 No external commercial provider processes Buyer data. Every adapter in use is a deterministic
 local implementation, a self-hosted component, or an opt-in connection to infrastructure the
-operator supplies. The Anthropic model client is integrated but disabled, and cannot be enabled
-while its terms are unexecuted (see below). There is therefore **no subprocessor, no processing
+operator supplies. The Anthropic and OpenAI model clients are integrated but disabled, and neither
+can be enabled while its terms are unexecuted (see below). There is therefore **no subprocessor, no processing
 region, and no provider contract to describe** — not because the inventory is unfinished, but
 because no third party processes Buyer data today.
 
@@ -31,7 +31,7 @@ providers, and each one adds contractual and privacy obligations this table cann
 | Postal-code location | `PostalJurisdictionResolver` over bundled Census reference data | In process | None — the dataset ships with the application and is never queried remotely |
 | Recovery email | `SmtpRecoveryEmail`, opt-in and unconfigured by default | Buyer email address | Operator's SMTP provider when enabled |
 | Human review | Internal queue behind separate consent | Redacted fields | None |
-| Model calls | `AnthropicModelGateway` through the [AI execution harness](ai-execution-harness.md); disabled (`ai.model.enabled=false`) | Not while disabled; would send normalized page images and recognized text | Anthropic, once enabled — **terms unexecuted** |
+| Model calls | `AnthropicModelGateway` or `OpenAiModelGateway` through the [AI execution harness](ai-execution-harness.md), one per deployment (`ai.model.provider`); disabled (`ai.model.enabled=false`) | Not while disabled; would send normalized page images and recognized text | Anthropic or OpenAI, once enabled — **terms unexecuted for both** |
 
 ## Bundled reference data
 
@@ -62,11 +62,13 @@ under the blocked `jurisdiction-pack` prerequisite.
   and stored artifacts, as described in [the deletion policy](case-deletion-policy.md). Backup
   expiry is disclosed rather than claimed as verified erasure.
 - **Training.** No customer document is used for model training, which is trivially true while no
-  model provider is called. The Anthropic client is integrated but off, and the model rollout gate
-  refuses to start the application with it on until executed terms validating data retention and
-  the exclusion of customer documents from training are recorded in
-  `backend/src/main/resources/ai/model-vendor-terms.json`. That record currently states
-  `UNEXECUTED`, so this obligation is **unmet**.
+  model provider is called. The Anthropic and OpenAI clients are integrated but off, and the model
+  rollout gate refuses to start the application with either on until executed terms for that
+  provider, validating data retention and the exclusion of customer documents from training, are
+  recorded in `backend/src/main/resources/ai/model-vendor-terms.json`. Both records currently
+  state `UNEXECUTED`, so this obligation is **unmet** for both. For OpenAI the terms must also
+  cover any retention of API inputs and outputs for abuse monitoring; the client already sends
+  `store: false` so responses are not kept as stored objects.
 
 ## What must be obtained before a public pilot
 
