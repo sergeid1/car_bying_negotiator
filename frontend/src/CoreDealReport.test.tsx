@@ -68,7 +68,7 @@ it("resolves amounts to a document page and region or states no source, and writ
       { label: "Legacy amount", minorUnits: 100, currency: "USD", precision: "EXACT", source: "cashEconomics", pointer: "/result/legacy" },
     ], policyVersions: {}, limitations: [],
   }, evidence: { cashEconomics: { result: { outTheDoorTotal: { minorUnits: 2642500 } } } }, reproduction: { inputFingerprint: "abc123" } };
-  const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(new Blob(["png"])));
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("png", { headers: { "Content-Type": "image/png" } }));
   Object.defineProperty(URL, "createObjectURL", { configurable: true, value: () => "blob:page" });
   Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: () => undefined });
   const { container } = render(<CoreDealReport report={report} caseId="case-1" token="token-1" />);
