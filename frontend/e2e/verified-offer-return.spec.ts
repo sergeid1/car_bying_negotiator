@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, Page, test } from "@playwright/test";
 const report = { version: 1, asOf: "2026-09-30", status: "COMPLETE", analysis: {
   reviewLabel: "Review required", dealRating: "FAIR", ratingBasis: "Recorded evidence", nextAction: "Review the fees",
-  topReasons: ["Review recorded fees"], marketAvailability: "AVAILABLE", cashAvailability: "AVAILABLE", materialAmounts: [], policyVersions: {}, limitations: ["Market evidence is estimated."],
+  topReasons: ["The verified offer requires review against your approved price limits.", "Market selling-price evidence is available; it is an estimate.", "The quoted total needs reconciliation with recorded charges."], marketAvailability: "AVAILABLE", cashAvailability: "AVAILABLE", materialAmounts: [{ label: "/result/outTheDoorTotal", minorUnits: 2850000, currency: "USD", precision: "ESTIMATED", source: "cashEconomics", pointer: "/result/outTheDoorTotal" }], policyVersions: {}, limitations: ["Market evidence is estimated."],
 }, evidence: {}, reproduction: {} };
 async function api(page: Page, unavailable = false) {
   await page.route("**/api/v1/**", async route => {
@@ -26,6 +26,12 @@ test("saved link opens frozen offer analysis and report in a second browser sess
   await page.goto("/#case=current&access=private-secret");
   await expect(page.getByRole("heading", { name: "Deal Analysis Report", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Deal Analysis Report", exact: true })).toBeFocused();
+  const lead = page.getByRole("region", { name: "Total, findings and next action" });
+  const box = await lead.boundingBox();
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(780);
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "$28,500.00" })).toBeFocused();
   expect(new URL(page.url()).hash).toBe("");
   const link = await page.getByRole("link", { name: "Private case link", exact: true }).getAttribute("href");
   const session = await browser.newContext({ viewport: { width: 360, height: 800 } });

@@ -180,3 +180,14 @@ granted. Decline, revocation, expiration or deletion removes eligibility. Consen
 inferred from feedback or willingness to pay. No case-level research export, Dealer
 ranking, cross-Buyer Dealer intelligence, materialized research table or external
 analytics transmission exists. Granting consent does not change assessment inputs.
+
+Ticket 29 measures report comprehension with an optional total-entry check. Each report mount opens
+an authenticated session tied to the immutable report version. The server compares the entered USD
+minor units (or an explicit unknown answer) with that version's leading out-the-door amount. Incorrect
+answers retain no amount and leave the session open; the first correct answer records elapsed browser
+monotonic time since report mount, capped at 24 hours. Repeated correct submissions do not add samples.
+`reportTotalIdentification` reports opens, correct identifications, mean and p95 milliseconds over
+retained sessions, including partial reports and repeat opens. Opens without a correct answer are in
+the denominator but not latency samples. These are optional, client-timed comprehension checks, not
+independently observed purchase outcomes. Session events follow existing case deletion/retention;
+submitted amounts and edited question text are never retained in pilot events.

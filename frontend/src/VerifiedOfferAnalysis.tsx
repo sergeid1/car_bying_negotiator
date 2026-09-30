@@ -85,8 +85,8 @@ export function VerifiedOfferAnalysis({ caseId, token, offerVersion, pollDelayMs
   }, [caseId, token, offerVersion, pollDelayMs, attempt]);
   const labels = financeCase ? stages.map((label, index) => index === 2 ? "Cash economics do not apply to dealer financing" : label) : stages;
   return <section className="stack verified-analysis" aria-label="Verified offer analysis">
-    <DealerFinancingForm caseId={caseId} token={token} />
-    <OutsideFinancing caseId={caseId} token={token} />
+    {!report && <DealerFinancingForm caseId={caseId} token={token} />}
+    {!report && <OutsideFinancing caseId={caseId} token={token} />}
     {!report && <div className="panel">
       <h2>Your offer analysis</h2>
       {waiting ? <p>Verify and freeze your dealer offer to continue to the report.</p> : <>
@@ -95,6 +95,6 @@ export function VerifiedOfferAnalysis({ caseId, token, offerVersion, pollDelayMs
       </>}
       {error && <><p role="alert">Analysis could not finish. Your accepted documents and verified offer are saved. Retry analysis; you do not need to upload them again. If access has expired, use your saved link or email recovery.</p><button onClick={() => setAttempt(value => value + 1)}>Retry analysis</button></>}
     </div>}
-    {report && <><button className="btn-secondary" onClick={() => { requestKey.current = crypto.randomUUID(); forceRun.current = true; setAttempt(value => value + 1); }}>Update analysis with saved terms</button><CoreDealReport report={report} /><OutcomeFeedback caseId={caseId} token={token} /><CaseDownloads caseId={caseId} token={token} reportVersion={report.version} /><NegotiationLoader caseId={caseId} token={token} reportVersion={report.version} /></>}
+    {report && <><CoreDealReport report={report} caseId={caseId} token={token} /><DealerFinancingForm caseId={caseId} token={token} /><OutsideFinancing caseId={caseId} token={token} /><button className="btn-secondary" onClick={() => { requestKey.current = crypto.randomUUID(); forceRun.current = true; setAttempt(value => value + 1); }}>Update analysis with saved terms</button><OutcomeFeedback caseId={caseId} token={token} /><CaseDownloads caseId={caseId} token={token} reportVersion={report.version} /><NegotiationLoader caseId={caseId} token={token} reportVersion={report.version} /></>}
   </section>;
 }
