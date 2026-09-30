@@ -1,9 +1,9 @@
 import { FormEvent, useState } from "react";
 import "./styles.css";
-import { RecoveryAccess, RecoveryEmailOptIn, CaseDownloads } from "./CasePortability";
+import { RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess, SaveCaseLink } from "./CasePortability";
 import { CaseLifecycle } from "./CaseLifecycle";
 import { PricePlan } from "./PricePlan";
-import { CoreReportLoader } from "./CoreDealReport";
+import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { BuyingCaseIntake } from "./BuyingCaseIntake";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 
@@ -101,6 +101,7 @@ function humanize(value: string) {
 }
 
 export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
+  const [recoveryCaseId, setRecoveryCaseId] = useState<string>();
   const [caseRevoked, setCaseRevoked] = useState(false);
   const [stage, setStage] = useState<string>();
   const [report, setReport] = useState<Report>();
@@ -189,6 +190,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
                 onCaseOpened={value => {
                   setCaseRevoked(false);
                   setCaseCredentials(value);
+                  setRecoveryCaseId(value.caseId);
                 }}
               />
             )}
@@ -239,28 +241,16 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 
             {caseCredentials && !caseRevoked && <DealerDocumentUpload key={`documents-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
-            {caseCredentials && !caseRevoked && <CoreReportLoader key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
+            {caseCredentials && !caseRevoked && <VerifiedOfferAnalysis key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} pollDelayMs={pollDelayMs} />}
           </div>
 
           <aside className="rail" aria-label="Case access and retention">
             <p className="rail-title">Your Buying Case</p>
 
-            <section id="case-workflow" tabIndex={-1} className="panel" aria-label="Open an existing Buying Case">
-              <h2>Open a saved case</h2>
-              <p className="muted">Enter the Case ID and access token you saved when the case was created.</p>
-              <form onSubmit={event => {
-                event.preventDefault();
-                const values = new FormData(event.currentTarget);
-                setCaseRevoked(false);
-                setCaseCredentials({ caseId: String(values.get("caseId")), token: String(values.get("token")) });
-              }}>
-                <label>Buying Case ID<input name="caseId" required /></label>
-                <label>Case access token<input name="token" type="password" required autoComplete="off" /></label>
-                <button>Open price plan</button>
-              </form>
-            </section>
-
-            <RecoveryAccess onRecovered={value => { setCaseRevoked(false); setCaseCredentials(value); }} />
+            <SavedCaseAccess onOpened={value => { setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }}
+              onUnavailable={caseId => { setCaseCredentials(undefined); setRecoveryCaseId(caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
+            <RecoveryAccess caseId={recoveryCaseId ?? caseCredentials?.caseId} onRecovered={value => { setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
+            {caseCredentials && !caseRevoked && <SaveCaseLink {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}

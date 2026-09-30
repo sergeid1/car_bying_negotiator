@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { CaseDownloads, RecoveryAccess } from "./CasePortability";
-afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
 it("verifies a recovery fragment only when requested and clears it from the URL", async () => {
   window.history.replaceState(null, "", "/#recover=secret");
   const fetcher=vi.fn().mockResolvedValue({ ok:true, json:async()=>({caseId:"case",accessToken:"new-token"}) });
@@ -22,4 +22,16 @@ it("retries a failed download with the same export key", async () => {
   await waitFor(()=>expect(fetcher).toHaveBeenCalledTimes(2));
   expect(fetcher.mock.calls[0][1].headers["Idempotency-Key"]).toBe(fetcher.mock.calls[1][1].headers["Idempotency-Key"]);
   expect(fetcher.mock.calls[0][0]).toBe("/api/v1/cases/case/exports");
+});
+
+it.each([404, 410, 403])("uses the same explanation for unavailable saved links (%s)", async status => {
+  const { SavedCaseAccess } = await import("./CasePortability");
+  window.history.replaceState(null, "", "/#case=current&access=private-secret");
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status })));
+  const opened = vi.fn(), unavailable = vi.fn();
+  const view = render(<SavedCaseAccess onOpened={opened} onUnavailable={unavailable} />);
+  await waitFor(() => expect(unavailable).toHaveBeenCalledWith("current"));
+  expect(screen.getByRole("alert")).toHaveTextContent("It may have expired, been revoked, or be unrecognized");
+  expect(opened).not.toHaveBeenCalled(); expect(window.location.hash).toBe("");
+  view.unmount();
 });

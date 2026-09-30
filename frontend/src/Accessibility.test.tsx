@@ -5,14 +5,17 @@ import { afterEach, expect, test } from "vitest";
 import App from "./App";
 import { CaseLifecycle } from "./CaseLifecycle";
 import { PricePlan } from "./PricePlan";
-import { CaseDownloads, RecoveryEmailOptIn } from "./CasePortability";
+import { CaseDownloads, RecoveryEmailOptIn, SaveCaseLink } from "./CasePortability";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
+import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 afterEach(cleanup);
 
 test("core entry, document intake, recovery, price approval, downloads and deletion have no automated AA violations", async () => {
   const { container } = render(<><App /><main aria-label="Saved case controls">
     <DealerDocumentUpload caseId="case" token="token" />
     <PricePlan caseId="case" token="token" />
+    <VerifiedOfferAnalysis caseId="case" token="token" />
+    <SaveCaseLink caseId="case" token="token" />
     <RecoveryEmailOptIn caseId="case" token="token" />
     <CaseDownloads caseId="case" token="token" reportVersion={1} />
     <CaseLifecycle caseId="case" token="token" onRevoked={() => {}} />
