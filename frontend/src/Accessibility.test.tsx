@@ -11,6 +11,7 @@ import { OfferVerification } from "./OfferVerification";
 import { CoreDealReport } from "./CoreDealReport";
 import { ReportTotalMeasure } from "./ReportTotalMeasure";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
+import { DealerReplyAssistant } from "./NegotiationDraft";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const AA = {
@@ -96,5 +97,21 @@ test("optional total-identification form has no automated AA violations", async 
   vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "session" })));
   const { container } = render(<main><h1>Pilot check</h1><ReportTotalMeasure caseId="case" token="token" report={{ version: 1 } as import("./CoreDealReport").CoreReport} /></main>);
   await userEvent.setup().click(screen.getByText("Optional pilot check: find the total"));
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+test("Dealer reply drafting with a returned reply has no automated AA violations", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+    policyVersion: "grounded-reply.v1", path: "TEMPLATE", fallbackReason: "MODEL_PATH_OFF", reportVersion: 1, dealerOfferId: "offer",
+    dealerOfferVersion: 1, omittedStatements: 1, provenance: null, scope: "Recorded figures only.", draft: "Thank you for your response.",
+    statements: [{ kind: "FACT", text: "The current written offer lists a selling price of $32,000.", sourcePointer: "/evidence/x", sourceValue: "3200000" }],
+    proposal: { currency: "USD", sellingPriceMinor: 3000000, ceilingMinor: 3000000, sellingWalkAwayMinor: 3050000, outTheDoorWalkAwayMinor: null },
+  })));
+  const { container } = render(<main><h1>Buying Case</h1><h2>Report</h2><h3>Negotiation</h3><DealerReplyAssistant caseId="case" token="token" reportVersion={1} /></main>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  const user = userEvent.setup();
+  await user.type(screen.getByRole("textbox", { name: "Dealer's response" }), "Best we can do.");
+  await user.click(screen.getByRole("button", { name: "Draft a reply" }));
+  await screen.findByRole("textbox", { name: "Your reply" });
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
