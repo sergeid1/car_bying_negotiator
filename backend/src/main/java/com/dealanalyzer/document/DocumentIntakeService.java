@@ -160,6 +160,20 @@ public class DocumentIntakeService {
     return document;
   }
 
+  public java.util.List<SourceDocumentView> listDocuments(String caseId, String accessToken) {
+    requireServiceProcessingConsent(caseId, accessToken);
+    return persistence.activeDocuments(caseId);
+  }
+
+  /** The normalized PNG the extractor read, so the Buyer can check a term against its source page. */
+  public byte[] pageImage(String caseId, String documentId, int pageNumber, String accessToken) {
+    requireServiceProcessingConsent(caseId, accessToken);
+    String objectKey = persistence.normalizedPageKey(caseId, documentId, pageNumber)
+        .orElseThrow(() -> new com.dealanalyzer.buyingcase.ResourceNotFoundException(
+            "Source page not found"));
+    return objectStorage.readNormalized(caseId, documentId, pageNumber, objectKey);
+  }
+
   public DocumentOperationView retry(
       String operationId, String accessToken, String idempotencyKey) {
     DocumentOperationView operation = persistence.requireOperation(operationId);

@@ -76,6 +76,27 @@ public class DocumentIntakePersistence {
         .orElseThrow(() -> new ResourceNotFoundException("Source Document not found"));
   }
 
+  /** The case's active documents, oldest first, so the Buyer can return to verify any of them. */
+  @Transactional(readOnly = true)
+  public List<SourceDocumentView> activeDocuments(String caseId) {
+    return documents.findByCaseIdOrderByCreatedAt(caseId).stream()
+        .filter(document -> document.lifecycle.equals("ACTIVE"))
+        .map(this::documentView)
+        .toList();
+  }
+
+  /** The stored key of a retained normalized page image, if the page is still held. */
+  @Transactional(readOnly = true)
+  public Optional<String> normalizedPageKey(String caseId, String documentId, int pageNumber) {
+    return documents.findById(documentId)
+        .filter(document -> document.caseId.equals(caseId) && document.lifecycle.equals("ACTIVE"))
+        .flatMap(document -> pages.findByDocumentIdOrderByPageNumber(documentId).stream()
+            .filter(page -> page.pageNumber == pageNumber
+                && page.normalizedDeletedAt == null && page.normalizedObjectKey != null)
+            .map(page -> page.normalizedObjectKey)
+            .findFirst());
+  }
+
   @Transactional(readOnly = true)
   public ProcessingDocument requireProcessingDocument(String documentId) {
     SourceDocumentEntity document = documents.findById(documentId)
