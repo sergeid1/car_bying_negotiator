@@ -1136,3 +1136,10 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
 }
 
 /* ==== End of ticket 25 block ============================================= */
+
+/* Ticket 26: verified offer analysis and private return access. */
+.verified-analysis ol { padding-left: 1.5rem; }
+.verified-analysis li { padding-block: .3rem; }
+.verified-analysis li[aria-current="step"] { font-weight: 700; }
+.saved-case-link a { display: block; overflow-wrap: anywhere; margin-bottom: 1rem; }
+/* End ticket 26. */

@@ -5,9 +5,10 @@ import { afterEach, expect, test, vi } from "vitest";
 import App from "./App";
 import { CaseLifecycle } from "./CaseLifecycle";
 import { PricePlan } from "./PricePlan";
-import { CaseDownloads, RecoveryEmailOptIn } from "./CasePortability";
+import { CaseDownloads, RecoveryEmailOptIn, SaveCaseLink } from "./CasePortability";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
+import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const AA = {
@@ -21,6 +22,8 @@ test("core entry, document intake, recovery, price approval, downloads and delet
     <DealerDocumentUpload caseId="case" token="token" />
     <OfferVerification caseId="case" token="token" />
     <PricePlan caseId="case" token="token" />
+    <VerifiedOfferAnalysis caseId="case" token="token" />
+    <SaveCaseLink caseId="case" token="token" />
     <RecoveryEmailOptIn caseId="case" token="token" />
     <CaseDownloads caseId="case" token="token" reportVersion={1} />
     <CaseLifecycle caseId="case" token="token" onRevoked={() => {}} />
