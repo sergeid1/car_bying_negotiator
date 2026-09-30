@@ -1,5 +1,7 @@
 FROM eclipse-temurin:21-jre AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends libheif-examples libheif-plugin-libde265 \
+# Take Ubuntu security fixes (e.g. OpenSSL) as soon as they ship, not when the base image is rebuilt.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends libheif-examples libheif-plugin-libde265 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 parser && useradd --uid 10001 --gid parser --no-create-home parser
 WORKDIR /app
