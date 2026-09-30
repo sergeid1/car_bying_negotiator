@@ -19,6 +19,8 @@ export function VerifiedOfferAnalysis({ caseId, token, offerVersion, pollDelayMs
   const [attempt, setAttempt] = useState(0);
   const requestKey = useRef(crypto.randomUUID());
   const requestedOffer = useRef<number | undefined>(undefined);
+  // Set by "Update analysis"; otherwise a report already made from this offer is reopened, not regenerated.
+  const forceRun = useRef(false);
   useEffect(() => {
     let cancelled = false;
     const base = `/api/v1/cases/${encodeURIComponent(caseId)}`;
@@ -43,6 +45,15 @@ export function VerifiedOfferAnalysis({ caseId, token, offerVersion, pollDelayMs
         if (offerVersion !== undefined && offer.version !== offerVersion) throw new Error("Offer changed");
         if (requestedOffer.current !== undefined && requestedOffer.current !== offer.version) requestKey.current = crypto.randomUUID();
         if (cancelled) return;
+        if (!forceRun.current) {
+          const existing = await fetch(`${base}/reports/latest`, { headers });
+          const saved = existing.ok ? await existing.json() : undefined;
+          if (cancelled) return;
+          if (offer.id && saved?.evidence?.dealerOffer?.id === offer.id && saved.analysis?.materialAmounts) {
+            setStage(4); setReport(saved); return;
+          }
+        }
+        forceRun.current = false;
         requestedOffer.current = offer.version;
         setReport(undefined); setStage(1);
         await request(`${base}/market-assessments`, "POST");
@@ -84,6 +95,6 @@ export function VerifiedOfferAnalysis({ caseId, token, offerVersion, pollDelayMs
       </>}
       {error && <><p role="alert">Analysis could not finish. Your accepted documents and verified offer are saved. Retry analysis; you do not need to upload them again. If access has expired, use your saved link or email recovery.</p><button onClick={() => setAttempt(value => value + 1)}>Retry analysis</button></>}
     </div>}
-    {report && <><button className="btn-secondary" onClick={() => { requestKey.current = crypto.randomUUID(); setAttempt(value => value + 1); }}>Update analysis with saved terms</button><CoreDealReport report={report} /><OutcomeFeedback caseId={caseId} token={token} /><CaseDownloads caseId={caseId} token={token} reportVersion={report.version} /><NegotiationLoader caseId={caseId} token={token} reportVersion={report.version} /></>}
+    {report && <><button className="btn-secondary" onClick={() => { requestKey.current = crypto.randomUUID(); forceRun.current = true; setAttempt(value => value + 1); }}>Update analysis with saved terms</button><CoreDealReport report={report} /><OutcomeFeedback caseId={caseId} token={token} /><CaseDownloads caseId={caseId} token={token} reportVersion={report.version} /><NegotiationLoader caseId={caseId} token={token} reportVersion={report.version} /></>}
   </section>;
 }

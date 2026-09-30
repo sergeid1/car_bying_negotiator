@@ -18,12 +18,13 @@ test("frozen offer advances through the endpoints and opens the focused report",
   }));
   render(<VerifiedOfferAnalysis caseId="current" token="secret" offerVersion={2} pollDelayMs={0} />);
   expect(await screen.findByRole("heading", { name: "Deal Analysis Report" })).toHaveFocus();
-  expect(calls).toEqual(["/api/v1/cases/current/dealer-offers/latest", "/api/v1/cases/current/market-assessments", "/api/v1/cases/current", "/api/v1/cases/current/cash-economics", "/api/v1/cases/current/analyses", "/api/v1/operations/op", "/api/v1/cases/current/reports/latest", "/api/v1/cases/current/reports/1/negotiation"]);
+  expect(calls).toEqual(["/api/v1/cases/current/dealer-offers/latest", "/api/v1/cases/current/reports/latest", "/api/v1/cases/current/market-assessments", "/api/v1/cases/current", "/api/v1/cases/current/cash-economics", "/api/v1/cases/current/analyses", "/api/v1/operations/op", "/api/v1/cases/current/reports/latest", "/api/v1/cases/current/reports/1/negotiation"]);
 });
 test("failure retries the saved offer without uploads and preserves analysis request identity", async () => {
-  let fail = true;
+  let reportReads = 0;
   const fetcher = vi.fn(async (path: string, options?: RequestInit) => {
-    if (path.endsWith("reports/latest") && fail) { fail = false; throw new Error("offline"); }
+    // The first read checks for an existing report; the second, after analysis, is the one that drops.
+    if (path.endsWith("reports/latest") && ++reportReads === 2) throw new Error("offline");
     return new Response(JSON.stringify(path.endsWith("negotiation") ? { language: { draft: "Review the fees", items: [] } } : path.endsWith("dealer-offers/latest") ? { version: 1, status: "VERIFIED" }
       : path.endsWith("analyses") ? { operation: { stage: "COMPLETE" } } : path.endsWith("reports/latest") ? report : {}));
   });
@@ -54,4 +55,21 @@ test("dealer financing continues to a report without calling cash-only economics
   render(<VerifiedOfferAnalysis caseId="finance" token="token" />);
   await screen.findByRole("heading", { name: "Deal Analysis Report" });
   expect(fetcher.mock.calls.some(([path]) => path.endsWith("cash-economics"))).toBe(false);
+});
+
+test("returning to a case reopens the report already made from its offer and only regenerates on request", async () => {
+  const saved = { ...report, evidence: { dealerOffer: { id: "offer-2", version: 2 } } };
+  const fetcher = vi.fn(async (path: string, _options?: RequestInit) => new Response(JSON.stringify(
+    path.endsWith("dealer-offers/latest") ? { id: "offer-2", version: 2, status: "VERIFIED" }
+      : path.endsWith("analyses") ? { operation: { stage: "COMPLETE" } }
+      : path.endsWith("reports/latest") ? saved
+      : path.endsWith("negotiation") ? { language: { draft: "Review the fees", items: [] } } : {})));
+  vi.stubGlobal("fetch", fetcher);
+  render(<VerifiedOfferAnalysis caseId="case" token="token" pollDelayMs={0} />);
+  await screen.findByRole("heading", { name: "Deal Analysis Report" });
+  expect(fetcher.mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(0);
+
+  fireEvent.click(screen.getByRole("button", { name: "Update analysis with saved terms" }));
+  await screen.findByRole("heading", { name: "Deal Analysis Report" });
+  await vi.waitFor(() => expect(fetcher.mock.calls.filter(([path]) => path.endsWith("analyses"))).toHaveLength(1));
 });
