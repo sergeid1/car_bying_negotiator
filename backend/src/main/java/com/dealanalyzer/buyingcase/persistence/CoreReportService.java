@@ -7,6 +7,7 @@ import com.dealanalyzer.economics.persistence.CashEconomicsPersistence;
 import com.dealanalyzer.market.persistence.MarketAssessmentPersistence;
 import com.dealanalyzer.plan.PricePlanService;
 import com.dealanalyzer.plan.PriceBoundaryPolicy;
+import com.dealanalyzer.report.AmountEvidence;
 import com.dealanalyzer.report.CoreReviewPolicy;
 import com.dealanalyzer.vehicle.VehicleEvidenceService;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence;
@@ -39,11 +40,14 @@ public class CoreReportService {
   private final ObjectMapper json;
   private final FinancingService financing;
   private final com.dealanalyzer.review.DealReviewService reviews;
+  private final com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence extractions;
 
   public CoreReportService(EphemeralBuyingCaseService access, AnalysisCaseRepository cases,
       OperationRepository operations, AnalysisReportRepository reports, BuyingCaseStore store,
       DealerOfferPersistence offers, CashEconomicsPersistence economics, MarketAssessmentPersistence market,
-      PricePlanService plans, VehicleEvidenceService vehicles, ObjectMapper json, FinancingService financing, com.dealanalyzer.review.DealReviewService reviews, NegotiationService negotiation, com.dealanalyzer.pilot.PilotEvents pilotEvents) {
+      PricePlanService plans, VehicleEvidenceService vehicles, ObjectMapper json, FinancingService financing, com.dealanalyzer.review.DealReviewService reviews, NegotiationService negotiation, com.dealanalyzer.pilot.PilotEvents pilotEvents,
+      com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence extractions) {
+    this.extractions = extractions;
     this.pilotEvents = pilotEvents;
     this.negotiation = negotiation;
     this.reviews = reviews;
@@ -182,6 +186,14 @@ public class CoreReportService {
     } else amounts.add(new MaterialAmount("Market selling-price range", null, "USD", "UNAVAILABLE", "marketAssessment", ""));
     if (cash == null && finance == null) amounts.add(new MaterialAmount("Out-the-door total", null, "USD", "UNAVAILABLE", "cashEconomics", ""));
     if (baseline != null) collectPlanAmounts(baseline.payload().path("plan"), "/payload/plan", plan.currency(), amounts);
+    var explained = new AmountEvidence()
+        .cash(cashView == null ? null : cashView.result(), offer == null ? null : offer.terms(),
+            offer == null ? null : documentOf(caseId, offer.extractionId()), offer == null ? null : offer.version())
+        .financing(finance == null ? null : json.valueToTree(finance.inputs()), finance == null ? null : json.valueToTree(finance.result()))
+        .market(assessment == null ? null : assessment.provider().source())
+        .plan(baseline == null ? null : baseline.payload().path("plan"),
+            baseline == null ? null : baseline.payload().at("/cashEconomics/result"), baseline == null ? null : baseline.version());
+    amounts.replaceAll(amount -> amount.explainedBy(explained));
     analysis.set("materialAmounts", json.valueToTree(amounts));
     analysis.set("policyVersions", json.valueToTree(Map.of("review", CoreReviewPolicy.VERSION,
         "revisedReview", com.dealanalyzer.review.RevisedOfferPolicy.VERSION,
@@ -220,6 +232,10 @@ public class CoreReportService {
     return new StartedReport(store.requireOperation(operationId));
   }
 
+  private String documentOf(String caseId, String extractionId) {
+    return extractions.documentIdOf(caseId, extractionId).orElse(null);
+  }
+
   private void addFinanceAmount(List<MaterialAmount> amounts, String label, Long value, String precision, String pointer) {
     amounts.add(new MaterialAmount(label, value, "USD", value == null ? "UNAVAILABLE" : precision, "financing", pointer));
   }
@@ -252,5 +268,18 @@ public class CoreReportService {
     catch (java.io.IOException failure) { throw new IllegalStateException(failure); }
   }
   public record StartedReport(BuyingCaseStore.OperationView operation) {}
-  public record MaterialAmount(String label, Long minorUnits, String currency, String precision, String source, String pointer) {}
+  /** documentSource or sourceNote says where the amount came from; calculation shows its arithmetic. */
+  public record MaterialAmount(String label, Long minorUnits, String currency, String precision, String source, String pointer,
+      AmountEvidence.DocumentSource documentSource, String sourceNote, AmountEvidence.Calculation calculation) {
+    MaterialAmount(String label, Long minorUnits, String currency, String precision, String source, String pointer) {
+      this(label, minorUnits, currency, precision, source, pointer, null, null, null);
+    }
+    MaterialAmount explainedBy(AmountEvidence evidence) {
+      var explanation = evidence.find(source, pointer);
+      return explanation == null ? new MaterialAmount(label, minorUnits, currency, precision, source, pointer, null,
+          "No document source or calculation is recorded for this amount.", null)
+          : new MaterialAmount(label, minorUnits, currency, precision, source, pointer,
+              explanation.documentSource(), explanation.sourceNote(), explanation.calculation());
+    }
+  }
 }
