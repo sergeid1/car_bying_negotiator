@@ -55,7 +55,7 @@ public class OperationsProjection {
     };
   }
   public List<Map<String, Object>> usage(String caseId) {
-    return rows("select u.id as correlationId, u.operation as operation, u.provider as provider, u.providerVersion as providerVersion, u.modelVersion as modelVersion, u.schemaVersion as schemaVersion, u.license as license, u.unit as unit, u.units as units, u.costUsd as costUsd, u.status as status, u.createdAt as createdAt, u.finishedAt as finishedAt from ProviderUsageEntity u where u.caseId = :id order by u.createdAt desc", Map.of("id", caseId));
+    return rows("select u.id as correlationId, u.operation as operation, u.provider as provider, u.providerVersion as providerVersion, u.modelVersion as modelVersion, u.schemaVersion as schemaVersion, u.promptVersion as promptVersion, u.thresholdSetVersion as thresholdSetVersion, u.evaluationSetVersion as evaluationSetVersion, u.license as license, u.unit as unit, u.units as units, u.inputTokens as inputTokens, u.outputTokens as outputTokens, u.costUsd as costUsd, u.status as status, u.createdAt as createdAt, u.finishedAt as finishedAt from ProviderUsageEntity u where u.caseId = :id order by u.createdAt desc", Map.of("id", caseId));
   }
   public List<Map<String, Object>> providers() {
     return rows("select u.operation as operation, u.provider as provider, u.providerVersion as providerVersion, u.status as status, count(u.id) as calls, sum(u.units) as units, sum(u.costUsd) as knownCostUsd, count(u.costUsd) as callsWithKnownCost, max(u.createdAt) as lastObservedAt from ProviderUsageEntity u group by u.operation, u.provider, u.providerVersion, u.status order by max(u.createdAt) desc", Map.of());

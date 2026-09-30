@@ -6,9 +6,10 @@ prerequisites in [the pilot readiness record](pilot-readiness-record.md). Both a
 
 ## Summary
 
-No external commercial provider is integrated. Every adapter the product depends on is a
-deterministic local implementation, a self-hosted component, or an opt-in connection to
-infrastructure the operator supplies. There is therefore **no subprocessor, no processing
+No external commercial provider processes Buyer data. Every adapter in use is a deterministic
+local implementation, a self-hosted component, or an opt-in connection to infrastructure the
+operator supplies. The Anthropic model client is integrated but disabled, and cannot be enabled
+while its terms are unexecuted (see below). There is therefore **no subprocessor, no processing
 region, and no provider contract to describe** — not because the inventory is unfinished, but
 because no third party processes Buyer data today.
 
@@ -30,6 +31,7 @@ providers, and each one adds contractual and privacy obligations this table cann
 | Postal-code location | `PostalJurisdictionResolver` over bundled Census reference data | In process | None — the dataset ships with the application and is never queried remotely |
 | Recovery email | `SmtpRecoveryEmail`, opt-in and unconfigured by default | Buyer email address | Operator's SMTP provider when enabled |
 | Human review | Internal queue behind separate consent | Redacted fields | None |
+| Model calls | `AnthropicModelGateway` through the [AI execution harness](ai-execution-harness.md); disabled (`ai.model.enabled=false`) | Not while disabled; would send normalized page images and recognized text | Anthropic, once enabled — **terms unexecuted** |
 
 ## Bundled reference data
 
@@ -60,7 +62,11 @@ under the blocked `jurisdiction-pack` prerequisite.
   and stored artifacts, as described in [the deletion policy](case-deletion-policy.md). Backup
   expiry is disclosed rather than claimed as verified erasure.
 - **Training.** No customer document is used for model training, which is trivially true while no
-  model provider is called. This becomes a contractual requirement the moment one is.
+  model provider is called. The Anthropic client is integrated but off, and the model rollout gate
+  refuses to start the application with it on until executed terms validating data retention and
+  the exclusion of customer documents from training are recorded in
+  `backend/src/main/resources/ai/model-vendor-terms.json`. That record currently states
+  `UNEXECUTED`, so this obligation is **unmet**.
 
 ## What must be obtained before a public pilot
 

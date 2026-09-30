@@ -27,7 +27,7 @@ this surface.
 | Method and path | Result |
 | --- | --- |
 | `GET /cases/{caseId}` | Analysis/document stages, operation correlation IDs, safe failure categories, current policies and report-specific policy snapshots |
-| `GET /cases/{caseId}/usage` | Provider calls, units, costs, status and registered provider/model/schema/license metadata |
+| `GET /cases/{caseId}/usage` | Provider calls, units, costs, status and registered provider/model/schema/license metadata; model calls add prompt, threshold-set and evaluation-set versions and input/output tokens |
 | `GET /providers` | Observed call counts/status, units, known costs, known-cost counts and last observation, grouped by provider/version/operation/status |
 | `GET /cases/{caseId}/audit` | Review access and Buyer verification audit metadata |
 | `GET /cases/{caseId}/deletion` | Deletion progress, attempt outcomes and verification evidence, including after case removal |
