@@ -77,7 +77,8 @@ beforeEach(() => {
       return json([{ id: "doc-1", originalFilename: "buyers-order.pdf", createdAt: "2026-09-30T10:00:00Z" }]);
     }
     if (url.endsWith("/extractions/latest")) return json(structuredClone(extraction));
-    if (url.includes("/pages/")) return new Response(new Blob(["png"], { type: "image/png" }));
+    // Bytes rather than jsdom's Blob: Node 22's Response cannot read a jsdom Blob as a body.
+    if (url.includes("/pages/")) return new Response("png", { headers: { "Content-Type": "image/png" } });
     if (url.endsWith("/corrections")) {
       const target = [...extraction.candidates, ...extraction.lineItems].find(item => item.id === body.targetId)!;
       const correction = {
