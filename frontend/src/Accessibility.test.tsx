@@ -92,6 +92,30 @@ test("report leading section, editable questions and evidence links have no auto
   await user.tab(); expect(screen.getByRole("link", { name: "$28,500.00" })).toHaveFocus();
 });
 
+test("field-to-document evidence, arithmetic and revised-offer differences have no automated AA violations", async () => {
+  const region = { pageNumber: 1, x: 0.1, y: 0.6, width: 0.5, height: 0.04 };
+  const { container } = render(<main><h1>Buying Case</h1><CoreDealReport report={{ version: 2, asOf: "2026-09-30", status: "COMPLETE", analysis: {
+    reviewLabel: "Review required", dealRating: "FAIR", ratingBasis: "Selling price comparison", nextAction: "Ask about the fee",
+    topReasons: ["Check fees"], marketAvailability: "AVAILABLE", cashAvailability: "AVAILABLE",
+    dealReview: { version: 1, baselineVersion: 1, previousOfferVersion: 1, currentOfferVersion: 2, status: "REVIEW_REQUIRED", checkedAt: "2026-09-30",
+      tolerancePolicy: "USD 1.00", scope: "Verified document terms", discrepancies: [{ comparison: "PREVIOUS", term: "line:doc fee#1", kind: "CHANGED",
+        expected: { amountMinor: 49900, currency: "USD" }, observed: { amountMinor: 89900, currency: "USD" }, delta: 40000, unit: "USD_MINOR",
+        severity: "MATERIAL", reason: "Changed", expectedEvidence: { originalLabel: "Doc fee", evidence: region },
+        observedEvidence: { originalLabel: "Doc fee", evidence: region }, confidence: 0.9, uncertain: false, buyerAction: "Ask" }],
+      cashDeltas: { previous: { availability: "ESTIMATED", currency: "USD", preTaxDeltaMinor: 40000, taxEffectMinor: 2500, outTheDoorDeltaMinor: 42500,
+        expectedOutTheDoorMinor: 2600000, observedOutTheDoorMinor: 2642500, expectedTaxesMinor: 150000, observedTaxesMinor: 152500 } } },
+    materialAmounts: [
+      { label: "Doc fee", minorUnits: 89900, currency: "USD", precision: "EXACT", source: "cashEconomics", pointer: "/result/lineItems/0/amount",
+        documentSource: { documentId: "document", extractionId: "extraction", offerVersion: 2, wording: "Doc fee", pageNumber: 1, region: { x: 0.1, y: 0.6, width: 0.5, height: 0.04 } } },
+      { label: "Out-the-door total", minorUnits: 2642500, currency: "USD", precision: "ESTIMATED", source: "cashEconomics", pointer: "/result/outTheDoorTotal",
+        sourceNote: "Calculated from the inputs below; no single document line holds this amount.",
+        calculation: { operands: [{ operator: null, label: "Vehicle subtotal", minorUnits: 2400000, value: null },
+          { operator: "+", label: "Taxes", minorUnits: 242500, value: null }], notes: ["Rounded half up."] } },
+    ], policyVersions: {}, limitations: [],
+  }, evidence: {}, reproduction: {} }} caseId="case" token="token" /></main>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
 test("optional total-identification form has no automated AA violations", async () => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "session" })));
   const { container } = render(<main><h1>Pilot check</h1><ReportTotalMeasure caseId="case" token="token" report={{ version: 1 } as import("./CoreDealReport").CoreReport} /></main>);

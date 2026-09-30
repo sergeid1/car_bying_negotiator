@@ -5,7 +5,13 @@ import { RevisedOfferReview, type DealReview } from "./RevisedOfferReview";
 import { OutsideFinancing } from "./OutsideFinancing";
 import { DealerFinancingForm, DealerFinancingResult, type FinancingResult } from "./DealerFinancing";
 import { ReportTotalMeasure } from "./ReportTotalMeasure";
+import { Arithmetic, DocumentSourceView, type Calculation, type DocumentSource } from "./EvidenceSource";
 import { useEffect, useRef, useState } from "react";
+
+export type MaterialAmount = {
+  label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string;
+  documentSource?: DocumentSource | null; sourceNote?: string | null; calculation?: Calculation | null;
+};
 
 export type CoreReport = {
   version: number; asOf: string; status: string;
@@ -14,7 +20,7 @@ export type CoreReport = {
     financingAvailability?: string; financing?: FinancingResult | null; financingTerms?: { aprPercent: number | null; termMonths: number | null } | null;
     reviewLabel: string; dealRating: string; ratingBasis: string; nextAction: string;
     topReasons: string[]; marketAvailability: string; cashAvailability: string;
-    materialAmounts: { label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string }[];
+    materialAmounts: MaterialAmount[];
     policyVersions: Record<string, string>; limitations: string[];
   };
   evidence: Record<string, unknown>;
@@ -114,17 +120,16 @@ export function CoreDealReport({ report, caseId, token }: { report: CoreReport; 
     </section>
     {analysis.financingAvailability && analysis.financingAvailability !== "NOT_APPLICABLE" && <DealerFinancingResult result={analysis.financing ?? null} availability={analysis.financingAvailability} terms={analysis.financingTerms} />}
     <section className="panel" id="core-evidence" tabIndex={-1}>
-      <h3>Frozen evidence and reproducible calculations</h3>
-      {analysis.materialAmounts.map((amount, index) => <section key={index} id={`amount-evidence-${index}`} tabIndex={-1}>
-        <h4>{amountLabel(amount.label)} — source and calculation</h4>
-        <p>{amount.source}{amount.pointer} · {amount.precision.toLowerCase()}</p>
-        <a href={`#evidence-${amount.source}`}>Open full frozen source</a>
-        <pre>{JSON.stringify(amount.pointer.split("/").filter(Boolean).reduce<unknown>((value, key) => value != null && typeof value === "object" ? (value as Record<string, unknown>)[key] : undefined, report.evidence[amount.source]) ?? "Unknown", null, 2)}</pre>
+      <h3>Evidence and calculations</h3>
+      <p>Each amount shows the dealer document page and region it was read from, or says that no document source exists, and each calculated amount shows its arithmetic.</p>
+      {analysis.materialAmounts.map((amount, index) => <section key={index} id={`amount-evidence-${index}`} tabIndex={-1} className="amount-evidence">
+        <h4>{amountLabel(amount.label)}: {money(amount)} <small>{amount.precision.toLowerCase()}</small></h4>
+        {amount.documentSource
+          ? <DocumentSourceView source={amount.documentSource} caseId={caseId} token={token} what={amountLabel(amount.label)} />
+          : <p>No document source: {amount.sourceNote ?? "this saved report does not record where this amount came from."}</p>}
+        {amount.calculation && <Arithmetic calculation={amount.calculation} result={amount.precision === "UNAVAILABLE" ? null : amount.minorUnits} currency={amount.currency} label={amountLabel(amount.label)} />}
       </section>)}
-      {Object.entries(report.evidence).map(([source, value]) => <section key={source} id={`evidence-${source}`} tabIndex={-1}>
-        <h4>{source}</h4><pre>{value == null ? "Unavailable" : JSON.stringify(value, null, 2)}</pre>
-      </section>)}
-      <details><summary>Reproduction metadata</summary><pre>{JSON.stringify(report.reproduction, null, 2)}</pre></details>
+      <ReproductionDiagnostics report={report} />
     </section>
     <section className="limitations" id="core-scope" tabIndex={-1}>
       <h3>Scope and policies</h3>
@@ -132,4 +137,19 @@ export function CoreDealReport({ report, caseId, token }: { report: CoreReport; 
       <dl>{Object.entries(analysis.policyVersions).map(([name, version]) => <div key={name}><dt>{name}</dt><dd>{version}</dd></div>)}</dl>
     </section>
   </article>;
+}
+
+/** Serialized inputs are only rendered once the Buyer opens this diagnostic disclosure. */
+function ReproductionDiagnostics({ report }: { report: CoreReport }) {
+  const [open, setOpen] = useState(false);
+  return <details onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary>Diagnostic data for reproducing this report</summary>
+    <p>This is technical data for regenerating and auditing the report. It is not evidence to read as a Buyer; the sections above explain each amount.</p>
+    {open && <>
+      <h4>Reproduction metadata</h4>
+      <pre>{JSON.stringify(report.reproduction, null, 2)}</pre>
+      <h4>Frozen inputs</h4>
+      <pre>{JSON.stringify(report.evidence, null, 2)}</pre>
+    </>}
+  </details>;
 }

@@ -79,6 +79,20 @@ class DocumentExtractionAcceptanceTest {
       String analysisPath = casePath + "/analyses";
       HttpAcceptanceHarness.post(application.client(), analysisPath, Map.of(), "initial-analysis", token);
       JsonNode report = HttpAcceptanceHarness.get(application.client(), casePath + "/reports/latest", token);
+      assertThat(report.at("/analysis/materialAmounts")).allSatisfy(amount ->
+          assertThat(amount.path("documentSource").isObject() || !amount.path("sourceNote").asText().isBlank()).isTrue());
+      assertThat(report.at("/analysis/materialAmounts")).anySatisfy(amount -> {
+        assertThat(amount.at("/documentSource/documentId").asText()).isEqualTo(upload.at("/document/id").asText());
+        assertThat(amount.at("/documentSource/pageNumber").asInt()).isPositive();
+        assertThat(amount.at("/documentSource/region/width").isNumber()).isTrue();
+      });
+      assertThat(report.at("/analysis/materialAmounts")).anySatisfy(amount -> {
+        assertThat(amount.path("pointer").asText()).isEqualTo("/result/outTheDoorTotal");
+        long sum = 0;
+        for (JsonNode operand : amount.at("/calculation/operands"))
+          sum += operand.path("operator").asText().equals("−") ? -operand.path("minorUnits").asLong() : operand.path("minorUnits").asLong();
+        assertThat(sum).isEqualTo(amount.path("minorUnits").asLong());
+      });
       parts = new LinkedMultiValueMap<String, Object>();
       parts.add("file", new NamedBytes("revision.pdf", twoPagePdf()));
       JsonNode revisionUpload = new com.fasterxml.jackson.databind.ObjectMapper().readTree(
@@ -112,6 +126,12 @@ class DocumentExtractionAcceptanceTest {
       assertThat(review.path("baselineVersion").asInt()).isEqualTo(1);
       assertThat(review.path("discrepancies").toString()).contains("BASELINE", "PREVIOUS", "AMOUNT_FINANCED", "LIMIT_VIOLATION");
       assertThat(review.path("tolerancePolicy").asText()).contains("zero tolerance");
+      JsonNode previousCash = review.at("/cashDeltas/previous");
+      assertThat(previousCash.path("availability").asText()).isEqualTo("ESTIMATED");
+      assertThat(previousCash.path("observedTaxesMinor").asLong() - previousCash.path("expectedTaxesMinor").asLong())
+          .isEqualTo(previousCash.path("taxEffectMinor").asLong());
+      assertThat(previousCash.path("observedOutTheDoorMinor").asLong() - previousCash.path("expectedOutTheDoorMinor").asLong())
+          .isEqualTo(previousCash.path("outTheDoorDeltaMinor").asLong());
       assertThat(review.path("discrepancies")).anySatisfy(d -> {
         assertThat(d.path("term").asText()).isEqualTo("buyerMaxOutTheDoorPriceMinor");
         assertThat(d.path("kind").asText()).isEqualTo("LIMIT_VIOLATION");

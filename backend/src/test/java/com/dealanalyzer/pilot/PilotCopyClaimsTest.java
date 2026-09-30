@@ -145,6 +145,7 @@ class PilotCopyClaimsTest {
           "backend/src/main/java/com/dealanalyzer/review/RevisedOfferPolicy.java",
           "backend/src/main/java/com/dealanalyzer/buyingcase/persistence/CoreReportService.java",
           "backend/src/main/java/com/dealanalyzer/report/CashDealAnalyzer.java",
+          "backend/src/main/java/com/dealanalyzer/report/AmountEvidence.java",
           "backend/src/main/java/com/dealanalyzer/report/StoredReportRenderer.java")) {
         Path file = REPOSITORY.resolve(generated);
         if (!Files.exists(file)) throw new AssertionError("Missing generated copy at " + file);
