@@ -209,6 +209,23 @@ class DocumentExtractionAcceptanceTest {
       awaitExtraction(application, upload.at("/operation/id").asText(), token);
 
       String documentId = upload.at("/document/id").asText();
+      JsonNode documents = HttpAcceptanceHarness.get(
+          application.client(), "/api/v1/cases/" + caseId + "/documents", token);
+      assertThat(documents).hasSize(1);
+      assertThat(documents.get(0).get("id").asText()).isEqualTo(documentId);
+      String pagePath = "/api/v1/cases/" + caseId + "/documents/" + documentId + "/pages/2/image";
+      var sourcePage = application.client().get().uri(pagePath)
+          .header("Case-Access-Token", token).retrieve().toEntity(byte[].class);
+      assertThat(sourcePage.getHeaders().getContentType()).isEqualTo(MediaType.IMAGE_PNG);
+      assertThat(sourcePage.getHeaders().getCacheControl()).isEqualTo("no-store");
+      assertThat(sourcePage.getBody()).startsWith((byte) 0x89, (byte) 'P', (byte) 'N', (byte) 'G');
+      assertThatThrownBy(() -> application.client().get().uri(pagePath)
+          .header("Case-Access-Token", "wrong-token").retrieve().toEntity(byte[].class))
+          .isInstanceOf(HttpClientErrorException.class);
+      assertThatThrownBy(() -> application.client().get()
+          .uri("/api/v1/cases/" + caseId + "/documents/" + documentId + "/pages/3/image")
+          .header("Case-Access-Token", token).retrieve().toEntity(byte[].class))
+          .isInstanceOf(HttpClientErrorException.NotFound.class);
       String extractionPath = "/api/v1/cases/" + caseId + "/documents/" + documentId
           + "/extractions/latest";
       JsonNode extraction = HttpAcceptanceHarness.get(application.client(), extractionPath, token);

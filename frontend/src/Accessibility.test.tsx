@@ -1,18 +1,29 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import App from "./App";
 import { CaseLifecycle } from "./CaseLifecycle";
 import { PricePlan } from "./PricePlan";
-import { CaseDownloads, RecoveryEmailOptIn } from "./CasePortability";
+import { CaseDownloads, RecoveryEmailOptIn, SaveCaseLink } from "./CasePortability";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
-afterEach(cleanup);
+import { OfferVerification } from "./OfferVerification";
+import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+const AA = {
+  runOnly: { type: "tag" as const, values: ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"] },
+  // Layout/contrast require the real-browser walkthrough; jsdom has no rendering engine.
+  rules: { "color-contrast": { enabled: false } },
+};
 
 test("core entry, document intake, recovery, price approval, downloads and deletion have no automated AA violations", async () => {
   const { container } = render(<><App /><main aria-label="Saved case controls">
     <DealerDocumentUpload caseId="case" token="token" />
+    <OfferVerification caseId="case" token="token" />
     <PricePlan caseId="case" token="token" />
+    <VerifiedOfferAnalysis caseId="case" token="token" />
+    <SaveCaseLink caseId="case" token="token" />
     <RecoveryEmailOptIn caseId="case" token="token" />
     <CaseDownloads caseId="case" token="token" reportVersion={1} />
     <CaseLifecycle caseId="case" token="token" onRevoked={() => {}} />
@@ -32,4 +43,37 @@ test("keyboard users can skip to the case workflow", async () => {
   expect(screen.getByRole("link", { name: "Skip to case workflow" })).toHaveFocus();
   await user.keyboard("{Enter}");
   expect(screen.getByRole("region", { name: "Open an existing Buying Case" })).toHaveFocus();
+});
+
+test("term verification with source pages, trade terms, corrections and version changes has no automated AA violations", async () => {
+  const evidence = (pageNumber: number) => ({ pageNumber, x: 0.1, y: 0.2, width: 0.5, height: 0.05 });
+  const correction = { id: "k1", version: 1, normalizedValue: "2680000", normalizedUnit: "USD_MINOR", category: null, amountMinor: null, createdAt: "" };
+  const extraction = {
+    id: "e1", documentId: "d1", version: 1, extractorVersion: "x", modelVersion: "m",
+    candidates: [
+      { id: "c1", field: "SELLING_PRICE", originalWording: "Price $25,000", normalizedValue: "2500000", normalizedUnit: "USD_MINOR",
+        evidence: evidence(1), confidence: 0.6, material: true, verificationState: "UNVERIFIED", currentCorrection: null, correctionHistory: [] },
+      { id: "c2", field: "AMOUNT_FINANCED", originalWording: "Financed", normalizedValue: null, normalizedUnit: "USD_MINOR",
+        evidence: evidence(2), confidence: 0.4, material: true, verificationState: "CORRECTED", currentCorrection: correction,
+        correctionHistory: [{ ...correction, id: "k0", normalizedValue: "2600000" }, correction] },
+      { id: "c3", field: "TRADE_ALLOWANCE", originalWording: "Trade $8,000", normalizedValue: "800000", normalizedUnit: "USD_MINOR",
+        evidence: evidence(1), confidence: 0.97, material: true, verificationState: "UNVERIFIED", currentCorrection: null, correctionHistory: [] },
+    ],
+    lineItems: [{ id: "l1", originalLabel: "Mystery", category: "UNKNOWN", amountMinor: 89900, currency: "USD", evidence: evidence(2),
+      confidence: 0.9, verificationState: "UNVERIFIED", currentCorrection: null, correctionHistory: [] }],
+  };
+  const offer = (version: number, price: string) => ({ id: `o${version}`, version, status: "VERIFIED", createdAt: "",
+    terms: { candidates: [{ field: "SELLING_PRICE", value: price, unit: "USD_MINOR" }], lineItems: [] } });
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => {
+    const url = String(input);
+    const body = url.endsWith("/documents") ? [{ id: "d1", originalFilename: "order.pdf" }, { id: "d0", originalFilename: "quote.pdf" }]
+      : url.endsWith("/extractions/latest") ? extraction
+      : url.endsWith("/dealer-offers/latest") ? offer(2, "2450000") : offer(1, "2500000");
+    return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+  });
+  const { container } = render(<main aria-label="Verify terms"><OfferVerification caseId="case" token="token" /></main>);
+  await screen.findByRole("table", { name: /terms that differ/i });
+  await userEvent.setup().click(screen.getByRole("button", { name: "Correct Selling price" }));
+  const result = await axe.run(container, AA);
+  expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
 });

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-type Credentials = { caseId: string; token: string };
+export type Credentials = { caseId: string; token: string };
 async function post(path: string, body: unknown, key: string, token?: string) {
   const response = await fetch(path, { method: "POST", headers: {
     "Content-Type": "application/json", "Idempotency-Key": key,
@@ -8,7 +8,64 @@ async function post(path: string, body: unknown, key: string, token?: string) {
   if (!response.ok) throw new Error(response.status === 410 ? "Export expired. Start a new export." : "Request failed. You can retry safely.");
   return response.json();
 }
-export function RecoveryAccess({ onRecovered }: { onRecovered: (value: Credentials) => void }) {
+export function caseLink({ caseId, token }: Credentials) {
+  return `${window.location.origin}${window.location.pathname}#case=${encodeURIComponent(caseId)}&access=${encodeURIComponent(token)}`;
+}
+export function readCaseLink(value: string): Credentials | undefined {
+  try {
+    const url = new URL(value, window.location.origin);
+    if (url.origin !== window.location.origin || url.pathname !== window.location.pathname) return undefined;
+    const params = new URLSearchParams(url.hash.slice(1));
+    const caseId = params.get("case"), token = params.get("access");
+    return caseId && token ? { caseId, token } : undefined;
+  } catch { return undefined; }
+}
+export function SavedCaseAccess({ onOpened, onUnavailable }: { onOpened: (value: Credentials) => void; onUnavailable: (caseId?: string) => void }) {
+  const [initial] = useState(() => window.location.hash.includes("case=") ? window.location.href : "");
+  const [link, setLink] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  async function open(value: string) {
+    setBusy(true); setError(false);
+    const credentials = readCaseLink(value);
+    try {
+      if (!credentials) throw new Error("Invalid link");
+      const response = await fetch(`/api/v1/cases/${encodeURIComponent(credentials.caseId)}`, { headers: { "Case-Access-Token": credentials.token } });
+      if (!response.ok) throw new Error("Unavailable link");
+      onOpened(credentials); setLink("");
+    } catch { setError(true); onUnavailable(credentials?.caseId); }
+    finally { setBusy(false); }
+  }
+  useEffect(() => {
+    if (initial) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      void open(initial);
+    }
+  }, [initial]);
+  return <section id="case-workflow" tabIndex={-1} className="panel" aria-label="Open an existing Buying Case">
+    <h2>Open a saved case</h2>
+    <p>Open your private saved case link, or paste it here. Anyone with the link can access the case.</p>
+    <form onSubmit={event => { event.preventDefault(); void open(link); }}>
+      <label>Saved case link<input type="password" autoComplete="off" required value={link} onChange={event => setLink(event.target.value)} /></label>
+      <button disabled={busy}>{busy ? "Opening case…" : "Open saved case"}</button>
+    </form>
+    {error && <p role="alert">This link cannot be opened. It may have expired, been revoked, or be unrecognized. Use email recovery below if you enabled it, or start a new case.</p>}
+  </section>;
+}
+export function SaveCaseLink(credentials: Credentials) {
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState(false);
+  const link = caseLink(credentials);
+  return <section className="panel saved-case-link" aria-label="Private return link">
+    <h2>Return to your case</h2>
+    <p>Save this private link to return from another browser. It stops working when access expires or the case is deleted. Keep it private.</p>
+    <a href={link}>Private case link</a>
+    <button className="btn-secondary" onClick={async () => { try { await navigator.clipboard.writeText(link); setCopied(true); setError(false); } catch { setError(true); } }}>Copy private case link</button>
+    {copied && <p role="status">Private link copied.</p>}
+    {error && <p role="alert">Copy is unavailable. Save the Private case link using your browser.</p>}
+  </section>;
+}
+export function RecoveryAccess({ onRecovered, caseId }: { onRecovered: (value: Credentials) => void; caseId?: string }) {
   const [secret, setSecret] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get("recover") ?? "");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -31,7 +88,7 @@ export function RecoveryAccess({ onRecovered }: { onRecovered: (value: Credentia
     }}>Verify recovery link</button> : null}
     <form onSubmit={async event => {
       event.preventDefault(); const data = new FormData(event.currentTarget);
-      const body = { caseId: String(data.get("recoveryCase")), email: String(data.get("recoveryEmail")) };
+      const body = { caseId: caseId ?? readCaseLink(String(data.get("recoveryLink")))?.caseId ?? "unrecognized", email: String(data.get("recoveryEmail")) };
       if (request.current.body !== JSON.stringify(body)) request.current = { body: JSON.stringify(body), key: crypto.randomUUID() };
       setBusy(true); setError("");
       try {
@@ -39,7 +96,7 @@ export function RecoveryAccess({ onRecovered }: { onRecovered: (value: Credentia
         setMessage(result.status); request.current = { body: "", key: "" };
       } catch (failure) { setError(String(failure)); } finally { setBusy(false); }
     }}>
-      <label>Case ID for recovery<input name="recoveryCase" required maxLength={36} /></label>
+      {!caseId && <label>Saved case link for recovery<input name="recoveryLink" type="password" autoComplete="off" required /></label>}
       <label>Recovery email<input name="recoveryEmail" type="email" required maxLength={254} /></label>
       <button disabled={busy}>Email recovery link</button>
     </form>
@@ -52,7 +109,7 @@ export function RecoveryEmailOptIn({ caseId, token }: Credentials) {
   const key = useRef(crypto.randomUUID());
   return <section className="panel" aria-label="Optional email recovery">
     <h2>Optional email recovery</h2>
-    <p>Save an email address and receive a single-use access link. It expires in 15 minutes. Save your Case ID to request another link later.</p>
+    <p>Save an email address and receive a single-use access link. It expires in 15 minutes. Save your private case link to request another email later.</p>
     <form onSubmit={async event => {
       event.preventDefault(); setBusy(true); setError("");
       try {

@@ -1037,3 +1037,109 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
   .outcome h2, .outcome p, .outcome .eyebrow { color: #000; }
   pre { max-height: none; }
 }
+
+/* ==========================================================================
+   Ticket 25 — Verify extracted terms against their source pages
+   Owned by OfferVerification.tsx. Kept in one block so a parallel ticket's
+   styles merge beside it rather than through it.
+   ========================================================================== */
+
+.verify-panel { display: grid; gap: 16px; }
+.verify-panel > * { margin: 0; }
+.verify-provenance { font-size: 0.85rem; overflow-wrap: anywhere; }
+
+.verify-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Value beside its page on wide screens; stacked, page second, at phone width. */
+.verify-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 13rem);
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card-sunk);
+}
+.verify-term { display: grid; gap: 8px; min-width: 0; align-content: start; }
+.verify-term h4 {
+  margin: 0;
+  color: var(--ink-strong);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+.verify-term .actions { margin: 0; }
+.verify-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.verify-flag, .verify-state {
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.verify-flag { background: var(--warn-tint); color: var(--warn-ink); }
+.verify-state { background: var(--accent-tint); color: var(--accent-ink); }
+.verify-state.verify-done { background: var(--ok-tint); color: var(--ok-ink); }
+
+.verify-facts { display: grid; gap: 4px; margin: 0; font-size: 0.9rem; }
+.verify-facts > div { display: flex; flex-wrap: wrap; gap: 0 8px; }
+.verify-facts dt { color: var(--ink-muted); }
+.verify-facts dd { margin: 0; color: var(--ink-strong); font-weight: 600; overflow-wrap: anywhere; min-width: 0; }
+
+.verify-correct { display: grid; gap: 8px; }
+.verify-correct button { justify-self: start; }
+.verify-history { font-size: 0.85rem; }
+.verify-history ol { margin: 6px 0 0; padding-left: 1.2rem; }
+
+.source-page { display: grid; gap: 6px; margin: 0; align-content: start; }
+.source-page-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--card-raised);
+}
+.source-page-frame img { display: block; width: 100%; height: auto; }
+.source-page-placeholder { aspect-ratio: 8.5 / 11; background: var(--paper-sunk); }
+.source-region {
+  position: absolute;
+  border: 2px solid var(--accent);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent-bright) 22%, transparent);
+  box-shadow: 0 0 0 2px var(--card-raised);
+}
+.source-page figcaption { color: var(--ink-muted); font-size: 0.8rem; }
+
+.verify-trade, .verify-versions { display: grid; gap: 10px; }
+.verify-trade h3, .verify-versions h3 { margin: 0; }
+.verify-trade > p, .verify-versions > p { margin: 0; }
+.verify-freeze { display: grid; gap: 8px; }
+.verify-freeze p { margin: 0; font-weight: 600; }
+.verify-freeze button { justify-self: start; }
+
+.verify-changes { width: 100%; border-collapse: collapse; font-size: 0.88rem; table-layout: fixed; }
+.verify-changes caption { text-align: left; font-weight: 700; padding-bottom: 6px; }
+.verify-changes th, .verify-changes td {
+  padding: 6px 8px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .verify-item { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ==== End of ticket 25 block ============================================= */
+
+/* Ticket 26: verified offer analysis and private return access. */
+.verified-analysis ol { padding-left: 1.5rem; }
+.verified-analysis li { padding-block: .3rem; }
+.verified-analysis li[aria-current="step"] { font-weight: 700; }
+.saved-case-link a { display: block; overflow-wrap: anywhere; margin-bottom: 1rem; }
+/* End ticket 26. */
