@@ -13,6 +13,11 @@ class ProviderUsageEntity {
   @Column(name = "provider_version") String providerVersion;
   @Column(name = "model_version") String modelVersion;
   @Column(name = "schema_version") String schemaVersion;
+  @Column(name = "prompt_version") String promptVersion;
+  @Column(name = "threshold_set_version") String thresholdSetVersion;
+  @Column(name = "evaluation_set_version") String evaluationSetVersion;
+  @Column(name = "input_tokens") Long inputTokens;
+  @Column(name = "output_tokens") Long outputTokens;
   String license;
   String unit;
   long units;

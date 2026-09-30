@@ -1,5 +1,7 @@
 package com.dealanalyzer.operations;
 
+import com.dealanalyzer.ai.ModelProvenance;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.concurrent.*;
 import java.util.function.Function;
@@ -39,11 +41,35 @@ public class ProviderMeter {
         }, new ThreadPoolExecutor.AbortPolicy());
   }
 
+  /** The wall-clock budget for one call; model clients use it as their own request timeout. */
+  public Duration timeout() { return timeout; }
+
   @jakarta.annotation.PreDestroy
   public void close() { executor.shutdownNow(); }
+  /** Token counts and cost a model vendor reported for one call; cost is null when unpriced. */
+  public record ModelUsage(long inputTokens, long outputTokens, BigDecimal costUsd) {
+    public ModelUsage {
+      if (inputTokens < 0 || outputTokens < 0) throw new IllegalArgumentException("Token counts are non-negative");
+    }
+  }
+
   public <T> T call(String caseId, Operation operation, Object provider, long units,
       Supplier<T> invocation, Function<T, Status> classify) {
-    String id = store.start(caseId, operation, provider, units);
+    return run(store.start(caseId, operation, provider, units), invocation, classify, null);
+  }
+
+  /**
+   * A model call under the same timeout, concurrency bound and status taxonomy as any provider,
+   * additionally recording the output's provenance and the reported tokens and cost. Usage is read
+   * from every classified result, including refusals and rejected output, because they are billed.
+   */
+  public <T> T callModel(String caseId, Operation operation, ModelProvenance provenance, String license,
+      long units, Supplier<T> invocation, Function<T, Status> classify, Function<T, ModelUsage> usage) {
+    return run(store.startModel(caseId, operation, provenance, license, units), invocation, classify, usage);
+  }
+
+  private <T> T run(String id, Supplier<T> invocation, Function<T, Status> classify,
+      Function<T, ModelUsage> usage) {
     T result;
     Future<T> pending = null;
     try {
@@ -63,10 +89,19 @@ public class ProviderMeter {
       throw new Failure(Status.PROVIDER_FAILURE);
     }
     Status status;
-    try { status = result == null ? Status.CONTRACT_FAILURE : classify.apply(result); }
-    catch (RuntimeException failure) { store.finish(id, Status.CONTRACT_FAILURE); throw new Failure(Status.CONTRACT_FAILURE); }
-    store.finish(id, status);
+    ModelUsage spent = null;
+    try {
+      if (result != null && usage != null) spent = usage.apply(result);
+      status = result == null ? Status.CONTRACT_FAILURE : classify.apply(result);
+    }
+    catch (RuntimeException failure) { finish(id, Status.CONTRACT_FAILURE, spent); throw new Failure(Status.CONTRACT_FAILURE); }
+    finish(id, status, spent);
     if (result == null) throw new Failure(Status.CONTRACT_FAILURE);
     return result;
+  }
+
+  private void finish(String id, Status status, ModelUsage usage) {
+    if (usage == null) store.finish(id, status);
+    else store.finish(id, status, usage);
   }
 }

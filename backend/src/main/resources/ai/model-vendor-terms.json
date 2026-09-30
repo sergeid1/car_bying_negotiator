@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "model-vendor-terms.v1",
+  "vendor": "Anthropic",
+  "status": "UNEXECUTED",
+  "agreementReference": null,
+  "retention": { "validated": false, "clause": null },
+  "trainingExclusion": { "validated": false, "clause": null },
+  "validatedBy": null,
+  "validatedAt": null,
+  "blocker": "No commercial terms with the model vendor have been executed, so data retention and the exclusion of customer documents from training are not contractually established. Until they are, validated here with the governing clauses, no model-backed path may be enabled."
+}

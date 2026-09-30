@@ -16,8 +16,8 @@
       "id": "provider-terms",
       "requirement": "Automotive and processing provider terms document display, caching, attribution, derived-value, retention, deletion, training, regional-processing, coverage, and cost rights.",
       "status": "BLOCKED",
-      "blocker": "No automotive or processing provider terms have been executed. Every provider in the inventory is a deterministic local fake or an unselected candidate, so no display, caching, attribution, derived-value, retention, deletion, training, regional-processing, coverage or cost right has been contractually established.",
-      "evidence": ["docs/provider-inventory.md"]
+      "blocker": "No automotive or processing provider terms have been executed. Every provider in the inventory is a deterministic local fake or an unselected candidate, so no display, caching, attribution, derived-value, retention, deletion, training, regional-processing, coverage or cost right has been contractually established. The integrated model client is disabled and its retention and training terms are recorded as unexecuted; the model rollout gate refuses to enable it until they are validated.",
+      "evidence": ["docs/provider-inventory.md", "docs/ai-execution-harness.md", "backend/src/main/resources/ai/model-vendor-terms.json"]
     },
     {
       "id": "document-corpus",
