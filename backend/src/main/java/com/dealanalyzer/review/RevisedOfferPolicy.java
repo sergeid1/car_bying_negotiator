@@ -62,6 +62,10 @@ public final class RevisedOfferPolicy {
     result.put("availability", "ESTIMATED"); result.put("currency", observed.at("/outTheDoorTotal/currency").asText());
     result.put("preTaxDeltaMinor", Math.subtractExact(total, tax)); result.put("taxEffectMinor", tax);
     result.put("outTheDoorDeltaMinor", total);
+    result.put("expectedOutTheDoorMinor", expected.at("/outTheDoorTotal/minorUnits").longValue());
+    result.put("observedOutTheDoorMinor", observed.at("/outTheDoorTotal/minorUnits").longValue());
+    result.put("expectedTaxesMinor", expected.at("/taxes/minorUnits").longValue());
+    result.put("observedTaxesMinor", observed.at("/taxes/minorUnits").longValue());
     result.put("reason", "Complete pre-tax OTD difference, including fees, add-ons and reductions; tax effect is the difference between separately calculated taxes.");
     result.put("expectedPolicy", expected.path("policyVersion").asText()); result.put("observedPolicy", observed.path("policyVersion").asText());
     return result;

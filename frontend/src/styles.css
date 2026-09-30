@@ -1157,3 +1157,20 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
 .report-leading a:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 
 .report .panel .status-row span { color: #172b3a; background: #e6eee8; }
+
+/* Field-to-document evidence and hand-checkable arithmetic in the report and revised-offer views. */
+.amount-evidence { display: grid; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); }
+.amount-evidence h4 { margin: 0; overflow-wrap: anywhere; }
+.evidence-source { display: grid; gap: 8px; justify-items: start; }
+.evidence-source p { margin: 0; overflow-wrap: anywhere; }
+.evidence-source .source-page { width: 96px; }
+.evidence-source .source-page.source-page-shown { width: min(100%, 480px); }
+.arithmetic ol { margin: 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+.arithmetic li { display: grid; grid-template-columns: 4.5em minmax(0, auto) minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.arithmetic .arithmetic-operator { color: var(--ink-muted); text-align: right; }
+.arithmetic .arithmetic-value { font-weight: 600; white-space: nowrap; }
+.arithmetic .arithmetic-label { overflow-wrap: anywhere; }
+.arithmetic .arithmetic-result { border-top: 1px solid var(--line-strong); margin-top: 4px; padding-top: 4px; }
+.arithmetic p { margin: 6px 0 0; color: var(--ink-muted); font-size: .9rem; }
+.expected-observed { display: grid; gap: 8px; }
+.expected-observed dd { margin: 0; display: grid; gap: 6px; overflow-wrap: anywhere; }

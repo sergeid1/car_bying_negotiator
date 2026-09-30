@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class ProviderMeter {
-  public enum Operation { EXTRACTION, MARKET_RETRIEVAL, LISTING_RETRIEVAL, SYNTHETIC_MARKET }
+  public enum Operation { EXTRACTION, MARKET_RETRIEVAL, LISTING_RETRIEVAL, SYNTHETIC_MARKET, REPLY_DRAFT }
   public enum Status { SUCCESS, PROVIDER_UNAVAILABLE, PROVIDER_FAILURE, CONTRACT_FAILURE, BUYER_INPUT, INTERNAL }
   /** A safe boundary error: provider text and exception causes must never escape into diagnostics. */
   public static final class Failure extends RuntimeException {

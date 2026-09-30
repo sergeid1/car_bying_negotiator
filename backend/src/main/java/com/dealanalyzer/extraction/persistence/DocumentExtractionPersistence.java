@@ -99,6 +99,12 @@ public class DocumentExtractionPersistence {
     return view(extraction);
   }
 
+  /** The source document of an extraction in this case, without loading its terms. */
+  @Transactional(readOnly = true)
+  public java.util.Optional<String> documentIdOf(String caseId, String extractionId) {
+    return extractions.findById(extractionId).filter(value -> value.caseId.equals(caseId)).map(value -> value.documentId);
+  }
+
   @Transactional(readOnly = true)
   public ExtractionView require(String caseId, String extractionId) {
     DocumentExtractionEntity extraction = extractions.findById(extractionId)
