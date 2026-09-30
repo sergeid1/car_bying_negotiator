@@ -1,0 +1,5 @@
+{
+  "schemaVersion": "shadow-comparisons.v2",
+  "intent": "Shadow comparisons written by the Python evaluation harness (ticket 28) against the frozen held-out corpus. A model-backed path may be enabled only for a task whose exact provider, model, prompt, schema, threshold-set and evaluation-set versions have a PASS record here. None exists yet: the harness and the permissioned corpus are not built.",
+  "comparisons": []
+}

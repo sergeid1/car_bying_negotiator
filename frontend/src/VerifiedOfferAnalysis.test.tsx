@@ -18,7 +18,7 @@ test("frozen offer advances through the endpoints and opens the focused report",
   }));
   render(<VerifiedOfferAnalysis caseId="current" token="secret" offerVersion={2} pollDelayMs={0} />);
   expect(await screen.findByRole("heading", { name: "Deal Analysis Report" })).toHaveFocus();
-  expect(calls).toEqual(["/api/v1/cases/current/dealer-offers/latest", "/api/v1/cases/current/reports/latest", "/api/v1/cases/current/market-assessments", "/api/v1/cases/current", "/api/v1/cases/current/cash-economics", "/api/v1/cases/current/analyses", "/api/v1/operations/op", "/api/v1/cases/current/reports/latest", "/api/v1/cases/current/reports/1/negotiation"]);
+  expect(calls.filter(path => !path.includes("/feedback/report-total"))).toEqual(["/api/v1/cases/current/dealer-offers/latest", "/api/v1/cases/current/reports/latest", "/api/v1/cases/current/market-assessments", "/api/v1/cases/current", "/api/v1/cases/current/cash-economics", "/api/v1/cases/current/analyses", "/api/v1/operations/op", "/api/v1/cases/current/reports/latest", "/api/v1/cases/current/reports/1/negotiation"]);
 });
 test("failure retries the saved offer without uploads and preserves analysis request identity", async () => {
   let reportReads = 0;
@@ -67,7 +67,7 @@ test("returning to a case reopens the report already made from its offer and onl
   vi.stubGlobal("fetch", fetcher);
   render(<VerifiedOfferAnalysis caseId="case" token="token" pollDelayMs={0} />);
   await screen.findByRole("heading", { name: "Deal Analysis Report" });
-  expect(fetcher.mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(0);
+  expect(fetcher.mock.calls.filter(([path, options]) => options?.method === "POST" && !path.includes("/feedback/report-total"))).toHaveLength(0);
 
   fireEvent.click(screen.getByRole("button", { name: "Update analysis with saved terms" }));
   await screen.findByRole("heading", { name: "Deal Analysis Report" });

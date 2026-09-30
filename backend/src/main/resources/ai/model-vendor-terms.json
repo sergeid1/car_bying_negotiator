@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "model-vendor-terms.v2",
+  "intent": "One record per model provider. A provider may be enabled only when its own record is EXECUTED with validated retention and training-exclusion clauses; another provider's terms never count.",
+  "vendors": [
+    {
+      "provider": "ANTHROPIC",
+      "vendor": "Anthropic",
+      "status": "UNEXECUTED",
+      "agreementReference": null,
+      "retention": { "validated": false, "clause": null },
+      "trainingExclusion": { "validated": false, "clause": null },
+      "validatedBy": null,
+      "validatedAt": null,
+      "blocker": "No commercial terms with Anthropic have been executed, so data retention and the exclusion of customer documents from training are not contractually established. Until they are, validated here with the governing clauses, the Anthropic provider may not be enabled."
+    },
+    {
+      "provider": "OPENAI",
+      "vendor": "OpenAI",
+      "status": "UNEXECUTED",
+      "agreementReference": null,
+      "retention": { "validated": false, "clause": null },
+      "trainingExclusion": { "validated": false, "clause": null },
+      "validatedBy": null,
+      "validatedAt": null,
+      "blocker": "No commercial terms with OpenAI have been executed, so data retention (including any retention of API inputs and outputs for abuse monitoring) and the exclusion of customer documents from training are not contractually established. Until they are, validated here with the governing clauses, the OpenAI provider may not be enabled."
+    }
+  ]
+}

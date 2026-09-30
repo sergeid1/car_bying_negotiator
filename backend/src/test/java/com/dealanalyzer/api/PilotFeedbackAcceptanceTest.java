@@ -59,6 +59,31 @@ class PilotFeedbackAcceptanceTest {
     }
   }
 
+  @Test void totalIdentificationUsesFrozenReportAndStoresOnlyFirstCorrectDuration() throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).start("report-total", false, ServiceOperationsAcceptanceTest.SETTINGS)) {
+      var created = post(app.client(), "/api/v1/cases", buyingCase());
+      String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+      String base = "/api/v1/cases/" + id;
+      post(app.client(), base + "/analyses", Map.of(), "analysis", token);
+      var before = get(app.client(), base + "/reports/1", token);
+      String measure = base + "/feedback/report-total";
+      assertThatThrownBy(() -> post(app.client(), measure, Map.of("reportVersion", 1), "open", "wrong"))
+          .isInstanceOf(HttpClientErrorException.NotFound.class);
+      var session = post(app.client(), measure, Map.of("reportVersion", 1), "open", token);
+      String answer = measure + "/" + session.path("id").asText();
+      assertThat(post(app.client(), answer, Map.of("answerMinor", 0, "unknown", false, "durationMillis", 1000), "wrong", token).path("correct").asBoolean()).isFalse();
+      assertThat(post(app.client(), answer, Map.of("unknown", true, "durationMillis", 2500), "correct", token).path("correct").asBoolean()).isTrue();
+      post(app.client(), answer, Map.of("unknown", true, "durationMillis", 5000), "retry", token);
+      var manager = app.context().getBean(jakarta.persistence.EntityManager.class);
+      assertThat(((Number) manager.createNativeQuery("select duration_millis from pilot_events where id = :id")
+          .setParameter("id", session.path("id").asText()).getSingleResult()).longValue()).isEqualTo(2500);
+      assertThat(get(app.client(), base + "/reports/1", token)).isEqualTo(before);
+      post(app.client(), base + "/deletion", Map.of(), "delete", token);
+      app.context().getBean(com.dealanalyzer.buyingcase.persistence.CaseDeletionWorker.class).runOnce();
+      assertThat(((Number) manager.createNativeQuery("select count(*) from pilot_events where case_id = :id").setParameter("id", id).getSingleResult()).longValue()).isZero();
+    }
+  }
+
   static Map<String, Object> protocol() {
     return Map.of("completionMinimum", 0.70, "usefulnessMinimum", 0.80, "veryDisappointedMinimum", 0.40,
         "numericErrorMaximum", 0.01, "criticalPrivacyMaximum", 0,

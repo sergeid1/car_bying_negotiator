@@ -46,6 +46,12 @@ implementation or operator-run component, so no display, caching, attribution, d
 retention, deletion, training, regional-processing, coverage, or cost right has been contractually
 established.
 
+The Anthropic and OpenAI model clients added by the
+[AI execution harness](ai-execution-harness.md) are disabled. Each vendor's retention and
+no-training terms are unexecuted, recorded as such per provider in
+`backend/src/main/resources/ai/model-vendor-terms.json`, and the model rollout gate refuses to
+start with either provider enabled until that provider's terms are validated there.
+
 ### 3. Document corpus — BLOCKED
 
 No permissioned Dealer documents have been acquired. The extraction and review corpora under
