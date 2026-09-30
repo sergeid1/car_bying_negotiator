@@ -1,7 +1,7 @@
 package com.dealanalyzer.ai;
 
-import static com.dealanalyzer.ai.StubAnthropicServer.error;
-import static com.dealanalyzer.ai.StubAnthropicServer.message;
+import static com.dealanalyzer.ai.StubModelServer.error;
+import static com.dealanalyzer.ai.StubModelServer.message;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -23,7 +23,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 
 @ExtendWith(OutputCaptureExtension.class)
 class ModelHarnessTest {
-  private static final ModelSettings ENABLED = new ModelSettings(true, "claude-opus-5", "pilot-parameters.v1", "corpus.v1");
+  private static final ModelSettings ENABLED = new ModelSettings(true, ModelProvider.ANTHROPIC, "claude-opus-5", "pilot-parameters.v1", "corpus.v1");
   private static final String SECRET = "BUYER-SSN-123-45-6789 VIN 1HGCV1F30LA000001";
   private static final List<UntrustedInput> INPUT = List.of(new UntrustedInput.Text("page 1 recognized text", SECRET));
 
@@ -49,7 +49,7 @@ class ModelHarnessTest {
         .run("case-1", TestTasks.total(), INPUT, 3);
 
     assertThat(result.value()).isEqualTo(new TestTasks.Total(3_150_000L, "USD"));
-    assertThat(result.provenance()).isEqualTo(new ModelProvenance(
+    assertThat(result.provenance()).isEqualTo(new ModelProvenance(ModelProvider.ANTHROPIC,
         "claude-opus-5", "total-prompt.v1", "total-schema.v1", "pilot-parameters.v1", "corpus.v1"));
     var row = store.last();
     assertThat(row.status()).isEqualTo(Status.SUCCESS);
@@ -122,7 +122,7 @@ class ModelHarnessTest {
 
   @Test void disabledModelPathsAreUnavailableWithoutContactingAnyone() {
     var calls = new AtomicInteger();
-    var disabled = new ModelHarness(meter, new ModelSettings(false, "claude-opus-5", "pilot-parameters.v1", "none"),
+    var disabled = new ModelHarness(meter, new ModelSettings(false, ModelProvider.ANTHROPIC, "claude-opus-5", "pilot-parameters.v1", "none"),
         request -> { calls.incrementAndGet(); return completed("{}"); }, "none", new ObjectMapper());
     assertThat(disabled.available()).isFalse();
     assertThatThrownBy(() -> disabled.run("case-1", TestTasks.total(), INPUT, 1))
@@ -133,7 +133,7 @@ class ModelHarnessTest {
   }
 
   @Test void noDocumentContentOrVendorTextReachesLogsThroughTheRealClient(CapturedOutput output) throws Exception {
-    try (var stub = new StubAnthropicServer()) {
+    try (var stub = new StubModelServer()) {
       stub.reply(200, message("claude-opus-5", "end_turn", "{\"total_minor\":1,\"currency\":\"USD\",\"leak\":\"" + SECRET + "\"}", 5, 5));
       stub.reply(400, "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"" + SECRET + "\"}}");
       stub.reply(200, message("claude-opus-5", "end_turn", "{\"total_minor\":1,\"currency\":\"USD\"}", 5, 5));
@@ -150,7 +150,7 @@ class ModelHarnessTest {
   }
 
   @Test void refusalThroughTheRealClientFailsClosed() throws Exception {
-    try (var stub = new StubAnthropicServer()) {
+    try (var stub = new StubModelServer()) {
       stub.reply(200, message("claude-opus-5", "refusal", null, 40, 2));
       stub.reply(429, error("rate_limit_error"));
       var harness = harness(stub.gateway(Duration.ofSeconds(2)));

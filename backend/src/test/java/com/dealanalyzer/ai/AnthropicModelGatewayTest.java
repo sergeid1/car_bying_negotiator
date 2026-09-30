@@ -1,7 +1,7 @@
 package com.dealanalyzer.ai;
 
-import static com.dealanalyzer.ai.StubAnthropicServer.error;
-import static com.dealanalyzer.ai.StubAnthropicServer.message;
+import static com.dealanalyzer.ai.StubModelServer.error;
+import static com.dealanalyzer.ai.StubModelServer.message;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.dealanalyzer.ai.ModelGateway.ModelRequest;
@@ -19,7 +19,7 @@ class AnthropicModelGatewayTest {
   }
 
   @Test void sendsTheConfiguredModelFixedInstructionsAndStructuredOutputSchema() throws Exception {
-    try (var stub = new StubAnthropicServer()) {
+    try (var stub = new StubModelServer()) {
       stub.reply(200, message("claude-opus-5", "end_turn", "{\"total_minor\":3150000,\"currency\":\"USD\"}", 1200, 40));
       var exchange = stub.gateway(TIMEOUT).send(request(
           new UntrustedInput.Text("page 1 recognized text", "Total: $31,500.00"),
@@ -47,7 +47,7 @@ class AnthropicModelGatewayTest {
   }
 
   @Test void refusalAndTruncationAreReportedWithTheirTokenSpend() throws Exception {
-    try (var stub = new StubAnthropicServer()) {
+    try (var stub = new StubModelServer()) {
       stub.reply(200, message("claude-opus-5", "refusal", null, 900, 5));
       stub.reply(200, message("claude-opus-5", "max_tokens", "{\"total_minor\":31", 900, 1024));
       stub.reply(200, message("claude-opus-5", "tool_use", null, 900, 10));
@@ -67,7 +67,7 @@ class AnthropicModelGatewayTest {
   }
 
   @Test void vendorErrorsBecomeOutcomesWithoutRetrying() throws Exception {
-    try (var stub = new StubAnthropicServer()) {
+    try (var stub = new StubModelServer()) {
       stub.reply(429, error("rate_limit_error"));
       stub.reply(529, error("overloaded_error"));
       stub.reply(500, error("api_error"));
@@ -86,7 +86,7 @@ class AnthropicModelGatewayTest {
   }
 
   @Test void aSlowVendorTimesOut() throws Exception {
-    try (var stub = new StubAnthropicServer()) {
+    try (var stub = new StubModelServer()) {
       stub.reply(200, message("claude-opus-5", "end_turn", "{}", 1, 1), 3_000);
       var exchange = stub.gateway(Duration.ofMillis(300))
           .send(request(new UntrustedInput.Text("page 1 recognized text", "x")));

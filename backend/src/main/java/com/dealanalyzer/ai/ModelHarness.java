@@ -36,8 +36,16 @@ public class ModelHarness {
   ModelHarness(ProviderMeter meter, ModelRolloutGate gate, ObjectMapper json) {
     // The gate has already refused startup if enabled with an unmet obligation.
     this(meter, gate.settings(),
-        gate.settings().enabled() ? AnthropicModelGateway.fromEnvironment(meter.timeout()) : null,
+        gate.settings().enabled() ? gateway(gate.settings().provider(), meter.timeout()) : null,
         gate.license(), json);
+  }
+
+  /** One gateway for the configured provider; there is deliberately no second one to fall back to. */
+  static ModelGateway gateway(ModelProvider provider, java.time.Duration timeout) {
+    return switch (provider) {
+      case ANTHROPIC -> AnthropicModelGateway.fromEnvironment(timeout);
+      case OPENAI -> OpenAiModelGateway.fromEnvironment(timeout);
+    };
   }
 
   /** @param gateway null when model paths are disabled */
@@ -67,7 +75,7 @@ public class ModelHarness {
 
   private <T> Attempt<T> attempt(ModelTask<T> task, ModelExchange exchange) {
     var usage = new ProviderMeter.ModelUsage(exchange.inputTokens(), exchange.outputTokens(),
-        ModelPricing.costUsd(settings.modelId(), exchange.inputTokens(), exchange.outputTokens()).orElse(null));
+        ModelPricing.costUsd(settings.provider(), settings.modelId(), exchange.inputTokens(), exchange.outputTokens()).orElse(null));
     Status status = switch (exchange.outcome()) {
       case COMPLETED -> Status.SUCCESS;
       case RATE_LIMITED, TIMED_OUT, UNAVAILABLE -> Status.PROVIDER_UNAVAILABLE;

@@ -53,7 +53,7 @@ public class ProviderUsageStore {
     requireActiveCase(caseId);
     var row = new ProviderUsageEntity();
     row.id = UUID.randomUUID().toString(); row.caseId = caseId; row.operation = operation.name();
-    row.provider = "ANTHROPIC"; row.providerVersion = "anthropic-messages-api";
+    row.provider = provenance.provider().name(); row.providerVersion = provenance.provider().api();
     row.modelVersion = provenance.modelId(); row.schemaVersion = provenance.schemaVersion();
     row.promptVersion = provenance.promptVersion();
     row.thresholdSetVersion = provenance.thresholdSetVersion();

@@ -32,19 +32,21 @@ class ModelReleaseCheckTest {
 
   @Test void theShippedRecordsAreWellFormed() {
     var shipped = ModelObligations.shipped(JSON);
-    assertThat(shipped.vendorTerms().vendor()).isEqualTo("Anthropic");
+    assertThat(shipped.vendorTerms()).extracting(ModelObligations.VendorTerms::provider)
+        .as("every provider has a terms record").containsExactlyInAnyOrder(ModelProvider.values());
     shipped.comparisons().forEach(comparison ->
         assertThat(comparison.executedBy()).isEqualTo(ModelObligations.EVALUATION_HARNESS));
   }
 
   @Test void theShippedConfigurationDoesNotEnableAModelPathWithUnmetObligations() throws Exception {
     var settings = ModelSettings.from(shippedEnvironment());
+    assertThat(settings.provider()).isEqualTo(ModelProvider.ANTHROPIC);
     assertThat(settings.modelId()).isEqualTo("claude-opus-5");
     var shipped = ModelObligations.shipped(JSON);
     if (settings.enabled()) {
       assertThat(ModelRolloutGate.unmet(settings, shipped, List.of(), System::getenv)).isEmpty();
     }
-    if (!shipped.vendorTerms().validated()) {
+    if (!shipped.termsFor(settings.provider()).validated()) {
       assertThat(settings.enabled()).as("vendor terms are unexecuted, so model paths stay off").isFalse();
     }
   }
@@ -55,7 +57,7 @@ class ModelReleaseCheckTest {
       text = new String(source.readAllBytes(), StandardCharsets.UTF_8);
     }
     assertThat(text.lines().filter(line -> !line.startsWith("#")))
-        .noneMatch(line -> line.toLowerCase().matches(".*(anthropic|ai\\.model).*(key|token|secret).*"))
-        .noneMatch(line -> line.contains("sk-ant-"));
+        .noneMatch(line -> line.toLowerCase().matches(".*(anthropic|openai|ai\\.model).*(key|token|secret).*"))
+        .noneMatch(line -> line.contains("sk-ant-") || line.contains("sk-proj-"));
   }
 }
