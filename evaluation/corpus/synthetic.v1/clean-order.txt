@@ -1,0 +1,6 @@
+BUYER'S ORDER
+Order Number: A-42
+VIN: 1HGCM82633A004352
+Selling Price: $25,000.00
+Dealer Fee: $899.00
+Out the Door Total: $26,800.00

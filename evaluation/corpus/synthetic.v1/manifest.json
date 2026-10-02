@@ -1,0 +1,35 @@
+{
+  "version": "synthetic-extraction.v1",
+  "kind": "synthetic",
+  "description": "Development checks derived from supported-layout-corpus.json and scoring-corpus.json. PHONE_PHOTO is a simulated condition label on text, not a photograph. Never accuracy evidence.",
+  "documents": [
+    {
+      "documentId": "clean-order",
+      "conditionTags": ["FEE_TABLE"],
+      "pages": ["clean-order.txt"],
+      "expected": {"VEHICLE_VIN": "1HGCM82633A004352", "SELLING_PRICE": 2500000, "DEALER_CHARGES_TOTAL": 89900, "OUT_THE_DOOR_TOTAL": 2680000},
+      "expectedPages": {"VEHICLE_VIN": 1, "SELLING_PRICE": 1, "DEALER_CHARGES_TOTAL": 1, "OUT_THE_DOOR_TOTAL": 1}
+    },
+    {
+      "documentId": "financed-quote",
+      "conditionTags": ["MULTI_PAGE", "FEE_TABLE"],
+      "pages": ["financed-quote-1.txt", "financed-quote-2.txt"],
+      "expected": {"SELLING_PRICE": 2500000, "OUT_THE_DOOR_TOTAL": 2680000, "APR": 7.5, "TERM_MONTHS": "60"},
+      "expectedPages": {"SELLING_PRICE": 1, "OUT_THE_DOOR_TOTAL": 2, "APR": 2, "TERM_MONTHS": 2}
+    },
+    {
+      "documentId": "missing-fee",
+      "conditionTags": ["PHONE_PHOTO", "MISSING_FIELDS"],
+      "pages": ["missing-fee.txt"],
+      "expected": {"VEHICLE_VIN": "1HGCM82633A004352", "SELLING_PRICE": 2500000, "OUT_THE_DOOR_TOTAL": 2847500},
+      "expectedPages": {"VEHICLE_VIN": 1, "SELLING_PRICE": 1, "OUT_THE_DOOR_TOTAL": 1}
+    },
+    {
+      "documentId": "revised-offer",
+      "conditionTags": ["REVISED_OFFER", "FEE_TABLE"],
+      "pages": ["revised-offer.txt"],
+      "expected": {"SELLING_PRICE": 2500000, "DEALER_CHARGES_TOTAL": 79900, "OUT_THE_DOOR_TOTAL": 2847500},
+      "expectedPages": {"SELLING_PRICE": 1, "DEALER_CHARGES_TOTAL": 1, "OUT_THE_DOOR_TOTAL": 1}
+    }
+  ]
+}
