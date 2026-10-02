@@ -33,6 +33,19 @@ providers, and each one adds contractual and privacy obligations this table cann
 | Human review | Internal queue behind separate consent | Redacted fields | None |
 | Model calls | `AnthropicModelGateway` or `OpenAiModelGateway` through the [AI execution harness](ai-execution-harness.md), one per deployment (`ai.model.provider`); disabled (`ai.model.enabled=false`) | Not while disabled; would send normalized page images and recognized text | Anthropic or OpenAI, once enabled — **terms unexecuted for both** |
 
+## Market and listing readiness
+
+No licensed listing or market source is integrated. These two deterministic adapters are
+development fixtures. `EvidenceProviderProductionGuard` rejects either selected adapter at startup
+and names it in the error when `evidence.deployment=production` (`EVIDENCE_DEPLOYMENT=production`)
+or a `production`, `prod`, or `pilot` profile is active. A development property cannot override a
+production profile. Future adapters must pass the reusable `EvidenceAdapterConformance` suite.
+Market snapshots older than 45 days, invalid metadata, and schema drift become explicit unavailable
+assessments without replacement prices; report generation also checks the age of stored snapshots.
+Calls use `ProviderMeter` with request counts, status, start and finish timestamps (latency), and
+zero fixture cost. Actual licensed-provider pricing, terms and measured coverage remain ticket 27.
+Listing observations currently mean the listing as seen at retrieval, not a vendor's last-update date.
+
 ## Bundled reference data
 
 Postal-code to jurisdiction resolution uses the U.S. Census Bureau 2020 ZCTA-to-county

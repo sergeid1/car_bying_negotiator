@@ -46,6 +46,11 @@ public class StoredReportRenderer {
       lines.add(new Line(amount.path("label").asText()+": "+value+" ("+amount.path("precision").asText()+")",false));
       lines.add(new Line("Evidence: "+amount.path("source").asText()+" "+amount.path("pointer").asText(),false));
     }
+    lines.add(new Line("Market evidence",true));
+    if (analysis.path("marketEvidence").path("paragraphs").isArray()) {
+      for (var paragraph : analysis.path("marketEvidence").path("paragraphs"))
+        lines.add(new Line(paragraph.asText(), false));
+    } else lines.add(new Line("Market evidence details are unavailable in this saved report.", false));
     lines.add(new Line("Limitations",true));
     for(var limitation:analysis.path("limitations")) lines.add(new Line(limitation.asText(),false));
     lines.add(new Line("Complete saved payload and evidence",true));

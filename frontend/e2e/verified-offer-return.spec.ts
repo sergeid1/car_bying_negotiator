@@ -1,6 +1,10 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, Page, test } from "@playwright/test";
 const report = { version: 1, asOf: "2026-09-30", status: "COMPLETE", analysis: {
+  marketEvidence: { status: "AVAILABLE", paragraphs: ["Market data retrieved: 2026-09-30T12:00:00Z.",
+    "Observation window: 2026-09-01T12:00:00Z to 2026-09-28T12:00:00Z.",
+    "Uncertainty: medium confidence from 4 usable comparables. This is an estimated selling-price range.",
+    "The usable sample is sparse; the range includes a $500 uncertainty buffer."] },
   reviewLabel: "Review required", dealRating: "FAIR", ratingBasis: "Recorded evidence", nextAction: "Review the fees",
   topReasons: ["The verified offer requires review against your approved price limits.", "Market selling-price evidence is available; it is an estimate.", "The quoted total needs reconciliation with recorded charges."], marketAvailability: "AVAILABLE", cashAvailability: "AVAILABLE", materialAmounts: [{ label: "/result/outTheDoorTotal", minorUnits: 2850000, currency: "USD", precision: "ESTIMATED", source: "cashEconomics", pointer: "/result/outTheDoorTotal" }], policyVersions: {}, limitations: ["Market evidence is estimated."],
 }, evidence: {}, reproduction: {} };
@@ -38,6 +42,10 @@ test("saved link opens frozen offer analysis and report in a second browser sess
   const second = await session.newPage(); await api(second);
   await second.goto(link!);
   await expect(second.getByRole("heading", { name: "Deal Analysis Report", exact: true })).toBeVisible();
+  const market = second.getByRole("region", { name: "Market evidence", exact: true });
+  await expect(market).toContainText("Market data retrieved:");
+  await expect(market).toContainText("Observation window:");
+  await expect(market).toContainText("Uncertainty: medium confidence");
   expect(await second.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect((await new AxeBuilder({ page: second }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze()).violations).toEqual([]);
   await session.close();

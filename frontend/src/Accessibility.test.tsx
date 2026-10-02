@@ -8,7 +8,7 @@ import { PricePlan } from "./PricePlan";
 import { CaseDownloads, RecoveryEmailOptIn, SaveCaseLink } from "./CasePortability";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
-import { CoreDealReport } from "./CoreDealReport";
+import { CoreDealReport, MarketEvidenceSection } from "./CoreDealReport";
 import { ReportTotalMeasure } from "./ReportTotalMeasure";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { DealerReplyAssistant } from "./NegotiationDraft";
@@ -19,6 +19,16 @@ const AA = {
   // Layout/contrast require the real-browser walkthrough; jsdom has no rendering engine.
   rules: { "color-contrast": { enabled: false } },
 };
+
+test("market freshness, uncertainty and unavailable evidence have no automated AA violations", async () => {
+  const { container } = render(<main><h1>Saved report</h1><h2>Evidence</h2><MarketEvidenceSection evidence={{ status: "AVAILABLE", paragraphs: [
+    "Market data retrieved: 2026-10-02T12:00:00Z.",
+    "Observation window: 2026-09-20T12:00:00Z to 2026-09-30T12:00:00Z.",
+    "Uncertainty: low confidence from 3 usable comparables. This is an estimated selling-price range.",
+    "Too few compatible, current comparables (2) to support a market conclusion. No market rating is drawn.",
+  ] }} /></main>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
 
 test("core entry, document intake, recovery, price approval, downloads and deletion have no automated AA violations", async () => {
   const { container } = render(<><App /><main aria-label="Saved case controls">

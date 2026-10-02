@@ -5,7 +5,7 @@ import java.time.Instant;
 public interface ListingEvidenceProvider {
   ListingRetrieval retrieve(String listingUrl);
 
-  enum RetrievalStatus { SUPPORTED, UNSUPPORTED }
+  enum RetrievalStatus { SUPPORTED, UNSUPPORTED, UNAVAILABLE }
 
   record ListingRetrieval(
       RetrievalStatus status, NormalizedListing listing, String message) {
@@ -15,6 +15,10 @@ public interface ListingEvidenceProvider {
 
     public static ListingRetrieval unsupported(String message) {
       return new ListingRetrieval(RetrievalStatus.UNSUPPORTED, null, message);
+    }
+
+    public static ListingRetrieval unavailable(String message) {
+      return new ListingRetrieval(RetrievalStatus.UNAVAILABLE, null, message);
     }
   }
 

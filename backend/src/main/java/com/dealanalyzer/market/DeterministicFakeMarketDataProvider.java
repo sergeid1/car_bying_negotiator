@@ -7,7 +7,7 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 @Component
-final class DeterministicFakeMarketDataProvider implements MarketDataProvider {
+final class DeterministicFakeMarketDataProvider implements MarketDataProvider, DevelopmentEvidenceAdapter {
   private static final FakeProviderResponse FIXTURE =
       new FakeProviderResponse(24_500_00L, 27_000_00L, "high", "2026-08-01T00:00:00Z");
 
@@ -30,7 +30,10 @@ final class DeterministicFakeMarketDataProvider implements MarketDataProvider {
         "market-provider.v1",
         "synthetic fixture; display and cache permitted",
         "fixture://market/accord-raleigh-v1",
-        Instant.parse("2026-08-27T12:00:00Z"));
+        Instant.now());
+    if (vehicle == null || !"Honda".equalsIgnoreCase(vehicle.make())
+        || !"Accord".equalsIgnoreCase(vehicle.model()))
+      return ProviderResult.unavailable("No development fixture covers this vehicle.", snapshot);
     return ProviderResult.available(snapshot, List.of(
         observation("market-001", 2021, "Honda", "Accord", "EX-L", 38_000L,
             2_500_000L, "2026-08-25T12:00:00Z"),
@@ -64,7 +67,8 @@ final class DeterministicFakeMarketDataProvider implements MarketDataProvider {
         priceMinor,
         "USD",
         "Raleigh-Durham, NC",
-        Instant.parse(observedAt));
+        Instant.now().minus(java.time.Duration.between(
+            Instant.parse(observedAt), Instant.parse("2026-08-27T12:00:00Z"))));
   }
 
   private record FakeProviderResponse(

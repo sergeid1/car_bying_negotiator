@@ -50,20 +50,17 @@ public class MarketAssessmentService {
     try {
       result = meter.call(caseId, com.dealanalyzer.operations.ProviderMeter.Operation.MARKET_RETRIEVAL,
           provider, 1, () -> provider.retrieve(query), value -> {
-            if (value.snapshot() == null || !"market-provider.v1".equals(value.snapshot().schemaVersion()))
+            if (MarketProviderContract.failure(value, now) != null)
               return com.dealanalyzer.operations.ProviderMeter.Status.CONTRACT_FAILURE;
             return value.availability() == Availability.AVAILABLE ? com.dealanalyzer.operations.ProviderMeter.Status.SUCCESS
                 : com.dealanalyzer.operations.ProviderMeter.Status.PROVIDER_UNAVAILABLE;
           });
-      if (result == null || result.snapshot() == null) {
-        result = unavailable("Provider response did not include snapshot metadata.", now);
-      } else if (!"market-provider.v1".equals(result.snapshot().schemaVersion())) {
-        result = new ProviderResult(
-            Availability.UNAVAILABLE,
-            "Provider schema drift; market analysis is unavailable.",
-            result.snapshot(),
-            java.util.List.of());
-      }
+      String failure = MarketProviderContract.failure(result, now);
+      if (failure != null) result = result != null && result.snapshot() != null
+          && result.snapshot().retrievedAt() != null && result.snapshot().source() != null
+          && result.snapshot().providerVersion() != null && result.snapshot().schemaVersion() != null
+          && result.snapshot().licenseMetadata() != null
+          ? ProviderResult.unavailable(failure, result.snapshot()) : unavailable(failure, now);
     } catch (RuntimeException failure) {
       result = unavailable("Market provider failed; market analysis is unavailable.", now);
     }
