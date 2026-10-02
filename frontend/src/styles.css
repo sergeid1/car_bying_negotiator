@@ -1174,3 +1174,6 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
 .arithmetic p { margin: 6px 0 0; color: var(--ink-muted); font-size: .9rem; }
 .expected-observed { display: grid; gap: 8px; }
 .expected-observed dd { margin: 0; display: grid; gap: 6px; overflow-wrap: anywhere; }
+
+/* Report explanation: report pointers and values wrap at narrow widths. */
+.report-explanation p, .report-explanation li { overflow-wrap: anywhere; }

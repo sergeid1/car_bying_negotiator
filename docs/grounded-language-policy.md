@@ -65,3 +65,36 @@ below the target lowers OTD at least one-for-one; above the target it is not all
 OTD boundary exists). An OTD limit without a recorded conversion, or no approved baseline,
 allows no counter. A model counter beyond the ceiling, not below the Dealer's figure, or with
 no approved limit rejects the whole model reply. The walk-away limits are never sent to the model.
+
+## Report explanations
+
+GET `/api/v1/cases/{caseId}/reports/{version}/explanation` with the Case-Access-Token returns
+the explanation of that finalized core report (`report-explanation.v1`). Nothing is stored and
+nothing is written, so the text cannot change an amount, rating, threshold, boundary, approval
+or state. The Deal Engine makes no model calls; `ExplanationBoundaryTest` fails if a calculation,
+review, rating, boundary or report-assembly class references the harness.
+
+Two producers share one code-enforced gate (`ExplanationCheck`), and the response names which
+one ran (`path`: `MODEL` or `TEMPLATE`, with a `fallbackReason` for the template, and the model
+`provenance` for model text):
+
+- Template: the `grounded-language.v1` explanation sentences, each citing its finding.
+- `EXPLANATION` model task (`report-explanation-prompt.v1` / `report-explanation-schema.v1`), run
+  only through `ModelHarness` and off until the rollout gate's obligations, including its own
+  shadow comparison, are met. Any unavailability, provider failure, malformed output or claim-check
+  failure falls back to the template.
+
+Input: `ExplanationFacts` reads only `/analysis` findings (review status, deal rating, cash, market
+and financing availability, payment and quoted-total reconciliation, financed add-on presence) and
+the material amounts' identifiers and precision. The model sees code-owned states and amount ids;
+it never sees a figure, a label, document text, provider prose or an extraction candidate.
+
+Gate: each sentence cites one to three findings. Amounts appear only as `{amount-N}` placeholders,
+rendered by the product from `/analysis/materialAmounts/N` (an estimate is marked "(estimated)",
+an unavailable amount reads "unknown"). A sentence is rejected for: a digit, currency sign or
+spelled-out amount; markup or links; a prohibited framing (an automated negotiator, safe to sign,
+legal, tax, mechanical, title or vehicle-history conclusions, savings or their causation,
+guarantees, advice); a state term (match, differs, above, within, exact, estimated, unavailable…)
+or subject (market, financing, payment, approval…) that no cited finding supports; calling an
+estimated amount exact; or citing a finding recorded as unavailable, unverifiable or stale without
+saying so. One rejected sentence blocks the whole model text; nothing is shown with a caveat.

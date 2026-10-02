@@ -418,6 +418,18 @@ class DocumentExtractionAcceptanceTest {
           .as("a reply changes no report").isEqualTo(report);
       assertThat(HttpAcceptanceHarness.get(application.client(), languagePath, token)).isEqualTo(language);
       assertThat(HttpAcceptanceHarness.get(application.client(), baselinePath + "/latest", token)).isEqualTo(baseline);
+
+      String explanationPath = "/api/v1/cases/" + caseId + "/reports/1/explanation";
+      JsonNode explanation = HttpAcceptanceHarness.get(application.client(), explanationPath, token);
+      assertThat(explanation.path("path").asText()).as("model paths are off in the shipped configuration").isEqualTo("TEMPLATE");
+      assertThat(explanation.path("fallbackReason").asText()).isEqualTo("MODEL_PATH_OFF");
+      assertThat(explanation.path("reportVersion").asInt()).isEqualTo(1);
+      assertThat(explanation.at("/statements/0/text").asText()).isEqualTo(language.at("/language/items/0/explanation").asText());
+      assertThat(explanation.at("/statements/0/sources/0/sourcePointer").asText()).isEqualTo("/analysis/reviewStatus");
+      assertThatThrownBy(() -> HttpAcceptanceHarness.get(application.client(), explanationPath, "wrong-token"))
+          .isInstanceOf(HttpClientErrorException.class);
+      assertThat(HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/1", token))
+          .as("an explanation changes no report").isEqualTo(report);
       assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), repliesPath,
           Map.of("dealerResponse", " "), "reply-blank", token))
           .isInstanceOf(HttpClientErrorException.BadRequest.class);

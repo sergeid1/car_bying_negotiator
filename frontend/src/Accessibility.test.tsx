@@ -12,6 +12,7 @@ import { CoreDealReport } from "./CoreDealReport";
 import { ReportTotalMeasure } from "./ReportTotalMeasure";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { DealerReplyAssistant } from "./NegotiationDraft";
+import { ReportExplanationLoader } from "./ReportExplanation";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const AA = {
@@ -137,5 +138,20 @@ test("Dealer reply drafting with a returned reply has no automated AA violations
   await user.type(screen.getByRole("textbox", { name: "Dealer's response" }), "Best we can do.");
   await user.click(screen.getByRole("button", { name: "Draft a reply" }));
   await screen.findByRole("textbox", { name: "Your reply" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+test("report explanation with generated text, amount links and sources has no automated AA violations", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+    policyVersion: "report-explanation.v1", path: "MODEL", fallbackReason: null, reportVersion: 1, scope: "Financial consistency only.",
+    provenance: { modelId: "claude-opus-5", promptVersion: "report-explanation-prompt.v1", schemaVersion: "report-explanation-schema.v1" },
+    statements: [{ text: "The out-the-door total is $28,500.00 (estimated).", segments: [
+      { text: "The out-the-door total is ", amountId: null, amountIndex: null, precision: null },
+      { text: "$28,500.00 (estimated)", amountId: "amount-0", amountIndex: 0, precision: "ESTIMATED" },
+      { text: ".", amountId: null, amountIndex: null, precision: null }],
+      sources: [{ id: "cash-availability", sourcePointer: "/analysis/cashAvailability", sourceValue: "AVAILABLE" }] }],
+  })));
+  const { container } = render(<main><h1>Buying Case</h1><h2>Report</h2><ReportExplanationLoader caseId="case" token="token" reportVersion={1} /></main>);
+  await screen.findByText("Generated explanation");
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
