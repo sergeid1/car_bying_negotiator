@@ -37,11 +37,14 @@ public class DocumentExtractionService {
     DocumentExtractionSource.ExtractionSourceDocument document = source.load(documentId);
     boolean pageWarning = document.pages().stream().anyMatch(page ->
         page.likelyMissing() || page.likelyDuplicate() || page.likelyCropped());
-    var providerResult = meter.call(document.caseId(), com.dealanalyzer.operations.ProviderMeter.Operation.EXTRACTION,
-        provider, document.pages().size(), () -> provider.extract(new ExtractionDocument(documentId, document.pages())), value -> {
-          validator.validate(value, document.pages().size(), pageWarning);
-          return com.dealanalyzer.operations.ProviderMeter.Status.SUCCESS;
-        });
+    var request = new ExtractionDocument(document.caseId(), documentId, document.pages());
+    // A failure under either provider propagates; there is no fallback to the other one.
+    var providerResult = provider.selfMetered() ? provider.extract(request)
+        : meter.call(document.caseId(), com.dealanalyzer.operations.ProviderMeter.Operation.EXTRACTION,
+            provider, document.pages().size(), () -> provider.extract(request), value -> {
+              validator.validate(value, document.pages().size(), pageWarning);
+              return com.dealanalyzer.operations.ProviderMeter.Status.SUCCESS;
+            });
     DealTermsValidator.ValidatedExtraction validated = validator.validate(providerResult, document.pages().size(), pageWarning);
     return persistence.append(
         document.caseId(), documentId,

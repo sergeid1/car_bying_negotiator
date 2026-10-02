@@ -2,6 +2,7 @@ package com.dealanalyzer.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.dealanalyzer.extraction.ExtractionProviderConfiguration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.io.InputStream;
@@ -49,6 +50,12 @@ class ModelReleaseCheckTest {
     if (!shipped.termsFor(settings.provider()).validated()) {
       assertThat(settings.enabled()).as("vendor terms are unexecuted, so model paths stay off").isFalse();
     }
+  }
+
+  @Test void theShippedConfigurationExtractsWithTheDeterministicProvider() throws Exception {
+    assertThat(ExtractionProviderConfiguration.choice(shippedEnvironment()))
+        .as("the Claude extraction provider has no shadow comparison, so it is not selected")
+        .isEqualTo(ExtractionProviderConfiguration.Choice.DETERMINISTIC);
   }
 
   @Test void noCredentialCanBeConfiguredThroughApplicationProperties() throws Exception {

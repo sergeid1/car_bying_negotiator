@@ -1,0 +1,84 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expectedPageCount", "candidates", "lineItems", "documentWarnings"],
+  "properties": {
+    "expectedPageCount": { "type": ["integer", "null"] },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "originalWording", "normalizedValue", "normalizedUnit", "evidence", "confidence", "material"],
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "DOCUMENT_TYPE", "DOCUMENT_NUMBER",
+              "VEHICLE_VIN", "VEHICLE_YEAR", "VEHICLE_MAKE", "VEHICLE_MODEL", "VEHICLE_TRIM",
+              "BUYER_NAME", "DEALER_NAME", "OFFER_DATE", "EXPIRATION_DATE",
+              "SELLING_PRICE", "DISCOUNT_TOTAL", "REBATE_TOTAL", "SUBTOTAL", "TAX_TOTAL",
+              "DEALER_CHARGES_TOTAL", "GOVERNMENT_CHARGES_TOTAL", "ADD_ON_TOTAL",
+              "TRADE_ALLOWANCE", "TRADE_PAYOFF", "CASH_DOWN", "OUT_THE_DOOR_TOTAL",
+              "AMOUNT_FINANCED", "APR", "TERM_MONTHS", "MONTHLY_PAYMENT",
+              "FINANCE_CHARGE", "TOTAL_OF_PAYMENTS", "CONDITIONAL_LANGUAGE"
+            ]
+          },
+          "originalWording": { "type": "string" },
+          "normalizedValue": { "type": ["string", "null"] },
+          "normalizedUnit": {
+            "type": "string",
+            "enum": ["USD_MINOR", "PERCENT", "DATE", "MONTH", "VIN", "YEAR", "TEXT"]
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pageNumber", "x", "y", "width", "height"],
+            "properties": {
+              "pageNumber": { "type": "integer" },
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "width": { "type": "number" },
+              "height": { "type": "number" }
+            }
+          },
+          "confidence": { "type": "number" },
+          "material": { "type": "boolean" }
+        }
+      }
+    },
+    "lineItems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["originalLabel", "category", "amountMinor", "currency", "taxClaim", "optionalityClaim", "evidence", "confidence"],
+        "properties": {
+          "originalLabel": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": ["SELLING_PRICE", "DISCOUNT", "REBATE", "DEALER_FEE", "ADD_ON", "TAX", "GOVERNMENT_CHARGE", "TRADE", "CREDIT", "UNKNOWN"]
+          },
+          "amountMinor": { "type": "integer" },
+          "currency": { "type": "string", "enum": ["USD"] },
+          "taxClaim": { "type": "string", "enum": ["TAXABLE", "NONTAXABLE", "UNKNOWN"] },
+          "optionalityClaim": { "type": "string", "enum": ["REQUIRED", "OPTIONAL", "CONDITIONAL", "UNKNOWN"] },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pageNumber", "x", "y", "width", "height"],
+            "properties": {
+              "pageNumber": { "type": "integer" },
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "width": { "type": "number" },
+              "height": { "type": "number" }
+            }
+          },
+          "confidence": { "type": "number" }
+        }
+      }
+    },
+    "documentWarnings": { "type": "array", "items": { "type": "string" } }
+  }
+}

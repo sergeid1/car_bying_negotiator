@@ -75,7 +75,50 @@ version
 (`ai.model.evaluation-set`, default `none`). The same tuple is written on the call's
 `provider_usage` row (migration V24), so every model output is recorded with its versions even
 before a feature persists the value. A feature that stores a model value must store the
-`ModelResult` provenance next to it; ticket 36 does this for extraction.
+`ModelResult` provenance next to it. Model-backed extraction records it as described under
+[Deal-terms extraction](#deal-terms-extraction-ticket-40).
+
+## Deal-terms extraction (ticket 40)
+
+`ClaudeDealTermsExtractionProvider` is the model-backed `DealTermsExtractionProvider`. It is built but
+not in use: `extraction.provider` selects `deterministic` (the default, and the provider every test
+context uses) or `claude`, and the shipped configuration keeps the deterministic one.
+
+- **Task.** One `ModelTask` on the `EXTRACTION` operation. Its instructions and schema are the
+  resource files `ai/extraction/deal-terms-prompt.v1.md` and `ai/extraction/deal-terms.v1.schema.json`,
+  loaded once from the classpath, as the
+  [extraction evaluation contract](extraction-evaluation-contract.md) requires. The schema is closed at
+  every level and enumerates the validator's fields, line categories, units, tax and optionality
+  claims. A changed prompt or schema is a new file and a new version, never an edit in place. As for
+  every task, the gateway appends the fixed untrusted-data policy (`UntrustedFraming.POLICY`) to the
+  instructions in the system channel.
+- **Input.** Only the normalized page images, each as a `PngImage` labelled `page <n> image`. The
+  recognized page text is not sent.
+- **Output.** The schema check and parser reject anything off-schema; nothing is repaired. Each
+  candidate and line item must carry an evidence region. The `DealTermsValidator` shape check then
+  runs inside the metered attempt, so evidence citing a page the document does not have or a region
+  outside the page fails the call as a `CONTRACT_FAILURE` and is metered as one. A value whose digits
+  (or VIN characters, or date parts) do not appear in the wording the model quoted for it is kept at
+  confidence 0 and marked material, so it always requires review; a value the model reports as
+  illegible (`null`) becomes a `MISSING` candidate.
+- **Authority.** The model proposes candidates only. The schema has no field for a verification
+  state, approval, limit or status, and the validator assigns every state, so model output can
+  never produce a Verified Term.
+- **Versions.** Each extraction records `extractorVersion` `claude:deal-terms-prompt.v1`,
+  `modelVersion` the configured model (the harness rejects output served by any other) and
+  `schemaVersion` `deal-terms.v1`. The deterministic provider records
+  `deterministic-dealer-layout.v1` and `none`. The `provider_usage` row carries the full provenance.
+- **Metering.** The provider meters itself through `ModelHarness`, once per document with pages as
+  units; `DocumentExtractionService` does not wrap it in a second meter call.
+- **Failure.** Any harness failure propagates from `DocumentExtractionService.extract`. There is no
+  fallback to the deterministic provider.
+- **Startup.** With `extraction.provider=claude`, the application refuses to start until every
+  obligation for the extraction task holds, whether or not `ai.model.enabled` is set. The refusal
+  lists `MODEL_PATHS_DISABLED` while model paths are off, `MODEL_PROVIDER_NOT_SELECTED:ANTHROPIC`
+  while another provider is configured, and the gate's codes, including
+  `NO_SHADOW_COMPARISON:ANTHROPIC:EXTRACTION:deal-terms-prompt.v1:deal-terms.v1`.
+
+Ticket 36 keeps the measured held-out accuracy, corpus regression tests and enabling the provider.
 
 ## Metering and cost
 
@@ -128,7 +171,8 @@ configured provider; another provider's terms, credentials or comparisons never 
   record in `classpath:ai/shadow-comparisons.json` for the exact provider, model, prompt, schema,
   threshold-set and evaluation-set versions.
 
-Tasks are registered as Spring beans of type `ModelTask`; none are registered yet. Changing the
+Tasks are registered as Spring beans of type `ModelTask`: the reply-draft and explanation tasks
+always, and the deal-terms extraction task only while `extraction.provider=claude`. Changing the
 provider, the model, a prompt, a schema, the threshold set or the evaluation set therefore requires
 a new comparison before the application will start with model paths on. `ModelReleaseCheckTest`
 states the same rules over the shipped configuration and records in CI.

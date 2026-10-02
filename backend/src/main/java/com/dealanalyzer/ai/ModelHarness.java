@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -63,17 +64,28 @@ public class ModelHarness {
   }
 
   public <T> ModelResult<T> run(String caseId, ModelTask<T> task, List<UntrustedInput> inputs, long units) {
+    return run(caseId, task, inputs, units, value -> {});
+  }
+
+  /**
+   * @param accept a check of the parsed value against this request, such as evidence that must cite
+   *     a page the document has. Throwing rejects the output as a {@code CONTRACT_FAILURE}, metered as
+   *     one, exactly like output the schema or parser rejects; it never repairs the value.
+   */
+  public <T> ModelResult<T> run(String caseId, ModelTask<T> task, List<UntrustedInput> inputs, long units,
+      Consumer<? super T> accept) {
+    Objects.requireNonNull(accept);
     if (gateway == null) throw new ProviderMeter.Failure(Status.PROVIDER_UNAVAILABLE);
     ModelProvenance provenance = ModelRolloutGate.provenance(settings, task);
     ModelRequest request = new ModelRequest(
         settings.modelId(), task.instructions(), task.outputSchema(), task.maxOutputTokens(), inputs);
     Attempt<T> attempt = meter.callModel(caseId, task.operation(), provenance, license, units,
-        () -> attempt(task, gateway.send(request)), Attempt::status, Attempt::usage);
+        () -> attempt(task, accept, gateway.send(request)), Attempt::status, Attempt::usage);
     if (attempt.status() != Status.SUCCESS) throw new ProviderMeter.Failure(attempt.status());
     return new ModelResult<>(attempt.value(), provenance);
   }
 
-  private <T> Attempt<T> attempt(ModelTask<T> task, ModelExchange exchange) {
+  private <T> Attempt<T> attempt(ModelTask<T> task, Consumer<? super T> accept, ModelExchange exchange) {
     var usage = new ProviderMeter.ModelUsage(exchange.inputTokens(), exchange.outputTokens(),
         ModelPricing.costUsd(settings.provider(), settings.modelId(), exchange.inputTokens(), exchange.outputTokens()).orElse(null));
     Status status = switch (exchange.outcome()) {
@@ -89,7 +101,9 @@ public class ModelHarness {
       if (output == null || !output.isObject()) return new Attempt<>(null, Status.CONTRACT_FAILURE, usage);
       OutputSchemaValidator.validate(task.outputSchema(), output);
       T value = task.parse().apply(output);
-      return value == null ? new Attempt<>(null, Status.CONTRACT_FAILURE, usage) : new Attempt<>(value, Status.SUCCESS, usage);
+      if (value == null) return new Attempt<>(null, Status.CONTRACT_FAILURE, usage);
+      accept.accept(value);
+      return new Attempt<>(value, Status.SUCCESS, usage);
     } catch (Exception rejected) {
       // The reason is deliberately dropped: it may quote the output.
       return new Attempt<>(null, Status.CONTRACT_FAILURE, usage);
