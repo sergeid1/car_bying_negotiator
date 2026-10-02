@@ -8,6 +8,23 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.Test;
 
 class StoredReportRendererTest {
+  @Test void bothExportsDisplayFrozenMarketFreshnessAndUncertainty() throws Exception {
+    var payload = new ObjectMapper().readTree("""
+        {"analysis":{"marketEvidence":{"status":"UNAVAILABLE","paragraphs":[
+          "Market data retrieved: August 1, 2026.",
+          "Observation window: July 20 to July 30, 2026.",
+          "Market evidence is unavailable: the stored snapshot is stale. No market rating is drawn."]}}}
+        """);
+    var renderer = new StoredReportRenderer();
+    String html = new String(renderer.html(payload), StandardCharsets.UTF_8);
+    try (var document = Loader.loadPDF(renderer.pdf(payload))) {
+      String pdf = new PDFTextStripper().getText(document);
+      for (String text : new String[] {html, pdf})
+        assertThat(text).contains("Market evidence", "Market data retrieved: August 1, 2026.",
+            "Observation window: July 20 to July 30, 2026.", "snapshot is stale", "No market rating is drawn")
+            .doesNotContain("T12:00:00Z");
+    }
+  }
   @Test void bothExportsLeadWithTheSameStoredTotalFindingsAndAction() throws Exception {
     var payload = new ObjectMapper().readTree("""
         {"version":2,"analysis":{"materialAmounts":[

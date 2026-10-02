@@ -4,7 +4,8 @@ import java.time.Instant;
 import org.springframework.stereotype.Component;
 
 @Component
-class DeterministicListingEvidenceProvider implements ListingEvidenceProvider {
+class DeterministicListingEvidenceProvider implements ListingEvidenceProvider,
+    com.dealanalyzer.market.DevelopmentEvidenceAdapter {
   private static final String SUPPORTED_URL =
       "https://licensed.example/vehicles/1HGCM82633A004352";
   private static final String MISMATCH_URL =

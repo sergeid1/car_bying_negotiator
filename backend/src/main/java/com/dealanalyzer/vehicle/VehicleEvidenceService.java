@@ -54,11 +54,19 @@ public class VehicleEvidenceService {
     ListingRetrievalView retrieval = null;
     List<IdentityConflictView> conflicts = List.of();
     if (request.listingUrl() != null && !request.listingUrl().isBlank()) {
-      var providerResult = meter.call(caseId, com.dealanalyzer.operations.ProviderMeter.Operation.LISTING_RETRIEVAL,
+      ListingEvidenceProvider.ListingRetrieval providerResult;
+      try {
+        providerResult = meter.call(caseId, com.dealanalyzer.operations.ProviderMeter.Operation.LISTING_RETRIEVAL,
           listingProvider, 1, () -> listingProvider.retrieve(request.listingUrl()), value ->
-              value.status() == ListingEvidenceProvider.RetrievalStatus.UNSUPPORTED ? com.dealanalyzer.operations.ProviderMeter.Status.BUYER_INPUT
-              : value.listing() == null ? com.dealanalyzer.operations.ProviderMeter.Status.CONTRACT_FAILURE
+              !com.dealanalyzer.listing.ListingProviderContract.valid(value, now) ? com.dealanalyzer.operations.ProviderMeter.Status.CONTRACT_FAILURE
+              : value.status() == ListingEvidenceProvider.RetrievalStatus.UNSUPPORTED ? com.dealanalyzer.operations.ProviderMeter.Status.BUYER_INPUT
+              : value.status() == ListingEvidenceProvider.RetrievalStatus.UNAVAILABLE ? com.dealanalyzer.operations.ProviderMeter.Status.PROVIDER_UNAVAILABLE
               : com.dealanalyzer.operations.ProviderMeter.Status.SUCCESS);
+        if (!com.dealanalyzer.listing.ListingProviderContract.valid(providerResult, now))
+          providerResult = ListingEvidenceProvider.ListingRetrieval.unavailable("Listing provider returned invalid evidence; no listing values were used.");
+      } catch (com.dealanalyzer.operations.ProviderMeter.Failure failure) {
+        providerResult = ListingEvidenceProvider.ListingRetrieval.unavailable("Listing provider is unavailable; no listing values were used.");
+      }
       if (providerResult.status() == ListingEvidenceProvider.RetrievalStatus.SUPPORTED) {
         snapshot = listingPersistence.appendSnapshot(caseId, providerResult.listing());
         retrieval = new ListingRetrievalView("SNAPSHOT_CREATED", null, null);
@@ -71,7 +79,8 @@ public class VehicleEvidenceService {
       } else {
         String fallback = request.vin() == null || request.vin().isBlank() ? "MANUAL_FACTS" : "VIN";
         retrieval = new ListingRetrievalView(
-            "UNSUPPORTED_FALLBACK", fallback, providerResult.message());
+            providerResult.status() == ListingEvidenceProvider.RetrievalStatus.UNSUPPORTED
+                ? "UNSUPPORTED_FALLBACK" : "UNAVAILABLE_FALLBACK", fallback, providerResult.message());
       }
     }
     boolean reliable = conflicts.stream()

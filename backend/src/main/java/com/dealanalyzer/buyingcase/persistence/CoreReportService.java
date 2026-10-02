@@ -93,6 +93,7 @@ public class CoreReportService {
     financeCurrent = financeCurrent && dealerCurrent;
     if (finance != null && !financeCurrent) financeAvailability = "STALE_OR_UNVERIFIED";
     boolean available = assessment != null && "AVAILABLE".equals(assessment.status())
+        && com.dealanalyzer.market.MarketReportEvidence.current(assessment, startedAt)
         && assessment.range() != null && vehicle != null
         && !assessment.createdAt().isBefore(vehicle.vehicle().confirmedAt());
     var plan = baseline == null ? null : json.convertValue(baseline.payload().get("plan"), PriceBoundaryPolicy.Plan.class);
@@ -156,6 +157,8 @@ public class CoreReportService {
         ? "Confirm the dealer is still offering this exact version before proceeding."
         : "Resolve missing evidence, changed terms, or price-limit questions with the dealer before deciding.");
     analysis.put("marketAvailability", available ? "AVAILABLE" : "UNAVAILABLE");
+    analysis.set("marketEvidence", json.valueToTree(
+        com.dealanalyzer.market.MarketReportEvidence.describe(assessment, startedAt, available)));
     analysis.put("cashAvailability", cash == null ? "UNAVAILABLE" : current ? "AVAILABLE" : "STALE_OR_UNVERIFIED");
     List<MaterialAmount> amounts = new ArrayList<>();
     if (finance != null) {
