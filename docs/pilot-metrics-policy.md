@@ -284,3 +284,14 @@ Calls from all retained service cases count; pilot enrollment and freeze are not
 These figures describe **development adapters** until ticket 27 integrates a licensed provider.
 Fixture costs and sample coverage do not establish a licensed source's pricing or coverage. No budget
 or release threshold is invented here; the deployment owner must supply approved ceilings.
+# Purchase measurements (ticket 44)
+
+This section supersedes the earlier pre-purchase `costPerPaidCase` table entry.
+
+paidCases reports paid cases / all case starts; refunds reports recorded refunds / paid cases.
+Both include retained records plus anonymous deletion totals, count a case once, and keep
+refunded purchases in the paid denominator. Development no-charge completions are labelled
+as such in the offer and purchase contract; these counts do not establish real revenue.
+Channel costPerPaidCase uses cumulative recorded channel spendMinor / paidCases in supported
+jurisdictions, including anonymous deleted paid counts. It is unavailable without recorded
+spend or a positive paid denominator and includes both numerator and denominator.

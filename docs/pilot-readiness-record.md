@@ -157,3 +157,16 @@ approved entries above are engineering evidence rather than commercial or legal 
 Ticket 22 retains the pilot release gate; the production rollout checks it lists — Flyway ahead of
 application traffic, ORM query and latency monitoring, and migration rollback criteria — are
 release work, not implementation work.
+
+## Ticket 44 readiness update
+
+This update supersedes the earlier prerequisite count: **seven of ten prerequisites are unmet**,
+and the public pilot remains blocked.
+
+| # | Prerequisite | Status | Evidence or blocker |
+| --- | --- | --- | --- |
+| 10 | `payment-provider` | **BLOCKED** | DevelopmentNoChargeCheckout cannot serve production; ticket 32 owns a real provider and enablement |
+
+DevelopmentNoChargeCheckout completes development purchases without collecting payment.
+CheckoutProductionGuard refuses it under production, prod, or pilot profiles, even without
+an active offer. Ticket 32 owns a real approved payment provider and commercial enablement.
