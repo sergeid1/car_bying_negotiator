@@ -40,7 +40,12 @@ export default defineConfig({
     {
       // 360 px is the narrow-width floor the Buyer interface commits to.
       name: "narrow",
-      use: { ...devices["Desktop Chrome"], viewport: { width: 360, height: 780 } },
+      use: { ...devices["Desktop Chrome"], viewport: { width: 360, height: 780 }, colorScheme: "light" },
+    },
+    {
+      // Every layout and contrast check runs again in the dark theme.
+      name: "narrow-dark",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 360, height: 780 }, colorScheme: "dark" },
     },
   ],
   webServer: {

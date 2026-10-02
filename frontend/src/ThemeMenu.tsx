@@ -1,0 +1,66 @@
+import { KeyboardEvent, useEffect, useRef, useState } from "react";
+import { applyThemeChoice, readThemeChoice, THEME_CHOICES, type ThemeChoice } from "./theme";
+
+const LABELS: Record<ThemeChoice, string> = { system: "System", light: "Light", dark: "Dark" };
+
+function ThemeIcon({ choice }: { choice: ThemeChoice }) {
+  const common = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+    strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+  if (choice === "light") return <svg {...common}><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></svg>;
+  if (choice === "dark") return <svg {...common}><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></svg>;
+  return <svg {...common}><rect x="3" y="4.5" width="18" height="12" rx="2" /><path d="M8.5 20h7M12 16.5V20" /></svg>;
+}
+
+/** The header's appearance menu: follow the device, or pin light or dark. */
+export function ThemeMenu() {
+  const [choice, setChoice] = useState<ThemeChoice>(readThemeChoice);
+  const [open, setOpen] = useState(false);
+  const container = useRef<HTMLDivElement>(null);
+  const toggle = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    container.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
+    const closeOutside = (event: PointerEvent) => {
+      if (!container.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [open]);
+
+  function pick(next: ThemeChoice) {
+    setChoice(next);
+    applyThemeChoice(next);
+    setOpen(false);
+    toggle.current?.focus();
+  }
+
+  function navigate(event: KeyboardEvent<HTMLDivElement>) {
+    const items = Array.from(container.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? []);
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    const move = (index: number) => { event.preventDefault(); items[(index + items.length) % items.length]?.focus(); };
+    if (event.key === "ArrowDown") move(current + 1);
+    else if (event.key === "ArrowUp") move(current - 1);
+    else if (event.key === "Home") move(0);
+    else if (event.key === "End") move(items.length - 1);
+    else if (event.key === "Escape" || event.key === "Tab") {
+      if (event.key === "Escape") { event.preventDefault(); toggle.current?.focus(); }
+      setOpen(false);
+    }
+  }
+
+  return <div className="theme-menu" ref={container}>
+    <button type="button" ref={toggle} className="theme-toggle" aria-haspopup="menu" aria-expanded={open}
+      aria-label={`Appearance: ${LABELS[choice]}`} onClick={() => setOpen(value => !value)}>
+      <ThemeIcon choice={choice} />
+    </button>
+    {open && <div role="menu" aria-label="Appearance" className="theme-options" onKeyDown={navigate}>
+      {THEME_CHOICES.map(option => <button key={option} type="button" role="menuitemradio"
+        aria-checked={option === choice} tabIndex={option === choice ? 0 : -1} onClick={() => pick(option)}>
+        <span className={`theme-swatch theme-swatch-${option}`} aria-hidden="true" />
+        <span>{LABELS[option]}</span>
+        {option === choice && <svg className="theme-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
+      </button>)}
+    </div>}
+  </div>;
+}

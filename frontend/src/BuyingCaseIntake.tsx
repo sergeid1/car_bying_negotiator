@@ -359,26 +359,28 @@ export function BuyingCaseIntake({ onCaseOpened }: {
 
           <fieldset>
             <legend>Which vehicle?</legend>
-            <label>
-              <input
-                type="radio"
-                name="identifyBy"
-                value="vin"
-                checked={identifyBy === "vin"}
-                onChange={() => setIdentifyBy("vin")}
-              />
-              I have the VIN
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="identifyBy"
-                value="details"
-                checked={identifyBy === "details"}
-                onChange={() => setIdentifyBy("details")}
-              />
-              Enter the vehicle details
-            </label>
+            <div className="segmented">
+              <label>
+                <input
+                  type="radio"
+                  name="identifyBy"
+                  value="vin"
+                  checked={identifyBy === "vin"}
+                  onChange={() => setIdentifyBy("vin")}
+                />
+                I have the VIN
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="identifyBy"
+                  value="details"
+                  checked={identifyBy === "details"}
+                  onChange={() => setIdentifyBy("details")}
+                />
+                Enter the vehicle details
+              </label>
+            </div>
 
             {identifyBy === "vin" ? (
               <label>
@@ -421,7 +423,7 @@ export function BuyingCaseIntake({ onCaseOpened }: {
             <input name="maxOutTheDoorPrice" type="number" min="0" step="0.01" />
           </label>
 
-          <fieldset>
+          <fieldset className="switches">
             <legend>Permissions</legend>
             <p className="muted">
               Processing your entered details to produce your own report is required. The rest are

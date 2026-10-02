@@ -8,6 +8,8 @@ import { BuyingCaseIntake } from "./BuyingCaseIntake";
 import { ReferralDisclosure } from "./AcquisitionChannel";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
+import { ThemeMenu } from "./ThemeMenu";
+import { XrayIllustration } from "./XrayIllustration";
 
 type MoneyAmount = {
   minorUnits: number;
@@ -169,23 +171,27 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             <a href="#case-workflow">Your case</a>
             <a href="#scope">Scope</a>
           </nav>
+          <ThemeMenu />
         </div>
       </header>
 
       <main>
         <div className="hero">
-          <p className="eyebrow">Buyer-aligned deal analysis</p>
-          <h1>See the whole deal before you decide.</h1>
-          <p className="lede">
-            Enter the vehicle you are negotiating for and get a transparent Deal X-Ray. Every
-            dollar stays connected to its input or calculation.
-          </p>
-          <ul className="trust-strip">
-            <li>Every amount linked to its source</li>
-            <li>Deterministic, versioned math</li>
-            <li>No account required</li>
-            <li>Ephemeral by default</li>
-          </ul>
+          <div className="hero-copy">
+            <p className="eyebrow">Buyer-aligned deal analysis</p>
+            <h1>See the whole deal <span className="hero-quiet">before you decide.</span></h1>
+            <p className="lede">
+              Enter the vehicle you are negotiating for and get a transparent Deal X-Ray. Every
+              dollar stays connected to its input or calculation.
+            </p>
+            <ul className="trust-strip">
+              <li>Every amount linked to its source</li>
+              <li>Deterministic, versioned math</li>
+              <li>No account required</li>
+              <li>Ephemeral by default</li>
+            </ul>
+          </div>
+          {!caseCredentials && !report && <XrayIllustration />}
         </div>
 
         <div className="workspace">

@@ -8,6 +8,7 @@ import { ReportTotalMeasure } from "./ReportTotalMeasure";
 import { Arithmetic, DocumentSourceView, type Calculation, type DocumentSource } from "./EvidenceSource";
 import { useEffect, useRef, useState } from "react";
 import { ReportExplanationLoader } from "./ReportExplanation";
+import { AnimatedAmount } from "./AnimatedAmount";
 
 export type MaterialAmount = {
   label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string;
@@ -89,7 +90,8 @@ export function CoreDealReport({ report, caseId, token }: { report: CoreReport; 
     <section className="outcome report-leading" aria-label="Total, findings and next action">
       <h2 id="core-report-heading" tabIndex={-1} ref={heading}>Deal Analysis Report</h2>
       <h3>Out-the-door total</h3>
-      <p className="report-leading-total">{total ? <a href={`#amount-evidence-${totalIndex}`}>{money(total)}</a> : "Unknown"} <small>{total?.precision.toLowerCase() ?? "unavailable"}</small></p>
+      <p className="report-leading-total">{total ? <a href={`#amount-evidence-${totalIndex}`}>{total.minorUnits != null && total.precision !== "UNAVAILABLE"
+        ? <AnimatedAmount minorUnits={total.minorUnits} currency={total.currency} text={money(total)} /> : money(total)}</a> : "Unknown"} <small>{total?.precision.toLowerCase() ?? "unavailable"}</small></p>
       <h3>Three material findings</h3>
       <ol>{reasons.map((reason, index) => <li key={index}><a href={`#finding-${index}`}>{reason}</a></li>)}</ol>
       {reasons.length < 3 && <p>{3 - reasons.length} further findings: unknown in this saved report.</p>}
