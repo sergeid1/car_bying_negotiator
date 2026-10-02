@@ -13,6 +13,7 @@ import { ReportTotalMeasure } from "./ReportTotalMeasure";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { DealerReplyAssistant } from "./NegotiationDraft";
 import { ReportExplanationLoader } from "./ReportExplanation";
+import { ReferralDisclosure } from "./AcquisitionChannel";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const AA = {
@@ -33,6 +34,7 @@ test("market freshness, uncertainty and unavailable evidence have no automated A
 
 test("core entry, document intake, recovery, price approval, downloads and deletion have no automated AA violations", async () => {
   const { container } = render(<><App /><main aria-label="Saved case controls">
+    <ReferralDisclosure text="A consumer educator referred you here under a disclosed referral arrangement." />
     <DealerDocumentUpload caseId="case" token="token" />
     <OfferVerification caseId="case" token="token" />
     <PricePlan caseId="case" token="token" />

@@ -127,3 +127,10 @@ The explicit deletion order and documented standards review had no findings.
 Ticket 19 adds finding/outcome feedback, pilot events, and experiment assignments to the
 verified deletion graph. Only anonymous cohort totals remain, without Buyer, case,
 Dealer, price, or variant references; see [the pilot metrics policy](pilot-metrics-policy.md).
+
+Ticket 42 stores the case's first-party acquisition channel code in the `analysis_cases` row, so
+it is removed with the case row and needs no separate step. Before the graph is erased, the plan
+adds the case to `acquisition_channel_totals`, an anonymous per-channel counter of removed case
+starts, qualified cases and qualified uploads, keyed only by channel code (`''` for no channel).
+Like the cohort totals, it holds no case, Buyer, Dealer, document or time reference. Channel
+configuration and operator-entered spend are global operator records, not case records.
