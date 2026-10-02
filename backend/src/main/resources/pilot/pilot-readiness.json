@@ -95,6 +95,13 @@
         "backend/src/test/java/com/dealanalyzer/buyingcase/persistence/PersistenceHardeningTest.java"
       ],
       "notes": "The check applies every migration, runs Hibernate in validate mode against the migrated schema, asserts no configuration selects an auto-generating ddl-auto value, and writes the constraint and fetch inventory to backend/target/readiness/schema-evidence.json."
+    },
+    {
+      "id": "payment-provider",
+      "requirement": "A real approved one-time payment provider replaces the development adapter before commercial pilot use.",
+      "status": "BLOCKED",
+      "blocker": "DevelopmentNoChargeCheckout collects no payment and cannot start under production, prod, or pilot profiles. Ticket 32 owns the real payment provider and enabling purchases for the pilot.",
+      "evidence": ["docs/offer-and-purchase-policy.md", "backend/src/main/java/com/dealanalyzer/purchase/CheckoutProductionGuard.java"]
     }
   ]
 }

@@ -117,3 +117,9 @@ processing, coverage, and cost. Until a provider is selected and its terms are e
 
 Selecting hosting, object storage, queue, mail, and model providers also completes the
 `infrastructure-and-privacy-inventory` prerequisite by making subprocessors and regions statable.
+# Development checkout (ticket 44)
+
+DevelopmentNoChargeCheckout is local, collects no payment or payment credentials, has no
+external processor, and immediately records DEVELOPMENT_NO_CHARGE / PAID. It cannot start
+under production, prod, or pilot. Ticket 32 must select and approve a real payment provider
+before commercial enablement; payment-provider is a blocked readiness prerequisite.

@@ -1,0 +1,6 @@
+{
+  "buyerZip": "27601",
+  "dealerZip": "27604",
+  "vehicle": {"vin": "1HGCM82633A004352", "year": 2021, "make": "Honda", "model": "Accord", "trim": "EX-L", "mileage": 38000},
+  "dealerOffer": {"currency": "USD", "sellingPriceMinor": 2500000, "dealerFeesMinor": 79900, "addOnsMinor": 50000, "taxesMinor": 194600, "governmentChargesMinor": 23000}
+}

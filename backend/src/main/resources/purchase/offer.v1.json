@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "offer-config.v1",
+  "approval": null,
+  "offer": {
+    "offerId": "one-time-case.v1",
+    "kind": "ONE_TIME_PER_CASE",
+    "paymentPoint": "BEFORE_REPORT",
+    "free": ["CASE_START", "VEHICLE_EVIDENCE", "DOCUMENT_UPLOAD", "TERM_VERIFICATION", "CASE_RECOVERY", "DOCUMENT_EXPORT", "CASE_DELETION"],
+    "paid": ["DEAL_ANALYSIS_REPORT", "REPORT_EXPORT", "REPORT_EXPLANATION", "NEGOTIATION_DRAFTS", "REPLY_ASSISTANCE", "REVISED_OFFER_REVIEW"],
+    "refund": {"windowDays": 0, "terms": "FULL_REFUND_ON_REQUEST_WITHIN_WINDOW"},
+    "jurisdiction": null,
+    "excludedPurchaseTypes": ["NEW_VEHICLE", "LEASE", "PRIVATE_PARTY", "AUCTION", "MOTORCYCLE", "RV", "COMMERCIAL_VEHICLE"],
+    "scopeLimits": ["NO_DEALER_CONTACT", "NO_LEGAL_OR_TAX_CONCLUSIONS", "NO_VEHICLE_HISTORY", "NO_TRADE_IN_VALUATION", "NO_FINAL_CONTRACT_REVIEW"]
+  }
+}

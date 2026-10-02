@@ -23,6 +23,13 @@ public class PilotMetrics {
     result.put("scope", "Completion uses all enrolled cases, including anonymous completion counts retained on deletion. Feedback uses retained respondents; workflow totals cover retained service events and deletion receipts. No release decision is automatic.");
     long qualified = count("select enrolled_count from pilot_cohort_totals where id = 1");
     result.put("cohort", rows("select enrolled_count, removed_count from pilot_cohort_totals where id = 1", "enrolled", "deleted"));
+    long paidCases = count("select count(*) from case_purchases where status = 'PAID'")
+        + count("select removed_paid_count from purchase_totals where id = 1");
+    long refunds = count("select count(*) from case_purchases where refunded_at is not null")
+        + count("select removed_refund_count from purchase_totals where id = 1");
+    result.put("paidCases", rate(paidCases, count("select count(*) from analysis_cases")
+        + count("select removed_case_count from purchase_totals where id = 1")));
+    result.put("refunds", rate(refunds, paidCases));
     result.put("qualifiedCompletion", rate(count("select count(*)" + COHORT + " and" + COMPLETED) + count("select removed_completed_count from pilot_cohort_totals where id = 1"), qualified));
     result.put("understoodDecisionWithoutUnresolvedDiscrepancy", rate(count("select count(*)" + COHORT + " and" + COMPLETED
         + " and exists (select 1 from analysis_cases c where c.id = a.case_id and c.status = 'COMPLETE' and c.core_review_blocked = false)"
@@ -80,6 +87,11 @@ public class PilotMetrics {
     for (var row : rowsOf("select channel_key, removed_case_starts, removed_qualified_count, removed_qualified_uploads from acquisition_channel_totals"))
       removed.put((String) row[0], new long[] {number(row[1]), number(row[2]), number(row[3])});
     var spend = new HashMap<String, Object[]>();
+    var purchases = new HashMap<String, Long>();
+    for (var row : rowsOf("select coalesce(c.acquisition_channel, ''), count(*) from case_purchases p join analysis_cases c on c.id = p.case_id where p.status = 'PAID' and" + SUPPORTED + " group by coalesce(c.acquisition_channel, '')"))
+      purchases.put((String) row[0], number(row[1]));
+    for (var row : rowsOf("select channel_key, removed_paid_count from acquisition_channel_totals"))
+      purchases.merge((String) row[0], number(row[1]), Long::sum);
     for (var row : rowsOf("select channel_code, count(*), sum(amount_minor), min(period_start), max(period_end) from acquisition_channel_spend group by channel_code"))
       spend.put((String) row[0], row);
     long allUploads = 0;
@@ -108,8 +120,13 @@ public class PilotMetrics {
       cost.put("status", measurable ? "MEASURED" : "UNAVAILABLE");
       if (!measurable) cost.put("reason", paid == null ? "NO_SPEND_RECORDED" : "NO_QUALIFIED_UPLOADS");
       row.put("costPerQualifiedUpload", cost);
-      // No purchase record exists yet, so no paid case can be attributed to a channel.
-      row.put("costPerPaidCase", Map.of("status", "UNAVAILABLE", "reason", "NO_PURCHASE_RECORD"));
+      long paidCount = purchases.getOrDefault(key, 0L);
+      var paidCost = new LinkedHashMap<String, Object>();
+      paidCost.put("spendMinor", spent); paidCost.put("paidCases", paidCount);
+      paidCost.put("costMinor", paid != null && paidCount > 0 ? (double) spent / paidCount : null);
+      paidCost.put("status", paid != null && paidCount > 0 ? "MEASURED" : "UNAVAILABLE");
+      if (paid == null || paidCount == 0) paidCost.put("reason", paid == null ? "NO_SPEND_RECORDED" : "NO_PAID_CASES");
+      row.put("costPerPaidCase", paidCost);
       perChannel.add(row);
     }
     var result = new LinkedHashMap<String, Object>();

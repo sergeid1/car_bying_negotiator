@@ -32,6 +32,14 @@ public class CashDealAnalyzer {
     return analyze(input, marketDataProvider.assess(input.vehicle()));
   }
 
+  /** The public example uses the golden synthetic market input and never calls a provider. */
+  public DealAnalysis analyzeSyntheticSample(SyntheticAnalysisRequest input) {
+    return analyze(input, new com.dealanalyzer.market.MarketEvidence(2_450_000L, 2_700_000L,
+        com.dealanalyzer.market.MarketEvidence.Confidence.HIGH,
+        java.time.Instant.parse("2026-08-01T00:00:00Z"),
+        "Synthetic licensed-market fixture", "synthetic-market-fixture.v1"));
+  }
+
   public DealAnalysis analyze(String caseId, SyntheticAnalysisRequest input, com.dealanalyzer.operations.ProviderMeter meter) {
     var market = meter.call(caseId, com.dealanalyzer.operations.ProviderMeter.Operation.SYNTHETIC_MARKET,
         marketDataProvider, 1, () -> marketDataProvider.assess(input.vehicle()),

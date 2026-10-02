@@ -9,6 +9,8 @@ import org.springframework.stereotype.Repository;
 class CaseGraphDeletionPlan {
   private record Step(String table, String predicate) {}
   private static final List<Step> STEPS = List.of(
+      new Step("case_purchase_requests", "case_id = :caseId"),
+      new Step("case_purchases", "case_id = :caseId"),
       new Step("experiment_assignments", "case_id = :caseId"),
       new Step("outcome_feedback", "case_id = :caseId"),
       new Step("pilot_events", "case_id = :caseId"),
@@ -60,6 +62,20 @@ class CaseGraphDeletionPlan {
     manager.createNativeQuery("update dealer_offers set previous_offer_id = null where case_id = :caseId")
         .setParameter("caseId", caseId).executeUpdate();
     // Preserve only anonymous cohort counters before erasing every case-linked pilot record.
+    manager.createNativeQuery("""
+        update purchase_totals set
+          removed_case_count = removed_case_count + (select count(*) from analysis_cases where id = :caseId),
+          removed_paid_count = removed_paid_count + (select count(*) from case_purchases where case_id = :caseId and status = 'PAID'),
+          removed_refund_count = removed_refund_count + (select count(*) from case_purchases where case_id = :caseId and refunded_at is not null)
+        where id = 1
+        """).setParameter("caseId", caseId).executeUpdate();
+    manager.createNativeQuery("""
+        update acquisition_channel_totals set removed_paid_count = removed_paid_count +
+          (select count(*) from case_purchases p join analysis_cases c on c.id = p.case_id
+            where p.case_id = :caseId and p.status = 'PAID'
+              and exists (select 1 from jurisdiction_policies j where j.jurisdiction = c.buyer_jurisdiction))
+        where channel_key = (select coalesce(acquisition_channel, '') from analysis_cases where id = :caseId)
+        """).setParameter("caseId", caseId).executeUpdate();
     manager.createNativeQuery("""
         update pilot_cohort_totals set
           removed_count = removed_count + (select count(*) from experiment_assignments where case_id = :caseId),
