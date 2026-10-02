@@ -413,3 +413,17 @@ class HarnessTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_default_resources_build_the_service_request(self):
+        # The default paths resolve to the backend's code-owned files, so a batch run sends what the service sends.
+        from evaluation.batch import DEFAULT_FRAMING, DEFAULT_PROMPT, DEFAULT_SCHEMA
+        self.use_page_images()
+        requests = build_requests(self.manifest, self.split, "DEVELOPMENT", "offline-model")
+        params = requests[0]["params"]
+        framing = core.read(DEFAULT_FRAMING)
+        self.assertEqual(DEFAULT_PROMPT.read_text(encoding="utf-8") + framing["policy"],
+                         params["system"][0]["text"])
+        self.assertEqual(core.read(DEFAULT_SCHEMA), params["output_config"]["format"]["schema"])
+        self.assertEqual('<untrusted_data label="page 1 image">The next image.</untrusted_data>',
+                         params["messages"][0]["content"][0]["text"])
+        self.assertEqual(16000, params["max_tokens"])
