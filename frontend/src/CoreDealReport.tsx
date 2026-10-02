@@ -73,18 +73,21 @@ export function CoreReportLoader({ caseId, token }: { caseId: string; token: str
   </section>;
 }
 
-export function CoreDealReport({ report, caseId, token }: { report: CoreReport; caseId?: string; token?: string }) {
+/** `redacted` marks an example report, whose removed fields are null and must read as removed. */
+export function CoreDealReport({ report, caseId, token, redacted }: { report: CoreReport; caseId?: string; token?: string; redacted?: boolean }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, [report]);
   const { analysis } = report;
+  const removed = "Removed from this example";
+  const text = (value: string | null | undefined) => value ?? (redacted ? removed : "Unknown");
   const total = analysis.materialAmounts.find(amount => amount.label === "Out-the-door total" || amount.pointer === "/result/outTheDoorTotal");
   const reasons = analysis.topReasons.slice(0, 3);
   const [questions, setQuestions] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
-  useEffect(() => { setQuestions(report.analysis.topReasons.slice(0, 3).map(reason => `Could you explain this finding: ${reason}`).join("\n")); setCopyStatus(""); }, [report]);
-  const money = (amount: CoreReport["analysis"]["materialAmounts"][number] | undefined) => !amount || amount.minorUnits == null || amount.precision === "UNAVAILABLE" ? "Unknown" : new Intl.NumberFormat("en-US", { style: "currency", currency: amount.currency }).format(amount.minorUnits / 100);
+  useEffect(() => { setQuestions(report.analysis.topReasons.slice(0, 3).filter(reason => reason != null).map(reason => `Could you explain this finding: ${reason}`).join("\n")); setCopyStatus(""); }, [report]);
+  const money = (amount: CoreReport["analysis"]["materialAmounts"][number] | undefined) => redacted && amount && amount.minorUnits == null && amount.precision !== "UNAVAILABLE" ? removed : !amount || amount.minorUnits == null || amount.precision === "UNAVAILABLE" ? "Unknown" : new Intl.NumberFormat("en-US", { style: "currency", currency: amount.currency }).format(amount.minorUnits / 100);
   const totalIndex = total ? analysis.materialAmounts.indexOf(total) : -1;
-  const amountLabel = (label: string) => label.replace("/payload/plan/", "Approved ")
+  const amountLabel = (label: string | null) => label == null ? removed : label.replace("/payload/plan/", "Approved ")
     .replace("/result/", "").replaceAll("/", " · ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/Minor$/, "");
   return <article className="report" aria-labelledby="core-report-heading">
     <section className="outcome report-leading" aria-label="Total, findings and next action">
@@ -93,10 +96,10 @@ export function CoreDealReport({ report, caseId, token }: { report: CoreReport; 
       <p className="report-leading-total">{total ? <a href={`#amount-evidence-${totalIndex}`}>{total.minorUnits != null && total.precision !== "UNAVAILABLE"
         ? <AnimatedAmount minorUnits={total.minorUnits} currency={total.currency} text={money(total)} /> : money(total)}</a> : "Unknown"} <small>{total?.precision.toLowerCase() ?? "unavailable"}</small></p>
       <h3>Three material findings</h3>
-      <ol>{reasons.map((reason, index) => <li key={index}><a href={`#finding-${index}`}>{reason}</a></li>)}</ol>
+      <ol>{reasons.map((reason, index) => <li key={index}><a href={`#finding-${index}`}>{text(reason)}</a></li>)}</ol>
       {reasons.length < 3 && <p>{3 - reasons.length} further findings: unknown in this saved report.</p>}
       <h3>Next action</h3>
-      <p className="next-action">{analysis.nextAction}</p>
+      <p className="next-action">{text(analysis.nextAction)}</p>
     </section>
     {caseId && token && <ReportExplanationLoader key={`${caseId}-${token}-${report.version}`} caseId={caseId} token={token} reportVersion={report.version} />}
     <section className="panel" aria-labelledby="core-questions">
@@ -105,14 +108,14 @@ export function CoreDealReport({ report, caseId, token }: { report: CoreReport; 
       <label htmlFor="report-questions">Your questions<textarea id="report-questions" rows={4} value={questions} onChange={event => setQuestions(event.target.value)} /></label>
       <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(questions); setCopyStatus("Questions copied."); } catch { setCopyStatus("Copy unavailable. Select the questions and copy them manually."); } }}>Copy questions</button>
       {copyStatus && <p role="status">{copyStatus}</p>}
-      <ol>{reasons.map((reason, index) => <li id={`finding-${index}`} tabIndex={-1} key={index}>{reason} <a href="#core-evidence">Frozen evidence</a> · <code>/analysis/topReasons/{index}</code></li>)}</ol>
+      <ol>{reasons.map((reason, index) => <li id={`finding-${index}`} tabIndex={-1} key={index}>{text(reason)} <a href="#core-evidence">Frozen evidence</a> · <code>/analysis/topReasons/{index}</code></li>)}</ol>
     </section>
     {caseId && token && <ReportTotalMeasure key={`${caseId}-${token}-${report.version}`} report={report} caseId={caseId} token={token} />}
-    <section className="panel"><h3>Review and rating</h3><div className="status-row"><strong>{analysis.reviewLabel}</strong><span>{analysis.dealRating.replaceAll("_", " ")}</span></div><p>{analysis.ratingBasis}</p></section>
+    <section className="panel"><h3>Review and rating</h3><div className="status-row"><strong>{text(analysis.reviewLabel)}</strong><span>{text(analysis.dealRating).replaceAll("_", " ")}</span></div><p>{text(analysis.ratingBasis)}</p></section>
     <p>Version {report.version} · {report.status} · As of <time dateTime={report.asOf}>{report.asOf}</time></p>
     {report.status === "PARTIAL" && <p className="notice">Warning: this report is partial. One or more analysis areas are unavailable.</p>}
     <nav aria-label="Report sections">{analysis.dealReview && <><a href="#revised-offer-review">Revised offer comparison</a> · </>}<a href="#core-amounts">Amounts</a> · {analysis.financingAvailability && analysis.financingAvailability !== "NOT_APPLICABLE" && <><a href="#core-financing">Financing</a> · </>} <a href="#core-evidence">Evidence and calculations</a> · <a href="#core-scope">Scope and policies</a></nav>
-    {analysis.dealReview && <RevisedOfferReview review={analysis.dealReview} />}
+    {analysis.dealReview && <RevisedOfferReview review={analysis.dealReview} redacted={redacted} />}
     <section className="panel" id="core-amounts" tabIndex={-1}>
       <h3>Amounts and sources</h3>
       <p>Market analysis: {analysis.marketAvailability}. Cash economics: {analysis.cashAvailability}.</p>
@@ -130,16 +133,18 @@ export function CoreDealReport({ report, caseId, token }: { report: CoreReport; 
       <p>Each amount shows the dealer document page and region it was read from, or says that no document source exists, and each calculated amount shows its arithmetic.</p>
       {analysis.materialAmounts.map((amount, index) => <section key={index} id={`amount-evidence-${index}`} tabIndex={-1} className="amount-evidence">
         <h4>{amountLabel(amount.label)}: {money(amount)} <small>{amount.precision.toLowerCase()}</small></h4>
-        {amount.documentSource
+        {redacted && (amount.documentSource?.pageNumber == null || amount.documentSource.region == null)
+          ? <p>Document source: removed from this example. Example reports keep no document pages or regions.</p>
+          : amount.documentSource
           ? <DocumentSourceView source={amount.documentSource} caseId={caseId} token={token} what={amountLabel(amount.label)} />
           : <p>No document source: {amount.sourceNote ?? "this saved report does not record where this amount came from."}</p>}
         {amount.calculation && <Arithmetic calculation={amount.calculation} result={amount.precision === "UNAVAILABLE" ? null : amount.minorUnits} currency={amount.currency} label={amountLabel(amount.label)} />}
       </section>)}
-      <ReproductionDiagnostics report={report} />
+      {redacted ? <p>Diagnostic data and frozen inputs: removed from this example.</p> : <ReproductionDiagnostics report={report} />}
     </section>
     <section className="limitations" id="core-scope" tabIndex={-1}>
       <h3>Scope and policies</h3>
-      {analysis.limitations.map(text => <p key={text}>{text}</p>)}
+      {analysis.limitations.map((limitation, index) => <p key={index}>{text(limitation)}</p>)}
       <dl>{Object.entries(analysis.policyVersions).map(([name, version]) => <div key={name}><dt>{name}</dt><dd>{version}</dd></div>)}</dl>
     </section>
   </article>;

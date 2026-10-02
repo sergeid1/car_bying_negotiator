@@ -9,6 +9,8 @@ import { ReferralDisclosure } from "./AcquisitionChannel";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
 import { ThemeMenu } from "./ThemeMenu";
+import { OfferTerms } from "./OneTimeOffer";
+import { SampleReportEntry } from "./SampleReport";
 import { XrayIllustration } from "./XrayIllustration";
 
 type MoneyAmount = {
@@ -196,6 +198,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 
         <div className="workspace">
           <div className="column">
+            {!report && !caseCredentials && <SampleReportEntry />}
+            {!report && !caseCredentials && <OfferTerms />}
             {!report && !caseCredentials && (
               <BuyingCaseIntake
                 onCaseOpened={(value, disclosure) => {

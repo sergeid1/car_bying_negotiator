@@ -72,12 +72,16 @@ function documentSource(evidence: unknown, offerVersion: number | null): Documen
     region: { x: Number(region.x ?? 0), y: Number(region.y ?? 0), width: Number(region.width ?? 0), height: Number(region.height ?? 0) } };
 }
 
-function SourceLine({ evidence, side, offerVersion, baselineVersion, term }: {
+function SourceLine({ evidence, side, offerVersion, baselineVersion, term, absent, redacted }: {
   evidence: unknown; side: "expected" | "observed"; offerVersion: number | null; baselineVersion: number | null; term: string;
+  absent: boolean; redacted?: boolean;
 }) {
   const source = documentSource(evidence, offerVersion);
   if (source) return <DocumentSourceView source={source} what={`the ${side} ${term}`} />;
   const recorded = fields(evidence);
+  // An example report strips document pages and regions; that is a removal, not a missing line.
+  if (redacted && !absent && !(recorded && (typeof recorded.baselineId === "string" || typeof recorded.basis === "string")))
+    return <p>Source: removed from this example. Example reports keep no document pages or regions.</p>;
   if (recorded && typeof recorded.baselineId === "string")
     return <p>Source: your approved limit in Approved Baseline{baselineVersion != null ? ` version ${baselineVersion}` : ""}. No dealer document source exists for it.</p>;
   if (recorded && typeof recorded.basis === "string")
@@ -88,7 +92,7 @@ function SourceLine({ evidence, side, offerVersion, baselineVersion, term }: {
 
 const comparisonName = (comparison: string) => comparison === "BASELINE" ? "Approved Baseline" : comparison === "PREVIOUS" ? "previous offer" : comparison.toLowerCase();
 
-export function RevisedOfferReview({ review }: { review: DealReview }) {
+export function RevisedOfferReview({ review, redacted }: { review: DealReview; redacted?: boolean }) {
   const expectedVersion = (comparison: string) => comparison === "PREVIOUS" ? review.previousOfferVersion : null;
   return <section className="panel" id="revised-offer-review" tabIndex={-1} aria-labelledby="revised-review-heading">
     <h3 id="revised-review-heading">Revised Dealer Offer review</h3>
@@ -127,12 +131,12 @@ export function RevisedOfferReview({ review }: { review: DealReview }) {
           <div>
             <dt>Expected ({comparisonName(d.comparison)})</dt>
             <dd>{termValue(d.expected, d.unit)}{expectedClass && <small> · {expectedClass}</small>}
-              <SourceLine evidence={d.expectedEvidence} side="expected" offerVersion={expectedVersion(d.comparison)} baselineVersion={review.baselineVersion} term={name} /></dd>
+              <SourceLine evidence={d.expectedEvidence} side="expected" offerVersion={expectedVersion(d.comparison)} baselineVersion={review.baselineVersion} term={name} absent={d.kind === "ADDED"} redacted={redacted} /></dd>
           </div>
           <div>
             <dt>Observed (current offer {review.currentOfferVersion})</dt>
             <dd>{termValue(d.observed, d.unit)}{observedClass && <small> · {observedClass}</small>}
-              <SourceLine evidence={d.observedEvidence} side="observed" offerVersion={review.currentOfferVersion} baselineVersion={review.baselineVersion} term={name} /></dd>
+              <SourceLine evidence={d.observedEvidence} side="observed" offerVersion={review.currentOfferVersion} baselineVersion={review.baselineVersion} term={name} absent={d.kind === "MISSING"} redacted={redacted} /></dd>
           </div>
           <div>
             <dt>Difference (observed − expected)</dt>
