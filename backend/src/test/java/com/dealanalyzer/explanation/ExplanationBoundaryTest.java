@@ -96,17 +96,28 @@ class ExplanationBoundaryTest {
     assertThat(offenders).isEmpty();
   }
 
-  /** The explanation producers read the report and return; nothing in them can persist or mutate. */
-  @Test void theExplanationPathWritesNothing() throws IOException {
+  /**
+   * The explanation path reads the report and writes exactly one thing: the explanation row for that
+   * report version, stored once. Nothing in it can persist or mutate a report, case, approval or state.
+   */
+  @Test void theExplanationPathWritesOnlyItsOwnStoredExplanation() throws IOException {
     List<Path> files = new ArrayList<>();
     try (Stream<Path> sources = Files.walk(MAIN.resolve("explanation"))) { sources.forEach(files::add); }
-    files.add(MAIN.resolve("buyingcase/persistence/ReportExplanationService.java"));
     files.add(MAIN.resolve("api/ReportExplanationController.java"));
     for (Path file : files) {
       if (!file.toString().endsWith(".java")) continue;
       assertThat(Files.readString(file)).as(file.toString())
-          .doesNotContain("save(", "saveAndFlush(", "delete(", "Transactional", "PostMapping", "PutMapping",
-              "PatchMapping", "DeleteMapping", ".put(\"analysis", ".set(\"analysis");
+          .doesNotContain("save(", "saveAndFlush(", "delete(", "persist(", "merge(", "executeUpdate(", "Transactional",
+              "TransactionTemplate", "PostMapping", "PutMapping", "PatchMapping", "DeleteMapping",
+              ".put(\"analysis", ".set(\"analysis");
     }
+    String store = Files.readString(MAIN.resolve("buyingcase/persistence/ReportExplanationService.java"));
+    assertThat(store.split("saveAndFlush\\(", -1)).as("exactly one write").hasSize(2);
+    assertThat(store).contains("explanations.saveAndFlush(new ReportExplanationEntity(")
+        .doesNotContain("save(", "delete(", "persist(", "merge(", "executeUpdate(", "Transactional",
+            "reports.saveAndFlush", "cases.saveAndFlush");
+    assertThat(Files.readString(MAIN.resolve("buyingcase/persistence/ReportExplanationEntity.java")))
+        .contains("@org.hibernate.annotations.Immutable").doesNotContain("@OneToMany", "@ManyToOne", "cascade");
   }
+
 }

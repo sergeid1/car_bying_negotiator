@@ -69,10 +69,16 @@ no approved limit rejects the whole model reply. The walk-away limits are never 
 ## Report explanations
 
 GET `/api/v1/cases/{caseId}/reports/{version}/explanation` with the Case-Access-Token returns
-the explanation of that finalized core report (`report-explanation.v1`). Nothing is stored and
-nothing is written, so the text cannot change an amount, rating, threshold, boundary, approval
-or state. The Deal Engine makes no model calls; `ExplanationBoundaryTest` fails if a calculation,
-review, rating, boundary or report-assembly class references the harness.
+the explanation of that finalized core report (`report-explanation.v1`). The first read produces
+it outside any transaction, then stores it in `report_explanations` (migration V25, keyed by case
+and report version, with the path, fallback reason and model provenance as columns) in its own
+short transaction under the case lock. A concurrent first read that loses the race serves the
+stored row, so every later read, including after restart, returns the same text and the model is
+called at most once per report version. That row is the only write: the text cannot change an
+amount, rating, threshold, boundary, approval or state. Case deletion and expiry remove the rows
+with the rest of the case graph, and case exports include them. The Deal Engine makes no model
+calls; `ExplanationBoundaryTest` fails if a calculation, review, rating, boundary or
+report-assembly class references the harness.
 
 Two producers share one code-enforced gate (`ExplanationCheck`), and the response names which
 one ran (`path`: `MODEL` or `TEMPLATE`, with a `fallbackReason` for the template, and the model
@@ -89,12 +95,14 @@ and financing availability, payment and quoted-total reconciliation, financed ad
 the material amounts' identifiers and precision. The model sees code-owned states and amount ids;
 it never sees a figure, a label, document text, provider prose or an extraction candidate.
 
-Gate: each sentence cites one to three findings. Amounts appear only as `{amount-N}` placeholders,
-rendered by the product from `/analysis/materialAmounts/N` (an estimate is marked "(estimated)",
+Gate: each sentence cites exactly one finding (the schema bounds `finding_ids` to one item and the
+check rejects anything else), so every state term and subject is checked against that single
+finding. Amounts appear only as `{amount-N}` placeholders for amounts that belong to the finding's
+subjects, rendered by the product from `/analysis/materialAmounts/N` (an estimate is marked "(estimated)",
 an unavailable amount reads "unknown"). A sentence is rejected for: a digit, currency sign or
 spelled-out amount; markup or links; a prohibited framing (an automated negotiator, safe to sign,
 legal, tax, mechanical, title or vehicle-history conclusions, savings or their causation,
 guarantees, advice); a state term (match, differs, above, within, exact, estimated, unavailable…)
-or subject (market, financing, payment, approval…) that no cited finding supports; calling an
+or subject (market, financing, payment, approval…) that the cited finding does not support; calling an
 estimated amount exact; or citing a finding recorded as unavailable, unverifiable or stale without
 saying so. One rejected sentence blocks the whole model text; nothing is shown with a caveat.
