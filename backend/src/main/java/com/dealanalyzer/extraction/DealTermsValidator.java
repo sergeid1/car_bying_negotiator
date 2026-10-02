@@ -17,7 +17,7 @@ import java.util.Set;
 
 /** Applies deterministic validation after an untrusted provider returns constrained data. */
 public final class DealTermsValidator {
-  private static final Set<String> FIELDS = Set.of(
+  static final Set<String> FIELDS = Set.of(
       "DOCUMENT_TYPE", "DOCUMENT_NUMBER",
       "VEHICLE_VIN", "VEHICLE_YEAR", "VEHICLE_MAKE", "VEHICLE_MODEL", "VEHICLE_TRIM",
       "BUYER_NAME", "DEALER_NAME", "OFFER_DATE", "EXPIRATION_DATE",
@@ -38,7 +38,7 @@ public final class DealTermsValidator {
       "TRADE_ALLOWANCE", "TRADE_PAYOFF", "CASH_DOWN", "OUT_THE_DOOR_TOTAL",
       "AMOUNT_FINANCED", "APR", "TERM_MONTHS", "MONTHLY_PAYMENT",
       "FINANCE_CHARGE", "TOTAL_OF_PAYMENTS", "CONDITIONAL_LANGUAGE");
-  private static final Set<String> LINE_CATEGORIES = Set.of(
+  static final Set<String> LINE_CATEGORIES = Set.of(
       "SELLING_PRICE", "DISCOUNT", "REBATE", "DEALER_FEE", "ADD_ON", "TAX",
       "GOVERNMENT_CHARGE", "TRADE", "CREDIT", "UNKNOWN");
   private final double materialConfidenceThreshold;

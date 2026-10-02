@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component;
 public class ModelRolloutGate {
   private final ModelSettings settings;
   private final ModelObligations obligations;
+  private final UnaryOperator<String> environment;
 
   @Autowired
   ModelRolloutGate(Environment environment, ObjectMapper json, ObjectProvider<ModelTask<?>> tasks) {
@@ -32,6 +33,7 @@ public class ModelRolloutGate {
       UnaryOperator<String> environment) {
     this.settings = settings;
     this.obligations = obligations;
+    this.environment = environment;
     if (settings.enabled()) {
       List<String> unmet = unmet(settings, obligations, tasks, environment);
       if (!unmet.isEmpty()) {
@@ -44,6 +46,25 @@ public class ModelRolloutGate {
   public ModelSettings settings() { return settings; }
 
   public ModelObligations obligations() { return obligations; }
+
+  /**
+   * Refuses startup for a path that has no non-model alternative once selected, such as model-backed
+   * extraction: unlike a path with a template fallback, it may not quietly stay off. Lists every unmet
+   * obligation for {@code task} under {@code provider}, including its missing shadow comparison, even
+   * while model paths are disabled.
+   */
+  public void requireModelPath(ModelProvider provider, ModelTask<?> task) {
+    List<String> unmet = new ArrayList<>();
+    if (!settings.enabled()) unmet.add("MODEL_PATHS_DISABLED");
+    if (settings.provider() != provider) unmet.add("MODEL_PROVIDER_NOT_SELECTED:" + provider);
+    for (String reason : unmet(settings, obligations, List.of(task), environment)) {
+      if (!unmet.contains(reason)) unmet.add(reason);
+    }
+    if (!unmet.isEmpty()) {
+      throw new IllegalStateException(
+          "A model-backed path is selected while obligations are unmet: " + String.join(", ", unmet));
+    }
+  }
 
   /** Reason codes only; no credential, endpoint or record content is ever included. */
   public static List<String> unmet(ModelSettings settings, ModelObligations obligations,

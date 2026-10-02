@@ -23,7 +23,7 @@ providers, and each one adds contractual and privacy obligations this table cann
 | Vehicle identity | `Vin` checksum validation, Buyer-entered facts | In process | None |
 | Listing evidence | `DeterministicListingEvidenceProvider` | In process | None |
 | Market comparables | `DeterministicFakeMarketDataProvider` | In process | None |
-| Deal-terms extraction | `DeterministicDealerDocumentProvider` | In process | None — no model provider is called |
+| Deal-terms extraction | `DeterministicDealerDocumentProvider`, selected by `extraction.provider=deterministic` (the default). `ClaudeDealTermsExtractionProvider` exists behind `extraction.provider=claude`, which refuses startup until the rollout gate's obligations are met | In process | None — no model provider is called. Once selected and enabled, the Claude provider sends normalized page images only to Anthropic |
 | Document parsing | Confined local container or disposable JVM | In process | None |
 | Malware scanning | `ClamAvMalwareScanner` against an operator-run daemon | Document bytes | Operator-run; not a third party |
 | Object storage | `EncryptedFileDocumentStorage` on an operator-supplied path | Encrypted originals | Operator-run |
