@@ -13,7 +13,12 @@ public record CreateBuyingCaseRequest(
     String buyerJurisdiction,
     @NotNull PurchaseMethod purchaseMethod,
     @Valid BuyerLimits buyerLimits,
-    @NotNull @Valid InitialConsents consents) {
+    @NotNull @Valid InitialConsents consents,
+    /**
+     * Optional first-party acquisition channel code read once from the arrival link. It is never
+     * validated here: an unknown or malformed code is stored as no channel and never fails creation.
+     */
+    String channel) {
 
   public enum PurchaseMethod { CASH, FINANCE }
 

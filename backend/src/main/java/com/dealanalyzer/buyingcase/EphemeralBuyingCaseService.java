@@ -3,6 +3,7 @@ package com.dealanalyzer.buyingcase;
 import com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence;
 import com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence.StoredEphemeralCase;
 import com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence.StoredConsent;
+import com.dealanalyzer.pilot.AcquisitionChannels;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.UUID;
@@ -18,14 +19,17 @@ public class EphemeralBuyingCaseService {
   private final EphemeralCasePersistence persistence;
   private final CaseAccessService caseAccess;
   private final BuyingCaseLocation location;
+  private final AcquisitionChannels channels;
 
   EphemeralBuyingCaseService(
       EphemeralCasePersistence persistence,
       CaseAccessService caseAccess,
-      BuyingCaseLocation location) {
+      BuyingCaseLocation location,
+      AcquisitionChannels channels) {
     this.persistence = persistence;
     this.caseAccess = caseAccess;
     this.location = location;
+    this.channels = channels;
   }
 
   public CreatedBuyingCase create(
@@ -38,6 +42,8 @@ public class EphemeralBuyingCaseService {
     // Refuse an unusable location before issuing a credential or storing anything.
     var resolved = location.resolve(request);
 
+    // Only an allow-listed code is kept; anything else is no channel and never refuses the case.
+    String channel = channels.admit(request.channel()).orElse(null);
     String caseId = UUID.randomUUID().toString();
     Instant now = Instant.now();
     var credential = caseAccess.issue(now);
@@ -47,6 +53,7 @@ public class EphemeralBuyingCaseService {
           caseId,
           idempotencyKey,
           request,
+          channel,
           resolved.buyerJurisdiction(),
           resolved.dealerLocation(),
           credential.protectedHash(),
@@ -109,6 +116,7 @@ public class EphemeralBuyingCaseService {
         stored.status(),
         limits,
         stored.consents(),
+        channels.referralDisclosure(stored.id()).orElse(null),
         stored.accessExpiresAt(),
         stored.createdAt(),
         stored.updatedAt());
@@ -134,6 +142,8 @@ public class EphemeralBuyingCaseService {
       String status,
       BuyerLimitsView buyerLimits,
       java.util.List<StoredConsent> consents,
+      /** Configured disclosure when the case started from a referral partnership; otherwise null. */
+      String referralDisclosure,
       Instant accessExpiresAt,
       Instant createdAt,
       Instant updatedAt) {}

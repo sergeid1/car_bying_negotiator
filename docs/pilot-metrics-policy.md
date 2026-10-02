@@ -191,3 +191,69 @@ retained sessions, including partial reports and repeat opens. Opens without a c
 the denominator but not latency samples. These are optional, client-timed comprehension checks, not
 independently observed purchase outcomes. Session events follow existing case deletion/retention;
 submitted amounts and edited question text are never retained in pilot events.
+
+## First-party acquisition channels
+
+Ticket 42 attributes qualified uploads to first-party acquisition channels. It measures; it does
+not choose channels, partners, or offers, which remain with ticket 34. No channel, spend, or
+disclosure value is configured by this change: an operator supplies every one.
+
+**Configuration.** `PUT /api/v1/operator/pilot/channels/{code}` with
+`{"kind": "EXPLAINER_CONTENT" | "REFERRAL_PARTNERSHIP", "referralDisclosure": "…", "active": true}`
+adds or updates an allow-listed channel; `GET /api/v1/operator/pilot/channels` lists them. A code is
+1–32 characters of lower-case letters, digits and hyphens, starting with a letter or digit. A
+referral partnership requires its Buyer-facing disclosure (at most 600 characters); other kinds must
+not have one. A channel's kind cannot change once created (409); use a new code. Channels are
+deactivated, never deleted, so stored codes stay resolvable. Dealer-paid lead and dealer outreach
+kinds do not exist in the API enum or the schema check constraint (specification §2.2), so they
+cannot be configured. Because the standing footer states that no commercial party pays for
+referrals, a referral arrangement in which the partner pays this service must not be configured
+without first revising that disclosure.
+
+**Spend.** `POST /api/v1/operator/pilot/channels/{code}/spend` with
+`{"spendId": "<uuid>", "periodStart": "2026-10-01", "periodEnd": "2026-10-31", "amountMinor": 50000, "currency": "USD"}`
+records immutable spend for an inclusive stated period. An identical retry returns the same record;
+a changed retry returns 409; an unknown channel returns 404. Use one spend ID per non-overlapping
+period; do not submit cumulative overlapping totals.
+
+**Access.** All channel, spend, and metrics endpoints require the configured `SUPPORT` operator
+Bearer credential. Reviewers get 403; Buyer case credentials are not operator credentials and are
+refused by the operator filter.
+
+**Attribution.** The client reads a `channel` link parameter once when the case intake mounts,
+removes it from the address bar with `history.replaceState`, holds it only in memory, and sends it
+as `channel` with `POST /api/v1/cases`. The service stores the code on the case only when it is well
+formed and an active allow-listed channel; an unknown, inactive, malformed, or absent
+code is stored as no channel and never refuses or delays case creation. The code is the only
+acquisition datum kept: there are no cookies, browser-storage identifiers, fingerprinting,
+third-party scripts, referrer capture, or cross-site tracking. The case entity does not map the
+column; it is written natively at creation and read only by pilot measurement, export, and
+deletion, which `AcquisitionChannelIsolationTest` enforces. Analysis, reports, explanations,
+pricing variants, and price plans never read it; `AcquisitionChannelAcceptanceTest` also shows a
+referred case and an unattributed case produce identical analyses.
+
+**Referral disclosure.** When a case starts from a `REFERRAL_PARTNERSHIP` channel, the case view
+carries `referralDisclosure`, and the client shows it in a "How you reached us" panel above the
+paperwork upload step. Other cases carry `null`. The case view never returns the channel code.
+
+**Metrics.** `GET /api/v1/operator/pilot/channels/metrics` (`acquisition-channels.v1`, also
+embedded as `acquisitionChannels` in `GET /metrics`) has one row per configured channel plus a row
+with `channel: null` for no channel. Like `/metrics`, it returns 409 before the protocol is frozen.
+
+| Output | Definition / source |
+| --- | --- |
+| qualifiedUploads (primary) | Enrolled cases with `experiment_assignments.qualified = true`, whose case jurisdiction has a `jurisdiction_policies` row, and with at least one accepted source document; plus the anonymous count retained at deletion. |
+| qualifiedUploadRate | qualifiedUploads / qualified enrolled cases in a supported jurisdiction for that channel (retained plus removed). |
+| shareOfQualifiedUploads | qualifiedUploads / qualified uploads across every channel and no channel. |
+| caseStarts (secondary) | Cases in a supported jurisdiction started with that channel, retained plus removed. Context only; never a success measure. |
+| spend | Record count, total USD minor units, earliest period start and latest period end. |
+| costPerQualifiedUpload | Total recorded spend / qualifiedUploads, in USD minor units. `UNAVAILABLE` with `NO_SPEND_RECORDED` or `NO_QUALIFIED_UPLOADS` otherwise. Spend and uploads are both cumulative over all recorded periods, not matched period by period. |
+| costPerPaidCase | Always `UNAVAILABLE` with `NO_PURCHASE_RECORD`: no per-case purchase record exists. Aggregate `PAID_CONVERSION` observations cannot be attributed to a channel. |
+
+**Privacy limits and deletion.** The channel code is stored on the case row and removed with it.
+At deletion, `acquisition_channel_totals` adds the case to its channel's anonymous removed counts
+(case starts, qualified cases, qualified uploads) before the graph is erased. These counters hold
+only a channel code and three integers — no Buyer, case, Dealer, variant, price, document, or time
+reference — and cannot be joined back to a case. With very few cases per channel, even an
+aggregate count can be small; operators must not combine it with outside knowledge to identify a
+Buyer. The Buyer's case export includes the stored channel code.
