@@ -15,10 +15,13 @@ public class EphemeralCasePersistence {
   private final AnalysisCaseRepository cases;
   private final ConsentRecordRepository consents;
   private final com.dealanalyzer.operations.ReviewConsentLifecycle reviews;
+  private final jakarta.persistence.EntityManager entities;
 
   EphemeralCasePersistence(
-      AnalysisCaseRepository cases, ConsentRecordRepository consents, com.dealanalyzer.operations.ReviewConsentLifecycle reviews) {
+      AnalysisCaseRepository cases, ConsentRecordRepository consents, com.dealanalyzer.operations.ReviewConsentLifecycle reviews,
+      jakarta.persistence.EntityManager entities) {
     this.reviews = reviews;
+    this.entities = entities;
     this.cases = cases;
     this.consents = consents;
   }
@@ -55,6 +58,7 @@ public class EphemeralCasePersistence {
       String caseId,
       String idempotencyKey,
       CreateBuyingCaseRequest request,
+      String acquisitionChannel,
       String buyerJurisdiction,
       String dealerLocation,
       String accessTokenHash,
@@ -75,6 +79,11 @@ public class EphemeralCasePersistence {
         expiresAt,
         idempotencyKey,
         now));
+    if (acquisitionChannel != null) {
+      // Written outside the entity so no case read path can reach the channel.
+      entities.createNativeQuery("update analysis_cases set acquisition_channel = :channel where id = :id")
+          .setParameter("channel", acquisitionChannel).setParameter("id", saved.id).executeUpdate();
+    }
     saveInitialConsents(
         saved.id,
         request.consents(),

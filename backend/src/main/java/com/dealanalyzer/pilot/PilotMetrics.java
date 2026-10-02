@@ -63,9 +63,70 @@ public class PilotMetrics {
       measured.put(metric.name(), rate(((Number) row[0]).longValue(), ((Number) row[1]).longValue()));
     }
     result.put("verifiedMeasurements", measured);
+    result.put("acquisitionChannels", channels());
     result.put("verifiedOutcomeDelta", rows("select count(total_delta_minor), sum(total_delta_minor), sum(case when total_delta_minor is not null then denominator else 0 end) from pilot_observations where metric = 'VERIFIED_OUTCOME_IMPROVEMENT'", "batches", "totalDeltaMinorUsd", "verifiedCases"));
     return result;
   }
+  private static final String SUPPORTED = " exists (select 1 from jurisdiction_policies p where p.jurisdiction = c.buyer_jurisdiction)";
+
+  /** Qualified uploads per first-party channel and for no channel; the channel key "" is no channel. */
+  public Map<String, Object> channels() {
+    var keys = new ArrayList<String>(); keys.add("");
+    for (Object code : manager.createNativeQuery("select code from acquisition_channels order by code").getResultList()) keys.add((String) code);
+    var qualified = grouped("select coalesce(c.acquisition_channel, ''), count(*), sum(case when exists (select 1 from source_documents d where d.case_id = a.case_id) then 1 else 0 end)"
+        + " from experiment_assignments a join analysis_cases c on c.id = a.case_id where a.qualified = true and" + SUPPORTED + " group by coalesce(c.acquisition_channel, '')");
+    var starts = grouped("select coalesce(c.acquisition_channel, ''), count(*), 0 from analysis_cases c where" + SUPPORTED + " group by coalesce(c.acquisition_channel, '')");
+    var removed = new HashMap<String, long[]>();
+    for (var row : rowsOf("select channel_key, removed_case_starts, removed_qualified_count, removed_qualified_uploads from acquisition_channel_totals"))
+      removed.put((String) row[0], new long[] {number(row[1]), number(row[2]), number(row[3])});
+    var spend = new HashMap<String, Object[]>();
+    for (var row : rowsOf("select channel_code, count(*), sum(amount_minor), min(period_start), max(period_end) from acquisition_channel_spend group by channel_code"))
+      spend.put((String) row[0], row);
+    long allUploads = 0;
+    for (var key : keys) allUploads += qualified.getOrDefault(key, new long[2])[1] + removed.getOrDefault(key, new long[3])[2];
+    var perChannel = new ArrayList<Map<String, Object>>();
+    for (var key : keys) {
+      long[] retained = qualified.getOrDefault(key, new long[2]), deleted = removed.getOrDefault(key, new long[3]);
+      long cases = retained[0] + deleted[1], uploads = retained[1] + deleted[2];
+      var row = new LinkedHashMap<String, Object>();
+      row.put("channel", key.isEmpty() ? null : key);
+      row.put("qualifiedUploads", uploads);
+      row.put("qualifiedUploadRate", rate(uploads, cases));
+      row.put("shareOfQualifiedUploads", rate(uploads, allUploads));
+      row.put("caseStarts", starts.getOrDefault(key, new long[2])[0] + deleted[0]);
+      var paid = spend.get(key);
+      long spent = paid == null ? 0 : number(paid[2]);
+      var spendView = new LinkedHashMap<String, Object>();
+      spendView.put("records", paid == null ? 0 : number(paid[1])); spendView.put("totalMinor", spent); spendView.put("currency", "USD");
+      spendView.put("firstPeriodStart", paid == null ? null : String.valueOf(paid[3]));
+      spendView.put("lastPeriodEnd", paid == null ? null : String.valueOf(paid[4]));
+      row.put("spend", spendView);
+      var cost = new LinkedHashMap<String, Object>();
+      cost.put("spendMinor", spent); cost.put("qualifiedUploads", uploads);
+      boolean measurable = paid != null && uploads > 0;
+      cost.put("costMinor", measurable ? (double) spent / uploads : null);
+      cost.put("status", measurable ? "MEASURED" : "UNAVAILABLE");
+      if (!measurable) cost.put("reason", paid == null ? "NO_SPEND_RECORDED" : "NO_QUALIFIED_UPLOADS");
+      row.put("costPerQualifiedUpload", cost);
+      // No purchase record exists yet, so no paid case can be attributed to a channel.
+      row.put("costPerPaidCase", Map.of("status", "UNAVAILABLE", "reason", "NO_PURCHASE_RECORD"));
+      perChannel.add(row);
+    }
+    var result = new LinkedHashMap<String, Object>();
+    result.put("schemaVersion", "acquisition-channels.v1");
+    result.put("primaryMeasure", "qualifiedUploads");
+    result.put("scope", "Qualified uploads are enrolled qualified cases in a supported jurisdiction with at least one accepted upload, including anonymous counts retained on deletion. Case starts are secondary context. Spend is cumulative over all recorded periods.");
+    result.put("channels", perChannel);
+    return result;
+  }
+  private Map<String, long[]> grouped(String sql) {
+    var result = new HashMap<String, long[]>();
+    for (var row : rowsOf(sql)) result.put((String) row[0], new long[] {number(row[1]), number(row[2])});
+    return result;
+  }
+  @SuppressWarnings("unchecked") private List<Object[]> rowsOf(String sql) { return manager.createNativeQuery(sql).getResultList(); }
+  private static long number(Object value) { return value == null ? 0 : ((Number) value).longValue(); }
+
   public Map<String, Object> research() {
     // Current consent and active retention are checked on every query; no secondary materialized dataset exists.
     String eligible = " from outcome_feedback o join analysis_cases c on c.id = o.case_id where o.stage = 'FINAL' and c.lifecycle = 'ACTIVE' and c.access_expires_at > :now"
