@@ -20,6 +20,7 @@ class CaseGraphDeletionPlan {
       new Step("case_delivery_requests", "case_id = :caseId"),
       new Step("case_recovery_contacts", "case_id = :caseId"),
       new Step("case_export_jobs", "case_id = :caseId"),
+      new Step("report_explanations", "case_id = :caseId"),
       new Step("negotiation_versions", "case_id = :caseId"),
       new Step("deal_reviews", "case_id = :caseId"),
       new Step("financing_comparisons", "case_id = :caseId"),

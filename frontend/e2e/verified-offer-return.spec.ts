@@ -4,6 +4,15 @@ const report = { version: 1, asOf: "2026-09-30", status: "COMPLETE", analysis: {
   reviewLabel: "Review required", dealRating: "FAIR", ratingBasis: "Recorded evidence", nextAction: "Review the fees",
   topReasons: ["The verified offer requires review against your approved price limits.", "Market selling-price evidence is available; it is an estimate.", "The quoted total needs reconciliation with recorded charges."], marketAvailability: "AVAILABLE", cashAvailability: "AVAILABLE", materialAmounts: [{ label: "/result/outTheDoorTotal", minorUnits: 2850000, currency: "USD", precision: "ESTIMATED", source: "cashEconomics", pointer: "/result/outTheDoorTotal" }], policyVersions: {}, limitations: ["Market evidence is estimated."],
 }, evidence: {}, reproduction: {} };
+const explanation = { policyVersion: "report-explanation.v1", path: "MODEL", fallbackReason: null, reportVersion: 1,
+  scope: "These explanations concern financial consistency only. They do not establish legal compliance, mechanical condition, title, vehicle history or purchase safety.",
+  provenance: { modelId: "claude-opus-5", promptVersion: "report-explanation-prompt.v1", schemaVersion: "report-explanation-schema.v1" },
+  statements: [{ text: "The quoted out-the-door total of $28,500.00 (estimated) reconciles with the recorded calculation.", segments: [
+    { text: "The quoted out-the-door total of ", amountId: null, amountIndex: null, precision: null },
+    { text: "$28,500.00 (estimated)", amountId: "amount-0", amountIndex: 0, precision: "ESTIMATED" },
+    { text: " reconciles with the recorded calculation.", amountId: null, amountIndex: null, precision: null }],
+    sources: [{ id: "quoted-total-reconciliation", sourcePointer: "/evidence/cashEconomics/result/reconciliation/withinTolerance", sourceValue: "true" },
+      { id: "amount-0", sourcePointer: "/analysis/materialAmounts/0", sourceValue: "2850000" }] }] };
 async function api(page: Page, unavailable = false) {
   await page.route("**/api/v1/**", async route => {
     const path = new URL(route.request().url()).pathname;
@@ -11,7 +20,7 @@ async function api(page: Page, unavailable = false) {
       expect(route.request().headers()["case-access-token"]).toBe("private-secret");
       return route.fulfill({ status: unavailable ? 404 : 200, json: unavailable ? { detail: "Buying Case not found" } : { id: "current" } });
     }
-    const body = path.endsWith("negotiation") ? { language: { draft: "Review the fees", items: [] } } : path.endsWith("dealer-offers/latest") ? { version: 1, status: "VERIFIED" }
+    const body = path.endsWith("explanation") ? explanation : path.endsWith("negotiation") ? { language: { draft: "Review the fees", items: [] } } : path.endsWith("dealer-offers/latest") ? { version: 1, status: "VERIFIED" }
       : path.endsWith("analyses") ? { operation: { id: "op", stage: "QUEUED" } }
       : path.endsWith("operations/op") ? { stage: "COMPLETE" }
       : path.endsWith("reports/latest") ? report
@@ -31,13 +40,15 @@ test("saved link opens frozen offer analysis and report in a second browser sess
   expect(box!.y).toBeGreaterThanOrEqual(0);
   expect(box!.y + box!.height).toBeLessThanOrEqual(780);
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "$28,500.00" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "$28,500.00", exact: true })).toBeFocused();
   expect(new URL(page.url()).hash).toBe("");
   const link = await page.getByRole("link", { name: "Private case link", exact: true }).getAttribute("href");
   const session = await browser.newContext({ viewport: { width: 360, height: 800 } });
   const second = await session.newPage(); await api(second);
   await second.goto(link!);
   await expect(second.getByRole("heading", { name: "Deal Analysis Report", exact: true })).toBeVisible();
+  await expect(second.getByRole("heading", { name: "What the findings mean" })).toBeVisible();
+  await second.getByText("Recorded sources for sentence 1").click();
   expect(await second.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect((await new AxeBuilder({ page: second }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze()).violations).toEqual([]);
   await session.close();

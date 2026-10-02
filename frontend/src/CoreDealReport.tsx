@@ -7,6 +7,7 @@ import { DealerFinancingForm, DealerFinancingResult, type FinancingResult } from
 import { ReportTotalMeasure } from "./ReportTotalMeasure";
 import { Arithmetic, DocumentSourceView, type Calculation, type DocumentSource } from "./EvidenceSource";
 import { useEffect, useRef, useState } from "react";
+import { ReportExplanationLoader } from "./ReportExplanation";
 
 export type MaterialAmount = {
   label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string;
@@ -94,6 +95,7 @@ export function CoreDealReport({ report, caseId, token }: { report: CoreReport; 
       <h3>Next action</h3>
       <p className="next-action">{analysis.nextAction}</p>
     </section>
+    {caseId && token && <ReportExplanationLoader key={`${caseId}-${token}-${report.version}`} caseId={caseId} token={token} reportVersion={report.version} />}
     <section className="panel" aria-labelledby="core-questions">
       <h3 id="core-questions">Questions to ask the dealer</h3>
       <p>Edit your questions before copying. Edits stay on this screen; the saved report and PDF keep the original findings.</p>
