@@ -179,7 +179,8 @@ states the same rules over the shipped configuration and records in CI.
 
 ### Shadow comparison record (`shadow-comparisons.v2`)
 
-The Python evaluation harness (ticket 28) appends one entry per comparison:
+The standalone [Python evaluation harness](../evaluation/README.md) (ticket 39) exports one entry
+per comparison for reviewed integration into this resource. It never edits the backend resource:
 
 ```json
 {
@@ -206,5 +207,5 @@ load, which fails startup. A `FAIL` outcome is kept as history but never satisfi
 | Obligation | State |
 | --- | --- |
 | Vendor retention and training terms | **Unmet for both Anthropic and OpenAI.** No terms executed; recorded in `model-vendor-terms.json`, the [provider inventory](provider-inventory.md) and the `provider-terms` readiness prerequisite. |
-| Frozen evaluation set and shadow comparison | **Unmet.** Ticket 28 (corpus and Python harness) is not built, so no comparison can run. |
+| Frozen evaluation set and shadow comparison | **Unmet.** Ticket 39 provides the offline harness and synthetic development checks. Ticket 28 still owns the permissioned corpus, live runs, published accuracy and pilot readiness. Synthetic runs cannot produce a shadow comparison or satisfy this gate. |
 | Credentials | Not provisioned. |
