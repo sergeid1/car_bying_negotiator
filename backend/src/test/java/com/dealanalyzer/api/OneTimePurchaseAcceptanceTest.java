@@ -137,9 +137,28 @@ class OneTimePurchaseAcceptanceTest {
       var sample = get(app.client(), "/api/v1/sample-report");
       assertThat(sample.path("label").asText()).isEqualTo("EXAMPLE");
       assertThat(sample.path("source").asText()).isEqualTo("SYNTHETIC_CASE");
-      assertThat(sample.at("/redaction/version").asText()).isEqualTo("sample-redaction.v1");
+      assertThat(sample.at("/redaction/version").asText()).isEqualTo("sample-redaction.v2");
+      assertThat(sample.at("/report/analysis/topReasons")).isNotEmpty();
+      sample.at("/report/analysis/topReasons").forEach(reason -> assertThat(reason.isTextual() && !reason.asText().isBlank()).isTrue());
+      assertThat(sample.at("/report/analysis/nextAction").asText()).isNotBlank();
+      assertThat(sample.at("/report/analysis/reviewStatus").asText()).isEqualTo("REVIEW_REQUIRED");
+      assertThat(sample.at("/report/analysis/dealRating").asText()).isEqualTo("FAIR_NEGOTIATE");
+      assertThat(sample.at("/report/analysis/limitations").get(0).asText()).isNotBlank();
+      assertThat(sample.at("/report/analysis/economics/steps/0/name").asText()).isEqualTo("vehicle subtotal");
       assertThat(sample.at("/report/analysis/economics/outTheDoorTotal/minorUnits").asLong()).isEqualTo(2847500L);
-      assertThat(sample.toString()).doesNotContain("1HGCM82633A004352", "27601", "27604", "Synthetic Dealer Offer");
+      assertThat(sample.toString()).doesNotContain("1HGCM82633A004352", "27601", "27604");
+      var mapper = app.context().getBean(ObjectMapper.class);
+      com.dealanalyzer.buyingcase.SyntheticAnalysisRequest input;
+      try (var fixture = getClass().getResourceAsStream("/purchase/sample-golden.v1.json")) {
+        input = mapper.readValue(fixture, com.dealanalyzer.buyingcase.SyntheticAnalysisRequest.class);
+      }
+      var assembled = app.context().getBean(com.dealanalyzer.report.ReportAssembler.class).assemble(
+          "synthetic-example", 1, "synthetic-golden.v1",
+          app.context().getBean(com.dealanalyzer.report.CashDealAnalyzer.class).analyzeSyntheticSample(input));
+      var actualText = new HashSet<String>();
+      textPaths(mapper.readTree(assembled.payloadJson()), "", actualText);
+      assertThat(actualText).as("Every new assembled source-text path needs explicit redaction review")
+          .isEqualTo(reviewedSampleTextPaths());
     }
   }
   @Test void channelPaidCostSurvivesDeletionAndDocumentOnlyArchivesRemainFree() throws Exception {
@@ -170,5 +189,28 @@ class OneTimePurchaseAcceptanceTest {
       JsonNode after = JSON.valueToTree(metrics.channels());
       assertThat(after.path("channels").get(1).path("costPerPaidCase")).isEqualTo(row);
     }
+  }
+  private static void textPaths(JsonNode node, String path, Set<String> paths) {
+    if (node.isTextual()) paths.add(path);
+    else if (node.isObject()) node.fields().forEachRemaining(field -> textPaths(field.getValue(), path + "/" + field.getKey(), paths));
+    else if (node.isArray()) node.forEach(value -> textPaths(value, path + "/*", paths));
+  }
+  /** Reviewed generated text and redacted identifiers in the actual golden pipeline output. */
+  private static Set<String> reviewedSampleTextPaths() {
+    var paths = new HashSet<>(Set.of("/id", "/caseId", "/schemaVersion", "/generatedAt",
+        "/analysis/reviewStatus", "/analysis/dealRating", "/analysis/topReasons/*", "/analysis/nextAction",
+        "/analysis/economics/calculationVersion", "/analysis/economics/rounding/mode", "/analysis/economics/rounding/appliedAt",
+        "/analysis/economics/steps/*/name", "/analysis/economics/steps/*/formula",
+        "/analysis/marketAssessment/confidence", "/analysis/marketAssessment/dataAsOf", "/analysis/marketAssessment/source",
+        "/analysis/marketAssessment/providerSnapshotVersion", "/analysis/policyVersions/cashEconomics",
+        "/analysis/policyVersions/marketAssessment", "/analysis/policyVersions/report", "/analysis/limitations/*",
+        "/reproduction/inputFingerprint", "/reproduction/analysisFingerprint", "/reproduction/expectedVersionDifferences/id",
+        "/reproduction/expectedVersionDifferences/version", "/reproduction/expectedVersionDifferences/generatedAt",
+        "/coverage/jurisdiction", "/coverage/asOf"));
+    for (String amount : List.of("sellingPrice", "dealerFees", "addOns", "taxes", "governmentCharges", "outTheDoorTotal"))
+      for (String field : List.of("currency", "precision", "source")) paths.add("/analysis/economics/" + amount + "/" + field);
+    for (String amount : List.of("low", "high"))
+      for (String field : List.of("currency", "precision", "source")) paths.add("/analysis/marketAssessment/" + amount + "/" + field);
+    return paths;
   }
 }

@@ -41,7 +41,12 @@ for anonymous count retention and denominators.
 The public sample is labelled EXAMPLE / SYNTHETIC_CASE. `sample-golden.v1.json` matches the
 standard golden cash-deal fixture; the real CashDealAnalyzer calculator/rating pipeline and
 ReportAssembler produce it with fixed synthetic market evidence and no provider calls.
-STRUCTURAL_ALLOWLIST / sample-redaction.v1 then removes identity, VIN, listing URLs,
-locations below jurisdiction, document references, page/region evidence, and free text.
-Unknown textual fields are null by default; only schema/policy and enumerated structural
-fields survive. This sample is not a permissioned real case; ticket 32 owns that separate sample.
+FIELD_CATEGORIES / sample-redaction.v2 then removes identity, VIN, listing URLs,
+locations below jurisdiction, document references, page/region evidence, and source-authored
+free text by field name (including original wording/labels, notes, raw/extracted document text,
+listing titles and Buyer/dealer messages). Generated reasons, findings, labels, rating basis,
+next action, limitations and all numeric amounts/rates remain. Sensitive scalars are null,
+arrays remain arrays, and sensitive objects retain their keys with scalar leaves null.
+An explicit reviewed text-path inventory test covers the real assembled golden payload;
+adding any new text path fails that test until its source/generated classification is reviewed.
+This sample is not a permissioned real case; ticket 32 owns that separate sample.

@@ -12,14 +12,17 @@ class SampleReportRedactionTest {
       assertThat(json.readTree(sample)).isEqualTo(json.readTree(golden).path("input"));
     }
   }
-  @Test void redactionRemovesNestedIdentityLocationDocumentRegionsAndUnrecognizedText() throws Exception {
+  @Test void redactionRemovesSourceTextAndSensitiveFieldsWhilePreservingGeneratedCopyAndNumbers() throws Exception {
     var json = new ObjectMapper();
     var source = json.readTree("""
         {"vin":"SECRET-VIN","dealerIdentity":{"name":"SECRET-DEALER"},"listingUrl":"SECRET-URL",
          "buyerZip":"SECRET-ZIP","buyerLocation":{"zip":"SECRET-ZIP"},
          "evidence":[{"documentId":"SECRET-DOCUMENT","pageNumber":7,"region":{"x":42},"originalWording":"SECRET-TEXT"}],
          "documentReferences":["SECRET-REFERENCE"],"region_x":42,
-         "notes":["SECRET-NOTE"],"newFreeTextField":"SECRET-NEW","minorUnits":123,"currency":"USD"}
+         "notes":["SECRET-NOTE"],"raw_document_text":"SECRET-RAW","listingTitle":"SECRET-TITLE",
+         "topReasons":["Generated reason"],"findings":[{"label":"Generated label","ratingBasis":"Generated basis"}],
+         "nextAction":"Generated next action","limitations":["Generated limitation"],
+         "amountMinor":123,"percentage":6.5,"apr":7.9,"termMonths":60,"amounts":[10,20],"currency":"USD"}
         """);
     var redacted = SampleReportController.redact(source);
     assertThat(redacted.toString()).doesNotContain("SECRET", "42");
@@ -28,7 +31,9 @@ class SampleReportRedactionTest {
     assertThat(redacted.path("documentReferences")).isEmpty();
     assertThat(redacted.path("region_x").isNull()).isTrue();
     assertThat(redacted.at("/dealerIdentity/name").isNull()).isTrue();
-    assertThat(redacted.path("minorUnits").asInt()).isEqualTo(123);
+    assertThat(redacted.path("amountMinor").asInt()).isEqualTo(123);
+    for (String field : java.util.List.of("topReasons", "findings", "nextAction", "limitations", "percentage", "apr", "termMonths", "amounts"))
+      assertThat(redacted.path(field)).as(field).isEqualTo(source.path(field));
     assertThat(redacted.path("currency").asText()).isEqualTo("USD");
     assertThat(source.path("vin").asText()).isEqualTo("SECRET-VIN");
   }

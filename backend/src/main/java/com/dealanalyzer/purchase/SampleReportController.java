@@ -17,12 +17,14 @@ public class SampleReportController {
   private final JsonNode report;
   static final List<String> REMOVED = List.of("VIN", "DEALER_IDENTITY", "LISTING_URL", "BUYER_LOCATION",
       "DOCUMENT_REFERENCES", "PAGE_REGIONS", "FREE_TEXT");
-  private static final Set<String> SENSITIVE = Set.of("vin", "dealer", "dealerIdentity", "dealerName", "dealerId",
-      "listingUrl", "buyerZip", "dealerZip", "buyerLocation", "documentId", "documentReference", "documentReferences",
-      "page", "pageNumber", "region", "pageRegion", "pageRegions", "regions", "id", "caseId", "reproduction");
-  private static final Set<String> TEXT = Set.of("schemaVersion", "reviewStatus", "dealRating", "currency", "precision",
-      "calculationVersion", "mode", "appliedAt", "confidence", "generatedAt", "dataAsOf", "providerSnapshotVersion");
-  private static final Set<String> NUMBERS = Set.of("version", "minorUnits", "resultMinorUnits", "currencyScale");
+  private static final Set<String> SENSITIVE = Set.of("vin", "dealer", "dealeridentity", "dealername", "dealerid",
+      "listingurl", "buyerzip", "dealerzip", "buyerlocation", "documentid", "documentreference", "documentreferences",
+      "page", "pagenumber", "region", "pageregion", "pageregions", "regions", "regionx", "regiony",
+      "regionwidth", "regionheight", "id", "caseid", "reproduction");
+  /** Source-authored text, unlike code-generated reasons, labels, instructions and limitations. */
+  private static final Set<String> SOURCE_TEXT = Set.of("originalwording", "originallabel", "notes", "buyernotes",
+      "dealernotes", "rawtext", "rawdocumenttext", "documenttext", "extractedtext", "listingtitle",
+      "buyertext", "dealertext", "dealerresponse", "buyercomments", "dealercomments");
   public SampleReportController(ObjectMapper json, CashDealAnalyzer analyzer, ReportAssembler assembler) throws java.io.IOException {
     SyntheticAnalysisRequest input;
     try (var fixture = getClass().getResourceAsStream("/purchase/sample-golden.v1.json")) {
@@ -34,7 +36,7 @@ public class SampleReportController {
   @GetMapping
   public Map<String, Object> sample() {
     return Map.of("label", "EXAMPLE", "source", "SYNTHETIC_CASE",
-        "redaction", Map.of("method", "STRUCTURAL_ALLOWLIST", "version", "sample-redaction.v1", "removed", REMOVED),
+        "redaction", Map.of("method", "FIELD_CATEGORIES", "version", "sample-redaction.v2", "removed", REMOVED),
         "report", report.deepCopy());
   }
   static JsonNode redact(JsonNode input) {
@@ -47,20 +49,15 @@ public class SampleReportController {
       var fields = new java.util.ArrayList<String>(); object.fieldNames().forEachRemaining(fields::add);
       for (String field : fields) {
         JsonNode value = object.get(field);
-        if (SENSITIVE.contains(field)) {
+        String normalized = field.replace("_", "").toLowerCase(java.util.Locale.ROOT);
+        if (SENSITIVE.contains(normalized) || SOURCE_TEXT.contains(normalized)) {
           if (value.isArray()) object.putArray(field);
           else if (value.isObject()) clear(value);
           else object.putNull(field);
-        } else if (value.isTextual() && !TEXT.contains(field)) object.putNull(field);
-        else if (value.isNumber() && !NUMBERS.contains(field)) object.putNull(field);
-        else clean(value);
+        } else clean(value);
       }
     } else if (node.isArray()) {
-      var array = (com.fasterxml.jackson.databind.node.ArrayNode) node;
-      for (int i = 0; i < array.size(); i++) {
-        if (array.get(i).isValueNode()) array.set(i, com.fasterxml.jackson.databind.node.NullNode.instance);
-        else clean(array.get(i));
-      }
+      node.forEach(SampleReportController::clean);
     }
   }
   /** Preserve object topology while nulling every scalar in a sensitive subtree. */
