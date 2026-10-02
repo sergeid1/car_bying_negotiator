@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from evaluation import core
-from evaluation.__main__ import main
+from evaluation.__main__ import main, parser
 from evaluation.batch import AnthropicBatchClient, BatchClient, build_requests
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -329,6 +329,24 @@ class HarnessTest(unittest.TestCase):
                          requests[1]["params"]["messages"][0]["content"][2]["text"])
         self.assertNotIn("tools", params)
         self.assertEqual("high", params["output_config"]["effort"])
+
+    def test_batch_service_token_limit_and_vendor_default_effort(self):
+        self.use_page_images()
+        requests = build_requests(self.manifest, self.split, "DEVELOPMENT", "offline-model",
+                                  effort="vendor-default", prompt_path=FIXTURES / "prompt.v1.md",
+                                  schema_path=FIXTURES / "schema.v1.json",
+                                  framing_path=FIXTURES / "untrusted-framing.v1.json")
+        for request in requests:
+            self.assertEqual(16000, request["params"]["max_tokens"])
+            self.assertNotIn("effort", request["params"]["output_config"])
+        options = parser().parse_args(["batch-build", "--manifest", str(self.manifest),
+                                      "--split-file", str(self.split), "--model", "offline-model",
+                                      "--output", str(self.folder / "requests.json")])
+        self.assertEqual(16000, options.max_tokens)
+        report = core.evaluate(self.manifest, self.split, self.predictions, self.thresholds,
+                               self.freeze, "DEVELOPMENT", "vendor-default-run", "synthetic-no-model",
+                               "deal-terms-prompt.v1", "deal-terms.v1", effort="vendor-default")
+        self.assertEqual("vendor-default", report["conditions"]["effort"])
 
     def use_page_images(self):
         manifest = core.read(self.manifest)

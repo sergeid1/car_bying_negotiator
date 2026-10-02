@@ -38,7 +38,7 @@ def closed_schema(schema):
 
 
 def build_requests(manifest_path, split_path, selected_split, model, effort="high",
-                   prompt_path=DEFAULT_PROMPT, schema_path=DEFAULT_SCHEMA, max_tokens=8192,
+                   prompt_path=DEFAULT_PROMPT, schema_path=DEFAULT_SCHEMA, max_tokens=16000,
                    framing_path=DEFAULT_FRAMING):
     manifest, split = verify_split(manifest_path, split_path)
     if selected_split not in {"DEVELOPMENT", "HELD_OUT"} or not model or max_tokens < 1:
@@ -71,9 +71,12 @@ def build_requests(manifest_path, split_path, selected_split, model, effort="hig
             blocks.extend([{"type": "text", "text": marker},
                            {"type": "image", "source": {"type": "base64", "media_type": "image/png",
                             "data": base64.b64encode(path.read_bytes()).decode("ascii")}}])
+        output_config = {"format": {"type": "json_schema", "schema": schema}}
+        if effort != "vendor-default":
+            output_config["effort"] = effort
         requests.append({"custom_id": doc["documentId"], "params": {
             "model": model, "max_tokens": max_tokens, "system": system,
-            "output_config": {"format": {"type": "json_schema", "schema": schema}, "effort": effort},
+            "output_config": output_config,
             "messages": [{"role": "user", "content": blocks}]}})
     if not requests:
         raise ValueError("Selected split has no documents")

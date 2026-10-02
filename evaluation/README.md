@@ -99,7 +99,7 @@ are for synthetic mechanics only; ticket 28 owns real pilot acceptance threshold
 defaults. Ticket 40 supplies those files; absence is a refusal, never a fallback to test fixtures:
 
 ```sh
-python3 -m evaluation batch-build --manifest PATH_TO_IMAGE_MANIFEST --split-file PATH_TO_FROZEN_SPLIT --model claude-opus-5 --effort high --output evaluation/reports/image-run/requests.json
+python3 -m evaluation batch-build --manifest PATH_TO_IMAGE_MANIFEST --split-file PATH_TO_FROZEN_SPLIT --model claude-opus-5 --effort vendor-default --output evaluation/reports/image-run/requests.json
 ```
 
 `--prompt`, `--schema` and `--framing` override paths for isolated fixtures. Framing defaults to
@@ -111,7 +111,12 @@ only PNG page images preceded by markers built from `imageMarkerTemplate` and
 synthetic scoring corpus is deliberately refused by `batch-build`. Tests use isolated image bytes
 and local resource fixtures. The system text block has ephemeral `cache_control`; structured-output
 schema caching is vendor-managed, with no unsupported cache keyword inserted in JSON Schema or
-extra schema text added to the service prompt. Effort is explicitly recorded in `output_config`.
+extra schema text added to the service prompt. The default output-token limit is 16000, matching
+`ClaudeDealTermsExtractionProvider.MAX_OUTPUT_TOKENS`; `--max-tokens` can override it for experiments.
+The service sends no effort parameter, so a run claiming parity with the service must use the
+vendor default: pass `--effort vendor-default` to `batch-build` to omit the parameter and to the
+subsequent `run` to record that choice. Other effort values are sent in `output_config` and remain
+explicit experiment conditions; the CLI otherwise defaults to `high`.
 
 `BatchClient` separates request construction from transport. The real adapter imports the optional
 `anthropic` SDK only after a credential is explicitly selected. It uses the vendor endpoint, no

@@ -51,7 +51,7 @@ def parser():
     build.add_argument("--schema", default=str(DEFAULT_SCHEMA))
     build.add_argument("--framing", default=str(DEFAULT_FRAMING))
     build.add_argument("--effort", default="high")
-    build.add_argument("--max-tokens", type=int, default=8192)
+    build.add_argument("--max-tokens", type=int, default=16000)
     for command in ("batch-submit", "batch-results"):
         live = commands.add_parser(command, help="EXPLICIT NETWORK COMMAND; requires optional SDK and credential")
         live.add_argument("--credential-env", required=True, help="Name of explicitly selected credential environment variable")
