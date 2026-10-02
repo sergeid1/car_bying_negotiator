@@ -77,13 +77,18 @@ public final class ClaudeDealTermsExtractionProvider implements DealTermsExtract
     int pageCount = document.pages().size();
     List<UntrustedInput> inputs = new ArrayList<>();
     for (NormalizedDocumentPage page : document.pages()) {
-      inputs.add(new UntrustedInput.PngImage("page " + page.pageNumber() + " image", page.image()));
+      inputs.add(new UntrustedInput.PngImage(pageLabel(page.pageNumber()), page.image()));
     }
     // Shape checks run inside the metered attempt, so rejected output is recorded as a contract
     // failure rather than a success. The service validates again; the validator stays the authority.
     ModelResult<Output> result = harness.run(document.caseId(), TASK, inputs, pageCount,
         output -> validator.validate(extraction(output, modelId), pageCount, false));
     return extraction(result.value(), result.provenance().modelId());
+  }
+
+  /** The label of a page image; published in {@code ai/untrusted-framing.v1.json} for the evaluation harness. */
+  public static String pageLabel(int pageNumber) {
+    return "page " + pageNumber + " image";
   }
 
   static ProviderExtraction extraction(Output output, String modelVersion) {
