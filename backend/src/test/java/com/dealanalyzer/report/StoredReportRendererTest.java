@@ -11,8 +11,8 @@ class StoredReportRendererTest {
   @Test void bothExportsDisplayFrozenMarketFreshnessAndUncertainty() throws Exception {
     var payload = new ObjectMapper().readTree("""
         {"analysis":{"marketEvidence":{"status":"UNAVAILABLE","paragraphs":[
-          "Market data retrieved: 2026-08-01T12:00:00Z.",
-          "Observation window: 2026-07-20T12:00:00Z to 2026-07-30T12:00:00Z.",
+          "Market data retrieved: August 1, 2026.",
+          "Observation window: July 20 to July 30, 2026.",
           "Market evidence is unavailable: the stored snapshot is stale. No market rating is drawn."]}}}
         """);
     var renderer = new StoredReportRenderer();
@@ -20,7 +20,9 @@ class StoredReportRendererTest {
     try (var document = Loader.loadPDF(renderer.pdf(payload))) {
       String pdf = new PDFTextStripper().getText(document);
       for (String text : new String[] {html, pdf})
-        assertThat(text).contains("Market evidence", "Market data retrieved:", "Observation window:", "snapshot is stale", "No market rating is drawn");
+        assertThat(text).contains("Market evidence", "Market data retrieved: August 1, 2026.",
+            "Observation window: July 20 to July 30, 2026.", "snapshot is stale", "No market rating is drawn")
+            .doesNotContain("T12:00:00Z");
     }
   }
   @Test void bothExportsLeadWithTheSameStoredTotalFindingsAndAction() throws Exception {

@@ -22,8 +22,8 @@ const AA = {
 
 test("market freshness, uncertainty and unavailable evidence have no automated AA violations", async () => {
   const { container } = render(<main><h1>Saved report</h1><h2>Evidence</h2><MarketEvidenceSection evidence={{ status: "AVAILABLE", paragraphs: [
-    "Market data retrieved: 2026-10-02T12:00:00Z.",
-    "Observation window: 2026-09-20T12:00:00Z to 2026-09-30T12:00:00Z.",
+    "Market data retrieved: October 2, 2026.",
+    "Observation window: September 20 to September 30, 2026.",
     "Uncertainty: low confidence from 3 usable comparables. This is an estimated selling-price range.",
     "Too few compatible, current comparables (2) to support a market conclusion. No market rating is drawn.",
   ] }} /></main>);

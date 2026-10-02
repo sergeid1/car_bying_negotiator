@@ -2,11 +2,15 @@ package com.dealanalyzer.market;
 
 import com.dealanalyzer.market.persistence.MarketAssessmentPersistence.MarketAssessmentView;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
 /** Buyer wording frozen at report creation; rendering never refreshes evidence or calls providers. */
 public final class MarketReportEvidence {
+  private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("MMMM d, uuuu", java.util.Locale.US);
+  private static final DateTimeFormatter MONTH_DAY = DateTimeFormatter.ofPattern("MMMM d", java.util.Locale.US);
   private MarketReportEvidence() {}
 
   public static boolean current(MarketAssessmentView assessment, Instant now) {
@@ -24,10 +28,10 @@ public final class MarketReportEvidence {
     String status = !current ? "UNAVAILABLE" : assessment.status();
     if (assessment.provider() != null && assessment.provider().retrievedAt() != null
         && !"MARKET_PROVIDER".equals(assessment.provider().source()))
-      paragraphs.add("Market data retrieved: " + assessment.provider().retrievedAt() + ".");
+      paragraphs.add("Market data retrieved: " + date(assessment.provider().retrievedAt()) + ".");
     else paragraphs.add("Market data retrieval time is unavailable.");
     if (assessment.vintage() != null) paragraphs.add("Observation window: "
-        + assessment.vintage().oldestObservationAt() + " to " + assessment.vintage().newestObservationAt() + ".");
+        + observationWindow(assessment.vintage().oldestObservationAt(), assessment.vintage().newestObservationAt()) + ".");
     else paragraphs.add("Observation window is unavailable.");
     if (!current) paragraphs.add("Market evidence is unavailable: the stored snapshot is stale or has an invalid retrieval time. No market rating is drawn.");
     else if ("INSUFFICIENT_DATA".equals(status)) paragraphs.add("Too few compatible, current comparables ("
@@ -50,4 +54,17 @@ public final class MarketReportEvidence {
   }
 
   public record Summary(String status, List<String> paragraphs) {}
+
+  static String date(Instant instant) {
+    return DATE.format(instant.atZone(ZoneOffset.UTC));
+  }
+
+  static String observationWindow(Instant oldest, Instant newest) {
+    var start = oldest.atZone(ZoneOffset.UTC).toLocalDate();
+    var end = newest.atZone(ZoneOffset.UTC).toLocalDate();
+    if (start.equals(end)) return DATE.format(start);
+    if (start.getYear() == end.getYear())
+      return MONTH_DAY.format(start) + " to " + DATE.format(end);
+    return DATE.format(start) + " to " + DATE.format(end);
+  }
 }

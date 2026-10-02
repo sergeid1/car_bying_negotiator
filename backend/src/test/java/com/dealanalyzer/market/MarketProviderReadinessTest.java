@@ -69,7 +69,20 @@ class MarketProviderReadinessTest {
     var assessment = new MarketAssessmentPolicy().assess(VEHICLE,
         ProviderResult.available(snapshot("market-provider.v1", NOW), observations()));
     assertThat(String.join(" ", MarketReportEvidence.describe(view(assessment), NOW, true).paragraphs()))
-        .contains("Market data retrieved: " + NOW, "Observation window:", "Uncertainty: low confidence", "uncertainty buffer");
+        .contains("Market data retrieved: " + MarketReportEvidence.date(NOW), "Observation window:", "Uncertainty: low confidence", "uncertainty buffer")
+        .doesNotContain(NOW.toString());
+  }
+
+  @Test void datesAndWindowsReadNaturallyAcrossMonthsAndYears() {
+    assertThat(MarketReportEvidence.date(Instant.parse("2026-10-02T09:12:33.123Z"))).isEqualTo("October 2, 2026");
+    assertThat(MarketReportEvidence.observationWindow(Instant.parse("2026-08-18T12:00:00Z"),
+        Instant.parse("2026-08-25T12:00:00Z"))).isEqualTo("August 18 to August 25, 2026");
+    assertThat(MarketReportEvidence.observationWindow(Instant.parse("2026-08-31T12:00:00Z"),
+        Instant.parse("2026-09-02T12:00:00Z"))).isEqualTo("August 31 to September 2, 2026");
+    assertThat(MarketReportEvidence.observationWindow(Instant.parse("2025-12-31T12:00:00Z"),
+        Instant.parse("2026-01-02T12:00:00Z"))).isEqualTo("December 31, 2025 to January 2, 2026");
+    assertThat(MarketReportEvidence.observationWindow(Instant.parse("2026-10-02T00:00:00Z"),
+        Instant.parse("2026-10-02T23:59:59Z"))).isEqualTo("October 2, 2026");
   }
 
   private MarketAssessment create(ProviderResult response, boolean throwsFailure, ProviderMeter.Status expected) {

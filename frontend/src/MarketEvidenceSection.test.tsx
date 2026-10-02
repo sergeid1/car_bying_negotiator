@@ -5,8 +5,8 @@ import { MarketEvidenceSection } from "./CoreDealReport";
 afterEach(cleanup);
 
 test("shows frozen retrieval, observation window and uncertainty in ordinary wording", () => {
-  const paragraphs = ["Market data retrieved: 2026-10-02T12:00:00Z.",
-    "Observation window: 2026-09-20T12:00:00Z to 2026-09-30T12:00:00Z.",
+  const paragraphs = ["Market data retrieved: October 2, 2026.",
+    "Observation window: September 20 to September 30, 2026.",
     "Uncertainty: medium confidence from 4 usable comparables. This is an estimated selling-price range."];
   render(<MarketEvidenceSection evidence={{ status: "AVAILABLE", paragraphs }} />);
   for (const paragraph of paragraphs) expect(screen.getByText(paragraph)).toBeVisible();
