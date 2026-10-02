@@ -19,6 +19,24 @@ batch run sends exactly the prompt and schema the service would send. Neither si
 the other's text. A changed prompt or schema is a new file with a new version id, never an edit in
 place.
 
+The service does not send the prompt file alone. Every gateway appends the fixed untrusted-data
+policy to the instructions, and puts a framing marker before each page image. Page images are
+labeled `page <n> image` and are the only user content; recognized text is not sent. The backend
+publishes this framing as `backend/src/main/resources/ai/untrusted-framing.v1.json`:
+
+```json
+{
+  "version": "untrusted-framing.v1",
+  "policy": "<exact text appended to the instructions, leading newlines included>",
+  "imageMarkerTemplate": "<untrusted_data label=\"{label}\">The next image.</untrusted_data>",
+  "pageImageLabelTemplate": "page {pageNumber} image"
+}
+```
+
+A backend test fails if this file differs from what the gateways actually send. The harness builds
+the system text as the prompt file followed by `policy`, and puts a text block made from the
+`imageMarkerTemplate` before each page image, so a batch request matches a service request.
+
 ## Model output (`deal-terms.v1`)
 
 The schema is a closed JSON object (`additionalProperties: false` at every level):
