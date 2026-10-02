@@ -1,0 +1,62 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expectedPageCount", "candidates", "lineItems", "documentWarnings"],
+  "properties": {
+    "expectedPageCount": {"type": "integer", "minimum": 1},
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "originalWording", "normalizedValue", "normalizedUnit", "evidence", "confidence", "material"],
+        "properties": {
+          "field": {"type": "string", "enum": ["VEHICLE_VIN", "SELLING_PRICE", "DEALER_CHARGES_TOTAL", "OUT_THE_DOOR_TOTAL", "APR", "TERM_MONTHS", "VEHICLE_YEAR", "DOCUMENT_TYPE"]},
+          "originalWording": {"type": "string"},
+          "normalizedValue": {"type": ["string", "null"]},
+          "normalizedUnit": {"type": "string", "enum": ["VIN", "USD_MINOR", "PERCENT", "MONTH", "YEAR", "TEXT", "DATE"]},
+          "evidence": {
+            "type": "object", "additionalProperties": false,
+            "required": ["pageNumber", "x", "y", "width", "height"],
+            "properties": {
+              "pageNumber": {"type": "integer", "minimum": 1},
+              "x": {"type": "number", "minimum": 0, "maximum": 1},
+              "y": {"type": "number", "minimum": 0, "maximum": 1},
+              "width": {"type": "number", "minimum": 0, "maximum": 1},
+              "height": {"type": "number", "minimum": 0, "maximum": 1}
+            }
+          },
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+          "material": {"type": "boolean"}
+        }
+      }
+    },
+    "lineItems": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["originalLabel", "category", "amountMinor", "currency", "taxClaim", "optionalityClaim", "evidence", "confidence"],
+        "properties": {
+          "originalLabel": {"type": "string"},
+          "category": {"type": "string", "enum": ["DEALER_FEE"]},
+          "amountMinor": {"type": "integer"}, "currency": {"type": "string", "enum": ["USD"]},
+          "taxClaim": {"type": "string", "enum": ["UNKNOWN"]},
+          "optionalityClaim": {"type": "string", "enum": ["REQUIRED"]},
+          "evidence": {
+            "type": "object", "additionalProperties": false,
+            "required": ["pageNumber", "x", "y", "width", "height"],
+            "properties": {
+              "pageNumber": {"type": "integer", "minimum": 1},
+              "x": {"type": "number", "minimum": 0, "maximum": 1},
+              "y": {"type": "number", "minimum": 0, "maximum": 1},
+              "width": {"type": "number", "minimum": 0, "maximum": 1},
+              "height": {"type": "number", "minimum": 0, "maximum": 1}
+            }
+          },
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      }
+    },
+    "documentWarnings": {"type": "array", "items": {"type": "string"}}
+  }
+}

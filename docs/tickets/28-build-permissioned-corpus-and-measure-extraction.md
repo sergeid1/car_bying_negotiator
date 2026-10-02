@@ -4,7 +4,11 @@
 
 **Blocked by:** 06 — Extract deal terms with field-level evidence.
 
-**Status:** ready-for-agent
+**Status:** blocked on a permissioned corpus — narrowed on 2026-10-02: ticket 39 builds the offline
+harness (split freezing, per-field scoring, failure taxonomy, run recording, frozen thresholds, batch
+client, shadow comparison records) against a synthetic corpus. This ticket keeps acquiring and
+documenting the permissioned corpus, the live batch runs, the published accuracy, and the
+pilot-readiness entry.
 
 - [ ] The permission basis for each corpus document is documented and is separate from the `SERVICE_PROCESSING` consent; customer documents are not retained for model training or dealer intelligence without a separately designed, voluntary opt-in.
 - [ ] The corpus spans phone photographs, multi-page buyer's orders, fee tables, documents with missing fields, and revised offers.

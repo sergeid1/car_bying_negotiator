@@ -6,7 +6,16 @@ import java.util.List;
 public interface DealTermsExtractionProvider {
   ProviderExtraction extract(ExtractionDocument document);
 
-  record ExtractionDocument(String documentId, List<NormalizedDocumentPage> pages) {
+  /**
+   * Whether the provider meters its own calls. A model-backed provider does, through
+   * {@code ModelHarness}, which records the model provenance and token spend; wrapping it in a second
+   * meter call would record the call twice.
+   */
+  default boolean selfMetered() {
+    return false;
+  }
+
+  record ExtractionDocument(String caseId, String documentId, List<NormalizedDocumentPage> pages) {
     public ExtractionDocument {
       pages = List.copyOf(pages);
     }

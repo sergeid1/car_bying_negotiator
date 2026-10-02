@@ -4,7 +4,10 @@
 
 **Blocked by:** 28 — Build the permissioned document corpus and publish measured extraction accuracy; 35 — Establish the AI execution harness.
 
-**Status:** ready-for-agent
+**Status:** blocked on tickets 28 and 39 and on vendor terms — narrowed on 2026-10-02: ticket 40
+implements the provider, schema validation, page evidence, configuration selection and fail-closed
+behavior behind the rollout gate. This ticket keeps the held-out accuracy measurement, the
+regression tests drawn from the permissioned corpus, and enabling the provider.
 
 - [ ] The new provider implements the existing `DealTermsExtractionProvider` interface and populates `extractorVersion`, `modelVersion`, and `schemaVersion` on every `ProviderExtraction`.
 - [ ] Extraction uses schema-constrained structured output; a response that does not validate against the schema is rejected rather than repaired by hand.

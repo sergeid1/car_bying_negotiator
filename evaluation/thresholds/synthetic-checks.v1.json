@@ -1,0 +1,10 @@
+{
+  "version": "synthetic-checks.v1",
+  "intent": "Synthetic mechanics checks only. These are not pilot acceptance thresholds or accuracy evidence.",
+  "minimumConfidence": 0.8,
+  "maximumFailures": {"missing": 0, "wrong_value": 0, "invented_field": 0, "wrong_page": 0, "low_confidence": 0},
+  "fields": {
+    "SELLING_PRICE": {"minimumPrecision": 1.0, "minimumRecall": 1.0, "maximumFailures": {"wrong_value": 0, "wrong_page": 0, "low_confidence": 0}},
+    "OUT_THE_DOOR_TOTAL": {"minimumPrecision": 1.0, "minimumRecall": 1.0, "maximumFailures": {"missing": 0, "invented_field": 0}}
+  }
+}

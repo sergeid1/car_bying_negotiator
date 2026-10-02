@@ -18,6 +18,6 @@ public final class DeterministicDealerDocumentTestSupport {
           pageNumber++, new byte[] {0}, text.asText(), false, false, false, false));
     }
     return new DeterministicDealerDocumentProvider()
-        .extract(new ExtractionDocument("corpus-document", pages));
+        .extract(new ExtractionDocument("corpus-case", "corpus-document", pages));
   }
 }

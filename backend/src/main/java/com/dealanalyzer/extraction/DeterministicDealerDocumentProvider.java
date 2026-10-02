@@ -12,10 +12,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.springframework.stereotype.Component;
 
-/** Deterministic extractor for supported text-bearing U.S. dealer quotes and buyers' orders. */
-@Component
+/**
+ * Deterministic extractor for supported text-bearing U.S. dealer quotes and buyers' orders. The
+ * default provider; {@link ExtractionProviderConfiguration} selects it.
+ */
 class DeterministicDealerDocumentProvider implements DealTermsExtractionProvider {
   private static final Pattern LABELED = Pattern.compile("^\\s*([^:]{2,80})\\s*[:#]\\s*(.*?)\\s*$");
   private static final Pattern MONEY = Pattern.compile("^\\$?([0-9]{1,3}(?:,[0-9]{3})*|[0-9]+)(?:\\.([0-9]{2}))?$");

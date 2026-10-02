@@ -14,6 +14,12 @@ advance the document to extraction-ready, and partial encrypted outputs are remo
 extraction must return exactly the persisted page count. The source check in
 `scripts/security-rules.yml` prevents direct parsing outside the worker implementation.
 
+Extraction sees only these normalized outputs, never the original upload. The deterministic
+provider reads the recognized text. The model-backed provider (`extraction.provider=claude`, off by
+default and refused at startup until the [AI execution harness](ai-execution-harness.md#deal-terms-extraction-ticket-40)
+obligations are met) sends only the validated PNG page images, framed as untrusted content, and its
+evidence regions must cite one of the persisted pages.
+
 ## Resource limits
 
 | Resource | Default and maximum |
