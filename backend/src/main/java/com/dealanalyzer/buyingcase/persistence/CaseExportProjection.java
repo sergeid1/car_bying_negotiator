@@ -47,6 +47,7 @@ class CaseExportProjection {
     result.set("financing_comparisons", rows("financing_comparisons", "id, case_id, version, outside_finance_offer_id, policy_version, payload_json, created_at", "case_id = :caseId", caseId));
     result.set("deal_reviews", rows("deal_reviews", "id, case_id, version, baseline_id, previous_offer_id, current_offer_id, tolerance_policy, payload_json, created_at", "case_id = :caseId", caseId));
     result.set("negotiation_versions", rows("negotiation_versions", "case_id, report_version, payload_json", "case_id = :caseId", caseId));
+    result.set("report_explanations", rows("report_explanations", "case_id, report_version, policy_version, path, fallback_reason, model_provider, model_id, prompt_version, schema_version, threshold_set_version, evaluation_set_version, payload_json, created_at", "case_id = :caseId", caseId));
     result.set("recovery_contact", rows("case_recovery_contacts", "case_id, email, expires_at", "case_id = :caseId", caseId));
     result.set("delivery_requests", rows("case_delivery_requests", "id, case_id, email, expires_at", "case_id = :caseId", caseId));
     return result;

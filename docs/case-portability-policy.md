@@ -50,7 +50,8 @@ Archives contain:
 
 - `case-data.json`: explicit named scalar projections of retained case records, consent history,
   evidence, extractions, corrections, verifications, offers, economics, market evidence, plans,
-  approved baselines, financing, reviews, negotiation versions, reports and recovery delivery metadata.
+  approved baselines, financing, reviews, negotiation versions, stored report explanations (with the
+  path and model versions that produced them), reports and recovery delivery metadata.
 - `reports/report-N.html`: each immutable saved report, including labels, limitations and evidence.
 - `documents/`: retained active originals named by document ID and normalized PNG pages. Filenames,
   media types and the document/page relationships remain in the JSON records. Expired, deleted or

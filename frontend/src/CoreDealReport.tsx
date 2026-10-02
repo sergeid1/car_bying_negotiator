@@ -7,6 +7,7 @@ import { DealerFinancingForm, DealerFinancingResult, type FinancingResult } from
 import { ReportTotalMeasure } from "./ReportTotalMeasure";
 import { Arithmetic, DocumentSourceView, type Calculation, type DocumentSource } from "./EvidenceSource";
 import { useEffect, useRef, useState } from "react";
+import { ReportExplanationLoader } from "./ReportExplanation";
 
 export type MaterialAmount = {
   label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string;
@@ -20,6 +21,7 @@ export type CoreReport = {
     financingAvailability?: string; financing?: FinancingResult | null; financingTerms?: { aprPercent: number | null; termMonths: number | null } | null;
     reviewLabel: string; dealRating: string; ratingBasis: string; nextAction: string;
     topReasons: string[]; marketAvailability: string; cashAvailability: string;
+    marketEvidence?: { status: string; paragraphs: string[] };
     materialAmounts: MaterialAmount[];
     policyVersions: Record<string, string>; limitations: string[];
   };
@@ -94,6 +96,7 @@ export function CoreDealReport({ report, caseId, token }: { report: CoreReport; 
       <h3>Next action</h3>
       <p className="next-action">{analysis.nextAction}</p>
     </section>
+    {caseId && token && <ReportExplanationLoader key={`${caseId}-${token}-${report.version}`} caseId={caseId} token={token} reportVersion={report.version} />}
     <section className="panel" aria-labelledby="core-questions">
       <h3 id="core-questions">Questions to ask the dealer</h3>
       <p>Edit your questions before copying. Edits stay on this screen; the saved report and PDF keep the original findings.</p>
@@ -119,6 +122,7 @@ export function CoreDealReport({ report, caseId, token }: { report: CoreReport; 
       </dl>
     </section>
     {analysis.financingAvailability && analysis.financingAvailability !== "NOT_APPLICABLE" && <DealerFinancingResult result={analysis.financing ?? null} availability={analysis.financingAvailability} terms={analysis.financingTerms} />}
+    <MarketEvidenceSection evidence={analysis.marketEvidence} />
     <section className="panel" id="core-evidence" tabIndex={-1}>
       <h3>Evidence and calculations</h3>
       <p>Each amount shows the dealer document page and region it was read from, or says that no document source exists, and each calculated amount shows its arithmetic.</p>
@@ -137,6 +141,14 @@ export function CoreDealReport({ report, caseId, token }: { report: CoreReport; 
       <dl>{Object.entries(analysis.policyVersions).map(([name, version]) => <div key={name}><dt>{name}</dt><dd>{version}</dd></div>)}</dl>
     </section>
   </article>;
+}
+
+export function MarketEvidenceSection({ evidence }: { evidence?: CoreReport["analysis"]["marketEvidence"] }) {
+  return <section className="panel" aria-labelledby="market-evidence-heading">
+    <h3 id="market-evidence-heading">Market evidence</h3>
+    {evidence?.paragraphs.length ? evidence.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)
+      : <p>Market evidence details are unavailable in this saved report.</p>}
+  </section>;
 }
 
 /** Serialized inputs are only rendered once the Buyer opens this diagnostic disclosure. */

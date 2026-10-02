@@ -159,6 +159,7 @@ class DocumentExtractionAcceptanceTest {
             Map.of("format", "ZIP", "reportVersion", 0), "retained-archive", token))
             .isInstanceOf(org.springframework.web.client.HttpServerErrorException.class);
       } finally { java.nio.file.Files.move(unavailableObjects, documentObjects); }
+      JsonNode servedExplanation = HttpAcceptanceHarness.get(application.client(), casePath + "/reports/3/explanation", token);
       JsonNode archive = HttpAcceptanceHarness.post(application.client(), casePath + "/exports",
           Map.of("format", "ZIP", "reportVersion", 0), "retained-archive", token);
       byte[] exported = application.client().get().uri(casePath + "/exports/" + archive.path("id").asText())
@@ -175,6 +176,10 @@ class DocumentExtractionAcceptanceTest {
       assertThat(retained.path("document_extractions")).hasSize(2);
       assertThat(retained.path("deal_term_corrections")).isNotEmpty();
       assertThat(retained.path("price_plan_snapshots")).isNotEmpty();
+      assertThat(retained.path("report_explanations")).hasSize(1);
+      assertThat(retained.at("/report_explanations/0/report_version").asInt()).isEqualTo(3);
+      assertThat(retained.at("/report_explanations/0/path").asText()).isEqualTo("TEMPLATE");
+      assertThat(retained.at("/report_explanations/0/payload_json")).isEqualTo(servedExplanation);
       assertThat(entries).containsKeys("reports/report-1.html", "reports/report-3.html",
           "documents/" + upload.at("/document/id").asText(),
           "documents/" + upload.at("/document/id").asText() + "-page-1.png");
@@ -418,6 +423,25 @@ class DocumentExtractionAcceptanceTest {
           .as("a reply changes no report").isEqualTo(report);
       assertThat(HttpAcceptanceHarness.get(application.client(), languagePath, token)).isEqualTo(language);
       assertThat(HttpAcceptanceHarness.get(application.client(), baselinePath + "/latest", token)).isEqualTo(baseline);
+
+      String explanationPath = "/api/v1/cases/" + caseId + "/reports/1/explanation";
+      JsonNode explanation = HttpAcceptanceHarness.get(application.client(), explanationPath, token);
+      assertThat(explanation.path("path").asText()).as("model paths are off in the shipped configuration").isEqualTo("TEMPLATE");
+      assertThat(explanation.path("fallbackReason").asText()).isEqualTo("MODEL_PATH_OFF");
+      assertThat(explanation.path("reportVersion").asInt()).isEqualTo(1);
+      assertThat(explanation.at("/statements/0/text").asText()).isEqualTo(language.at("/language/items/0/explanation").asText());
+      assertThat(explanation.at("/statements/0/sources/0/sourcePointer").asText()).isEqualTo("/analysis/reviewStatus");
+      assertThatThrownBy(() -> HttpAcceptanceHarness.get(application.client(), explanationPath, "wrong-token"))
+          .isInstanceOf(HttpClientErrorException.class);
+      assertThat(HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/1", token))
+          .as("an explanation changes no report").isEqualTo(report);
+      assertThat(HttpAcceptanceHarness.get(application.client(), explanationPath, token))
+          .as("the stored explanation is served unchanged on reopen").isEqualTo(explanation);
+      var explanationRows = new org.springframework.jdbc.core.JdbcTemplate(application.context().getBean(javax.sql.DataSource.class))
+          .queryForList("select path, fallback_reason, model_id from report_explanations where case_id = ?", caseId);
+      assertThat(explanationRows).hasSize(1);
+      assertThat(explanationRows.getFirst()).containsEntry("path", "TEMPLATE").containsEntry("fallback_reason", "MODEL_PATH_OFF")
+          .containsEntry("model_id", null);
       assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), repliesPath,
           Map.of("dealerResponse", " "), "reply-blank", token))
           .isInstanceOf(HttpClientErrorException.BadRequest.class);
