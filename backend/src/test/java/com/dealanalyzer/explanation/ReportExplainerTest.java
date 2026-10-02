@@ -80,8 +80,10 @@ class ReportExplainerTest {
   }
 
   private static String sentence(String text, String... findings) {
-    return "{\"sentences\":[{\"text\":\"" + text + "\",\"finding_ids\":[" + String.join(",",
-        java.util.Arrays.stream(findings).map(id -> "\"" + id + "\"").toList()) + "]}]}";
+    // One id is sent as the schema's string; more than one is sent as an array, which the schema rejects.
+    String finding = findings.length == 1 ? "\"" + findings[0] + "\"" : "[" + String.join(",",
+        java.util.Arrays.stream(findings).map(id -> "\"" + id + "\"").toList()) + "]";
+    return "{\"sentences\":[{\"text\":\"" + text + "\",\"finding_id\":" + finding + "}]}";
   }
 
   @Test void withTheModelPathOffTheTemplateWordingIsShownAndSaysSo() throws Exception {
@@ -107,12 +109,12 @@ class ReportExplainerTest {
     var before = report.deepCopy();
     var explanation = model(replying("""
         {"sentences":[
-          {"text":"The written offer needs your review before you decide.","finding_ids":["review-status"]},
+          {"text":"The written offer needs your review before you decide.","finding_id":"review-status"},
           {"text":"The selling price of {amount-0} is above the estimated market range of {amount-2} to {amount-3}.",
-           "finding_ids":["deal-rating"]},
+           "finding_id":"deal-rating"},
           {"text":"The quoted out-the-door total reconciles with the recorded calculation of {amount-1}.",
-           "finding_ids":["quoted-total-reconciliation"]},
-          {"text":"Your approved out-the-door limit is {amount-4}, so it is unknown here.","finding_ids":["review-status"]}]}
+           "finding_id":"quoted-total-reconciliation"},
+          {"text":"Your approved out-the-door limit is {amount-4}, so it is unknown here.","finding_id":"review-status"}]}
         """)).explain("case-1", report);
 
     assertThat(explanation.path()).isEqualTo(Path.MODEL);
@@ -202,8 +204,8 @@ class ReportExplainerTest {
   @Test void oneUnsupportedSentenceBlocksTheWholeModelText() throws Exception {
     var explanation = model(replying("""
         {"sentences":[
-          {"text":"The written offer needs review.","finding_ids":["review-status"]},
-          {"text":"The selling price is within the estimated market range.","finding_ids":["deal-rating"]}]}
+          {"text":"The written offer needs review.","finding_id":"review-status"},
+          {"text":"The selling price is within the estimated market range.","finding_id":"deal-rating"}]}
         """)).explain("case-1", report());
 
     assertThat(explanation.path()).isEqualTo(Path.TEMPLATE);
@@ -268,7 +270,12 @@ class ReportExplainerTest {
     var twoIds = model(replying(sentence("The written offer needs review.", "review-status", "deal-rating")))
         .explain("case-1", report);
     assertThat(twoIds.path()).isEqualTo(Path.TEMPLATE);
-    assertThat(twoIds.fallbackReason()).as("the schema bounds finding_ids to one item").isEqualTo("CONTRACT_FAILURE");
-    assertThat(ExplanationTask.task().outputSchema().toString()).contains("maxItems=1", "minItems=1");
+    assertThat(twoIds.fallbackReason()).as("finding_id is a single string; an array is off-schema").isEqualTo("CONTRACT_FAILURE");
+    var sentenceSchema = (java.util.Map<?, ?>) ((java.util.Map<?, ?>) ((java.util.Map<?, ?>) ((java.util.Map<?, ?>)
+        ExplanationTask.task().outputSchema().get("properties")).get("sentences")).get("items"));
+    assertThat(sentenceSchema.get("required")).isEqualTo(List.of("text", "finding_id"));
+    assertThat(((java.util.Map<?, ?>) sentenceSchema.get("properties")).get("finding_id"))
+        .isEqualTo(java.util.Map.of("type", "string"));
+    assertThat(ExplanationTask.task().outputSchema().toString()).doesNotContain("minItems", "maxItems", "finding_ids");
   }
 }

@@ -10,7 +10,7 @@ import java.util.Map;
  * Checks model output against the task's own schema before the task parser sees it. Structured output
  * constrains decoding, but the result is still vendor data: anything outside the schema is rejected,
  * never trimmed or repaired. Supports the subset task schemas use: type (including a list of types),
- * properties, required, additionalProperties false, items, minItems, maxItems, and enum.
+ * properties, required, additionalProperties false, items, and enum.
  */
 final class OutputSchemaValidator {
   private OutputSchemaValidator() {}
@@ -41,12 +41,6 @@ final class OutputSchemaValidator {
           throw new IllegalArgumentException("Output has a field the schema does not declare");
         }
       }
-    }
-    if (value.isArray() && schema.get("minItems") instanceof Number min && value.size() < min.intValue()) {
-      throw new IllegalArgumentException("Output array has too few items");
-    }
-    if (value.isArray() && schema.get("maxItems") instanceof Number max && value.size() > max.intValue()) {
-      throw new IllegalArgumentException("Output array has too many items");
     }
     if (value.isArray() && schema.get("items") instanceof Map<?, ?> items) {
       for (JsonNode element : value) check(items, element, depth + 1);

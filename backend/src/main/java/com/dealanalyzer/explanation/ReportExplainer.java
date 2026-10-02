@@ -39,7 +39,7 @@ public class ReportExplainer {
       var result = harness.run(caseId, task,
           List.of(new UntrustedInput.Text("finalized findings", facts.modelInput(json))), 1);
       List<ExplanationCheck.Sentence> sentences = result.value().sentences().stream()
-          .map(sentence -> new ExplanationCheck.Sentence(sentence.text(), sentence.findingIds())).toList();
+          .map(sentence -> new ExplanationCheck.Sentence(sentence.text(), List.of(sentence.findingId()))).toList();
       return explanation(ReportExplanation.Path.MODEL, null, facts, ExplanationCheck.check(facts, sentences),
           result.provenance());
     } catch (ProviderMeter.Failure failure) {

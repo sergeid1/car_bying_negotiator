@@ -21,7 +21,6 @@ public class ExplanationTask {
   public static final String PROMPT_VERSION = "report-explanation-prompt.v1";
   public static final String SCHEMA_VERSION = "report-explanation-schema.v1";
   public static final int MAX_SENTENCES = 6;
-  public static final int FINDINGS_PER_SENTENCE = 1;
   public static final int MAX_TEXT = 400;
 
   static final String INSTRUCTIONS = """
@@ -32,8 +31,7 @@ public class ExplanationTask {
       Return only the required JSON object with up to six sentences. Each sentence has:
       - text: one plain sentence describing only what the cited findings record. To mention an amount, \
       write its placeholder exactly, for example {amount-0}; the product inserts the recorded figure.
-      - finding_ids: exactly one id, of the single finding the sentence describes. Use only ids from the \
-      data. Describe each finding in its own sentence, and mention only amounts whose subjects match it.
+      - finding_id: the id of the single finding the sentence describes. Use only ids from the data. Describe each finding in its own sentence, and mention only amounts whose subjects match it.
 
       Never write digits or spelled-out amounts. Describe a finding whose state is unavailable, missing \
       or insufficient as unknown or unavailable. Never call an estimated amount exact. Do not mention \
@@ -45,9 +43,8 @@ public class ExplanationTask {
     public Output { sentences = List.copyOf(sentences); }
   }
 
-  public record Sentence(String text, List<String> findingIds) {
-    public Sentence { findingIds = List.copyOf(findingIds); }
-  }
+  /** One sentence and the single finding it describes; the schema allows no second id. */
+  public record Sentence(String text, String findingId) {}
 
   @Bean
   public ModelTask<Output> explanationModelTask() {
@@ -59,9 +56,8 @@ public class ExplanationTask {
     Map<String, Object> sentence = Map.of(
         "type", "object",
         "additionalProperties", false,
-        "required", List.of("text", "finding_ids"),
-        "properties", Map.of("text", text, "finding_ids", Map.of("type", "array", "items", text,
-            "minItems", FINDINGS_PER_SENTENCE, "maxItems", FINDINGS_PER_SENTENCE)));
+        "required", List.of("text", "finding_id"),
+        "properties", Map.of("text", text, "finding_id", text));
     Map<String, Object> schema = Map.of(
         "type", "object",
         "additionalProperties", false,
@@ -76,11 +72,8 @@ public class ExplanationTask {
     if (sentences.isEmpty() || sentences.size() > MAX_SENTENCES) throw new IllegalArgumentException("Sentence count out of range");
     List<Sentence> parsed = new ArrayList<>();
     for (JsonNode sentence : sentences) {
-      JsonNode ids = sentence.get("finding_ids");
-      if (ids.size() != FINDINGS_PER_SENTENCE) throw new IllegalArgumentException("A sentence cites exactly one finding");
-      List<String> findingIds = new ArrayList<>();
-      ids.forEach(id -> findingIds.add(bounded(id.asText(), 100)));
-      parsed.add(new Sentence(bounded(sentence.get("text").asText(), MAX_TEXT), findingIds));
+      parsed.add(new Sentence(bounded(sentence.get("text").asText(), MAX_TEXT),
+          bounded(sentence.get("finding_id").asText(), 100)));
     }
     return new Output(parsed);
   }

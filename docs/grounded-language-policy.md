@@ -95,7 +95,7 @@ and financing availability, payment and quoted-total reconciliation, financed ad
 the material amounts' identifiers and precision. The model sees code-owned states and amount ids;
 it never sees a figure, a label, document text, provider prose or an extraction candidate.
 
-Gate: each sentence cites exactly one finding (the schema bounds `finding_ids` to one item and the
+Gate: each sentence cites exactly one finding (the schema's `finding_id` is a single string, and the
 check rejects anything else), so every state term and subject is checked against that single
 finding. Amounts appear only as `{amount-N}` placeholders for amounts that belong to the finding's
 subjects, rendered by the product from `/analysis/materialAmounts/N` (an estimate is marked "(estimated)",
