@@ -5,7 +5,7 @@ import App from "./App";
 /** The shape `GET /api/v1/sample-report` returns: a real report with its identifying fields set to null. */
 const SAMPLE = {
   label: "EXAMPLE", source: "SYNTHETIC_CASE",
-  redaction: { method: "field-removal", version: "sample-redaction.v1", removed: ["VIN", "DEALER_IDENTITY", "LISTING_URL", "DOCUMENT_REFERENCES", "FREE_TEXT"] },
+  redaction: { method: "FIELD_CATEGORIES", version: "sample-redaction.v2", removed: ["VIN", "DEALER_IDENTITY", "LISTING_URL", "DOCUMENT_REFERENCES", "FREE_TEXT"] },
   report: { version: 1, asOf: "2026-09-30", status: "COMPLETE", analysis: {
     reviewLabel: "Review required", dealRating: "FAIR", ratingBasis: "Selling price comparison", nextAction: "Ask the dealer to itemize the fees.",
     topReasons: ["The documentation fee is above the recorded range.", null], marketAvailability: "AVAILABLE", cashAvailability: "AVAILABLE",
@@ -41,7 +41,7 @@ test("the example report opens from the start of the flow without a case, labell
   const about = within(panel).getByRole("note", { name: "About this example" });
   expect(about).toHaveTextContent("Example report.");
   expect(about).toHaveTextContent("Built from a synthetic case");
-  expect(about).toHaveTextContent("Redaction method: field-removal, version sample-redaction.v1.");
+  expect(about).toHaveTextContent("Redaction method: named categories of fields are removed; generated wording and amounts are kept (version sample-redaction.v2).");
   expect(within(about).getByText("Vehicle identification number (VIN)")).toBeVisible();
   expect(within(about).getByText("Dealer name and identity")).toBeVisible();
 

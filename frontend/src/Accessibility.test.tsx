@@ -175,7 +175,7 @@ test("offer terms, the example report and the payment point have no automated AA
     paymentPoint: "BEFORE_REPORT", free: ["CASE_START", "DOCUMENT_UPLOAD", "CASE_DELETION"], paid: ["DEAL_ANALYSIS_REPORT", "REPORT_EXPORT"],
     refund: { windowDays: 14, terms: "FULL_REFUND_ON_REQUEST_WITHIN_WINDOW" }, jurisdiction: null,
     excludedPurchaseTypes: ["LEASE", "AUCTION"], scopeLimits: ["NO_DEALER_CONTACT"], checkout: "DEVELOPMENT_NO_CHARGE" };
-  const sample = { label: "EXAMPLE", source: "SYNTHETIC_CASE", redaction: { method: "field-removal", version: "v1", removed: ["VIN", "DEALER_IDENTITY"] },
+  const sample = { label: "EXAMPLE", source: "SYNTHETIC_CASE", redaction: { method: "FIELD_CATEGORIES", version: "sample-redaction.v2", removed: ["VIN", "DEALER_IDENTITY"] },
     report: { version: 1, asOf: "2026-09-30", status: "COMPLETE", analysis: {
       reviewLabel: "Review required", dealRating: "FAIR", ratingBasis: "Selling price comparison", nextAction: "Ask about the fee",
       topReasons: ["Check fees", null], marketAvailability: "AVAILABLE", cashAvailability: "AVAILABLE",

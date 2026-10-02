@@ -27,7 +27,7 @@ const REPORT = { version: 1, asOf: "2026-09-30", status: "COMPLETE", analysis: {
 }, evidence: { dealerOffer: { id: "o1" } }, reproduction: {} };
 
 const SAMPLE = { label: "EXAMPLE", source: "SYNTHETIC_CASE",
-  redaction: { method: "field-removal", version: "sample-redaction.v1", removed: ["VIN", "DEALER_IDENTITY", "LISTING_URL", "BUYER_LOCATION", "DOCUMENT_REFERENCES", "PAGE_REGIONS", "FREE_TEXT"] },
+  redaction: { method: "FIELD_CATEGORIES", version: "sample-redaction.v2", removed: ["VIN", "DEALER_IDENTITY", "LISTING_URL", "BUYER_LOCATION", "DOCUMENT_REFERENCES", "PAGE_REGIONS", "FREE_TEXT"] },
   report: REPORT };
 
 /** No backend: the offer, the example, and a case whose report is refused until it is bought. */
@@ -98,7 +98,7 @@ test("the example report opens before any case at 360 px", async ({ page }) => {
   const example = page.getByRole("region", { name: "See an example report" });
   await expect(example.getByRole("heading", { name: "Deal Analysis Report", exact: true })).toBeFocused();
   await expect(example.getByRole("note", { name: "About this example" })).toContainText("Built from a synthetic case");
-  await expect(example.getByRole("note", { name: "About this example" })).toContainText("Redaction method: field-removal, version sample-redaction.v1.");
+  await expect(example.getByRole("note", { name: "About this example" })).toContainText("Redaction method: named categories of fields are removed; generated wording and amounts are kept (version sample-redaction.v2).");
   await expect(example.getByText(/Document source: removed from this example/)).toHaveCount(2);
   await expectNoHorizontalOverflow(page);
   await expectNoAxeViolations(page);

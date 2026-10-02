@@ -9,6 +9,14 @@ type SampleReport = {
   report: CoreReport;
 };
 
+const REDACTION_METHODS: Record<string, string> = {
+  FIELD_CATEGORIES: "named categories of fields are removed; generated wording and amounts are kept",
+};
+
+function redactionMethodName(method: string): string {
+  return REDACTION_METHODS[method] ?? method;
+}
+
 const REMOVED: Record<string, string> = {
   VIN: "Vehicle identification number (VIN)",
   DEALER_IDENTITY: "Dealer name and identity",
@@ -72,7 +80,7 @@ export function SampleReportEntry() {
         <p><strong>Example report.</strong> {sample.source === "SYNTHETIC_CASE"
           ? "Built from a synthetic case, not a real Buyer's deal."
           : "Not a real Buyer's deal."} Its amounts illustrate the format and say nothing about your deal.</p>
-        <p>Redaction method: {sample.redaction.method}, version {sample.redaction.version}.</p>
+        <p>Redaction method: {redactionMethodName(sample.redaction.method)} (version {sample.redaction.version}).</p>
         {sample.redaction.removed.length > 0 && <>
           <p>Removed from this example:</p>
           <ul>{sample.redaction.removed.map(code => <li key={code}>{removedName(code)}</li>)}</ul>
