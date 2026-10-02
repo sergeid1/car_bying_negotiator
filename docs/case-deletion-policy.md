@@ -134,3 +134,11 @@ adds the case to `acquisition_channel_totals`, an anonymous per-channel counter 
 starts, qualified cases and qualified uploads, keyed only by channel code (`''` for no channel).
 Like the cohort totals, it holds no case, Buyer, Dealer, document or time reference. Channel
 configuration and operator-entered spend are global operator records, not case records.
+# Purchase records (ticket 44)
+
+V27 case_purchases and case_purchase_requests belong to the case and are erased by CaseGraphDeletionPlan, including
+request keys, offer and price, checkout state, refund time and operator. Before erasure,
+purchase_totals retains anonymous removed case, paid purchase and refund counts; the existing
+acquisition_channel_totals retains removed paid counts by channel. No purchase ID, case ID,
+operator, timestamp, or price survives in these totals. Deletion retries cannot double-count:
+counter updates and graph erasure share the deletion transaction.

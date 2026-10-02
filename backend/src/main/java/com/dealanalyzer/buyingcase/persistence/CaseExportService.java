@@ -24,12 +24,15 @@ public class CaseExportService {
   private final ObjectMapper json;
   private final ExportContentProtection protection;
   private final java.time.Duration lifetime;
+  private final com.dealanalyzer.purchase.PurchaseService purchases;
   public CaseExportService(AnalysisCaseRepository cases, AnalysisReportRepository reports, ExportJobRepository jobs,
       CaseAccessService access, CaseExportProjection projection, RetainedDocumentExport documents,
       StoredReportRenderer renderer, ObjectMapper json, ExportContentProtection protection,
+      com.dealanalyzer.purchase.PurchaseService purchases,
       @org.springframework.beans.factory.annotation.Value("${case.export.lifetime:PT24H}") java.time.Duration lifetime) {
     this.cases=cases; this.reports=reports; this.jobs=jobs; this.access=access; this.projection=projection;
     this.documents=documents; this.renderer=renderer; this.json=json; this.protection=protection; this.lifetime=lifetime;
+    this.purchases=purchases;
   }
   public enum Format { ZIP, HTML, PDF }
   public record Job(String id, Format format, int reportVersion, Instant createdAt, Instant expiresAt) {}
@@ -37,6 +40,7 @@ public class CaseExportService {
   @Transactional
   public Job create(String caseId, String token, String key, Format format, int version) {
     var buyingCase=access.requireAuthorized(cases.findLockedById(caseId), token, c->c.accessTokenHash, c->c.accessExpiresAt);
+    if (format != Format.ZIP || buyingCase.currentReportVersion > 0) purchases.requireReport(caseId, token);
     var previous=jobs.findByCaseIdAndRequestKey(caseId,key).orElse(null);
     if(previous!=null) {
       if(!previous.format.equals(format.name()) || previous.reportVersion!=version) throw new IdempotencyConflictException();
@@ -66,6 +70,9 @@ public class CaseExportService {
     access.requireAuthorized(cases.findById(caseId), token, c->c.accessTokenHash, c->c.accessExpiresAt);
     var job=jobs.findById(id).filter(j->j.caseId.equals(caseId) && j.expiresAt.isAfter(Instant.now()))
         .orElseThrow(()->new ResourceNotFoundException("Export not found"));
+    // A pre-offer archive may already contain reports, so ZIP downloads are gated if the case has reports.
+    if (!job.format.equals("ZIP") || cases.findById(caseId).orElseThrow().currentReportVersion > 0)
+      purchases.requireReport(caseId, token);
     return new Download(protection.decrypt(caseId + ":" + job.id,job.contentBase64), Format.valueOf(job.format));
   }
   private Job view(ExportJobEntity job) { return new Job(job.id,Format.valueOf(job.format),job.reportVersion,job.createdAt,job.expiresAt); }

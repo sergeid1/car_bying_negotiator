@@ -20,7 +20,7 @@ public class PilotReadiness {
   public static final List<String> REQUIRED_IDS = List.of(
       "jurisdiction-pack", "provider-terms", "document-corpus", "expert-policy-validation",
       "frozen-parameters", "infrastructure-and-privacy-inventory", "legal-and-product-copy",
-      "preregistered-thresholds", "schema-and-orm-evidence");
+      "preregistered-thresholds", "schema-and-orm-evidence", "payment-provider");
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   public record Prerequisite(String id, String requirement, String status, String blocker,
