@@ -11,6 +11,8 @@ import com.dealanalyzer.market.persistence.MarketAssessmentPersistence.MarketAss
 import com.dealanalyzer.vehicle.InvalidVehicleEvidenceException;
 import com.dealanalyzer.vehicle.VehicleEvidenceService;
 import java.time.Instant;
+import java.time.Clock;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -21,12 +23,21 @@ public class MarketAssessmentService {
   private final MarketAssessmentPersistence persistence;
   private final com.dealanalyzer.operations.ProviderMeter meter;
   private final MarketAssessmentPolicy policy = new MarketAssessmentPolicy();
+  private final Clock clock;
 
+  @Autowired
   public MarketAssessmentService(
       EphemeralBuyingCaseService cases,
       VehicleEvidenceService vehicles,
       MarketDataProvider provider,
       MarketAssessmentPersistence persistence, com.dealanalyzer.operations.ProviderMeter meter) {
+    this(cases, vehicles, provider, persistence, meter, Clock.systemUTC());
+  }
+
+  MarketAssessmentService(
+      EphemeralBuyingCaseService cases, VehicleEvidenceService vehicles, MarketDataProvider provider,
+      MarketAssessmentPersistence persistence, com.dealanalyzer.operations.ProviderMeter meter, Clock clock) {
+    this.clock = clock;
     this.meter = meter;
     this.cases = cases;
     this.vehicles = vehicles;
@@ -45,7 +56,7 @@ public class MarketAssessmentService {
     MarketVehicle query = new MarketVehicle(
         vehicle.vin(), vehicle.year(), vehicle.make(), vehicle.model(), vehicle.trim(),
         vehicle.mileage(), buyingCase.dealerLocation());
-    Instant now = Instant.now();
+    Instant now = clock.instant();
     ProviderResult result;
     try {
       result = meter.call(caseId, com.dealanalyzer.operations.ProviderMeter.Operation.MARKET_RETRIEVAL,

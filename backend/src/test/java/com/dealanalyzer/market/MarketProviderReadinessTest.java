@@ -12,11 +12,14 @@ import com.dealanalyzer.operations.ProviderUsageStore;
 import com.dealanalyzer.vehicle.VehicleEvidenceService;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class MarketProviderReadinessTest {
-  private static final Instant NOW = Instant.now();
+  private static final Instant NOW = Instant.parse("2026-10-02T09:12:33.123Z");
+  private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
   private static final MarketVehicle VEHICLE = new MarketVehicle(
       null, 2021, "Honda", "Accord", "EX-L", 38_000L, "27604");
 
@@ -56,20 +59,33 @@ class MarketProviderReadinessTest {
   @Test void cachedAssessmentExpiresAtReportGenerationWithoutRefreshingPrices() {
     var assessment = new MarketAssessmentPolicy().assess(VEHICLE,
         ProviderResult.available(snapshot("market-provider.v1", NOW), observations()));
-    assertThat(MarketReportEvidence.current(view(assessment), NOW)).isTrue();
-    var expired = NOW.plus(Duration.ofDays(46));
-    assertThat(MarketReportEvidence.current(view(assessment), expired)).isFalse();
-    var summary = MarketReportEvidence.describe(view(assessment), expired, false);
+    var current = new MarketReportEvidence(CLOCK);
+    assertThat(current.current(view(assessment))).isTrue();
+    var boundary = new MarketReportEvidence(Clock.offset(CLOCK, Duration.ofDays(45)));
+    assertThat(boundary.current(view(assessment))).isTrue();
+    var expired = new MarketReportEvidence(Clock.offset(CLOCK, Duration.ofDays(45).plusNanos(1)));
+    assertThat(expired.current(view(assessment))).isFalse();
+    var summary = expired.describe(view(assessment), false);
     assertThat(summary.status()).isEqualTo("UNAVAILABLE");
     assertThat(String.join(" ", summary.paragraphs())).contains("stale", "No market rating is drawn");
     assertThat(assessment.range()).isNotNull(); // Original frozen evidence is retained, never reused as current.
   }
 
+  @Test void assessmentUsesTheFixedClockForSnapshotFreshnessAndPersistenceTime() {
+    var accepted = create(ProviderResult.available(snapshot("market-provider.v1", NOW.minus(Duration.ofDays(45))),
+        List.of()), false, ProviderMeter.Status.SUCCESS);
+    assertThat(accepted.status()).isEqualTo(MarketAssessment.Status.INSUFFICIENT_DATA);
+    var expired = create(ProviderResult.available(snapshot("market-provider.v1", NOW.minus(Duration.ofDays(45)).minusNanos(1)),
+        List.of()), false, ProviderMeter.Status.CONTRACT_FAILURE);
+    assertThat(expired.status()).isEqualTo(MarketAssessment.Status.UNAVAILABLE);
+    assertThat(expired.limitation()).contains("stale");
+  }
+
   @Test void availableEvidenceStatesRetrievalWindowAndUncertainty() {
     var assessment = new MarketAssessmentPolicy().assess(VEHICLE,
         ProviderResult.available(snapshot("market-provider.v1", NOW), observations()));
-    assertThat(String.join(" ", MarketReportEvidence.describe(view(assessment), NOW, true).paragraphs()))
-        .contains("Market data retrieved: " + MarketReportEvidence.date(NOW), "Observation window:", "Uncertainty: low confidence", "uncertainty buffer")
+    assertThat(String.join(" ", new MarketReportEvidence(CLOCK).describe(view(assessment), true).paragraphs()))
+        .contains("Market data retrieved: October 2, 2026.", "Observation window: September 28 to September 30, 2026.", "Uncertainty: low confidence", "uncertainty buffer")
         .doesNotContain(NOW.toString());
   }
 
@@ -99,10 +115,10 @@ class MarketProviderReadinessTest {
     var usage = mock(ProviderUsageStore.class);
     when(usage.start(anyString(), any(), any(), anyLong())).thenReturn("usage");
     try (var ignored = new MeterCloser(new ProviderMeter(usage, Duration.ofSeconds(1), 1))) {
-      new MarketAssessmentService(cases, vehicles, provider, persistence, ignored.meter).create("case", "token");
+      new MarketAssessmentService(cases, vehicles, provider, persistence, ignored.meter, CLOCK).create("case", "token");
     }
     var assessment = org.mockito.ArgumentCaptor.forClass(MarketAssessment.class);
-    verify(persistence).append(eq("case"), any(), assessment.capture(), any());
+    verify(persistence).append(eq("case"), any(), assessment.capture(), eq(NOW));
     verify(usage).start(eq("case"), eq(ProviderMeter.Operation.MARKET_RETRIEVAL), eq(provider), eq(1L));
     verify(usage).finish("usage", expected);
     return assessment.getValue();

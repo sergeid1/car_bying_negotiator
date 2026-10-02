@@ -2,6 +2,7 @@ package com.dealanalyzer.market;
 
 import com.dealanalyzer.market.persistence.MarketAssessmentPersistence.MarketAssessmentView;
 import java.time.Instant;
+import java.time.Clock;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -11,7 +12,23 @@ import java.util.List;
 public final class MarketReportEvidence {
   private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("MMMM d, uuuu", java.util.Locale.US);
   private static final DateTimeFormatter MONTH_DAY = DateTimeFormatter.ofPattern("MMMM d", java.util.Locale.US);
-  private MarketReportEvidence() {}
+  private final Clock clock;
+
+  public MarketReportEvidence() {
+    this(Clock.systemUTC());
+  }
+
+  MarketReportEvidence(Clock clock) {
+    this.clock = clock;
+  }
+
+  public boolean current(MarketAssessmentView assessment) {
+    return current(assessment, clock.instant());
+  }
+
+  public Summary describe(MarketAssessmentView assessment, boolean usable) {
+    return describe(assessment, clock.instant(), usable);
+  }
 
   public static boolean current(MarketAssessmentView assessment, Instant now) {
     return assessment != null && assessment.provider() != null
