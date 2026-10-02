@@ -6,8 +6,12 @@ import { DealerFinancingForm } from "./DealerFinancing";
 import { OutsideFinancing } from "./OutsideFinancing";
 import { OutcomeFeedback } from "./PilotFeedback";
 import { NegotiationLoader } from "./NegotiationDraft";
+import { PurchasePoint } from "./OneTimeOffer";
 
 type Props = { caseId: string; token: string; offerVersion?: number; pollDelayMs?: number };
+/** A paid endpoint refused this unpurchased case: the payment point, not a failure. */
+class PurchaseRequired extends Error {}
+
 const stages = ["Finding your verified offer", "Reading market evidence", "Calculating cash economics", "Preparing your report", "Opening your report"];
 
 export function VerifiedOfferAnalysis({ caseId, token, offerVersion, pollDelayMs = 250 }: Props) {
@@ -17,6 +21,7 @@ export function VerifiedOfferAnalysis({ caseId, token, offerVersion, pollDelayMs
   const [error, setError] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [purchaseRequired, setPurchaseRequired] = useState(false);
   const requestKey = useRef(crypto.randomUUID());
   const requestedOffer = useRef<number | undefined>(undefined);
   // Set by "Update analysis"; otherwise a report already made from this offer is reopened, not regenerated.
@@ -29,11 +34,12 @@ export function VerifiedOfferAnalysis({ caseId, token, offerVersion, pollDelayMs
       const response = await fetch(path, { method, headers: {
         ...headers, ...(method === "POST" ? { "Idempotency-Key": requestKey.current } : {}),
       } });
+      if (response.status === 402) throw new PurchaseRequired();
       if (!response.ok) throw new Error("Analysis unavailable");
       return response.json();
     }
     async function run() {
-      setError(false); setWaiting(false); setStage(0); setReport(undefined);
+      setError(false); setWaiting(false); setPurchaseRequired(false); setStage(0); setReport(undefined);
       try {
         const response = await fetch(`${base}/dealer-offers/latest`, { headers });
         if (response.status === 404 && offerVersion === undefined) { if (!cancelled) setWaiting(true); return; }
@@ -47,6 +53,8 @@ export function VerifiedOfferAnalysis({ caseId, token, offerVersion, pollDelayMs
         if (cancelled) return;
         if (!forceRun.current) {
           const existing = await fetch(`${base}/reports/latest`, { headers });
+          // Checked before any analysis work, so an unpurchased case stops here.
+          if (existing.status === 402) throw new PurchaseRequired();
           const saved = existing.ok ? await existing.json() : undefined;
           if (cancelled) return;
           if (offer.id && saved?.evidence?.dealerOffer?.id === offer.id && saved.analysis?.materialAmounts) {
@@ -78,7 +86,10 @@ export function VerifiedOfferAnalysis({ caseId, token, offerVersion, pollDelayMs
         const payload = await request(`${base}/reports/latest`);
         if (!payload.analysis?.materialAmounts) throw new Error("Report unavailable");
         if (!cancelled) setReport(payload);
-      } catch { if (!cancelled) setError(true); }
+      } catch (caught) {
+        if (cancelled) return;
+        if (caught instanceof PurchaseRequired) setPurchaseRequired(true); else setError(true);
+      }
     }
     void run();
     return () => { cancelled = true; };
@@ -87,7 +98,8 @@ export function VerifiedOfferAnalysis({ caseId, token, offerVersion, pollDelayMs
   return <section className="stack verified-analysis" aria-label="Verified offer analysis">
     {!report && <DealerFinancingForm caseId={caseId} token={token} />}
     {!report && <OutsideFinancing caseId={caseId} token={token} />}
-    {!report && <div className="panel">
+    {!report && purchaseRequired && <PurchasePoint caseId={caseId} token={token} onPurchased={() => setAttempt(value => value + 1)} />}
+    {!report && !purchaseRequired && <div className="panel">
       <h2>Your offer analysis</h2>
       {waiting ? <p>Verify and freeze your dealer offer to continue to the report.</p> : <>
         <ol aria-label="Analysis stages">{labels.map((label, index) => <li key={label} aria-current={index === stage ? "step" : undefined}>{label}{index < stage ? " — complete" : ""}</li>)}</ol>

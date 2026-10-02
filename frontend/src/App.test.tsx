@@ -38,9 +38,10 @@ test("buyer can start a synthetic cash analysis and reach the rendered report", 
     },
   ];
   vi.spyOn(globalThis, "fetch").mockImplementation(async input => {
-    // The intake form reads its options on mount; the fixture flow owns the remaining replies.
+    // The intake form reads its options and the offer on mount; the fixture flow owns the remaining replies.
     const body = String(input).endsWith("/intake-options")
       ? { supported: ["US-NC"], consentPolicies: { serviceProcessing: "service-processing.v1" } }
+      : String(input).endsWith("/api/v1/offer") ? { status: "UNAVAILABLE" }
       : responses.shift();
     return new Response(JSON.stringify(body), {
       status: 200,

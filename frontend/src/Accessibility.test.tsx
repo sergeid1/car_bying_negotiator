@@ -14,6 +14,8 @@ import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { DealerReplyAssistant } from "./NegotiationDraft";
 import { ReportExplanationLoader } from "./ReportExplanation";
 import { ReferralDisclosure } from "./AcquisitionChannel";
+import { OfferTerms, PurchasePoint } from "./OneTimeOffer";
+import { SampleReportEntry } from "./SampleReport";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const AA = {
@@ -166,4 +168,31 @@ test("report explanation with generated text, amount links and sources has no au
   const { container } = render(<main><h1>Buying Case</h1><h2>Report</h2><ReportExplanationLoader caseId="case" token="token" reportVersion={1} /></main>);
   await screen.findByText("Generated explanation");
   expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+test("offer terms, the example report and the payment point have no automated AA violations", async () => {
+  const offer = { status: "AVAILABLE", offerId: "offer-1", kind: "ONE_TIME_PER_CASE", price: { amountMinor: 4900, currency: "USD" },
+    paymentPoint: "BEFORE_REPORT", free: ["CASE_START", "DOCUMENT_UPLOAD", "CASE_DELETION"], paid: ["DEAL_ANALYSIS_REPORT", "REPORT_EXPORT"],
+    refund: { windowDays: 14, terms: "FULL_REFUND_ON_REQUEST_WITHIN_WINDOW" }, jurisdiction: null,
+    excludedPurchaseTypes: ["LEASE", "AUCTION"], scopeLimits: ["NO_DEALER_CONTACT"], checkout: "DEVELOPMENT_NO_CHARGE" };
+  const sample = { label: "EXAMPLE", source: "SYNTHETIC_CASE", redaction: { method: "field-removal", version: "v1", removed: ["VIN", "DEALER_IDENTITY"] },
+    report: { version: 1, asOf: "2026-09-30", status: "COMPLETE", analysis: {
+      reviewLabel: "Review required", dealRating: "FAIR", ratingBasis: "Selling price comparison", nextAction: "Ask about the fee",
+      topReasons: ["Check fees", null], marketAvailability: "AVAILABLE", cashAvailability: "AVAILABLE",
+      materialAmounts: [{ label: "Out-the-door total", minorUnits: 2850000, currency: "USD", precision: "EXACT", source: "cashEconomics",
+        pointer: "/result/outTheDoorTotal", documentSource: null, sourceNote: null }], policyVersions: {}, limitations: [null],
+    }, evidence: {}, reproduction: {} } };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => {
+    const url = String(input);
+    const body = url.endsWith("/api/v1/offer") ? offer : url.endsWith("/sample-report") ? sample : {};
+    return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+  });
+  const { container } = render(<main><h1>Deal X-Ray</h1><SampleReportEntry /><OfferTerms />
+    <PurchasePoint caseId="case" token="token" onPurchased={() => {}} /></main>);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Open the example report" }));
+  await screen.findByRole("note", { name: "About this example" });
+  await screen.findByRole("region", { name: "What is free and what you pay for" });
+  await userEvent.setup().click(await screen.findByText("Price terms, refunds, and scope"));
+  const result = await axe.run(container, AA);
+  expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
 });
