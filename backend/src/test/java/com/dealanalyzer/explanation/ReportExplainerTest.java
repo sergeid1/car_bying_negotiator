@@ -182,6 +182,10 @@ class ReportExplainerTest {
       PROHIBITED_FRAMING         | Following this review will save you money.                           | review-status
       PROHIBITED_FRAMING         | Thanks to this review the price came down.                           | review-status
       PROHIBITED_FRAMING         | We recommend that the written offer gets a review.                   | review-status
+      UNSUPPORTED_SUBJECT        | The market rating needs review.                                      | review-status
+      UNSUPPORTED_CLAIM          | The cash calculation is above the estimated range.                   | cash-availability
+      UNRELATED_AMOUNT           | The written offer needs review against {amount-2}.                   | review-status
+      UNRELATED_AMOUNT           | The out-the-door total is available as {amount-3}.                   | cash-availability
       """)
   void anUnsupportedClaimBlocksTheModelTextAndTheTemplateIsShownInstead(String reason, String text, String finding)
       throws Exception {
@@ -217,12 +221,12 @@ class ReportExplainerTest {
         .explain("case-1", report);
     assertThat(silent.fallbackReason()).isEqualTo("UNKNOWN_NOT_STATED");
 
-    var stated = model(replying(sentence("The market comparison and rating are unknown for this report.",
-        "market-availability", "deal-rating"))).explain("case-1", report);
+    var stated = model(replying(sentence("The market comparison is unknown for this report.",
+        "market-availability"))).explain("case-1", report);
     assertThat(stated.path()).isEqualTo(Path.MODEL);
 
-    var claimed = model(replying(sentence("The market comparison is available and the rating is fair.",
-        "market-availability", "deal-rating"))).explain("case-1", report);
+    var claimed = model(replying(sentence("The market comparison is available.", "market-availability")))
+        .explain("case-1", report);
     assertThat(claimed.fallbackReason()).isEqualTo("UNSUPPORTED_CLAIM");
   }
 
@@ -239,5 +243,32 @@ class ReportExplainerTest {
         .fallbackReason()).isEqualTo("CONTRACT_FAILURE");
     assertThat(model(replying("{\"sentences\":[]}")).explain("case-1", report()).fallbackReason())
         .isEqualTo("CONTRACT_FAILURE");
+  }
+
+  /**
+   * A sentence describes exactly one finding, so a state recorded for one finding cannot be attached
+   * to another finding's subject in the same sentence.
+   */
+  @Test void aSentenceCitesExactlyOneFinding() throws Exception {
+    var report = (com.fasterxml.jackson.databind.node.ObjectNode) report();
+    ((com.fasterxml.jackson.databind.node.ObjectNode) report.get("analysis")).put("marketAvailability", "UNAVAILABLE");
+    var facts = ExplanationFacts.from(report);
+    // Before: "available" from cash-availability could be borrowed for the unavailable market subject.
+    var borrowed = new ExplanationCheck.Sentence("The market comparison is unknown and the cash calculation is available.",
+        List.of("market-availability", "cash-availability"));
+    assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(ExplanationCheck.Rejected.class,
+        () -> ExplanationCheck.check(facts, List.of(borrowed))).reason()).isEqualTo("NOT_ONE_FINDING");
+    assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(ExplanationCheck.Rejected.class,
+        () -> ExplanationCheck.check(facts, List.of(new ExplanationCheck.Sentence("The written offer needs review.", List.of()))))
+        .reason()).isEqualTo("NOT_ONE_FINDING");
+    var alone = new ExplanationCheck.Sentence("The market comparison is available.", List.of("cash-availability"));
+    assertThat(org.assertj.core.api.Assertions.catchThrowableOfType(ExplanationCheck.Rejected.class,
+        () -> ExplanationCheck.check(facts, List.of(alone))).reason()).isEqualTo("UNSUPPORTED_SUBJECT");
+
+    var twoIds = model(replying(sentence("The written offer needs review.", "review-status", "deal-rating")))
+        .explain("case-1", report);
+    assertThat(twoIds.path()).isEqualTo(Path.TEMPLATE);
+    assertThat(twoIds.fallbackReason()).as("the schema bounds finding_ids to one item").isEqualTo("CONTRACT_FAILURE");
+    assertThat(ExplanationTask.task().outputSchema().toString()).contains("maxItems=1", "minItems=1");
   }
 }

@@ -33,12 +33,14 @@ public record ExplanationFacts(int reportVersion, List<Finding> findings, List<A
    * must use one of {@code requires} when that set is not empty, so a finding recorded as unknown,
    * unverifiable or stale is stated as such.
    * {@code state} is a code-owned value (an enum name, a boolean, or {@code RECORDED}); it is the only
-   * part of the finding the model sees.
+   * part of the finding the model sees. {@code amountSubjects} are the subjects of the amounts a sentence
+   * about this finding may mention.
    */
   public record Finding(String id, String sourcePointer, String sourceValue, String state, Set<Subject> subjects,
-      Set<Term> permits, Set<Term> requires) {
+      Set<Subject> amountSubjects, Set<Term> permits, Set<Term> requires) {
     public Finding {
       subjects = Set.copyOf(subjects);
+      amountSubjects = Set.copyOf(amountSubjects);
       permits = Set.copyOf(permits);
       requires = Set.copyOf(requires);
     }
@@ -98,15 +100,17 @@ public record ExplanationFacts(int reportVersion, List<Finding> findings, List<A
           EnumSet.of(Subject.APPROVAL), EnumSet.of(Term.UNVERIFIABLE, Term.UNAVAILABLE), EnumSet.of(Term.UNVERIFIABLE));
       default -> throw new IllegalArgumentException("Unknown finalized review status");
     }
+    // The rating compares the offer's selling price (cash or financing) with the market range.
+    Set<Subject> ratingAmounts = EnumSet.of(Subject.MARKET, Subject.CASH, Subject.FINANCING);
     switch (analysis.path("dealRating").asText()) {
       case "STRONG_DEAL" -> add(findings, report, "deal-rating", "/analysis/dealRating",
-          EnumSet.of(Subject.RATING, Subject.MARKET), EnumSet.of(Term.BELOW, Term.STRONG, Term.ESTIMATED, Term.AVAILABLE), Set.of());
+          EnumSet.of(Subject.RATING, Subject.MARKET), ratingAmounts, EnumSet.of(Term.BELOW, Term.STRONG, Term.ESTIMATED, Term.AVAILABLE), Set.of());
       case "FAIR_NEGOTIATE" -> add(findings, report, "deal-rating", "/analysis/dealRating",
-          EnumSet.of(Subject.RATING, Subject.MARKET), EnumSet.of(Term.WITHIN, Term.FAIR, Term.ESTIMATED, Term.AVAILABLE), Set.of());
+          EnumSet.of(Subject.RATING, Subject.MARKET), ratingAmounts, EnumSet.of(Term.WITHIN, Term.FAIR, Term.ESTIMATED, Term.AVAILABLE), Set.of());
       case "POOR_DEAL" -> add(findings, report, "deal-rating", "/analysis/dealRating",
-          EnumSet.of(Subject.RATING, Subject.MARKET), EnumSet.of(Term.ABOVE, Term.POOR, Term.ESTIMATED, Term.AVAILABLE), Set.of());
+          EnumSet.of(Subject.RATING, Subject.MARKET), ratingAmounts, EnumSet.of(Term.ABOVE, Term.POOR, Term.ESTIMATED, Term.AVAILABLE), Set.of());
       case "INSUFFICIENT_DATA" -> add(findings, report, "deal-rating", "/analysis/dealRating",
-          EnumSet.of(Subject.RATING, Subject.MARKET), EnumSet.of(Term.UNAVAILABLE), EnumSet.of(Term.UNAVAILABLE));
+          EnumSet.of(Subject.RATING, Subject.MARKET), ratingAmounts, EnumSet.of(Term.UNAVAILABLE), EnumSet.of(Term.UNAVAILABLE));
       default -> throw new IllegalArgumentException("Unknown finalized deal rating");
     }
     availability(findings, report, "market-availability", "/analysis/marketAvailability",
@@ -213,10 +217,15 @@ public record ExplanationFacts(int reportVersion, List<Finding> findings, List<A
 
   private static void add(List<Finding> findings, JsonNode report, String id, String pointer, Set<Subject> subjects,
       Set<Term> permits, Set<Term> requires) {
+    add(findings, report, id, pointer, subjects, subjects, permits, requires);
+  }
+
+  private static void add(List<Finding> findings, JsonNode report, String id, String pointer, Set<Subject> subjects,
+      Set<Subject> amountSubjects, Set<Term> permits, Set<Term> requires) {
     JsonNode source = report.at(pointer);
     if (source.isMissingNode() || source.isNull()) throw new IllegalArgumentException("Missing finding: " + pointer);
     String value = source.isTextual() ? source.asText() : source.toString();
     String state = source.isTextual() && source.asText().matches("[A-Z_]{1,40}") || source.isBoolean() ? value : "RECORDED";
-    findings.add(new Finding(id, pointer, value, state, subjects, permits, requires));
+    findings.add(new Finding(id, pointer, value, state, subjects, amountSubjects, permits, requires));
   }
 }

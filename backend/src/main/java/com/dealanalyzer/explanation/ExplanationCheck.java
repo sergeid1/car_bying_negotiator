@@ -9,22 +9,22 @@ import com.dealanalyzer.explanation.ReportExplanation.Source;
 import com.dealanalyzer.explanation.ReportExplanation.Statement;
 import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The code-enforced gate every explanation passes, whichever producer wrote it. A sentence is shown
- * only when each claim it makes is backed by a finding it cites: every state term and subject it uses
- * must be permitted by a cited finding or referenced amount, a finding recorded as unknown must be
- * stated as unknown, an estimate may not be called exact, and amounts appear only as placeholders the
+ * The code-enforced gate every explanation passes, whichever producer wrote it. Each sentence cites
+ * exactly one finding, and a sentence is shown only when each claim it makes is backed by that finding:
+ * every subject it uses must be one of the finding's subjects, every state term must be permitted by
+ * the finding (or be the precision of an amount it mentions), every amount it mentions must belong to
+ * the finding's subjects, a finding recorded as unknown must be stated as unknown, an estimate may not be called exact, and amounts appear only as placeholders the
  * product renders from the report. Free text carrying a figure, a prohibited framing, links or markup
  * fails. Any failing sentence blocks the whole candidate: nothing is shown with a caveat.
  */
 public final class ExplanationCheck {
-  /** One sentence from either producer: text with amount placeholders, and the findings it cites. */
+  /** One sentence from either producer: text with amount placeholders, and the finding it cites. */
   public record Sentence(String text, List<String> findingIds) {
     public Sentence { findingIds = List.copyOf(findingIds); }
   }
@@ -37,7 +37,6 @@ public final class ExplanationCheck {
   }
 
   static final int MAX_SENTENCES = 6;
-  static final int MAX_FINDINGS = 3;
   static final int MAX_TEXT = 400;
 
   private static final Pattern PLACEHOLDER = Pattern.compile("\\{(amount-[0-9]{1,3})\\}");
@@ -80,14 +79,10 @@ public final class ExplanationCheck {
   private static Statement statement(ExplanationFacts facts, Sentence sentence) {
     String text = sentence.text() == null ? "" : sentence.text().strip();
     if (text.isEmpty() || text.length() > MAX_TEXT) throw new Rejected("TEXT_OUT_OF_BOUNDS");
-    if (sentence.findingIds().isEmpty() || sentence.findingIds().size() > MAX_FINDINGS)
-      throw new Rejected("FINDINGS_OUT_OF_BOUNDS");
-    List<Finding> cited = new ArrayList<>();
-    for (String id : new LinkedHashSet<>(sentence.findingIds())) {
-      Finding finding = facts.finding(id);
-      if (finding == null) throw new Rejected("UNKNOWN_FINDING");
-      cited.add(finding);
-    }
+    // One finding per sentence, so no state can be borrowed from one finding for another's subject.
+    if (sentence.findingIds().size() != 1) throw new Rejected("NOT_ONE_FINDING");
+    Finding finding = facts.finding(sentence.findingIds().getFirst());
+    if (finding == null) throw new Rejected("UNKNOWN_FINDING");
     List<Segment> segments = new ArrayList<>();
     List<Amount> referenced = new ArrayList<>();
     StringBuilder prose = new StringBuilder();
@@ -96,6 +91,7 @@ public final class ExplanationCheck {
     while (matcher.find()) {
       Amount amount = facts.amount(matcher.group(1));
       if (amount == null) throw new Rejected("UNKNOWN_AMOUNT");
+      if (amount.subjects().stream().noneMatch(finding.amountSubjects()::contains)) throw new Rejected("UNRELATED_AMOUNT");
       if (matcher.start() > last) segments.add(Segment.text(text.substring(last, matcher.start())));
       segments.add(Segment.amount(amount));
       referenced.add(amount);
@@ -112,22 +108,20 @@ public final class ExplanationCheck {
     if (PROHIBITED.matcher(words).find()) throw new Rejected("PROHIBITED_FRAMING");
 
     Set<Term> permitted = EnumSet.noneOf(Term.class);
-    Set<Subject> covered = EnumSet.noneOf(Subject.class);
-    cited.forEach(finding -> { permitted.addAll(finding.permits()); covered.addAll(finding.subjects()); });
-    referenced.forEach(amount -> { permitted.add(amount.precisionTerm()); covered.addAll(amount.subjects()); });
+    permitted.addAll(finding.permits());
+    referenced.forEach(amount -> permitted.add(amount.precisionTerm()));
+    Set<Subject> covered = finding.subjects();
     List<Term> terms = ClaimVocabulary.terms(words);
     if (terms.contains(Term.EXACT) && referenced.stream().anyMatch(amount -> !"EXACT".equals(amount.precision())))
       throw new Rejected("ESTIMATE_STATED_AS_EXACT");
     for (Term term : terms) if (!permitted.contains(term)) throw new Rejected("UNSUPPORTED_CLAIM");
     for (Subject subject : ClaimVocabulary.subjects(words))
       if (!covered.contains(subject)) throw new Rejected("UNSUPPORTED_SUBJECT");
-    for (Finding finding : cited) {
-      if (!finding.requires().isEmpty() && terms.stream().noneMatch(finding.requires()::contains))
-        throw new Rejected("UNKNOWN_NOT_STATED");
-    }
+    if (!finding.requires().isEmpty() && terms.stream().noneMatch(finding.requires()::contains))
+      throw new Rejected("UNKNOWN_NOT_STATED");
 
     List<Source> sources = new ArrayList<>();
-    cited.forEach(finding -> sources.add(new Source(finding.id(), finding.sourcePointer(), finding.sourceValue())));
+    sources.add(new Source(finding.id(), finding.sourcePointer(), finding.sourceValue()));
     referenced.stream().distinct().forEach(amount -> sources.add(new Source(amount.id(), amount.sourcePointer(),
         amount.minorUnits() == null ? null : Long.toString(amount.minorUnits()))));
     return new Statement(segments, sources);

@@ -11,8 +11,8 @@ import org.springframework.context.annotation.Configuration;
 /**
  * The code-owned model task behind the explanation of one finalized Deal Analysis Report. The model
  * receives only the report's finalized findings and the identifiers of its material amounts, never a
- * figure, document text or an extraction candidate. It writes short sentences that cite findings by
- * id and refer to amounts only by placeholder; the product renders every amount from the report.
+ * figure, document text or an extraction candidate. It writes short sentences that each cite one finding
+ * by id and refer to amounts only by placeholder; the product renders every amount from the report.
  * Every sentence is checked again in code before a Buyer sees it, so these instructions are guidance,
  * not the safety boundary. Registered as a bean so the rollout gate requires its own shadow comparison.
  */
@@ -21,7 +21,7 @@ public class ExplanationTask {
   public static final String PROMPT_VERSION = "report-explanation-prompt.v1";
   public static final String SCHEMA_VERSION = "report-explanation-schema.v1";
   public static final int MAX_SENTENCES = 6;
-  public static final int MAX_FINDINGS_PER_SENTENCE = 3;
+  public static final int FINDINGS_PER_SENTENCE = 1;
   public static final int MAX_TEXT = 400;
 
   static final String INSTRUCTIONS = """
@@ -32,7 +32,8 @@ public class ExplanationTask {
       Return only the required JSON object with up to six sentences. Each sentence has:
       - text: one plain sentence describing only what the cited findings record. To mention an amount, \
       write its placeholder exactly, for example {amount-0}; the product inserts the recorded figure.
-      - finding_ids: one to three ids of the findings the sentence describes. Use only ids from the data.
+      - finding_ids: exactly one id, of the single finding the sentence describes. Use only ids from the \
+      data. Describe each finding in its own sentence, and mention only amounts whose subjects match it.
 
       Never write digits or spelled-out amounts. Describe a finding whose state is unavailable, missing \
       or insufficient as unknown or unavailable. Never call an estimated amount exact. Do not mention \
@@ -59,7 +60,8 @@ public class ExplanationTask {
         "type", "object",
         "additionalProperties", false,
         "required", List.of("text", "finding_ids"),
-        "properties", Map.of("text", text, "finding_ids", Map.of("type", "array", "items", text)));
+        "properties", Map.of("text", text, "finding_ids", Map.of("type", "array", "items", text,
+            "minItems", FINDINGS_PER_SENTENCE, "maxItems", FINDINGS_PER_SENTENCE)));
     Map<String, Object> schema = Map.of(
         "type", "object",
         "additionalProperties", false,
@@ -75,7 +77,7 @@ public class ExplanationTask {
     List<Sentence> parsed = new ArrayList<>();
     for (JsonNode sentence : sentences) {
       JsonNode ids = sentence.get("finding_ids");
-      if (ids.size() > MAX_FINDINGS_PER_SENTENCE) throw new IllegalArgumentException("Too many findings");
+      if (ids.size() != FINDINGS_PER_SENTENCE) throw new IllegalArgumentException("A sentence cites exactly one finding");
       List<String> findingIds = new ArrayList<>();
       ids.forEach(id -> findingIds.add(bounded(id.asText(), 100)));
       parsed.add(new Sentence(bounded(sentence.get("text").asText(), MAX_TEXT), findingIds));
