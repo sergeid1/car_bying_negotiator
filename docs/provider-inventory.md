@@ -46,6 +46,31 @@ Calls use `ProviderMeter` with request counts, status, start and finish timestam
 zero fixture cost. Actual licensed-provider pricing, terms and measured coverage remain ticket 27.
 Listing observations currently mean the listing as seen at retrieval, not a vendor's last-update date.
 
+`GET /api/v1/operator/evidence/metrics?from=<UTC instant>&to=<UTC instant>` measures retained
+market/listing calls by operation, provider and status, including known/unknown cost counts,
+known USD cost, mean known call cost, latency sample count, mean and continuous p95 milliseconds.
+The window includes records started at `from` and excludes records started at `to`. The combined
+market/listing cost per case uses distinct cases with calls in that window, including failed calls
+and retries; the report states both the mean and maximum over those case totals. Cases without calls
+are excluded. The per-case ceiling comparison uses the maximum, so averaging cannot hide an overage.
+Unknown-cost calls prevent an all-in cost comparison; unfinished calls prevent a complete latency
+comparison. Fixture zero cost is explicitly recorded, never inferred from missing prices.
+
+Configure `evidence.budget.per-case-cost-usd` (non-negative USD) and
+`evidence.budget.p95-latency-millis` (positive milliseconds), or their Spring environment equivalents
+`EVIDENCE_BUDGET_PER_CASE_COST_USD` and `EVIDENCE_BUDGET_P95_LATENCY_MILLIS`, with approved ceilings.
+Neither has a default. `EvidenceBudget` rejects missing ceilings in `pilot`, `production`, `prod`
+or `evidence.deployment=production`; development reports `UNSET`. Observations are compared with
+the combined market/listing per-case cost ceiling and per-call p95 latency ceiling as `OVER`,
+`WITHIN` or `NOT_MEASURABLE`. These are measurements, not an automatic release decision.
+The existing development-adapter production guard remains independent and still blocks release.
+
+Coverage lists every effective supported jurisdiction from `jurisdiction_policies`, including zero
+samples. It counts attempted cases, available/unavailable/too-thin latest assessments, report coverage
+events and included/excluded comparable decisions with their denominators. These figures describe
+development adapters until ticket 27 integrates a licensed source. Comparable inclusion is the
+recorded selection policy's decision, not independently labeled comparable relevance.
+
 ## Bundled reference data
 
 Postal-code to jurisdiction resolution uses the U.S. Census Bureau 2020 ZCTA-to-county
