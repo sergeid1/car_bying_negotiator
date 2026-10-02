@@ -72,6 +72,18 @@ class CaseGraphDeletionPlan {
               and not exists (select 1 from pilot_events n where n.case_id = e.case_id and n.event_type = 'REVIEW_STATUS' and n.created_at > e.created_at)))
         where id = 1
         """).setParameter("caseId", caseId).executeUpdate();
+    // Same rule for first-party channel counts: anonymous per-channel totals, no case reference.
+    manager.createNativeQuery("""
+        update acquisition_channel_totals set
+          removed_case_starts = removed_case_starts + (select count(*) from analysis_cases c where c.id = :caseId
+            and exists (select 1 from jurisdiction_policies p where p.jurisdiction = c.buyer_jurisdiction)),
+          removed_qualified_count = removed_qualified_count + (select count(*) from experiment_assignments a join analysis_cases c on c.id = a.case_id
+            where a.case_id = :caseId and a.qualified = true and exists (select 1 from jurisdiction_policies p where p.jurisdiction = c.buyer_jurisdiction)),
+          removed_qualified_uploads = removed_qualified_uploads + (select count(*) from experiment_assignments a join analysis_cases c on c.id = a.case_id
+            where a.case_id = :caseId and a.qualified = true and exists (select 1 from jurisdiction_policies p where p.jurisdiction = c.buyer_jurisdiction)
+            and exists (select 1 from source_documents d where d.case_id = a.case_id))
+        where channel_key = (select coalesce(c.acquisition_channel, '') from analysis_cases c where c.id = :caseId)
+        """).setParameter("caseId", caseId).executeUpdate();
     long removed = 0;
     for (var step : STEPS) {
       removed += manager.createNativeQuery("delete from " + step.table + " where " + step.predicate)

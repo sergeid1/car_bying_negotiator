@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { arrivalChannel, forgetArrivalChannel } from "./AcquisitionChannel";
 
 type CaseCredentials = { caseId: string; token: string };
 
@@ -70,7 +71,9 @@ async function send<T>(path: string, options: RequestInit): Promise<T> {
   throw new IntakeProblem(problem);
 }
 
-export function BuyingCaseIntake({ onCaseOpened }: { onCaseOpened: (value: CaseCredentials) => void }) {
+export function BuyingCaseIntake({ onCaseOpened }: {
+  onCaseOpened: (value: CaseCredentials, referralDisclosure?: string) => void;
+}) {
   const [options, setOptions] = useState<IntakeOptions>();
   const [identifyBy, setIdentifyBy] = useState<"vin" | "details">("vin");
   const [statedJurisdiction, setStatedJurisdiction] = useState("");
@@ -80,6 +83,9 @@ export function BuyingCaseIntake({ onCaseOpened }: { onCaseOpened: (value: CaseC
   // Kept across a vehicle-evidence failure so a correction never restarts the case.
   const [openCase, setOpenCase] = useState<CaseCredentials>();
   const [conflicts, setConflicts] = useState<IdentityConflict[]>();
+  const [referralDisclosure, setReferralDisclosure] = useState<string>();
+  // Read when the case starts, so the link parameter leaves the address bar straight away.
+  const [channel] = useState(arrivalChannel);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,12 +111,16 @@ export function BuyingCaseIntake({ onCaseOpened }: { onCaseOpened: (value: CaseC
     setSubmitting(true);
     try {
       let credentials = openCase;
+      let disclosure = referralDisclosure;
       if (!credentials) {
         const decision = (granted: boolean, policy: string) => ({
           granted,
           policyVersion: policy,
         });
-        const created = await send<{ case: { id: string }; accessToken: string }>("/api/v1/cases", {
+        const created = await send<{
+          case: { id: string; referralDisclosure?: string | null };
+          accessToken: string;
+        }>("/api/v1/cases", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
           body: JSON.stringify({
@@ -136,9 +146,13 @@ export function BuyingCaseIntake({ onCaseOpened }: { onCaseOpened: (value: CaseC
                 policies.anonymizedResearch ?? "unknown",
               ),
             },
+            channel,
           }),
         });
+        forgetArrivalChannel();
         credentials = { caseId: created.case.id, token: created.accessToken };
+        disclosure = created.case.referralDisclosure ?? undefined;
+        setReferralDisclosure(disclosure);
         setOpenCase(credentials);
         setCrossingCandidates(undefined);
       }
@@ -172,7 +186,8 @@ export function BuyingCaseIntake({ onCaseOpened }: { onCaseOpened: (value: CaseC
         setConflicts(unresolved);
         return;
       }
-      onCaseOpened(credentials);
+      if (disclosure) onCaseOpened(credentials, disclosure);
+      else onCaseOpened(credentials);
     } catch (caught) {
       if (caught instanceof IntakeProblem) {
         setProblem(caught.problem);
@@ -201,7 +216,10 @@ export function BuyingCaseIntake({ onCaseOpened }: { onCaseOpened: (value: CaseC
       );
       const unresolved = evidence.identityConflicts.filter(item => item.status === "UNRESOLVED");
       setConflicts(unresolved.length > 0 ? unresolved : undefined);
-      if (unresolved.length === 0) onCaseOpened(openCase);
+      if (unresolved.length === 0) {
+        if (referralDisclosure) onCaseOpened(openCase, referralDisclosure);
+        else onCaseOpened(openCase);
+      }
     } catch (caught) {
       setProblem(
         caught instanceof IntakeProblem

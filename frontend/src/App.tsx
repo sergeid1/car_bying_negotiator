@@ -5,6 +5,7 @@ import { CaseLifecycle } from "./CaseLifecycle";
 import { PricePlan } from "./PricePlan";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { BuyingCaseIntake } from "./BuyingCaseIntake";
+import { ReferralDisclosure } from "./AcquisitionChannel";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
 
@@ -110,6 +111,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   const [caseCredentials, setCaseCredentials] = useState<{ caseId: string; token: string }>();
   // Tied to its case so a version frozen in one case never reaches another.
   const [frozenOffer, setFrozenOffer] = useState<{ caseId: string; version: number }>();
+  const [referral, setReferral] = useState<{ caseId: string; text: string }>();
 
   async function startAnalysis(event: FormEvent) {
     event.preventDefault();
@@ -190,7 +192,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
           <div className="column">
             {!report && !caseCredentials && (
               <BuyingCaseIntake
-                onCaseOpened={value => {
+                onCaseOpened={(value, disclosure) => {
+                  setReferral(disclosure ? { caseId: value.caseId, text: disclosure } : undefined);
                   setCaseRevoked(false);
                   setCaseCredentials(value);
                   setRecoveryCaseId(value.caseId);
@@ -242,6 +245,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 
             {report && <DealReport report={report} />}
 
+            {caseCredentials && !caseRevoked && referral?.caseId === caseCredentials.caseId && <ReferralDisclosure text={referral.text} />}
             {caseCredentials && !caseRevoked && <DealerDocumentUpload key={`documents-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <OfferVerification key={`verify-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
               onOfferFrozen={offer => setFrozenOffer({ caseId: caseCredentials.caseId, version: offer.version })} />}

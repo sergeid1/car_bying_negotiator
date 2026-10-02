@@ -191,3 +191,96 @@ retained sessions, including partial reports and repeat opens. Opens without a c
 the denominator but not latency samples. These are optional, client-timed comprehension checks, not
 independently observed purchase outcomes. Session events follow existing case deletion/retention;
 submitted amounts and edited question text are never retained in pilot events.
+
+## First-party acquisition channels
+
+Ticket 42 attributes qualified uploads to first-party acquisition channels. It measures; it does
+not choose channels, partners, or offers, which remain with ticket 34. No channel, spend, or
+disclosure value is configured by this change: an operator supplies every one.
+
+**Configuration.** `PUT /api/v1/operator/pilot/channels/{code}` with
+`{"kind": "EXPLAINER_CONTENT" | "REFERRAL_PARTNERSHIP", "referralDisclosure": "…", "active": true}`
+adds or updates an allow-listed channel; `GET /api/v1/operator/pilot/channels` lists them. A code is
+1–32 characters of lower-case letters, digits and hyphens, starting with a letter or digit. A
+referral partnership requires its Buyer-facing disclosure (at most 600 characters); other kinds must
+not have one. A channel's kind cannot change once created (409); use a new code. Channels are
+deactivated, never deleted, so stored codes stay resolvable. Dealer-paid lead and dealer outreach
+kinds do not exist in the API enum or the schema check constraint (specification §2.2), so they
+cannot be configured. Because the standing footer states that no commercial party pays for
+referrals, a referral arrangement in which the partner pays this service must not be configured
+without first revising that disclosure.
+
+**Spend.** `POST /api/v1/operator/pilot/channels/{code}/spend` with
+`{"spendId": "<uuid>", "periodStart": "2026-10-01", "periodEnd": "2026-10-31", "amountMinor": 50000, "currency": "USD"}`
+records immutable spend for an inclusive stated period. An identical retry returns the same record;
+a changed retry returns 409; an unknown channel returns 404. Use one spend ID per non-overlapping
+period; do not submit cumulative overlapping totals.
+
+**Access.** All channel, spend, and metrics endpoints require the configured `SUPPORT` operator
+Bearer credential. Reviewers get 403; Buyer case credentials are not operator credentials and are
+refused by the operator filter.
+
+**Attribution.** The client reads a `channel` link parameter once when the case intake mounts,
+removes it from the address bar with `history.replaceState`, holds it only in memory, and sends it
+as `channel` with `POST /api/v1/cases`. The service stores the code on the case only when it is well
+formed and an active allow-listed channel; an unknown, inactive, malformed, or absent
+code is stored as no channel and never refuses or delays case creation. The code is the only
+acquisition datum kept: there are no cookies, browser-storage identifiers, fingerprinting,
+third-party scripts, referrer capture, or cross-site tracking. The case entity does not map the
+column; it is written natively at creation and read only by pilot measurement, export, and
+deletion, which `AcquisitionChannelIsolationTest` enforces. Analysis, reports, explanations,
+pricing variants, and price plans never read it; `AcquisitionChannelAcceptanceTest` also shows a
+referred case and an unattributed case produce identical analyses.
+
+**Referral disclosure.** When a case starts from a `REFERRAL_PARTNERSHIP` channel, the case view
+carries `referralDisclosure`, and the client shows it in a "How you reached us" panel above the
+paperwork upload step. Other cases carry `null`. The case view never returns the channel code.
+
+**Metrics.** `GET /api/v1/operator/pilot/channels/metrics` (`acquisition-channels.v1`, also
+embedded as `acquisitionChannels` in `GET /metrics`) has one row per configured channel plus a row
+with `channel: null` for no channel. Like `/metrics`, it returns 409 before the protocol is frozen.
+
+| Output | Definition / source |
+| --- | --- |
+| qualifiedUploads (primary) | Enrolled cases with `experiment_assignments.qualified = true`, whose case jurisdiction has a `jurisdiction_policies` row, and with at least one accepted source document; plus the anonymous count retained at deletion. |
+| qualifiedUploadRate | qualifiedUploads / qualified enrolled cases in a supported jurisdiction for that channel (retained plus removed). |
+| shareOfQualifiedUploads | qualifiedUploads / qualified uploads across every channel and no channel. |
+| caseStarts (secondary) | Cases in a supported jurisdiction started with that channel, retained plus removed. Context only; never a success measure. |
+| spend | Record count, total USD minor units, earliest period start and latest period end. |
+| costPerQualifiedUpload | Total recorded spend / qualifiedUploads, in USD minor units. `UNAVAILABLE` with `NO_SPEND_RECORDED` or `NO_QUALIFIED_UPLOADS` otherwise. Spend and uploads are both cumulative over all recorded periods, not matched period by period. |
+| costPerPaidCase | Always `UNAVAILABLE` with `NO_PURCHASE_RECORD`: no per-case purchase record exists. Aggregate `PAID_CONVERSION` observations cannot be attributed to a channel. |
+
+**Privacy limits and deletion.** The channel code is stored on the case row and removed with it.
+At deletion, `acquisition_channel_totals` adds the case to its channel's anonymous removed counts
+(case starts, qualified cases, qualified uploads) before the graph is erased. These counters hold
+only a channel code and three integers — no Buyer, case, Dealer, variant, price, document, or time
+reference — and cannot be joined back to a case. With very few cases per channel, even an
+aggregate count can be small; operators must not combine it with outside knowledge to identify a
+Buyer. The Buyer's case export includes the stored channel code.
+
+## Market and listing budget and jurisdiction measurement (ticket 41)
+
+`GET /api/v1/operator/evidence/metrics?from=<ISO instant>&to=<ISO instant>` requires the existing
+`SUPPORT` Bearer credential. Reviewers and Buyer case credentials cannot read it. Responses have
+`Cache-Control: no-store` and carry no case, Buyer, Dealer, VIN, postal code, listing URL, document
+identifier or provider payload. No new retained dataset, external analytics or release decision is
+created. Static SQL aggregate projections run in one repeatable-read transaction; deletion removes
+source records, so measurements describe retained service records, not historical totals.
+
+`evidence-metrics.v1` states a half-open window (`fromInclusive`, `toExclusive`), selected by record
+start/creation time. An attempt begun before the window is excluded even if it finishes within it.
+Calls from all retained service cases count; pilot enrollment and freeze are not prerequisites.
+
+| Output | Numerators and denominators |
+| --- | --- |
+| providers | Per operation (`MARKET_RETRIEVAL`, `LISTING_RETRIEVAL`), provider and status: calls, calls with known cost, calls with unknown cost, summed known USD cost, and mean cost over known-cost calls. Latency sample count, mean and continuous p95 milliseconds use finished calls. Unknown cost is never zero; no known cost yields null sums/means. |
+| observed | Combined market/listing calls, distinct cases with calls, known/unknown cost counts, summed known cost, mean known cost divided by distinct cases with calls, and maximum known per-case total. `observedCostPerCaseUsd` (mean) and `maximumObservedCostPerCaseUsd` are null unless every call is priced. Retries add costs but do not multiply case denominators. Partial known totals remain explicitly labeled. |
+| budget and comparisons | No default for `evidence.budget.per-case-cost-usd` or `evidence.budget.p95-latency-millis`. Both are required by pilot/production startup; development reports `UNSET` when either is missing. Cost comparison uses the maximum observed combined per-case total, so averaging cannot hide an overage. It is `NOT_MEASURABLE` for missing cost ceiling, unknown cost or no calls. Latency comparison is `NOT_MEASURABLE` for missing latency ceiling, unfinished calls or no calls. Otherwise each independently returns `OVER` or `WITHIN` (equality counts as within). No automatic release decision follows. |
+| casesAttempted | Per distinct jurisdiction policy effective before window end: distinct retained cases with a market call, assessment or `MARKET_COVERAGE` event in the window. Missing assessment attempts remain in the denominator. Multiple policy versions do not multiply cases. Jurisdictions with no attempts report zero counts. |
+| assessment coverage | One latest assessment version in the window per attempted case. `casesWithAssessment` is the status denominator: `assessmentsAvailable`, `assessmentsUnavailable`, `assessmentsTooThin`. `casesAttempted` is the denominator for `casesWithAssessment` and `casesWithoutAssessment`. |
+| report evidence coverage | One latest `MARKET_COVERAGE` event in the window per case (time, then internal ID breaks ties). `reportEvidenceAvailable` and `reportEvidenceUnavailable` use `casesWithCoverageEvent` as denominator; `casesAttempted` is the denominator for having an event. An unavailable report event can coexist with a stored available assessment, for example when it has expired. |
+| comparable selection | `comparablesIncluded` and `comparablesExcluded` use `comparablesEvaluated` as denominator, over the provider snapshots of the selected assessments only. `assessmentSampleCount` sums their accepted sample sizes; `casesWithAssessment` is its assessment denominator. These are counts of stored selection decisions, not independently verified relevance. Labeled relevance remains the separate `COMPARABLE_RELEVANCE` observation measure. |
+
+These figures describe **development adapters** until ticket 27 integrates a licensed provider.
+Fixture costs and sample coverage do not establish a licensed source's pricing or coverage. No budget
+or release threshold is invented here; the deployment owner must supply approved ceilings.
