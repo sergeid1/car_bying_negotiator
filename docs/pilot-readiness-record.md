@@ -66,6 +66,14 @@ No consumer-side automotive expert has reviewed opening, target, and walk-away b
 synthetic market ranges. That is not evidence that the resulting numbers are sound negotiating
 positions on representative retrospective deals.
 
+The [expert review packet](expert-review-packet.md) is the route to preparing and importing that
+evidence. `ExpertReviewPacket` runs the shipped boundary policy and economics engine offline over
+`backend/src/main/resources/expert-review/scenarios.v1.json`; the documented `generate` and `import`
+commands create a hashed CSV/Markdown packet and a validated verdict record. The twelve shipped
+scenarios are labelled synthetic, not representative of any jurisdiction. Import changes no policy,
+parameter, or readiness decision. Prerequisite 4 remains **BLOCKED** pending qualified expert review
+and the evidence-backed approval owned by ticket 22.
+
 ### 6. Infrastructure and privacy inventory — BLOCKED
 
 Recovery, purposes, retention, and deletion behavior are documented and implemented. Hosting,
