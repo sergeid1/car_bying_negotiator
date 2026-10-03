@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 class CaseGraphDeletionPlan {
   private record Step(String table, String predicate) {}
   private static final List<Step> STEPS = List.of(
+      new Step("buyer_account_cases", "case_id = :caseId"),
       new Step("case_support_time", "case_id = :caseId"),
       new Step("case_purchase_requests", "case_id = :caseId"),
       new Step("case_purchases", "case_id = :caseId"),

@@ -1226,6 +1226,7 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
 .verified-analysis li { padding-block: .3rem; }
 .verified-analysis li[aria-current="step"] { font-weight: 700; }
 .saved-case-link a { display: block; overflow-wrap: anywhere; margin-bottom: 1rem; }
+.account-email, .account-cases li { overflow-wrap: anywhere; }
 /* End ticket 26. */
 
 /* Ticket 29: total, findings and next action lead the saved report. */
