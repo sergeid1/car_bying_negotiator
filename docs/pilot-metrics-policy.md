@@ -375,3 +375,21 @@ Willingness-to-pay answers remain only in the existing `willingnessToPay` survey
 they are not purchases and never contribute to conversion or revenue here. This report
 takes **no continue, reprice or stop decision**, changes no frozen thresholds, and
 publishes no case studies. Ticket 33 owns those decisions and publication.
+
+## Explainer guide channel codes (ticket 47)
+
+Two first-party explainer guides link to case intake with a channel code through the existing
+`channel` link parameter described under "First-party acquisition channels":
+
+| Guide | Shareable address | Channel code |
+| --- | --- | --- |
+| How to read an out-the-door quote | `?guide=out-the-door-quote` | `guide-otd-quote` |
+| Which dealer fees to ask about | `?guide=dealer-fees` | `guide-dealer-fees` |
+
+No channel is seeded by this change. An operator must configure each code, as an
+`EXPLAINER_CONTENT` channel with no referral disclosure, through
+`PUT /api/v1/operator/pilot/channels/{code}` before cases that start from a guide are counted
+against it. Until then, a case started from a guide is stored with no channel, exactly as for any
+unknown code, and counts in the no-channel row. The guides themselves set no cookies, write nothing
+to browser storage, fetch nothing, and load nothing from another site; the channel code is the only
+acquisition datum they add.
