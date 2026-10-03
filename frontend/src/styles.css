@@ -1527,3 +1527,23 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
 .sample-report, .sample-report .stack > *, .sample-report .report > * { min-width: 0; }
 .sample-about { flex-direction: column; }
 .sample-about > * { margin: 0; }
+
+/* Ticket 47: explainer guides read as an article inside the column, at any width. */
+.guide { min-width: 0; }
+.guide h1 { font-size: clamp(1.8rem, 6vw, 2.6rem); line-height: 1.1; letter-spacing: -0.03em; }
+.guide section > * + * { margin-top: 10px; }
+.guide ul, .guide ol { padding-left: 1.2em; }
+.guide li + li { margin-top: 6px; }
+.guide-example { margin: 0; padding: 12px 14px; border: 1px dashed var(--line-strong); border-radius: var(--radius-lg); }
+.guide-example figcaption { color: var(--ink-muted); font-size: 0.87rem; }
+.guide-example .money-list > div { gap: 12px; }
+.guide-start { padding-top: 14px; border-top: 1px solid var(--line); }
+.actions > a.button-link {
+  display: inline-flex; align-items: center; min-height: 48px; padding: 12px 24px;
+  border-radius: var(--radius-pill); background: var(--brand); color: var(--on-brand);
+  font-size: 0.97rem; text-decoration: none;
+}
+.actions > a.button-link:hover { background: var(--brand-hover); color: var(--on-brand); }
+.guide-links { margin: 0; padding: 0; list-style: none; }
+.guide-links li { display: grid; gap: 4px; }
+.guide-links li + li { margin-top: 12px; }

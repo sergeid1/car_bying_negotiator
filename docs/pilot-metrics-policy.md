@@ -295,3 +295,21 @@ as such in the offer and purchase contract; these counts do not establish real r
 Channel costPerPaidCase uses cumulative recorded channel spendMinor / paidCases in supported
 jurisdictions, including anonymous deleted paid counts. It is unavailable without recorded
 spend or a positive paid denominator and includes both numerator and denominator.
+
+## Explainer guide channel codes (ticket 47)
+
+Two first-party explainer guides link to case intake with a channel code through the existing
+`channel` link parameter described under "First-party acquisition channels":
+
+| Guide | Shareable address | Channel code |
+| --- | --- | --- |
+| How to read an out-the-door quote | `?guide=out-the-door-quote` | `guide-otd-quote` |
+| Which dealer fees to ask about | `?guide=dealer-fees` | `guide-dealer-fees` |
+
+No channel is seeded by this change. An operator must configure each code, as an
+`EXPLAINER_CONTENT` channel with no referral disclosure, through
+`PUT /api/v1/operator/pilot/channels/{code}` before cases that start from a guide are counted
+against it. Until then, a case started from a guide is stored with no channel, exactly as for any
+unknown code, and counts in the no-channel row. The guides themselves set no cookies, write nothing
+to browser storage, fetch nothing, and load nothing from another site; the channel code is the only
+acquisition datum they add.

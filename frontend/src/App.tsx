@@ -11,6 +11,7 @@ import { OfferVerification } from "./OfferVerification";
 import { ThemeMenu } from "./ThemeMenu";
 import { OfferTerms } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
+import { ExplainerGuide, GuideLinks, requestedGuide } from "./ExplainerGuides";
 import { XrayIllustration } from "./XrayIllustration";
 
 type MoneyAmount = {
@@ -116,6 +117,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   // Tied to its case so a version frozen in one case never reaches another.
   const [frozenOffer, setFrozenOffer] = useState<{ caseId: string; version: number }>();
   const [referral, setReferral] = useState<{ caseId: string; text: string }>();
+  const [guide] = useState(requestedGuide);
 
   async function startAnalysis(event: FormEvent) {
     event.preventDefault();
@@ -178,7 +180,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       </header>
 
       <main>
-        <div className="hero">
+        {!guide && <div className="hero">
           <div className="hero-copy">
             <p className="eyebrow">Buyer-aligned deal analysis</p>
             <h1>See the whole deal <span className="hero-quiet">before you decide.</span></h1>
@@ -194,13 +196,14 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             </ul>
           </div>
           {!caseCredentials && !report && <XrayIllustration />}
-        </div>
+        </div>}
 
         <div className="workspace">
           <div className="column">
-            {!report && !caseCredentials && <SampleReportEntry />}
-            {!report && !caseCredentials && <OfferTerms />}
-            {!report && !caseCredentials && (
+            {guide && <ExplainerGuide slug={guide} />}
+            {!guide && !report && !caseCredentials && <SampleReportEntry />}
+            {!guide && !report && !caseCredentials && <OfferTerms />}
+            {!guide && !report && !caseCredentials && (
               <BuyingCaseIntake
                 onCaseOpened={(value, disclosure) => {
                   setReferral(disclosure ? { caseId: value.caseId, text: disclosure } : undefined);
@@ -211,7 +214,9 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               />
             )}
 
-            {!report && import.meta.env.DEV && (
+            {!guide && !report && !caseCredentials && <GuideLinks />}
+
+            {!guide && !report && import.meta.env.DEV && (
               <section className="panel" aria-labelledby="case-heading">
                 <div className="section-heading">
                   <div>
