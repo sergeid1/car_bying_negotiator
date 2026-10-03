@@ -12,6 +12,7 @@ import { ThemeMenu } from "./ThemeMenu";
 import { OfferTerms } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks, requestedGuide } from "./ExplainerGuides";
+import { partnerKitLink, ReferralPartnerKit, requestedPartnerKit } from "./ReferralPartnerKit";
 import { XrayIllustration } from "./XrayIllustration";
 
 type MoneyAmount = {
@@ -118,6 +119,9 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   const [frozenOffer, setFrozenOffer] = useState<{ caseId: string; version: number }>();
   const [referral, setReferral] = useState<{ caseId: string; text: string }>();
   const [guide] = useState(requestedGuide);
+  const [partnerKit] = useState(requestedPartnerKit);
+  // A guide or the partner kit replaces the start screen at its own shareable address.
+  const standalone = Boolean(guide || partnerKit);
 
   async function startAnalysis(event: FormEvent) {
     event.preventDefault();
@@ -180,7 +184,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       </header>
 
       <main>
-        {!guide && <div className="hero">
+        {!standalone && <div className="hero">
           <div className="hero-copy">
             <p className="eyebrow">Buyer-aligned deal analysis</p>
             <h1>See the whole deal <span className="hero-quiet">before you decide.</span></h1>
@@ -201,9 +205,10 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         <div className="workspace">
           <div className="column">
             {guide && <ExplainerGuide slug={guide} />}
-            {!guide && !report && !caseCredentials && <SampleReportEntry />}
-            {!guide && !report && !caseCredentials && <OfferTerms />}
-            {!guide && !report && !caseCredentials && (
+            {!guide && partnerKit && <ReferralPartnerKit />}
+            {!standalone && !report && !caseCredentials && <SampleReportEntry />}
+            {!standalone && !report && !caseCredentials && <OfferTerms />}
+            {!standalone && !report && !caseCredentials && (
               <BuyingCaseIntake
                 onCaseOpened={(value, disclosure) => {
                   setReferral(disclosure ? { caseId: value.caseId, text: disclosure } : undefined);
@@ -214,9 +219,9 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               />
             )}
 
-            {!guide && !report && !caseCredentials && <GuideLinks />}
+            {!standalone && !report && !caseCredentials && <GuideLinks />}
 
-            {!guide && !report && import.meta.env.DEV && (
+            {!standalone && !report && import.meta.env.DEV && (
               <section className="panel" aria-labelledby="case-heading">
                 <div className="section-heading">
                   <div>
@@ -300,6 +305,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
                 does not guarantee savings or any negotiating outcome.
               </p>
             </div>
+            <p><a href={partnerKitLink}>Referral partner kit</a></p>
           </section>
         </div>
       </footer>

@@ -1,9 +1,12 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { arrivalChannel } from "./AcquisitionChannel";
 
 /**
  * First-party explainer guides. Each is reachable without a case at a stable `?guide=<slug>` link
  * and ends with a plain link that starts a case through the existing `channel` link parameter, so
- * the only acquisition datum stays the channel code. The guides are static: they fetch nothing,
+ * the only acquisition datum stays the channel code. A guide reached through a referral partner's
+ * link carries that partner's code instead of its own, so the referral is not lost on the way to
+ * the intake. The guides are static: they fetch nothing,
  * load nothing from another site, and write nothing to cookies or browser storage.
  */
 const PARAMETER = "guide";
@@ -37,9 +40,12 @@ export function requestedGuide(): GuideSlug | undefined {
   return isGuide(value) ? value : undefined;
 }
 
-const guideLink = (slug: GuideSlug) => `?${PARAMETER}=${slug}`;
+export const guideLink = (slug: GuideSlug) => `?${PARAMETER}=${slug}`;
 /** The intake reads `channel` once and removes it from the address bar, exactly as for any link. */
-const startLink = (slug: GuideSlug) => `?channel=${GUIDES[slug].channel}#intake-heading`;
+const startLink = (channel: string) => `?channel=${channel}#intake-heading`;
+
+/** Every guide, for pages that link to them. */
+export const GUIDE_LIST = (Object.keys(GUIDES) as GuideSlug[]).map(slug => ({ slug, title: GUIDES[slug].title }));
 
 /** Shown on the start screen so the guides can be found without a shared link. */
 export function GuideLinks() {
@@ -61,6 +67,8 @@ export function GuideLinks() {
 
 export function ExplainerGuide({ slug }: { slug: GuideSlug }) {
   const guide = GUIDES[slug];
+  // Read once like the intake does: removed from the address bar and held only in memory.
+  const [referral] = useState(arrivalChannel);
   const Body = guide.body;
   const other = (Object.keys(GUIDES) as GuideSlug[]).filter(each => each !== slug);
   return <article className="panel guide" aria-labelledby="guide-heading">
@@ -79,7 +87,7 @@ export function ExplainerGuide({ slug }: { slug: GuideSlug }) {
         came from before any analysis runs.
       </p>
       <div className="actions">
-        <a className="button-link" href={startLink(slug)}>Start a case with your quote</a>
+        <a className="button-link" href={startLink(referral ?? guide.channel)}>Start a case with your quote</a>
       </div>
     </section>
     <nav className="actions" aria-label="More guides">

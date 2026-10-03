@@ -17,6 +17,7 @@ import { ReferralDisclosure } from "./AcquisitionChannel";
 import { OfferTerms, PurchasePoint } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
+import { ReferralPartnerKit } from "./ReferralPartnerKit";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const AA = {
@@ -201,5 +202,19 @@ test("offer terms, the example report and the payment point have no automated AA
 test.each(["out-the-door-quote", "dealer-fees"] as const)("the %s guide and the start-screen guide links have no automated AA violations", async slug => {
   const { container } = render(<main><GuideLinks /><ExplainerGuide slug={slug} /></main>);
   const result = await axe.run(container, AA);
+  expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
+});
+
+test("the referral partner kit, its example disclosure, and its built links have no automated AA violations", async () => {
+  const { container } = render(<main><ReferralPartnerKit /></main>);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "Build links" }));
+  await screen.findByRole("alert");
+  let result = await axe.run(container, AA);
+  expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
+  await user.type(screen.getByLabelText("Channel code"), "inspector-1");
+  await user.click(screen.getByRole("button", { name: "Build links" }));
+  await screen.findByRole("list", { name: "Referral links for inspector-1" });
+  result = await axe.run(container, AA);
   expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
 });

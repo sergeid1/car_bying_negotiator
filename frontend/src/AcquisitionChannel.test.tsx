@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { afterEach, expect, test, vi } from "vitest";
 
 const OPTIONS = { supported: ["US-NC"], consentPolicies: { serviceProcessing: "service-processing.v1" } };
-const DISCLOSURE = "Example Inspections refers Buyers here and receives a flat fee per referral.";
+const DISCLOSURE = "Example Inspections refers Buyers here. It is not paid for referrals.";
 
 function stubApi(created: unknown) {
   const calls: { url: string; body?: Record<string, unknown> }[] = [];
