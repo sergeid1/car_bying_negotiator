@@ -26,7 +26,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
  */
 class ExtractionProviderSelectionTest {
   private static final ObjectMapper JSON = new ObjectMapper().registerModule(new JavaTimeModule());
-  private static final String MISSING_COMPARISON = "NO_SHADOW_COMPARISON:ANTHROPIC:EXTRACTION:deal-terms-prompt.v1:deal-terms.v1";
+  private static final String MISSING_COMPARISON = "NO_SHADOW_COMPARISON:ANTHROPIC:EXTRACTION:deal-terms-prompt.v2:deal-terms.v1";
 
   private static ApplicationContextRunner shipped() {
     return new ApplicationContextRunner()
@@ -68,12 +68,19 @@ class ExtractionProviderSelectionTest {
   @Test void withEveryObligationMetClaudeIsSelectedAndNothingFallsBack() {
     var settings = new ModelSettings(true, ModelProvider.ANTHROPIC, "claude-opus-5", "pilot-parameters.v1", "corpus.v1");
     var comparison = new ShadowComparison("cmp-40", "EXTRACTION",
-        new Candidate(ModelProvider.ANTHROPIC, "claude-opus-5", "deal-terms-prompt.v1", "deal-terms.v1"),
+        new Candidate(ModelProvider.ANTHROPIC, "claude-opus-5", "deal-terms-prompt.v2", "deal-terms.v1"),
         "deterministic-dealer-layout.v1", "corpus.v1", "pilot-parameters.v1", "HELD_OUT",
         ModelObligations.EVALUATION_HARNESS, "0.1.0", Instant.parse("2026-09-02T00:00:00Z"), "PASS", "reports/cmp-40.json");
     var terms = new VendorTerms(ModelProvider.ANTHROPIC, "Anthropic", "EXECUTED", "agreement-1",
         new Term(true, "Section 4.2"), new Term(true, "Section 5.1"), "counsel", Instant.parse("2026-09-01T00:00:00Z"), null);
     var obligations = new ModelObligations(List.of(terms), List.of(comparison));
+    var oldComparison = new ShadowComparison("cmp-old", "EXTRACTION",
+        new Candidate(ModelProvider.ANTHROPIC, "claude-opus-5", "deal-terms-prompt.v1", "deal-terms.v1"),
+        "deterministic-dealer-layout.v1", "corpus.v1", "pilot-parameters.v1", "HELD_OUT",
+        ModelObligations.EVALUATION_HARNESS, "0.1.0", Instant.parse("2026-09-02T00:00:00Z"), "PASS", "reports/cmp-old.json");
+    assertThat(ModelRolloutGate.unmet(settings, new ModelObligations(List.of(terms), List.of(oldComparison)),
+        List.of(ClaudeDealTermsExtractionProvider.task()), Map.of("ANTHROPIC_API_KEY", "set")::get))
+        .contains(MISSING_COMPARISON);
     var gate = new ModelRolloutGate(settings, obligations, List.of(ClaudeDealTermsExtractionProvider.task()),
         Map.of("ANTHROPIC_API_KEY", "set")::get);
     var meter = new ProviderMeter(new RecordingUsageStore(), Duration.ofSeconds(1), 1);

@@ -32,7 +32,7 @@ def parser():
     for name in ("manifest", "split-file", "predictions", "thresholds", "threshold-freeze", "id", "output", "model"):
         run.add_argument("--" + name, required=True)
     run.add_argument("--split", choices=sorted(core.SPLITS), default="DEVELOPMENT")
-    run.add_argument("--prompt-version", default="deal-terms-prompt.v1")
+    run.add_argument("--prompt-version", default="deal-terms-prompt.v2")
     run.add_argument("--schema-version", default="deal-terms.v1")
     run.add_argument("--concurrency", type=int, default=1)
     run.add_argument("--effort", default="high")
@@ -62,7 +62,7 @@ def parser():
         else:
             live.add_argument("--batch-id", required=True)
             live.add_argument("--schema-version", default="deal-terms.v1")
-            live.add_argument("--prompt-version", default="deal-terms-prompt.v1")
+            live.add_argument("--prompt-version", default="deal-terms-prompt.v2")
     return root
 
 
@@ -109,7 +109,7 @@ def main(argv=None):
             if not credential:
                 raise ValueError("Explicit credential environment variable is empty")
             client = AnthropicBatchClient(credential, args.model, getattr(args, "schema_version", "deal-terms.v1"),
-                                          getattr(args, "prompt_version", "deal-terms-prompt.v1"))
+                                          getattr(args, "prompt_version", "deal-terms-prompt.v2"))
             if args.command == "batch-submit":
                 requests = core.read(args.requests)
                 if any(request["params"]["model"] != args.model for request in requests):

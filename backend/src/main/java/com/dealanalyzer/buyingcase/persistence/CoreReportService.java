@@ -68,6 +68,9 @@ public class CoreReportService {
       return new StartedReport(store.requireOperation(existing.get().id));
     }
     var offer = offers.latestOffer(caseId).orElse(null);
+    var worksheet = extractions.latestForCase(caseId).orElse(null);
+    var worksheetPolicy = new com.dealanalyzer.report.FourSquareReportPolicy();
+    var worksheetFindings = worksheetPolicy.findings(worksheet);
     boolean financeCase = "FINANCE".equals(buyingCase.purchaseMethod);
     var finance = financeCase ? financing.snapshot(caseId).orElse(null) : null;
     boolean dealerCurrent = offer != null && ("READY_TO_ANALYZE".equals(buyingCase.status)
@@ -128,6 +131,7 @@ public class CoreReportService {
     evidence.set("marketAssessment", json.valueToTree(assessment));
     evidence.set("approvedBaseline", json.valueToTree(baseline));
     evidence.set("vehicle", json.valueToTree(vehicle));
+    if (!worksheetFindings.isEmpty()) evidence.set("fourSquareWorksheet", json.valueToTree(worksheet));
     evidence.put("caseStatusAtAnalysis", buyingCase.status);
     evidence.put("buyerJurisdiction", buyingCase.buyerJurisdiction);
     ObjectNode analysis = json.createObjectNode();
@@ -150,6 +154,11 @@ public class CoreReportService {
             : "AVAILABLE".equals(financeAvailability) ? "Financing uses independently calculated payments and Buyer-confirmed inputs."
             : "Resolve the missing, unsupported or stale financing inputs before relying on loan economics.",
         "Financing is not checked against an approved financing baseline; review the full-term cost.")));
+    if (!worksheetFindings.isEmpty()) {
+      List<String> reasons = new ArrayList<>();
+      analysis.path("topReasons").forEach(reason -> reasons.add(reason.asText()));
+      analysis.set("topReasons", json.valueToTree(worksheetPolicy.topReasons(worksheetFindings, reasons)));
+    }
     analysis.put("financingAvailability", financeAvailability);
     analysis.set("financingTerms", json.valueToTree(finance == null ? null : finance.inputs()));
     analysis.set("financing", json.valueToTree(finance == null ? null : finance.result()));

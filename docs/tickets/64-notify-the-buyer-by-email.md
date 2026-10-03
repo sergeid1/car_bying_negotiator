@@ -4,7 +4,7 @@
 
 **Blocked by:** 50 — Sign in with a passwordless Buyer Account.
 
-**Status:** blocked on 50 — filed on 2026-10-03 from specification 2.0.
+**Status:** ready-for-agent (50 complete) — filed on 2026-10-03 from specification 2.0.
 
 - [ ] Notifications are sent through the existing email adapter to the account's address.
 - [ ] No notification contains amounts, dealer names, VINs, or document content; it links to the journey, which requires sign-in.

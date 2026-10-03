@@ -67,6 +67,11 @@ public class CaseAccessService {
     return protect("recovery:" + token);
   }
 
+  /** Keyed hash for Buyer Account secrets and lookups, separated by scope from case credentials. */
+  public String protectAccountSecret(String scope, String value) {
+    return protect("account:" + scope + ":" + value);
+  }
+
   private String protect(String token) {
     try {
       Mac hmac = Mac.getInstance("HmacSHA256");

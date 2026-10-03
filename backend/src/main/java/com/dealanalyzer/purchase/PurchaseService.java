@@ -31,6 +31,14 @@ public class PurchaseService {
   @Transactional(readOnly = true)
   public Entitlement entitlement(String caseId, String token) {
     authorize(caseId, token);
+    return entitlementOf(caseId);
+  }
+  /** For callers that already authorized the Buyer another way, such as an attached Buyer Account. */
+  @Transactional(readOnly = true)
+  public boolean reportPurchaseRequired(String caseId) {
+    return entitlementOf(caseId).reportAccess().equals("PURCHASE_REQUIRED");
+  }
+  private Entitlement entitlementOf(String caseId) {
     String offer = offers.activeId();
     boolean purchased = ((Number) manager.createNativeQuery("select count(*) from case_purchases where case_id = :id and status = 'PAID'")
         .setParameter("id", caseId).getSingleResult()).longValue() > 0;

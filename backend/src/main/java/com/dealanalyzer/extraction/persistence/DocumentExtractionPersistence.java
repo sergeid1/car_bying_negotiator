@@ -74,6 +74,11 @@ public class DocumentExtractionPersistence {
   }
 
   @Transactional(readOnly = true)
+  public java.util.Optional<ExtractionView> latestForCase(String caseId) {
+    return extractions.findTopByCaseIdOrderByCreatedAtDescIdDesc(caseId).map(this::view);
+  }
+
+  @Transactional(readOnly = true)
   public ExtractionView requireLatest(String caseId, String documentId) {
     DocumentExtractionEntity extraction = extractions
         .findTopByDocumentIdOrderByExtractionVersionDesc(documentId)

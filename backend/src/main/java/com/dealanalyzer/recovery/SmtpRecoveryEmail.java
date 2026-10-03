@@ -13,13 +13,21 @@ class SmtpRecoveryEmail implements RecoveryEmail {
   SmtpRecoveryEmail(ObjectProvider<JavaMailSender> sender, @Value("${case.recovery.from:}") String from) {
     this.sender = sender; this.from = from;
   }
-  public void send(String recipient, String link) {
+  public void send(String recipient, String link) { send(recipient, link, Purpose.CASE_RECOVERY); }
+  @Override public void send(String recipient, String link, Purpose purpose) {
     var mailer = sender.getIfAvailable();
     if (mailer == null || from.isBlank()) throw unavailable();
     var message = new SimpleMailMessage();
-    message.setFrom(from); message.setTo(recipient); message.setSubject("Your Buying Case access link");
-    message.setText("You requested Buying Case access. This single-use link expires in 15 minutes.\n"
-        + link + "\nIf you did not request this, ignore this email.");
+    message.setFrom(from); message.setTo(recipient);
+    if (purpose == Purpose.ACCOUNT_SIGN_IN) {
+      message.setSubject("Your Deal X-Ray sign-in link");
+      message.setText("You asked to sign in to your Buyer Account. This single-use link expires in 15 minutes.\n"
+          + link + "\nIf you did not request this, ignore this email. No account is used until the link is opened.");
+    } else {
+      message.setSubject("Your Buying Case access link");
+      message.setText("You requested Buying Case access. This single-use link expires in 15 minutes.\n"
+          + link + "\nIf you did not request this, ignore this email.");
+    }
     try { mailer.send(message); } catch (org.springframework.mail.MailException failure) { throw unavailable(); }
   }
   private ResponseStatusException unavailable() {

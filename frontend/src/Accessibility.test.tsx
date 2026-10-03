@@ -18,6 +18,7 @@ import { OfferTerms, PurchasePoint } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 import { ReferralPartnerKit } from "./ReferralPartnerKit";
+import { ACCOUNT_SESSION_KEY, BuyerAccount } from "./BuyerAccount";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const AA = {
@@ -53,6 +54,28 @@ test("core entry, document intake, recovery, price approval, downloads and delet
     // Layout/contrast require the real-browser walkthrough; jsdom has no rendering engine.
     rules: { "color-contrast": { enabled: false } },
   });
+  expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
+});
+
+test("the signed-in Buyer Account, its contact form and its deletion receipt have no automated AA violations", async () => {
+  const values = new Map([[ACCOUNT_SESSION_KEY, "session"]]);
+  Object.defineProperty(window, "localStorage", { configurable: true, value: {
+    getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); },
+    removeItem: (key: string) => { values.delete(key); } } });
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => new Response(JSON.stringify(
+    String(input).endsWith("/deletion") && init?.method === "POST"
+      ? { state: "DELETION_PENDING", failureCode: null, cases: [{ caseId: "case-1", state: "DELETION_PENDING" }] }
+      : { contact: { email: "buyer@example.com", firstName: null, lastName: null, phone: null }, createdAt: "", sessionExpiresAt: "",
+        cases: [{ caseId: "case-1", attachedAt: "", state: "ACTIVE" }] }), { headers: { "Content-Type": "application/json" } }));
+  const { container } = render(<main><h1>Buying Case</h1><BuyerAccount caseCredentials={{ caseId: "case-2", token: "token" }} /></main>);
+  await screen.findByRole("form", { name: "Contact details" });
+  let result = await axe.run(container, AA);
+  expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
+  const user = userEvent.setup();
+  await user.click(screen.getByLabelText(/permanently delete my Buyer Account/));
+  await user.click(screen.getByRole("button", { name: "Delete Buyer Account" }));
+  await screen.findByRole("list", { name: "Attached cases being deleted" });
+  result = await axe.run(container, AA);
   expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
 });
 

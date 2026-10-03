@@ -75,6 +75,19 @@ public class CaseExportService {
       purchases.requireReport(caseId, token);
     return new Download(protection.decrypt(caseId + ":" + job.id,job.contentBase64), Format.valueOf(job.format));
   }
+  public enum ArchiveStatus { INCLUDED, PURCHASE_REQUIRED, UNAVAILABLE }
+  public record AccountArchive(ArchiveStatus status, byte[] bytes) {}
+  /** The case archive for an attached Buyer Account export, under the same report gate as a case export. */
+  @Transactional(readOnly=true)
+  public AccountArchive accountArchive(String caseId) {
+    var buyingCase=cases.findById(caseId).orElse(null);
+    if(buyingCase==null || !"ACTIVE".equals(buyingCase.lifecycle) || !buyingCase.accessExpiresAt.isAfter(Instant.now()))
+      return new AccountArchive(ArchiveStatus.UNAVAILABLE,null);
+    if(buyingCase.currentReportVersion>0 && purchases.reportPurchaseRequired(caseId))
+      return new AccountArchive(ArchiveStatus.PURCHASE_REQUIRED,null);
+    try { return new AccountArchive(ArchiveStatus.INCLUDED,archive(caseId)); }
+    catch(IOException failure) { throw new IllegalStateException("Export unavailable; retry safely",failure); }
+  }
   private Job view(ExportJobEntity job) { return new Job(job.id,Format.valueOf(job.format),job.reportVersion,job.createdAt,job.expiresAt); }
   private byte[] archive(String caseId) throws IOException {
     var data=projection.read(caseId); data.put("schemaVersion","buying-case-export.v1");
