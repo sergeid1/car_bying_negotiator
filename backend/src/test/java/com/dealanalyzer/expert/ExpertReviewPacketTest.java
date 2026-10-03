@@ -55,7 +55,7 @@ class ExpertReviewPacketTest {
     for (var fixed : ExpertReviewPacket.compute(scenarios).rows()) {
       List<String> row = new ArrayList<>(fixed);
       row.addAll(List.of(List.of("SOUND", "ADJUST", "UNSOUND").get(index++ % 3), "", "", "",
-          "Recorded judgment, with \"quotes\"\nand a second line", "Expert Reviewer", "Consumer-side automotive experience", "2026-10-03"));
+          "Recorded judgment, with \"quotes\"\nand a second line", "Expert Reviewer", "Consumer-side automotive experience", "2026-10-03", "INDEPENDENT"));
       rows.add(row);
     }
     return rows;
@@ -86,7 +86,7 @@ class ExpertReviewPacketTest {
   }
 
   @Test void refusesEachMissingReviewFieldAndInvalidVerdict() throws Exception {
-    for (String field : List.of("verdict", "rationale", "reviewer_name", "qualification_statement", "review_date")) {
+    for (String field : List.of("verdict", "rationale", "reviewer_name", "qualification_statement", "review_date", "dealer_independence")) {
       var rows = completed(); rows.get(1).set(rows.getFirst().indexOf(field), "");
       refuses(rows, field.equals("verdict") ? "verdict must" : "missing " + field);
     }
@@ -100,6 +100,9 @@ class ExpertReviewPacketTest {
     }
     var rows = completed(); rows.get(1).set(30, "2026-02-30"); refuses(rows, "ISO calendar date");
     rows = completed(); rows.get(2).set(28, "Different reviewer"); refuses(rows, "inconsistent reviewer metadata");
+    for (String value : List.of("DEALER_AFFILIATED", "independent", "NO")) {
+      rows = completed(); rows.get(1).set(31, value); refuses(rows, "dealer_independence must be INDEPENDENT");
+    }
   }
   @Test void refusesTamperingMissingDuplicateUnknownAndMalformedRows() throws Exception {
     for (int column = 0; column < 23; column++) {

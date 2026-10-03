@@ -20,7 +20,7 @@ import org.springframework.web.client.RestClient;
 
 class AcquisitionChannelAcceptanceTest {
   private static final String CHANNELS = "/api/v1/operator/pilot/channels";
-  private static final String DISCLOSURE = "Example Inspections refers Buyers here and receives a flat fee per referral.";
+  private static final String DISCLOSURE = "Example Inspections refers Buyers here. It is not paid for referrals.";
   @TempDir Path directory;
 
   private String[] settings() {

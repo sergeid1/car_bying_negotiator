@@ -11,7 +11,7 @@ const OPTIONS = {
 };
 
 const DISCLOSURE =
-  "Example Independent Vehicle Inspections, a consumer inspection service, refers Buyers here and receives a flat referral fee that does not depend on the outcome.";
+  "Example Independent Vehicle Inspections, a consumer inspection service, refers Buyers here. It is not paid for referrals and does not pay Deal X-Ray.";
 
 /** The layout gate needs no real service, only the case shape a referral arrival renders from. */
 async function stubCaseApi(page: Page, created: (body: Record<string, unknown>) => void) {

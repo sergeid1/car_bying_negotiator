@@ -27,7 +27,8 @@ and imports a completed review as a validated verdict record, as of 2026-10-03. 
       they are unavailable, warnings, and the method text. It has blank columns for a verdict
       (`SOUND`, `ADJUST`, `UNSOUND`), suggested opening/target/walk-away, and a rationale.
 - [x] An import validates a completed workbook: every scenario answered with an allowed verdict, a
-      reviewer name, qualification statement and review date present, suggested values well formed, and
+      reviewer name, qualification statement and review date present, a declaration that no dealer or lender
+      employs, pays, or is affiliated with the reviewer, suggested values well formed, and
       the packet hash matching. It refuses an incomplete or mismatched workbook with a reason per row and
       writes a review record with counts by verdict.
 - [x] Generation and import run from a documented command that does not start the application, bind a

@@ -1,6 +1,8 @@
 # Price boundary expert review packet
 
-This offline packet prepares evidence for public-pilot readiness prerequisite 4. A consumer-side
+This offline packet prepares evidence for public-pilot readiness prerequisite 4. Deal X-Ray works
+only for Buyers and does not work with dealers, so the reviewer must be independent of the dealer
+side: not employed by, paid by, or affiliated with a dealer, dealer group, or lender. A consumer-side
 automotive expert is asked to judge whether the shipped opening, target, policy maximum, and
 walk-away are sound negotiating positions given the recorded market range, offer terms, and Buyer
 limits. Assess selling-price and OTD boundaries separately, the fixed-charge conversion assumptions,
@@ -69,6 +71,9 @@ unchanged and fill the review columns on **every** scenario:
 - `rationale`: required explanation, including assumptions and reservations.
 - `reviewer_name`, `qualification_statement`, `review_date`: required on every row and identical
   across the workbook. Describe consumer-side automotive qualifications; date format is `YYYY-MM-DD`.
+- `dealer_independence`: required on every row, exactly `INDEPENDENT`. It declares that no dealer,
+  dealer group, or lender currently employs, pays, or is affiliated with the reviewer. Any other value
+  is refused; a dealer-side reviewer cannot supply this evidence.
 
 Use a CSV editor that preserves long integers and quoted JSON as text. The importer accepts ordinary
 quoted CSV, including embedded commas, doubled quotes, and multiline rationales. It refuses malformed

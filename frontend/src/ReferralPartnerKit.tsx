@@ -99,6 +99,10 @@ export function ReferralPartnerKit() {
     <section aria-labelledby="partner-terms-heading">
       <h2 id="partner-terms-heading">Terms of the arrangement</h2>
       <ul>
+        <li>
+          Deal X-Ray works only for Buyers. It does not work with dealers: it has no dealer customers or
+          partners, takes no money from dealers, and shares nothing about a Buyer with any dealer.
+        </li>
         <li>Partners are not paid for referrals, and partners do not pay for placement or referrals.</li>
         <li>Every Buyer who arrives through a partner's link is shown a disclosure of the referral.</li>
         <li>

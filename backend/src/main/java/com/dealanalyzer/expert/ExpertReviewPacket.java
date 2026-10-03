@@ -23,7 +23,9 @@ public final class ExpertReviewPacket {
       "otd_walk_away_minor", "otd_unavailable_reason", "warnings", "method", "scenario_set_hash");
   private static final List<String> REVIEW = List.of("verdict", "suggested_opening_minor",
       "suggested_target_minor", "suggested_walk_away_minor", "rationale", "reviewer_name",
-      "qualification_statement", "review_date");
+      "qualification_statement", "review_date", "dealer_independence");
+  /** The reviewer works for Buyers: no dealer or lender employs, pays, or is affiliated with them. */
+  static final String INDEPENDENT = "INDEPENDENT";
   public record ScenarioSet(String version, Policy economicsPolicy, List<Scenario> scenarios) {}
   public record Scenario(String id, String provenance, String permissionReference, String description,
       long marketLowMinor, long marketHighMinor, Long buyerSellingLimitMinor, Long buyerOtdLimitMinor,
@@ -101,7 +103,7 @@ public final class ExpertReviewPacket {
       markdown.append("## ").append(escape(row.get(3))).append("\n\n");
       for (int i = 1; i < FIXED.size(); i++)
         markdown.append("- **").append(FIXED.get(i)).append("**: ").append(escape(row.get(i))).append("\n");
-      markdown.append("\nVerdict, suggested opening/target/walk-away, rationale, reviewer name, qualifications, and date: complete in workbook.csv.\n\n");
+      markdown.append("\nVerdict, suggested opening/target/walk-away, rationale, reviewer name, qualifications, date, and dealer independence: complete in workbook.csv.\n\n");
     }
     Path dir = newDirectory(output);
     write(dir.resolve("workbook.csv"), csv(workbook));
@@ -148,7 +150,10 @@ public final class ExpertReviewPacket {
         if (row.get(c).isBlank()) errors.add(label + ": missing " + header().get(c));
       try { LocalDate.parse(row.get(start + 7)); }
       catch (Exception invalid) { errors.add(label + ": review_date must be an ISO calendar date"); }
-      List<String> currentIdentity = List.copyOf(row.subList(start + 5, start + 8));
+      if (!row.get(start + 8).isBlank() && !INDEPENDENT.equals(row.get(start + 8)))
+        errors.add(label + ": dealer_independence must be " + INDEPENDENT
+            + "; a reviewer employed by, paid by, or affiliated with a dealer or lender cannot review");
+      List<String> currentIdentity = List.copyOf(row.subList(start + 5, start + 9));
       if (identity == null) identity = currentIdentity;
       else if (!identity.equals(currentIdentity)) errors.add(label + ": inconsistent reviewer metadata");
       Map<String, String> answer = new LinkedHashMap<>();
