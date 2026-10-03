@@ -1,11 +1,38 @@
-# AI Deal Analyzer — MVP Development Specification
+# Deal X-Ray — Product and Development Specification
 
-Status: Ready for development; public pilot gated by Section 18 prerequisites  
-Version: 1.0  
-Date: 2026-08-25  
-Sources consolidated: `PROPOSED_CONTEXT.md`, `PROPOSED_PRODUCT_SPEC.md`, and `.scratch/ai-deal-analyzer-mvp/spec.md`
+Status: Phase 1 (Deal X-Ray) built; Phases 2–4 ready for ticketing; public pilot gated by Section 18 prerequisites  
+Version: 2.0  
+Date: 2026-10-03  
+Supersedes: version 1.0 (2026-08-25), which specified Phase 1 only. Phase 1 requirements are unchanged
+unless a section says otherwise. Sources consolidated: `PROPOSED_CONTEXT.md`, `PROPOSED_PRODUCT_SPEC.md`,
+`.scratch/ai-deal-analyzer-mvp/spec.md`, and the product owner's vision of 2026-10-03.
 
 ## 1. Product contract
+
+### 1.0 Vision
+
+Deal X-Ray is the Buyer's side of a used-car purchase. It exists so that a person buying a car does
+not get taken advantage of by a dealership. The full journey is:
+
+1. **Shop.** The Buyer describes the car they want (for example, a 2021–2023 Honda Civic under 40,000
+   miles within 50 miles) and can add VINs of cars they like as references. The platform finds
+   matching cars for sale and explains why each one matches.
+2. **Get a quote and negotiate.** The Buyer picks a car. Acting as the Buyer's disclosed representative,
+   the platform contacts that dealer, asks for an itemized out-the-door quote, and negotiates the price
+   within limits the Buyer approved, using market evidence and the deterministic analysis below.
+3. **Agree.** The platform explains each quote: how the price compares with similar cars, which fees
+   and add-ons are in it, and whether it is a good price. When the Buyer accepts a written quote, that
+   becomes the **Agreed Price**.
+4. **Test drive.** The platform helps schedule a test-drive appointment with the dealer. The Buyer
+   arrives already knowing the number and does not need to negotiate at the dealership.
+5. **At the desk.** When the dealer presents paperwork (a buyer's order, quote, or four-square
+   worksheet), the Buyer uploads it and the platform checks it against the Agreed Price. If the Buyer
+   switches to a different car at the dealership, or never negotiated beforehand, the Buyer can upload
+   that car's paperwork and get the same market, fee, and jurisdiction check on the spot.
+6. **Later.** Financing and insurance shopping on the Buyer's behalf. Not specified in this version.
+
+Phase 1 (Section 17) is the document analysis at the core of steps 3 and 5 and is built. Phases 2–4 add
+shopping, the Buyer Agent, and test-drive scheduling.
 
 The AI Deal Analyzer is a buyer-aligned, document-first web product for a U.S. consumer evaluating a used vehicle offered by a licensed dealer. Given a vehicle or listing, the buyer's jurisdiction, and a dealer quote, it produces a versioned, evidence-backed **Deal Analysis Report** that answers:
 
@@ -13,9 +40,9 @@ The AI Deal Analyzer is a buyer-aligned, document-first web product for a U.S. c
 
 The product uses AI to extract and explain facts. Deterministic, versioned code owns money calculations, classifications, thresholds, financial boundaries, state transitions, and review outcomes.
 
-The product represents the Buyer. Dealer compensation, affiliate eligibility, or lead value must never influence a market assessment, rating, finding, or recommendation.
+The product represents the Buyer. Dealer compensation, affiliate eligibility, or lead value must never influence a market assessment, rating, finding, recommendation, search result, or negotiation.
 
-### 1.1 MVP outcome
+### 1.1 Phase 1 outcome (Deal X-Ray, built)
 
 A Buyer can:
 
@@ -30,13 +57,53 @@ A Buyer can:
 9. upload a revised Dealer Offer and compare it with the Approved Baseline and prior offer;
 10. export or delete the Buying Case.
 
-### 1.2 MVP positioning
+Phases 2–4 add these outcomes. A Buyer can:
 
-Position the product as an **evidence-backed second set of eyes on the dealer's actual paperwork** or “deal X-ray.” Do not market it as a legal review, autonomous negotiator, guaranteed savings product, or a declaration that a document is “safe to sign.”
+11. describe the car they want in a Shopping Brief and add Reference Vehicles by VIN;
+12. review matching cars for sale, each with match reasons and a listed-price market check, and shortlist them;
+13. pick a car and approve a Negotiation Mandate that sets what the platform may ask, offer, and disclose;
+14. have the platform request an itemized quote from the dealer and negotiate within that mandate, seeing every message sent and received;
+15. accept a written dealer quote as the Agreed Price, which becomes the Approved Baseline;
+16. schedule a test drive through the platform;
+17. upload desk paperwork and see it compared with the Agreed Price, or analyze a different car's paperwork on the spot.
+
+### 1.2 Positioning
+
+Position the product as **the Buyer's side of the deal**: it finds cars, gets real quotes, negotiates
+within limits the Buyer sets, and checks the dealer's actual paperwork (the “deal X-ray”). Do not market
+it as a legal review, an autonomous negotiator that acts without the Buyer's limits, a guaranteed
+savings product, or a declaration that a document is “safe to sign.” Negotiation copy says the platform
+negotiates **on the Buyer's behalf within limits the Buyer approves**. All Buyer-facing claims about the
+Buyer Agent require counsel review before public use (Section 18).
+
+### 1.3 Credo: we don't work with dealers, we help people
+
+The platform is on the Buyer's side so that the Buyer does not get taken advantage of. It is **not** a
+platform that sends customers to dealers. Working with a good, trustworthy dealer is welcome; the
+platform contacts dealers only as the Buyer's disclosed representative. These invariants are
+enforceable product rules, not marketing:
+
+1. **No dealer money.** No dealer, dealer group, lender, or other seller-side party pays the platform
+   for leads, placement, referrals, appointments, sales, subscriptions, or data. Revenue comes from
+   Buyers.
+2. **Not a lead source.** The platform never sells, rents, or hands Buyer identity or contact details
+   to a dealer. A dealer talks to the platform's relay, not to the Buyer, until the Buyer chooses to
+   release contact details (for example, to book a test drive).
+3. **Buyer-only ranking.** Search results, shortlists, and recommendations are ordered only by the
+   Buyer's criteria and evidence. No dealer relationship can change ordering, inclusion, or wording.
+4. **Buyer's limits rule.** The platform never offers above the Buyer's approved ceiling, never commits
+   the Buyer to a purchase, and never says anything to a dealer the Buyer has not authorized.
+5. **Independent judgment.** Experts, reviewers, and referral partners whose judgment reaches Buyers
+   must be independent of dealers and lenders.
+6. **Transparency.** The Buyer sees every message the platform sends to or receives from a dealer.
+
+A design that conflicts with this credo is out of scope regardless of other benefits.
 
 ## 2. Scope
 
 ### 2.1 Included
+
+Phase 1 (Deal X-Ray, built):
 
 - Responsive web application.
 - Used passenger vehicles sold by licensed dealers.
@@ -56,18 +123,49 @@ Position the product as an **evidence-backed second set of eyes on the dealer's 
 - Ephemeral access by high-entropy case link and optional email recovery/delivery.
 - Redacted operator diagnostics and separately consented manual review.
 
+Phases 2–4 (to build):
+
+- A Buyer account (passwordless email sign-in) for journeys that span days and need notifications.
+  Phase 1 analysis stays available without an account.
+- A Shopping Brief: year range, make, model, trims, mileage, price ceiling, search radius, and must-have
+  and nice-to-have features, using a structured form.
+- Reference Vehicles: Buyer-supplied VINs decoded into comparable attributes that refine matching.
+- Licensed inventory search within the Buyer's radius through a replaceable adapter, with explained
+  match reasons and a listed-price market check per candidate.
+- A shortlist, and one Buying Case per picked candidate, seeded from its Listing Snapshot.
+- A Negotiation Mandate approved by the Buyer: target, walk-away ceiling, what may be disclosed, and
+  the autonomy mode.
+- Dealer communication by email through a per-case relay address, identifying the platform as the
+  Buyer's representative and using AI, with the Buyer's identity withheld until the Buyer releases it.
+- Quote requests for an itemized out-the-door quote, counteroffers within the mandate, and ingestion of
+  dealer replies and attachments through the existing document pipeline.
+- Comparison of quotes across the Buyer's candidates.
+- An Agreed Price created only by Buyer acceptance of a written dealer quote.
+- Test-drive scheduling through the relay, with a calendar file and reminders for the Buyer.
+- A Desk Check: fast mobile upload of desk paperwork, including four-square worksheets, compared with
+  the Agreed Price, and an on-the-spot analysis path for a different car.
+- Notifications to the Buyer by email for dealer replies, approvals needed, and appointments.
+
 ### 2.2 Excluded
 
 - New vehicles, leases, private-party sales, auctions, motorcycles, RVs, and commercial vehicles.
-- Natural-language nationwide inventory discovery.
-- Dealer contact by the product, autonomous negotiation, deposits, signatures, credit applications, or binding commitments.
-- Credit pulls, lender matching, loan origination, insurance quoting, or credit eligibility decisions.
+- Inventory discovery from unlicensed sources or scraping, and natural-language search as the only
+  way to state criteria. Structured criteria are required; free-text may assist.
+- Dealer contact other than as the Buyer's disclosed representative under an active Negotiation
+  Mandate; telephone calls; SMS before its consent and compliance work is done.
+- Deposits, payments to dealers, signatures, credit applications, or any binding commitment made by
+  the platform. Only the Buyer agrees to buy, and only in person or by their own action.
+- Credit pulls, lender matching, loan origination, insurance quoting, or credit eligibility decisions (planned for a later version).
 - Trade-in valuation or external trade offers. If a quote includes trade terms, preserve and show them separately but do not assess their fairness.
 - Definitive legal, tax, mechanical, title, accident, recall, odometer, dealer-legitimacy, or vehicle-history conclusions.
 - Final-contract legal review or the phrase “safe to sign.”
 - Proprietary market-value machine learning.
-- Dealer rankings or cross-Buyer dealer intelligence.
-- Native mobile apps, multilingual support, subscriptions, success fees, and dealer-paid leads.
+- Dealer rankings or cross-Buyer dealer intelligence, until the open decision in Section 18 is made.
+  A Buyer still sees how each dealer behaved in their own journey.
+- Anything that makes the platform a lead source: dealer-paid leads, placement, referral, appointment,
+  or success fees; dealer subscriptions; sale of Buyer data.
+- Native mobile apps, multilingual support, and Buyer subscriptions. A Buyer-paid success fee is an
+  open decision in Section 18.
 
 ## 3. Canonical language
 
@@ -94,8 +192,22 @@ Code, API schemas, UI copy, analytics, and tests must use these terms consistent
 | **Out-the-Door Total** | Purchase charge before trade allowance, payoff, cash down, or financing: vehicle price, dealer charges, taxes, and government charges. |
 | **Total Transaction Cost** | Cash paid plus scheduled financing payments and known deferred charges needed to complete and repay the purchase. |
 | **Deal Analysis Report** | An immutable, versioned presentation of verified evidence and deterministic analysis for a Buying Case. |
+| **Buyer Account** | A passwordless identity that holds a Buyer's journeys, contact preferences, and notifications. |
+| **Buying Journey** | One Buyer's search for one car: a Shopping Brief, its candidates and shortlist, and the Buying Cases opened from it. |
+| **Shopping Brief** | The Buyer's structured criteria for the car they want. Versioned; edits create a new version. |
+| **Reference Vehicle** | A VIN the Buyer likes, decoded into attributes that refine matching. It is not necessarily for sale. |
+| **Candidate Vehicle** | A vehicle for sale returned by inventory search for a Shopping Brief, with match reasons and a Listing Snapshot. |
+| **Shortlist** | The Candidate Vehicles a Buyer has kept for comparison. |
+| **Negotiation Mandate** | An immutable Buyer-approved authorization for one Buying Case: target, walk-away ceiling, permitted disclosures, autonomy mode, and expiry. |
+| **Supervised mode** | Autonomy mode in which every outbound dealer message requires Buyer approval before sending. |
+| **Delegated mode** | Autonomy mode in which messages that pass the policy gate and stay within the mandate send without per-message approval. |
+| **Dealer Conversation** | The relay thread between the platform, acting for the Buyer, and one Dealer about one Buying Case. |
+| **Quote Request** | A message asking a Dealer for an itemized out-the-door quote on a specific Vehicle. |
+| **Agreed Price** | A written dealer quote the Buyer explicitly accepted. Non-binding on either party; it becomes the Approved Baseline. |
+| **Test Drive Appointment** | A time and place agreed with the Dealer through the relay, with the quote reference it relies on. |
+| **Desk Check** | A Deal Review of paperwork presented at the dealership against the Agreed Price, or a fresh analysis when none exists. |
 
-The MVP uses **walk-away ceiling** in the UI for the maximum approved economic boundary. In the domain model it is a limit within the Deal Plan; it is never inferred from a monthly-payment preference.
+The product uses **walk-away ceiling** in the UI for the maximum approved economic boundary. In the domain model it is a limit within the Deal Plan; it is never inferred from a monthly-payment preference.
 
 ## 4. Product principles and invariants
 
@@ -109,8 +221,17 @@ The MVP uses **walk-away ceiling** in the UI for the maximum approved economic b
 8. **No false assurance.** Financial consistency does not imply legal validity, mechanical quality, or purchase safety.
 9. **Fail closed for positive outcomes.** Missing or uncertain material fields prevent an unqualified positive review.
 10. **Consumer alignment.** Commercial relationships cannot change ordering or analysis.
+11. **The Buyer authorizes, the platform represents.** The platform speaks to a dealer only within an
+    active Negotiation Mandate, never above its ceiling, and never commits the Buyer.
+12. **Deterministic gate before every send.** An outbound dealer message is sent only after a
+    deterministic policy gate verifies its amounts, disclosures, and commitments against the mandate.
+13. **Private by default.** A dealer learns the Buyer's identity or contact details only when the Buyer
+    releases them.
 
 ## 5. Primary workflow
+
+Sections 5.1–5.5 are the Phase 1 workflow; a Buying Case may start there directly (for example, at the
+desk). Sections 5.6–5.9 add the journey that leads into it.
 
 ### 5.1 Start a Buying Case
 
@@ -165,7 +286,67 @@ The report leads with a concise outcome, top findings, and next action, followed
 
 A revised offer produces a new extraction, Dealer Offer, Deal Review, and report version. It is compared line by line with both the Approved Baseline and immediately preceding offer.
 
+### 5.6 Shop
+
+The Buyer signs in and creates a Buying Journey with a Shopping Brief and optional Reference Vehicles.
+VINs are checksum-validated and decoded; decoded attributes are shown to the Buyer, who chooses which
+ones matter (for example, trim and drivetrain but not color). Inventory search runs against a licensed
+provider within the Buyer's radius and returns Candidate Vehicles with:
+
+- why each matches and which criteria it misses, never a hidden score;
+- a Listing Snapshot with source and retrieval time;
+- a listed-price market check using the Market Assessment module, labelled as the advertised price,
+  not a quote.
+
+Ordering uses only the Buyer's criteria and evidence (credo 3). The Buyer shortlists candidates and
+picks one or more; each pick opens a Buying Case seeded with the Vehicle and Listing Snapshot.
+
+### 5.7 Request a quote and negotiate
+
+Before any dealer contact the Buyer approves a Negotiation Mandate for that Buying Case. The platform
+proposes a target and walk-away ceiling from the Deal Plan (Section 5.4); the Buyer can lower either,
+and the ceiling can never exceed the Buyer's maximum. The mandate also records what may be disclosed
+(for example, "pre-approved financing", "paying cash", the Buyer's first name), the autonomy mode, and
+an expiry. Supervised mode is the default and the only mode until the Phase 3 gate allows delegation.
+
+The platform sends the Dealer a Quote Request from the case's relay address. Each message states that
+it is sent on behalf of a Buyer by an AI-assisted service. Dealer replies and attachments enter the
+Dealer Conversation; quote attachments and quote figures in message bodies become Document Artifacts
+and go through the existing extraction and verification pipeline. Every quote produces a Deal Analysis
+Report that tells the Buyer whether it is a good price and why.
+
+Counteroffers are drafted by the Explanation and negotiation modules from verified facts and
+deterministic boundaries only, then pass the policy gate (Section 12). In supervised mode the Buyer
+approves, edits, or declines each one. Negotiation stops when the dealer's itemized quote is at or
+below target, when the dealer declines to move, when the mandate expires, or when the Buyer stops it.
+
+### 5.8 Agree and schedule a test drive
+
+The Buyer accepts a quote. The platform asks the Dealer to confirm it in writing if it is not already
+written and itemized, and the confirmed quote becomes the Agreed Price and the Approved Baseline. The
+platform never tells a dealer the Buyer will buy; it says the Buyer accepts the quote subject to a test
+drive and the final paperwork matching it.
+
+The platform then proposes test-drive times from the Buyer's availability. When the Buyer books, the
+Buyer chooses which contact details to release to the Dealer. The Buyer receives a calendar file, a
+reminder, and a one-page summary of the Agreed Price to bring.
+
+### 5.9 Desk Check
+
+At the dealership the Buyer opens the journey on a phone and uploads the paperwork presented. A Desk
+Check compares it line by line with the Agreed Price and leads with any difference: added fees or
+add-ons, a changed price, changed financing, or a different VIN. If the Buyer switches to another car,
+or never negotiated, the Buyer starts a Buying Case from that car's VIN and paperwork and receives the
+Phase 1 analysis, including the jurisdiction's fees and taxes. A Desk Check has the same p95 latency
+target as Phase 1 document review and is usable one-handed at 360 px.
+
 ## 6. Workflow state model
+
+The Phase 1 Buying Case states below are unchanged. A Buying Journey adds `SHOPPING`, `NEGOTIATING`,
+`AGREED`, `TEST_DRIVE_SCHEDULED`, `CLOSED`, and `ABANDONED`, and each Buying Case under it adds a
+negotiation sub-state: `NO_MANDATE`, `MANDATE_ACTIVE`, `AWAITING_DEALER`, `AWAITING_BUYER`, `AGREED`,
+`STOPPED`, `EXPIRED`. Mandate expiry, revocation, or case deletion stops all outbound messages
+immediately.
 
 `AnalysisCase.status` is one of:
 
@@ -291,7 +472,7 @@ Every Discrepancy records expected value, observed value, delta where meaningful
 - **PLAN-05:** Express estimated savings against a named baseline with uncertainty; never guarantee savings.
 - **NEG-01:** Generate editable questions and drafts only from verified case facts and deterministic findings.
 - **NEG-02:** Drafts cannot invent competing offers, legal claims, commitments, or dealer statements.
-- **NEG-03:** The system cannot send a message in the MVP.
+- **NEG-03:** The system sends a dealer message only under an active Negotiation Mandate, after the policy gate, and in supervised mode only after the Buyer approves that message.
 
 ### 8.7 Report, operations, and deletion
 
@@ -305,6 +486,45 @@ Every Discrepancy records expected value, observed value, delta where meaningful
 - **DEL-01:** Default raw artifact retention is 30 days or less, configurable downward by the Buyer.
 - **DEL-02:** Case deletion revokes access immediately and schedules removal of originals, normalized pages, OCR artifacts, exports, caches, and derived personal data.
 - **DEL-03:** Record deletion progress and accurately disclose backup expiry rather than promising immediate erasure from immutable backups.
+
+### 8.8 Buyer Account and journey
+
+- **ACCT-01:** Sign in by expiring single-use email link; no passwords. Phase 1 cases remain usable without an account and can be attached to one.
+- **ACCT-02:** A Buyer can export or delete their account and every journey, conversation, and case under it under the Section 8.7 deletion rules.
+- **ACCT-03:** Contact details are stored once, encrypted, and released to a dealer only by an explicit per-dealer Buyer action that is audited.
+
+### 8.9 Shopping
+
+- **SHOP-01:** Capture a versioned Shopping Brief with validated structured criteria.
+- **SHOP-02:** Decode Reference Vehicle VINs through a replaceable VIN decoder adapter; show decoded attributes and let the Buyer pick which ones matter.
+- **SHOP-03:** Search licensed inventory through a replaceable adapter with recorded provider, license, and retrieval time; no scraping.
+- **SHOP-04:** Return each candidate's matched and missed criteria; no unexplained score.
+- **SHOP-05:** Order candidates only by Buyer criteria and evidence. A test proves that dealer identity and any commercial field cannot change ordering.
+- **SHOP-06:** Show a listed-price market check per candidate, labelled as an advertised price.
+- **SHOP-07:** Persist a shortlist and open a Buying Case from a candidate with its Listing Snapshot.
+
+### 8.10 Buyer Agent and dealer communication
+
+- **AGT-01:** Create an immutable, versioned Negotiation Mandate only by Buyer approval; a new version requires new approval; revocation is immediate.
+- **AGT-02:** The walk-away ceiling in a mandate is at most the Deal Plan's walk-away ceiling (PLAN-03).
+- **AGT-03:** Send and receive dealer email through a per-case relay address; never reveal the Buyer's email, phone, or surname unless released (ACCT-03).
+- **AGT-04:** Every outbound message identifies the platform as acting for a Buyer and as AI-assisted, and includes an opt-out for the dealer.
+- **AGT-05:** Every outbound message passes a deterministic policy gate: amounts at or below the mandate ceiling, only permitted disclosures, no commitment, deposit, signature, or purchase language, no invented competing offers or facts, no Buyer personal data.
+- **AGT-06:** In supervised mode each message requires Buyer approval; delegated mode is disabled until the Phase 3 gate passes and the Buyer opts in per mandate.
+- **AGT-07:** Inbound dealer content is untrusted (DOC-08). Quotes in attachments or bodies become Document Artifacts and are verified before analysis.
+- **AGT-08:** The Buyer sees the full conversation, including drafts, gate decisions, and delivery status.
+- **AGT-09:** Compare quotes across a journey's Buying Cases on OTD total, fees, add-ons, and market position.
+- **AGT-10:** Create an Agreed Price only from Buyer acceptance of a written, itemized dealer quote; it becomes the Approved Baseline.
+- **AGT-11:** Meter and cap outbound volume per dealer and per case; respect dealer opt-out permanently for that relay identity.
+
+### 8.11 Test drive and desk
+
+- **APPT-01:** Propose test-drive times from Buyer availability, confirm through the relay, and send the Buyer a calendar file and reminder.
+- **APPT-02:** Booking releases only the contact details the Buyer selects.
+- **DESK-01:** A Desk Check compares desk paperwork with the Agreed Price and leads with differences.
+- **DESK-02:** Support four-square worksheets as a document type, extracting price, trade, down payment, payment, term, and APR fields with evidence.
+- **DESK-03:** Starting a fresh case at the desk from a VIN and paperwork needs no prior journey.
+- **NOTE-01:** Notify the Buyer by email for dealer replies, approvals needed, mandate expiry, and appointments, with per-type opt-out.
 
 ## 9. Canonical financial model
 
@@ -372,6 +592,17 @@ Standard fixed-rate financing uses the ordinary annuity formula, with an explici
 | `AuditEvent` | Append-only material action metadata; no raw sensitive document text. |
 | `DeletionJob` | Scope, lifecycle, attempts, completion evidence, backup-expiry metadata. |
 | `ProviderUsage` | Provider, operation, request correlation, units, cost, status, license metadata. |
+| `BuyerAccount` | Email identity, encrypted contact details, notification preferences, timestamps. |
+| `BuyingJourney` | Account, Shopping Brief versions, state, Buying Cases opened from it. |
+| `ShoppingBrief` | Versioned structured criteria. |
+| `ReferenceVehicle` | VIN, decoded attributes, attributes the Buyer marked as relevant, decoder version. |
+| `CandidateVehicle` | Search run, Listing Snapshot reference, matched/missed criteria, market check, shortlist flag. |
+| `NegotiationMandate` | Case, version, target, ceiling, permitted disclosures, autonomy mode, expiry, approval/revocation actor and time. |
+| `DealerConversation` | Case, Dealer, relay address, opt-out state. |
+| `DealerMessage` | Direction, body reference, attachments, draft/approval/gate decision, delivery status. Bodies follow artifact retention. |
+| `AgreedPrice` | Case, accepted Dealer Offer version, acceptance actor and time, written-confirmation evidence. |
+| `TestDriveAppointment` | Case, time, location, confirmation evidence, contact-release record. |
+| `Notification` | Account, type, channel, delivery state; no sensitive content in the payload. |
 
 Material records include IDs, case ID, creation time, source, schema/policy version, and actor. Original document bytes never live in PostgreSQL.
 
@@ -389,6 +620,10 @@ Build a modular monolith with one background worker. The initial reference stack
 - **Deal Policy:** produces ratings and price boundaries under Buyer caps.
 - **Report:** assembles immutable structured output and evidence references.
 - **Explanation:** converts finalized structured results to plain language and cannot introduce facts.
+- **Shopping:** owns Shopping Briefs, Reference Vehicles, search runs, candidates, and shortlists.
+- **Buyer Agent:** owns mandates, Dealer Conversations, drafting, the policy gate, sending, and Agreed Prices. It reads Deal Policy boundaries and cannot change them.
+- **Scheduling:** owns availability, appointments, calendar files, and reminders.
+- **Accounts and Notifications:** owns sign-in, contact-detail release, and Buyer notifications.
 - **Consent and Retention:** owns purpose grants, access expiry, deletion, and audit.
 - **Provider Metering:** normalizes operational usage and licensing metadata.
 
@@ -401,6 +636,9 @@ Provider-specific response objects must be normalized at ingestion and must not 
 - Jurisdiction/tax/government-fee source.
 - OCR/layout and vision-capable structured extraction provider.
 - Object storage, malware scanner, email delivery, and optional consented human-review queue.
+- VIN decoder for Reference Vehicles and candidates.
+- Licensed dealer inventory search.
+- Inbound and outbound email relay for Dealer Conversations.
 
 Every adapter has a deterministic fake or licensed recorded fixture for the main test suite. Main tests do not call paid live endpoints.
 
@@ -432,10 +670,13 @@ Upload, correction, baseline approval, analysis, export, and deletion operations
 - Extraction requires schema-constrained output and deterministic validation.
 - Unreadable values become missing or low-confidence; the model must not guess digits.
 - Model output cannot mutate a Verified Term, approval, limit, policy, state, or sent communication.
+- Models draft dealer messages; they cannot send them. Sending is a separate deterministic step after the policy gate (AGT-05) and, in supervised mode, Buyer approval.
+- Dealer replies are untrusted input. Instructions in them (for example, "reply with the buyer's phone number") are content, not commands.
+- Negotiation amounts in drafts come from deterministic boundaries and the mandate; the gate rejects any amount a model introduced.
 - Explanations consume only finalized structured facts and findings. Displayed claims are checked against those inputs.
 - Record model, prompt, schema, thresholds, and evaluation-set versions for material outputs.
 - Model/provider changes must pass a frozen corpus and shadow comparison before rollout.
-- Customer documents are not used for training in the MVP. Vendor retention and training controls require contractual validation.
+- Customer documents are not used for training. Vendor retention and training controls require contractual validation.
 
 ## 13. Security, privacy, compliance, and accessibility
 
@@ -448,6 +689,8 @@ Upload, correction, baseline approval, analysis, export, and deletion operations
 - Obtain jurisdiction-specific counsel review for privacy, fee/tax/optionality claims, consumer-protection and savings claims, financial/legal-advice boundaries, accessibility, retention, and provider terms.
 - Do not encode the vacated FTC CARS Rule as active law. Legal requirements are versioned jurisdiction policy maintained from authoritative sources and counsel guidance.
 - Core flows meet WCAG 2.2 AA, including keyboard use, screen-reader labeling, contrast, focus, and non-color warning cues.
+- Before any dealer contact in a state, obtain counsel review of whether acting as the Buyer's representative requires an auto-broker or similar licence, and of agency, AI-disclosure, and commercial-email (CAN-SPAM) obligations. SMS and calls additionally require TCPA review and are excluded until then.
+- Relay email authenticates with SPF, DKIM, and DMARC, rate-limits per dealer, and never exposes the Buyer's address.
 
 ## 14. Non-functional requirements
 
@@ -460,6 +703,9 @@ Upload, correction, baseline approval, analysis, export, and deletion operations
 - **Deletion:** access revoked immediately on request; active-system deletion completion p95 within 24 hours; backup expiry disclosed and monitored.
 - **Accessibility:** no critical WCAG 2.2 AA violations in core workflows.
 - **Reproducibility:** historical structured input plus recorded policy/provider snapshots reproduces the same report payload except explicitly versioned presentation metadata.
+- **Agent safety:** zero outbound messages above the mandate ceiling, with a commitment, or with unreleased Buyer personal data in the release test corpus; the gate is tested against adversarial drafts.
+- **Search latency:** inventory search results p95 under 5 seconds, excluding provider outages, which are stated.
+- **Desk Check latency:** the Phase 1 document-review targets apply.
 
 ## 15. Acceptance scenarios
 
@@ -478,6 +724,17 @@ Upload, correction, baseline approval, analysis, export, and deletion operations
 13. **Partial provider failure:** Market-provider failure preserves the case and yields a partial deal-economics report with market analysis unavailable.
 14. **Deletion:** Deleting a case immediately invalidates its access link, progresses through every derived artifact, and produces auditable completion without sensitive content in logs.
 15. **Financed add-on:** An add-on financed for the full term shows both its cash price and incremental scheduled-payment/interest effect.
+16. **Reference VINs:** Two Reference Vehicle VINs for EX-trim Civics refine a Civic brief so EX-trim candidates show "matches your reference trim"; an invalid VIN is refused with a checksum message.
+17. **Ranking integrity:** Changing a candidate's dealer, or adding any commercial field, does not change ordering or wording.
+18. **Ceiling enforcement:** A model draft offering $500 above the mandate ceiling is blocked by the gate and never sent; the Buyer sees why.
+19. **Data leak attempt:** A dealer reply asking for the Buyer's phone number produces no disclosure; the draft reply is gated and the Buyer is informed.
+20. **No commitment:** A draft saying "the buyer will take it, deposit to follow" is blocked.
+21. **Supervised send:** In supervised mode no message leaves before Buyer approval; an edited draft is re-gated.
+22. **Agreed Price:** Accepting a written itemized quote creates the Agreed Price and Approved Baseline; accepting a verbal or partial quote prompts for written confirmation instead.
+23. **Desk add-ons:** Desk paperwork adding a $1,495 service contract to the Agreed Price leads the Desk Check with that addition and its total effect.
+24. **Switch cars at the desk:** A Buyer with an Agreed Price on one car uploads a different VIN's four-square and receives a fresh analysis, clearly separate from the agreed car.
+25. **Opt-out:** A dealer replying "stop" receives no further messages from that relay identity, and the Buyer is told.
+26. **Mandate revocation:** Revoking a mandate cancels queued drafts and blocks sends within one second.
 
 ## 16. Test strategy
 
@@ -532,14 +789,46 @@ Gate: 25–50 moderated cases complete safely before a gated 100–300-case pilo
 
 Expected effort: 12–16 calendar weeks for two experienced full-stack engineers plus part-time product/design, automotive expertise, security, and counsel. Provider contracting and corpus acquisition are critical-path dependencies.
 
+Milestones 0–4 make up **Phase 1 (Deal X-Ray)**. Its open release items are tracked in
+`docs/pilot-readiness-record.md` and ticket 22. Later phases may be built in parallel with the Phase 1
+pilot, but no Buyer outside moderated testing uses a later phase before its gate passes.
+
+### Phase 2 — Shop
+
+Deliver Buyer Accounts, Shopping Briefs, Reference Vehicle decoding, the inventory search adapter with
+a deterministic fake, candidate matching with explained reasons, listed-price market checks,
+shortlists, and opening a Buying Case from a candidate.
+
+Gate: a licensed inventory source under executed terms; ranking-integrity tests pass; moderated Buyers
+find and shortlist a suitable car from a brief.
+
+### Phase 3 — Buyer Agent
+
+Deliver Negotiation Mandates, the email relay, Quote Requests, dealer reply ingestion, drafting, the
+policy gate, supervised sending, conversation view, cross-candidate quote comparison, Agreed Price, and
+notifications.
+
+Gate: counsel sign-off for the pilot state (Section 13); zero gate escapes on the adversarial corpus;
+moderated supervised-mode journeys obtain written itemized quotes. Delegated mode requires a separate
+gate: supervised-mode evidence that Buyers approve gated drafts unchanged at a pre-registered rate, and
+zero gate escapes over a pre-registered volume.
+
+### Phase 4 — Test drive and desk
+
+Deliver test-drive scheduling, contact release, reminders, the Desk Check, four-square extraction, and
+the switch-cars path.
+
+Gate: Desk Check meets latency targets on phones; four-square extraction meets Section 14 thresholds on
+a permissioned corpus.
+
 ## 18. Decisions and prerequisites
 
 The following defaults resolve prior scope ambiguity:
 
 - used dealer retail purchases only;
-- analysis plus Buyer-sent drafts, not product-sent negotiation;
-- one-time case pricing experiment after private alpha, not subscription;
-- no required account;
+- Phase 1 sends nothing; Phase 3 sends dealer messages only under a Buyer-approved mandate, supervised first;
+- one-time case pricing experiment after private alpha, not subscription; Buyers are the only payers;
+- no required account for Phase 1; a passwordless account for Phases 2–4;
 - raw-document retention default no longer than 30 days;
 - Buyer correction by default; human review only through separate consent;
 - one initial offer plus revised-offer comparison;
@@ -555,6 +844,22 @@ Development may begin on provider-independent modules and synthetic jurisdiction
 6. Decide the private-alpha recovery mechanism and cloud/provider stack.
 7. Pre-register pilot success and safety thresholds before reading pilot outcomes.
 
+Before Phase 2 and 3 reach Buyers outside moderated testing:
+
+8. Execute terms with a licensed inventory provider covering search, display, caching, and pricing.
+9. Obtain counsel review, per pilot state, of broker licensing, agency, AI-disclosure, and commercial-email obligations for acting as the Buyer's representative.
+10. Choose an email relay provider and complete sender authentication.
+
+Open decisions for the product owner:
+
+- **Dealer reputation.** Whether to show Buyers cross-journey evidence about dealers (for example,
+  "added fees at the desk in 3 of 5 journeys"). Currently excluded for fairness, privacy, and
+  defamation risk; a Buyer still sees their own dealer's conduct.
+- **Pricing for the Buyer Agent.** Whether Buyers pay a flat fee per journey, per negotiated car, or a
+  Buyer-paid success fee. Dealer-paid fees are excluded by the credo in every option.
+- **New vehicles.** Whether to extend shopping and negotiation to new cars.
+- **Delegated mode thresholds.** The approval rate and volume that would allow delegated sending.
+
 ## 19. Success measures
 
 Primary pilot measure: percentage of qualified Buyers who complete a Deal Analysis Report and make an understood decision without an unresolved material Discrepancy.
@@ -568,6 +873,9 @@ Track:
 - comparable relevance and market-confidence coverage;
 - usefulness, clarity, trust, action taken, revised-offer rate, and verified outcome delta;
 - willingness to pay at one-time price variants;
+- Phase 2: briefs created, candidates shortlisted, and picks per journey;
+- Phase 3: dealer response rate, time to first itemized quote, quotes obtained per pick, drafts approved unchanged, gate blocks by reason, and dealer opt-outs;
+- Phase 3–4: Agreed Price vs. desk paperwork difference, and the share of Desk Checks with added fees or add-ons;
 - per-completed and per-failed-case provider cost;
 - refunds, complaints, support contacts, deletion SLA, and privacy/licensing incidents.
 
@@ -575,4 +883,10 @@ Directional gate after 100–300 pilot cases: at least 70% qualified-case comple
 
 ## 20. Definition of done
 
-The MVP is done when a Buyer can establish a supported Vehicle and jurisdiction, upload a supported Dealer Offer, verify every material extracted term, approve financial boundaries, receive a reproducible and traceable Deal Analysis Report, compare a revised offer, evaluate standard financing when present, export the report, and delete the Buying Case—while no AI component can alter calculations, approvals, limits, review state, or external systems.
+Phase 1 is done when a Buyer can establish a supported Vehicle and jurisdiction, upload a supported Dealer Offer, verify every material extracted term, approve financial boundaries, receive a reproducible and traceable Deal Analysis Report, compare a revised offer, evaluate standard financing when present, export the report, and delete the Buying Case—while no AI component can alter calculations, approvals, limits, review state, or external systems.
+
+The full product is done when a Buyer can, in addition, describe a car and add reference VINs, review
+and shortlist explained matches, approve a mandate, have the platform obtain and negotiate a written
+quote within it while seeing every message, accept an Agreed Price, book a test drive, and check desk
+paperwork against the Agreed Price, with no dealer money, no Buyer data released without consent, and
+no AI component able to raise a limit, send outside the gate, or commit the Buyer.
