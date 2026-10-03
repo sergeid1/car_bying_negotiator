@@ -393,3 +393,28 @@ against it. Until then, a case started from a guide is stored with no channel, e
 unknown code, and counts in the no-channel row. The guides themselves set no cookies, write nothing
 to browser storage, fetch nothing, and load nothing from another site; the channel code is the only
 acquisition datum they add.
+
+## Referral partner onboarding (ticket 49)
+
+The referral partner kit at `?page=referral-partners`, linked from the page footer, is the
+partner-facing description of a referral channel: who may be a partner, what the product does, how a
+referral link works, what Buyers are told, and the terms. Ticket 34 still recruits partners and
+reports results. To onboard a partner:
+
+1. Confirm the partner is a consumer educator or an independent inspection service. Dealers,
+   lenders, and dealer-affiliated parties cannot be referral partners (specification §2.2).
+2. Confirm the arrangement matches the kit's terms and the standing footer: the partner is not paid
+   for referrals and does not pay for placement or referrals. Any other arrangement needs that
+   disclosure revised first.
+3. Agree the Buyer-facing disclosure wording with the partner, then configure the channel with
+   `PUT /api/v1/operator/pilot/channels/{code}` and
+   `{"kind": "REFERRAL_PARTNERSHIP", "referralDisclosure": "…", "active": true}`. The code follows
+   the format under "First-party acquisition channels"; use a new code per partner.
+4. Give the partner the code and the kit URL. The kit's link builder composes links in the browser,
+   with no request, cookie, or storage, to the start screen (`?channel=<code>`) and to both explainer
+   guides (`?guide=<slug>&channel=<code>`). A guide reached this way removes the code from the
+   address bar and starts its case with the partner's code instead of the guide's own.
+
+No channel is seeded by this change. Until the operator configures a code, a case started from a
+partner's link is stored with no channel and shows no disclosure, exactly as for any unknown code.
+Deactivating the channel has the same effect for later cases.

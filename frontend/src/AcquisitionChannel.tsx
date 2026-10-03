@@ -6,6 +6,11 @@
 const PARAMETER = "channel";
 const CODE = /^[a-z0-9][a-z0-9-]{0,31}$/;
 
+/** Ticket 42's code format, which the service also enforces. */
+export function isChannelCode(value: string) {
+  return CODE.test(value);
+}
+
 let read = false;
 let held: string | undefined;
 
@@ -20,7 +25,7 @@ export function arrivalChannel(): string | undefined {
       window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     }
     // The service checks its allow list; a malformed code is simply not sent.
-    held = value !== null && CODE.test(value) ? value : undefined;
+    held = value !== null && isChannelCode(value) ? value : undefined;
   }
   return held;
 }

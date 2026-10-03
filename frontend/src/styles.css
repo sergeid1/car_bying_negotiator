@@ -1547,3 +1547,11 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
 .guide-links { margin: 0; padding: 0; list-style: none; }
 .guide-links li { display: grid; gap: 4px; }
 .guide-links li + li { margin-top: 12px; }
+
+/* Ticket 49: the referral partner kit's links wrap inside a 360 px column. */
+.partner-kit .guide-example .panel { margin-top: 10px; box-shadow: none; }
+.partner-builder { display: grid; gap: 8px; }
+.partner-links { margin: 14px 0 0; padding: 0; list-style: none; }
+.partner-kit .partner-links li { display: grid; gap: 8px; margin-top: 14px; }
+.partner-links input { width: 100%; min-width: 0; font-family: var(--font-mono); font-size: 0.87rem; }
+.partner-links button { justify-self: start; }
