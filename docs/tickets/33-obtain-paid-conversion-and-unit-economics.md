@@ -4,7 +4,10 @@
 
 **Blocked by:** 19 — Capture privacy-minimized feedback and pilot metrics; 32 — Publish an honest sample report and a defined one-time offer.
 
-**Status:** ready-for-agent
+**Status:** ready-for-agent — narrowed on 2026-10-03: ticket 46 reports conversion, refunds, and
+completed cases with denominators and computes contribution margin from recorded costs, configured fees,
+and support time. This ticket keeps the frozen decision thresholds, the decision recorded against them,
+and any published case studies.
 
 - [ ] Paid conversion, refunds, and completed cases are reported with denominators over a defined window.
 - [ ] Contribution margin is computed net of payment fees, provider and extraction costs, and human support time per case.

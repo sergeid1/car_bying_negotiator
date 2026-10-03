@@ -89,6 +89,9 @@ public class PurchaseService {
   private Purchase view(Object[] row) { return new Purchase((String) row[0], (String) row[1], (String) row[2], (String) row[3]); }
   @Transactional
   public java.util.Map<String, String> refund(String purchaseId, String operator) {
+    var owningCase = manager.createNativeQuery("select c.id from analysis_cases c where c.id = (select p.case_id from case_purchases p where p.id = :id) for update")
+        .setParameter("id", purchaseId).getResultList();
+    if (owningCase.isEmpty()) throw new ResourceNotFoundException("Purchase not found");
     int changed = manager.createNativeQuery("update case_purchases set refunded_at = coalesce(refunded_at, :now), refunded_by = coalesce(refunded_by, :operator) where id = :id and status = 'PAID'")
         .setParameter("now", Instant.now()).setParameter("operator", operator).setParameter("id", purchaseId).executeUpdate();
     if (changed == 0) throw new ResourceNotFoundException("Purchase not found");

@@ -16,6 +16,7 @@ import { ReportExplanationLoader } from "./ReportExplanation";
 import { ReferralDisclosure } from "./AcquisitionChannel";
 import { OfferTerms, PurchasePoint } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
+import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const AA = {
@@ -193,6 +194,12 @@ test("offer terms, the example report and the payment point have no automated AA
   await screen.findByRole("note", { name: "About this example" });
   await screen.findByRole("region", { name: "What is free and what you pay for" });
   await userEvent.setup().click(await screen.findByText("Price terms, refunds, and scope"));
+  const result = await axe.run(container, AA);
+  expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
+});
+
+test.each(["out-the-door-quote", "dealer-fees"] as const)("the %s guide and the start-screen guide links have no automated AA violations", async slug => {
+  const { container } = render(<main><GuideLinks /><ExplainerGuide slug={slug} /></main>);
   const result = await axe.run(container, AA);
   expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
 });

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 class CaseGraphDeletionPlan {
   private record Step(String table, String predicate) {}
   private static final List<Step> STEPS = List.of(
+      new Step("case_support_time", "case_id = :caseId"),
       new Step("case_purchase_requests", "case_id = :caseId"),
       new Step("case_purchases", "case_id = :caseId"),
       new Step("experiment_assignments", "case_id = :caseId"),
@@ -59,6 +60,7 @@ class CaseGraphDeletionPlan {
 
   long deleteAndVerify(String caseId) {
     manager.flush();
+    com.dealanalyzer.purchase.ContributionService.retainAnonymousTotals(manager, caseId);
     manager.createNativeQuery("update dealer_offers set previous_offer_id = null where case_id = :caseId")
         .setParameter("caseId", caseId).executeUpdate();
     // Preserve only anonymous cohort counters before erasing every case-linked pilot record.
