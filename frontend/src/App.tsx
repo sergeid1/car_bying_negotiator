@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import "./styles.css";
 import { RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess, SaveCaseLink } from "./CasePortability";
 import { CaseLifecycle } from "./CaseLifecycle";
+import { BuyerAccount } from "./BuyerAccount";
 import { PricePlan } from "./PricePlan";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { BuyingCaseIntake } from "./BuyingCaseIntake";
@@ -283,6 +284,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             {caseCredentials && !caseRevoked && <SaveCaseLink {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
+            <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined} />
             {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
               onRevoked={() => { setCaseRevoked(true); setReport(undefined); setStage(undefined); setError(undefined); }} />}
           </aside>
