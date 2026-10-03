@@ -23,7 +23,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Model-backed deal-terms extraction through the code-owned {@code deal-terms-prompt.v1} instructions
+ * Model-backed deal-terms extraction through the code-owned {@code deal-terms-prompt.v2} instructions
  * and {@code deal-terms.v1} schema. The model sees only the normalized page images, as untrusted
  * content, and proposes candidates; {@link DealTermsValidator} decides what is accepted, and nothing
  * the model returns can set a verified term, an approval, a limit or a state.
@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
  * the model quoted for it is kept only at zero confidence, so it always needs review.
  */
 public final class ClaudeDealTermsExtractionProvider implements DealTermsExtractionProvider {
-  public static final String PROMPT_VERSION = "deal-terms-prompt.v1";
+  public static final String PROMPT_VERSION = "deal-terms-prompt.v2";
   public static final String SCHEMA_VERSION = "deal-terms.v1";
   /** Recorded as the extraction's extractor version, so each extraction names its provider and prompt. */
   public static final String EXTRACTOR_VERSION = "claude:" + PROMPT_VERSION;
@@ -127,6 +127,11 @@ public final class ClaudeDealTermsExtractionProvider implements DealTermsExtract
       String unit = candidate.get("normalizedUnit").asText();
       double confidence = number(candidate.get("confidence"));
       boolean material = candidate.get("material").asBoolean();
+      if (DeterministicDealerDocumentProvider.uncertainFigure(wording)) {
+        confidence = Math.min(confidence, 0.5);
+        material = true;
+        if (DeterministicDealerDocumentProvider.crossedOut(wording)) value = null;
+      }
       if (value != null && !supportedByWording(unit, value, wording)) {
         confidence = Math.min(confidence, UNSUPPORTED_VALUE_CONFIDENCE);
         material = true;

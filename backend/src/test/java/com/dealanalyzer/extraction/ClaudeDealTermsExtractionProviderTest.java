@@ -107,7 +107,7 @@ class ClaudeDealTermsExtractionProviderTest {
   @Test void sendsOnlyThePageImagesUnderTheCodeOwnedPromptAndSchemaAndRecordsItsVersions() throws Exception {
     ProviderExtraction extraction = answering(output()).extract(DOCUMENT);
 
-    assertThat(extraction.extractorVersion()).isEqualTo("claude:deal-terms-prompt.v1");
+    assertThat(extraction.extractorVersion()).isEqualTo("claude:deal-terms-prompt.v2");
     assertThat(extraction.modelVersion()).isEqualTo("claude-opus-5");
     assertThat(extraction.schemaVersion()).isEqualTo("deal-terms.v1");
     assertThat(extraction.candidates()).hasSize(3);
@@ -126,7 +126,7 @@ class ClaudeDealTermsExtractionProviderTest {
     var row = store.last();
     assertThat(row.status()).isEqualTo(Status.SUCCESS);
     assertThat(row.units()).as("metered per page").isEqualTo(2);
-    assertThat(row.provenance().promptVersion()).isEqualTo("deal-terms-prompt.v1");
+    assertThat(row.provenance().promptVersion()).isEqualTo("deal-terms-prompt.v2");
     assertThat(row.provenance().schemaVersion()).isEqualTo("deal-terms.v1");
     assertThat(store.rows).as("metered once, by the model harness").hasSize(1);
   }
@@ -155,6 +155,21 @@ class ClaudeDealTermsExtractionProviderTest {
     String prompt = resource(ClaudeDealTermsExtractionProvider.PROMPT_RESOURCE);
     assertThat(prompt).contains("Never infer, complete or correct a digit")
         .contains("set normalizedValue to null and confidence to 0.5 or lower");
+  }
+
+  @Test void fourSquareModelOutputPreservesEvidenceAndCapsHandwrittenAndCrossedOutConfidence() {
+    var root = output();
+    var fields = root.putArray("candidates");
+    fields.add(candidate("DOCUMENT_TYPE", "FOUR SQUARE", "FOUR_SQUARE_WORKSHEET", "TEXT", evidence(1, 0.1, 0.1, 0.5, 0.1), 0.99));
+    fields.add(candidate("MONTHLY_PAYMENT", "Payment: $399 [handwritten]", "39900", "USD_MINOR", evidence(1, 0.5, 0.5, 0.4, 0.1), 0.99));
+    fields.add(candidate("TRADE_ALLOWANCE", "Trade: $5000 [crossed out]", "500000", "USD_MINOR", evidence(1, 0.1, 0.5, 0.4, 0.1), 0.99));
+    var extraction = answering(root).extract(DOCUMENT);
+    assertThat(extraction.candidates().get(1).confidence()).isEqualTo(0.5);
+    assertThat(extraction.candidates().get(1).evidence().x()).isEqualTo(0.5);
+    assertThat(extraction.candidates().get(2).normalizedValue()).isNull();
+    var validated = new DealTermsValidator(0.85).validate(extraction, 2, false);
+    assertThat(validated.issueCodes()).contains("PAYMENT_LED_MISSING_TOTAL", "PAYMENT_LED_MISSING_TERM");
+    assertThat(requests.getFirst().instructions()).contains("FOUR_SQUARE_WORKSHEET", "Handwritten figures", "never infer them");
   }
 
   @Test void outputThatFailsTheSchemaIsRejectedNeverRepaired() {

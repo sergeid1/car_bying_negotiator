@@ -11,8 +11,15 @@ backend and read-only to the harness:
 
 | File | Version id |
 | --- | --- |
-| `backend/src/main/resources/ai/extraction/deal-terms-prompt.v1.md` | `deal-terms-prompt.v1` |
+| `backend/src/main/resources/ai/extraction/deal-terms-prompt.v2.md` | `deal-terms-prompt.v2` |
 | `backend/src/main/resources/ai/extraction/deal-terms.v1.schema.json` | `deal-terms.v1` |
+
+Prompt v2 supports four-square worksheets as `DOCUMENT_TYPE: FOUR_SQUARE_WORKSHEET` using the
+existing TEXT document-type field and existing price, trade allowance, cash down, monthly payment,
+term and APR fields in schema v1. It adds evidence annotations for handwriting and crossed-out
+figures without changing the JSON shape. Prompt v1 is retained unchanged for historical runs;
+its shadow comparisons cannot authorize v2. Synthetic four-square results are development checks
+only; ticket 28's permissioned corpus owns accuracy evidence.
 
 The Java `ModelTask` loads both at build time. The harness reads the same two files by path, so a
 batch run sends exactly the prompt and schema the service would send. Neither side copies or edits

@@ -1,0 +1,7 @@
+{
+  "version": "four-square-development.v1",
+  "intent": "Synthetic development mechanics only, never pilot thresholds or accuracy evidence. Low-confidence handwritten fields are expected and must remain untrusted.",
+  "minimumConfidence": 0.8,
+  "maximumFailures": {"wrong_value": 0, "invented_field": 0, "wrong_page": 0},
+  "fields": {"DOCUMENT_TYPE": {"minimumPrecision": 1.0, "minimumRecall": 1.0}}
+}
