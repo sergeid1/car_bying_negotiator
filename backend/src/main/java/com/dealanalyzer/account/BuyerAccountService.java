@@ -7,7 +7,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,20 +27,25 @@ public class BuyerAccountService {
   private final ContactProtection protection;
   private final CaseAccessService secrets;
   private final AccountCaseLifecycle caseLifecycle;
+  private final AccountEnrollment enrollment;
   private final RecoveryEmail email;
   private final String origin;
   private final Duration linkLifetime;
   private final Duration sessionLifetime;
+  private final int maxActiveLinks;
 
   BuyerAccountService(BuyerAccountRepository accounts, SignInLinkRepository links, AccountSessionRepository sessions,
       AccountCaseRepository attachments, ContactProtection protection, CaseAccessService secrets,
-      AccountCaseLifecycle caseLifecycle, RecoveryEmail email,
+      AccountCaseLifecycle caseLifecycle, AccountEnrollment enrollment, RecoveryEmail email,
       @Value("${case.recovery.public-url:http://localhost:5173/}") String origin,
       @Value("${account.sign-in.link-lifetime:PT15M}") Duration linkLifetime,
-      @Value("${account.session.lifetime:PT336H}") Duration sessionLifetime) {
+      @Value("${account.session.lifetime:PT336H}") Duration sessionLifetime,
+      @Value("${account.sign-in.max-active-links:3}") int maxActiveLinks) {
+    if (maxActiveLinks < 1) throw new IllegalArgumentException("account.sign-in.max-active-links must be positive");
     this.accounts = accounts; this.links = links; this.sessions = sessions; this.attachments = attachments;
     this.protection = protection; this.secrets = secrets; this.caseLifecycle = caseLifecycle; this.email = email;
     this.origin = origin; this.linkLifetime = linkLifetime; this.sessionLifetime = sessionLifetime;
+    this.maxActiveLinks = maxActiveLinks; this.enrollment = enrollment;
   }
 
   public record Session(String sessionToken, Instant expiresAt) {}
@@ -54,17 +58,19 @@ public class BuyerAccountService {
     String normalized = address.strip().toLowerCase(Locale.ROOT);
     String lookup = secrets.protectAccountSecret("email", normalized);
     var account = accounts.findLockedByEmailLookup(lookup).orElse(null);
-    Instant now = Instant.now();
     if (account == null) {
-      account = new BuyerAccountEntity(UUID.randomUUID().toString());
-      account.emailLookup = lookup; account.lifecycle = "ACTIVE"; account.createdAt = now; account.updatedAt = now;
-      account.contactCiphertext = protection.encrypt(account.id, new Contact(normalized, null, null, null));
-      accounts.saveAndFlush(account);
+      try { enrollment.create(lookup, normalized); }
+      catch (org.springframework.dao.DataIntegrityViolationException concurrentlyCreated) { /* Read the winner's row below. */ }
+      account = accounts.findLockedByEmailLookup(lookup).orElseThrow();
     }
+    Instant now = Instant.now();
     // An account awaiting deletion cannot sign in; the acknowledgement stays the same.
     if (!"ACTIVE".equals(account.lifecycle)) return;
     String keyHash = secrets.protectAccountSecret("sign-in-request", requestKey);
     if (links.findByAccountIdAndRequestKeyHash(account.id, keyHash).isPresent()) return;
+    // Cap unused links per address so this unauthenticated endpoint cannot flood a mailbox. The
+    // account row lock serializes the count; the acknowledgement does not reveal the cap.
+    if (links.countByAccountIdAndConsumedAtIsNullAndExpiresAtAfter(account.id, now) >= maxActiveLinks) return;
     String token = secrets.issue(now).token();
     var link = new SignInLinkEntity(secrets.protectAccountSecret("sign-in", token));
     link.accountId = account.id; link.requestKeyHash = keyHash; link.createdAt = now;

@@ -190,6 +190,67 @@ class BuyerAccountAcceptanceTest {
     }
   }
 
+  @Test void signInEmailsToOneAddressAreCappedWithoutChangingTheAcknowledgement() throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("cap", false, EmailConfiguration.class, KEY)) {
+      var client = app.client();
+      var acknowledgements = new java.util.HashSet<JsonNode>();
+      for (int i = 0; i < 6; i++) {
+        var result = exchange(client, "POST", "/api/v1/account/sign-in-requests", Map.of("email", "victim@example.com"),
+            null, null, "flood-" + i);
+        assertThat(result.status()).isEqualTo(202);
+        acknowledgements.add(result.body());
+      }
+      assertThat(acknowledgements).hasSize(1);
+      assertThat(sent).hasSize(3);
+      // Another address is unaffected by the first one's cap.
+      post(client, "/api/v1/account/sign-in-requests", Map.of("email", "other@example.com"), "other");
+      assertThat(sent).hasSize(4);
+      // Using a link frees a slot, so the real owner is never locked out for longer than one link.
+      post(client, "/api/v1/account/sign-in/verify", Map.of("token", sent.getFirst().link().split("#sign-in=")[1]));
+      post(client, "/api/v1/account/sign-in-requests", Map.of("email", "victim@example.com"), "after-use");
+      assertThat(sent).hasSize(5);
+      assertThat(sent.getLast().recipient()).isEqualTo("victim@example.com");
+    }
+    sent.clear();
+    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("cap-expired", false, EmailConfiguration.class, KEY,
+        "--account.sign-in.link-lifetime=PT0S")) {
+      // Expired links no longer count toward the cap.
+      for (int i = 0; i < 5; i++)
+        post(app.client(), "/api/v1/account/sign-in-requests", Map.of("email", "buyer@example.com"), "expired-" + i);
+      assertThat(sent).hasSize(5);
+    }
+  }
+
+  @Test void concurrentFirstSignInRequestsForANewAddressAllGetTheAcknowledgement() throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("race", false, EmailConfiguration.class, KEY,
+        "--account.sign-in.max-active-links=100")) {
+      var client = app.client();
+      var jdbc = new JdbcTemplate(app.context().getBean(javax.sql.DataSource.class));
+      try (var executor = java.util.concurrent.Executors.newFixedThreadPool(8)) {
+        for (int round = 0; round < 5; round++) {
+          String email = "new-" + round + "@example.com";
+          var start = new java.util.concurrent.CountDownLatch(1);
+          var attempts = new java.util.ArrayList<java.util.concurrent.Future<Result>>();
+          for (int i = 0; i < 8; i++) {
+            String key = "race-" + round + "-" + i;
+            attempts.add(executor.submit(() -> { start.await();
+              return exchange(client, "POST", "/api/v1/account/sign-in-requests", Map.of("email", email), null, null, key); }));
+          }
+          start.countDown();
+          var bodies = new java.util.HashSet<JsonNode>();
+          for (var attempt : attempts) {
+            var result = attempt.get();
+            assertThat(result.status()).as(email).isEqualTo(202);
+            bodies.add(result.body());
+          }
+          assertThat(bodies).hasSize(1);
+          assertThat(jdbc.queryForObject("select count(*) from buyer_accounts", Long.class)).isEqualTo(round + 1L);
+        }
+      }
+      assertThat(sent).hasSize(40);
+    }
+  }
+
   @Test void deletionRevokesAccessAndRemovesTheAccountAndEveryAttachedCase() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("deletion", false, EmailConfiguration.class, KEY,
         "--case.deletion.delay=PT1H")) {
@@ -264,7 +325,13 @@ class BuyerAccountAcceptanceTest {
   }
 
   private static Result exchange(RestClient client, String method, String path, Object body, String session, String caseToken) {
+    return exchange(client, method, path, body, session, caseToken, null);
+  }
+
+  private static Result exchange(RestClient client, String method, String path, Object body, String session, String caseToken,
+      String idempotencyKey) {
     var request = client.method(org.springframework.http.HttpMethod.valueOf(method)).uri(path);
+    if (idempotencyKey != null) request.header("Idempotency-Key", idempotencyKey);
     if (session != null) request.header(SESSION, session);
     if (caseToken != null) request.header("Case-Access-Token", caseToken);
     if (body != null) request.contentType(MediaType.APPLICATION_JSON).body(body);

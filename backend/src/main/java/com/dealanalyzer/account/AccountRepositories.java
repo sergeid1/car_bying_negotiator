@@ -22,6 +22,7 @@ interface SignInLinkRepository extends JpaRepository<SignInLinkEntity, String> {
   @Lock(LockModeType.PESSIMISTIC_WRITE) Optional<SignInLinkEntity> findLockedByTokenHash(String tokenHash);
   Optional<SignInLinkEntity> findByAccountIdAndRequestKeyHash(String accountId, String requestKeyHash);
   List<SignInLinkEntity> findByAccountIdAndConsumedAtIsNull(String accountId);
+  long countByAccountIdAndConsumedAtIsNullAndExpiresAtAfter(String accountId, Instant now);
 }
 
 interface AccountSessionRepository extends JpaRepository<AccountSessionEntity, String> {

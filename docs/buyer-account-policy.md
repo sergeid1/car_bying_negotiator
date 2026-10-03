@@ -13,7 +13,12 @@ pending-deletion addresses. Links expire after `account.sign-in.link-lifetime` (
 15 minutes) and are stored only as a scoped HMAC. `POST /api/v1/account/sign-in/verify`
 consumes a link once and returns a session token; a reused link gets 410
 `SIGN_IN_LINK_USED`, an expired one 410 `SIGN_IN_LINK_EXPIRED`, an unknown one 404
-`SIGN_IN_LINK_UNKNOWN`, each with a fixed Buyer-facing `detail`. Unverified sign-ups whose
+`SIGN_IN_LINK_UNKNOWN`, each with a fixed Buyer-facing `detail`. At most
+`account.sign-in.max-active-links` (default 3) unused, unexpired links exist per address;
+further requests send nothing and return the same acknowledgement, so the public endpoint
+cannot flood a mailbox. Using a link or letting it expire frees a slot. Concurrent first
+requests for a new address create one account in its own transaction; the losing request
+reads the winner's row and gets the same acknowledgement. Unverified sign-ups whose
 link expired are removed by the account worker.
 
 ## Sessions
