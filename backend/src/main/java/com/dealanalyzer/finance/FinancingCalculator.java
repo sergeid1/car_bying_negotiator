@@ -13,6 +13,20 @@ public final class FinancingCalculator {
   public static final String ROUNDING = "DECIMAL128 intermediates; HALF_UP cents for regular payments; remaining balance plus interest rounded for final payment";
   private static final MathContext MC = MathContext.DECIMAL128;
   private static final long MAX_MONEY = 100_000_000_000L;
+  /** Partial-document check only; it does not establish purchase totals, fees or loan timing. */
+  public PaymentReconciliation reconcilePayment(Long principal, BigDecimal apr, Integer months, Long quoted) {
+    if (principal == null || principal < 0 || principal > MAX_MONEY || apr == null
+        || apr.signum() < 0 || apr.compareTo(new BigDecimal("100")) > 0
+        || apr.stripTrailingZeros().scale() > 8 || months == null || months < 1 || months > 1200
+        || quoted == null || quoted < 0 || quoted > MAX_MONEY)
+      return new PaymentReconciliation(null, null, 100L);
+    Schedule calculated = schedule(principal, apr.divide(new BigDecimal("1200"), MC), months);
+    return calculated == null ? new PaymentReconciliation(null, null, 100L)
+        : new PaymentReconciliation(calculated.payment, Math.abs(quoted - calculated.payment) <= 100, 100L);
+  }
+
+  public record PaymentReconciliation(Long paymentMinor, Boolean withinTolerance, long toleranceMinor) {}
+
   public Result calculate(FinanceLoan loan) {
     List<String> issues = new ArrayList<>();
     if (loan == null) return unavailable("UNAVAILABLE", List.of("Verified Finance Offer is missing."));

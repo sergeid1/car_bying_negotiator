@@ -38,6 +38,16 @@ threshold failed (the report and deviations are still saved); 2 means the comman
 
 ## Corpus, split and predictions
 
+Ticket 67 adds `corpus/four-square-synthetic.v1/manifest.json` and its hand-written
+`predictions.jsonl`: a complete quadrant worksheet, a payment-only worksheet, and text-annotated
+handwritten/crossed-out figures. Use the same split/freeze/run/check sequence above with a fresh
+output directory, that manifest and predictions file, and
+`thresholds/four-square-development.v1.json`. The model is `synthetic-no-model`. Its mechanics
+thresholds prohibit wrong values, invented fields and wrong pages while retaining expected
+low-confidence handwriting in the report; passing them does not establish extraction accuracy.
+These text fixtures cannot establish visual OCR performance or be submitted through `batch-build`.
+Only ticket 28's permissioned corpus can supply accuracy evidence.
+
 See [the binding contract](../docs/extraction-evaluation-contract.md). A manifest has `version`,
 `kind` (`synthetic` or `permissioned`) and `documents`. Each document has a unique `documentId`,
 `conditionTags`, `pages` (paths relative to the manifest) and `expected` field labels. Money labels
@@ -133,7 +143,7 @@ python3 -m evaluation batch-results --batch-id BATCH_ID_FROM_SUBMISSION --model 
 Set the selected variable securely outside these commands. Neither command uses ambient credentials
 without `--credential-env`. Collection is a single attempt after the batch ends, with no polling
 loop; it writes predictions for a subsequent offline `run`, with the service's
-`extractorVersion: claude:deal-terms-prompt.v1` (or `claude:` plus `--prompt-version`). Do not enable SDK HTTP debug logging.
+`extractorVersion: claude:deal-terms-prompt.v2` (or `claude:` plus `--prompt-version`). Do not enable SDK HTTP debug logging.
 CLI errors print only the exception type, never a vendor response, document text, or credential.
 
 ## Shadow export

@@ -3,9 +3,8 @@ package com.dealanalyzer.extraction;
 import com.dealanalyzer.extraction.DealTermsExtractionProvider.Candidate;
 import com.dealanalyzer.extraction.DealTermsExtractionProvider.LineItem;
 import com.dealanalyzer.extraction.DealTermsExtractionProvider.ProviderExtraction;
+import com.dealanalyzer.finance.FinancingCalculator;
 import java.math.BigDecimal;
-import java.math.MathContext;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -85,13 +84,16 @@ public final class DealTermsValidator {
       }
       validateValue(candidate, issues);
       boolean material = MATERIAL_FIELDS.contains(candidate.field()) || candidate.material();
+      double confidence = DeterministicDealerDocumentProvider.uncertainFigure(candidate.originalWording())
+          ? Math.min(candidate.confidence(), 0.5) : candidate.confidence();
       String verificationState = candidate.normalizedValue() == null
           ? "MISSING"
-          : material && candidate.confidence() < materialConfidenceThreshold
+          : material && (confidence < materialConfidenceThreshold
+              || DeterministicDealerDocumentProvider.uncertainFigure(candidate.originalWording()))
               ? "REQUIRES_REVIEW" : "UNVERIFIED";
       candidates.add(new ValidatedCandidate(
           candidate.field(), candidate.originalWording(), candidate.normalizedValue(),
-          candidate.normalizedUnit(), candidate.evidence(), candidate.confidence(),
+          candidate.normalizedUnit(), candidate.evidence(), confidence,
           material, verificationState));
     }
     Set<String> seenLines = new HashSet<>();
@@ -105,15 +107,19 @@ public final class DealTermsValidator {
             "An identical line item appears more than once."));
       }
       String category = LINE_CATEGORIES.contains(line.category()) ? line.category() : "UNKNOWN";
-      String verificationState = line.confidence() < materialConfidenceThreshold
+      double confidence = DeterministicDealerDocumentProvider.uncertainFigure(line.originalLabel())
+          ? Math.min(line.confidence(), 0.5) : line.confidence();
+      String verificationState = confidence < materialConfidenceThreshold
+          || DeterministicDealerDocumentProvider.uncertainFigure(line.originalLabel())
           ? "REQUIRES_REVIEW" : "UNVERIFIED";
       validatedLines.add(new ValidatedLineItem(
           line.originalLabel(), category, line.amountMinor(), line.currency(), line.taxClaim(),
-          line.optionalityClaim(), line.evidence(), line.confidence(), verificationState));
+          line.optionalityClaim(), line.evidence(), confidence, verificationState));
     }
     crossFoot(provider, issues);
     financeCheck(provider, issues);
-    double confidence = provider.candidates().stream().mapToDouble(Candidate::confidence)
+    paymentLedCheck(provider, issues);
+    double confidence = candidates.stream().mapToDouble(ValidatedCandidate::confidence)
         .average().orElse(0.0);
     boolean review = suspectedMissing
         || provider.candidates().isEmpty()
@@ -273,21 +279,25 @@ public final class DealTermsValidator {
         || apr.compareTo(new BigDecimal("100")) > 0) {
       return;
     }
-    BigDecimal expected;
-    if (apr.signum() == 0) {
-      expected = BigDecimal.valueOf(principal).divide(BigDecimal.valueOf(months), 12, RoundingMode.HALF_UP);
-    } else {
-      BigDecimal monthlyRate = apr.divide(new BigDecimal("1200"), 16, RoundingMode.HALF_UP);
-      BigDecimal factor = BigDecimal.ONE.add(monthlyRate)
-          .pow(months.intValue(), MathContext.DECIMAL128);
-      expected = BigDecimal.valueOf(principal).multiply(monthlyRate)
-          .multiply(factor)
-          .divide(factor.subtract(BigDecimal.ONE), 12, RoundingMode.HALF_UP);
-    }
-    if (Math.abs(expected.setScale(0, RoundingMode.HALF_UP).longValue() - payment) > 1) {
+    var reconciliation = new FinancingCalculator().reconcilePayment(principal, apr, months.intValue(), payment);
+    if (Boolean.FALSE.equals(reconciliation.withinTolerance())) {
       issues.add(issue("FINANCING_INCONSISTENT", "MONTHLY_PAYMENT",
-          "Payment is inconsistent with amount financed, APR, and term."));
+          "Payment differs by more than $1 from the standard monthly financing calculation using amount financed, APR, and term; ask the dealer to reconcile timing, fees and loan terms."));
     }
+  }
+
+  private static void paymentLedCheck(ProviderExtraction provider, List<ValidationIssue> issues) {
+    Map<String, Candidate> fields = new HashMap<>();
+    provider.candidates().forEach(candidate -> fields.putIfAbsent(candidate.field(), candidate));
+    Candidate type = fields.get("DOCUMENT_TYPE");
+    if (type == null || !"FOUR_SQUARE_WORKSHEET".equals(type.normalizedValue())
+        || !fields.containsKey("MONTHLY_PAYMENT")) return;
+    if (candidateLong(fields.get("OUT_THE_DOOR_TOTAL")) == null)
+      issues.add(issue("PAYMENT_LED_MISSING_TOTAL", "OUT_THE_DOOR_TOTAL",
+          "The four-square worksheet shows a monthly payment but the out-the-door total is missing. Payment-led figures hide the total; ask for an itemized out-the-door total. Do not infer it from payment."));
+    if (candidateLong(fields.get("TERM_MONTHS")) == null)
+      issues.add(issue("PAYMENT_LED_MISSING_TERM", "TERM_MONTHS",
+          "The four-square worksheet loan term is missing. Ask for the term in months; do not infer it from payment."));
   }
 
   private static Map<String, Long> moneyValues(List<Candidate> candidates) {

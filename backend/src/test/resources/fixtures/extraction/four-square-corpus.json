@@ -1,0 +1,27 @@
+{
+  "kind": "synthetic",
+  "description": "Synthetic development checks, never accuracy evidence. Handwriting and crossing out are text annotations, not real OCR samples.",
+  "layouts": [
+    {
+      "name": "complete quadrant worksheet",
+      "pages": ["FOUR-SQUARE WORKSHEET\nPrice: $25,000.00 | Trade: $5,000.00\nDown Payment: $2,000.00 | Payment: $300.00\nTerm: 60 months | APR: 0%\nAmount Financed: $18,000.00\nOut the Door Total: $25,000.00"],
+      "expected": {"DOCUMENT_TYPE": "FOUR_SQUARE_WORKSHEET", "SELLING_PRICE": "2500000", "TRADE_ALLOWANCE": "500000", "CASH_DOWN": "200000", "MONTHLY_PAYMENT": "30000", "TERM_MONTHS": "60", "APR": "0", "AMOUNT_FINANCED": "1800000", "OUT_THE_DOOR_TOTAL": "2500000"},
+      "issueCodes": [],
+      "reviewFields": []
+    },
+    {
+      "name": "payment alone hides total and term",
+      "pages": ["4 SQUARE WORKSHEET\nMonthly Payment: $399.00"],
+      "expected": {"DOCUMENT_TYPE": "FOUR_SQUARE_WORKSHEET", "MONTHLY_PAYMENT": "39900"},
+      "issueCodes": ["PAYMENT_LED_MISSING_TOTAL", "PAYMENT_LED_MISSING_TERM"],
+      "reviewFields": []
+    },
+    {
+      "name": "handwritten and crossed out quadrants",
+      "pages": ["FOUR SQUARE\nPrice: $25,000.00 [handwritten] | Trade Allowance: ~~$5,000.00~~ [crossed out]\nCash Down: $2,000.00 | Monthly Payment: $400.00 [handwritten]\nAPR: 7.5% | Term: 60 months"],
+      "expected": {"DOCUMENT_TYPE": "FOUR_SQUARE_WORKSHEET", "SELLING_PRICE": "2500000", "TRADE_ALLOWANCE": null, "CASH_DOWN": "200000", "MONTHLY_PAYMENT": "40000", "APR": "7.5", "TERM_MONTHS": "60"},
+      "issueCodes": ["PAYMENT_LED_MISSING_TOTAL"],
+      "reviewFields": ["SELLING_PRICE", "TRADE_ALLOWANCE", "MONTHLY_PAYMENT"]
+    }
+  ]
+}

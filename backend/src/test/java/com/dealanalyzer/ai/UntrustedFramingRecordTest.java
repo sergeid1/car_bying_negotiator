@@ -58,7 +58,7 @@ class UntrustedFramingRecordTest {
   @Test void thePublishedFramingMatchesWhatEachGatewaySends() throws Exception {
     JsonNode record = record();
     String prompt;
-    try (InputStream source = UntrustedFramingRecordTest.class.getResourceAsStream("/ai/extraction/deal-terms-prompt.v1.md")) {
+    try (InputStream source = UntrustedFramingRecordTest.class.getResourceAsStream("/ai/extraction/deal-terms-prompt.v2.md")) {
       prompt = new String(source.readAllBytes(), StandardCharsets.UTF_8).strip();
     }
     var document = new ExtractionDocument("case-1", "document-1", List.of(

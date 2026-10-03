@@ -1,0 +1,22 @@
+{
+  "version": "four-square-synthetic.v1",
+  "kind": "synthetic",
+  "description": "Synthetic four-square development checks, never accuracy evidence. Handwritten and crossed-out conditions are text annotations, not photographs or OCR measurements. Labels omit crossed-out trade because it is not a current amount. Accuracy and pilot readiness await ticket 28's permissioned corpus.",
+  "documents": [
+    {
+      "documentId": "four-square-complete", "conditionTags": [], "pages": ["complete.txt"],
+      "expected": {"DOCUMENT_TYPE": "FOUR_SQUARE_WORKSHEET", "SELLING_PRICE": 2500000, "TRADE_ALLOWANCE": 500000, "CASH_DOWN": 200000, "MONTHLY_PAYMENT": 30000, "TERM_MONTHS": "60", "APR": 0, "AMOUNT_FINANCED": 1800000, "OUT_THE_DOOR_TOTAL": 2500000},
+      "expectedPages": {"DOCUMENT_TYPE": 1, "SELLING_PRICE": 1, "TRADE_ALLOWANCE": 1, "CASH_DOWN": 1, "MONTHLY_PAYMENT": 1, "TERM_MONTHS": 1, "APR": 1, "AMOUNT_FINANCED": 1, "OUT_THE_DOOR_TOTAL": 1}
+    },
+    {
+      "documentId": "four-square-payment-only", "conditionTags": ["MISSING_FIELDS"], "pages": ["payment-only.txt"],
+      "expected": {"DOCUMENT_TYPE": "FOUR_SQUARE_WORKSHEET", "MONTHLY_PAYMENT": 39900},
+      "expectedPages": {"DOCUMENT_TYPE": 1, "MONTHLY_PAYMENT": 1}
+    },
+    {
+      "documentId": "four-square-uncertain", "conditionTags": ["REVISED_OFFER", "MISSING_FIELDS"], "pages": ["uncertain.txt"],
+      "expected": {"DOCUMENT_TYPE": "FOUR_SQUARE_WORKSHEET", "SELLING_PRICE": 2500000, "CASH_DOWN": 200000, "MONTHLY_PAYMENT": 40000, "APR": 7.5, "TERM_MONTHS": "60"},
+      "expectedPages": {"DOCUMENT_TYPE": 1, "SELLING_PRICE": 1, "CASH_DOWN": 1, "MONTHLY_PAYMENT": 1, "APR": 1, "TERM_MONTHS": 1}
+    }
+  ]
+}

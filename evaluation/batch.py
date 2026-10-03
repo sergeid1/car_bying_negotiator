@@ -8,7 +8,7 @@ from typing import Protocol
 from .core import verify_split
 
 REPO = Path(__file__).resolve().parent.parent
-DEFAULT_PROMPT = REPO / "backend/src/main/resources/ai/extraction/deal-terms-prompt.v1.md"
+DEFAULT_PROMPT = REPO / "backend/src/main/resources/ai/extraction/deal-terms-prompt.v2.md"
 DEFAULT_SCHEMA = REPO / "backend/src/main/resources/ai/extraction/deal-terms.v1.schema.json"
 DEFAULT_FRAMING = REPO / "backend/src/main/resources/ai/untrusted-framing.v1.json"
 
@@ -84,7 +84,7 @@ def build_requests(manifest_path, split_path, selected_split, model, effort="hig
 
 
 class AnthropicBatchClient:
-    def __init__(self, credential, model, schema_version="deal-terms.v1", prompt_version="deal-terms-prompt.v1"):
+    def __init__(self, credential, model, schema_version="deal-terms.v1", prompt_version="deal-terms-prompt.v2"):
         if not credential or not credential.strip():
             raise ValueError("An explicitly supplied credential is required")
         # No SDK import, installation or environment credential lookup on the offline path.

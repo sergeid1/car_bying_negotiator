@@ -14,7 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Deterministic extractor for supported text-bearing U.S. dealer quotes and buyers' orders. The
+ * Deterministic extractor for text-bearing U.S. dealer quotes, buyers' orders and four-square worksheets. The
  * default provider; {@link ExtractionProviderConfiguration} selects it.
  */
 class DeterministicDealerDocumentProvider implements DealTermsExtractionProvider {
@@ -34,12 +34,14 @@ class DeterministicDealerDocumentProvider implements DealTermsExtractionProvider
     boolean supported = document.pages().stream().map(NormalizedDocumentPage::recognizedText)
         .map(text -> text.toUpperCase(Locale.ROOT))
         .anyMatch(text -> text.contains("BUYER'S ORDER") || text.contains("BUYERS ORDER")
-            || text.contains("DEALER QUOTE") || text.contains("PURCHASE ORDER"));
+            || text.contains("DEALER QUOTE") || text.contains("PURCHASE ORDER")
+            || fourSquare(text));
     if (!supported) {
       warnings.add("The normalized pages do not match a supported text-bearing dealer layout.");
     }
     for (NormalizedDocumentPage page : document.pages()) {
-      for (String rawLine : page.recognizedText().split("\\R")) {
+      // Text normalization retains quadrant boundaries as pipes, tabs, or wide spacing.
+      for (String rawLine : page.recognizedText().split("\\R|\\s*\\|\\s*|\\t+| {3,}")) {
         String line = rawLine.strip();
         if (line.isEmpty()) {
           continue;
@@ -47,9 +49,11 @@ class DeterministicDealerDocumentProvider implements DealTermsExtractionProvider
         EvidenceRegion evidence = new EvidenceRegion(page.pageNumber(), 0, 0, 1, 1);
         String upper = line.toUpperCase(Locale.ROOT);
         if (upper.equals("BUYER'S ORDER") || upper.equals("BUYERS ORDER")
-            || upper.equals("DEALER QUOTE") || upper.equals("PURCHASE ORDER")) {
+            || upper.equals("DEALER QUOTE") || upper.equals("PURCHASE ORDER")
+            || fourSquare(upper)) {
           candidates.putIfAbsent("DOCUMENT_TYPE", new Candidate(
-              "DOCUMENT_TYPE", line, upper.replace("'", ""), "TEXT", evidence, 0.99, false));
+              "DOCUMENT_TYPE", line, fourSquare(upper) ? "FOUR_SQUARE_WORKSHEET" : upper.replace("'", ""),
+              "TEXT", evidence, 0.99, false));
           continue;
         }
         Matcher labeled = LABELED.matcher(line);
@@ -57,8 +61,12 @@ class DeterministicDealerDocumentProvider implements DealTermsExtractionProvider
           String normalizedLabel = normalizeLabel(labeled.group(1));
           FieldDefinition definition = LABELS.get(normalizedLabel);
           if (definition != null) {
-            String value = normalize(definition, labeled.group(2));
-            double confidence = value == null ? 0.35 : 0.99;
+            String rawValue = labeled.group(2);
+            boolean uncertain = uncertainFigure(line);
+            // A crossed-out amount is not a current offer, even when its digits are legible.
+            String value = crossedOut(line) ? null : normalize(definition,
+                rawValue.replaceAll("(?i)\\[(?:handwritten|handwriting)\\]", "").strip());
+            double confidence = uncertain || value == null ? 0.35 : 0.99;
             candidates.putIfAbsent(definition.field(), new Candidate(
                 definition.field(), line, value, definition.unit(), evidence,
                 confidence, definition.material()));
@@ -129,6 +137,21 @@ class DeterministicDealerDocumentProvider implements DealTermsExtractionProvider
         || line.startsWith("IF ");
   }
 
+  static boolean fourSquare(String text) {
+    return text.matches("(?s).*\\b(?:FOUR[ -]?SQUARE|4[ -]?SQUARE)\\b.*");
+  }
+
+  static boolean crossedOut(String wording) {
+    String lower = wording.toLowerCase(Locale.ROOT);
+    return lower.contains("crossed out") || lower.contains("crossed-out")
+        || lower.contains("struck out") || lower.contains("strikethrough") || lower.contains("~~");
+  }
+
+  static boolean uncertainFigure(String wording) {
+    String lower = wording.toLowerCase(Locale.ROOT);
+    return crossedOut(wording) || lower.contains("handwritten") || lower.contains("handwriting");
+  }
+
   private static String normalizeLabel(String label) {
     return label.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]+", " ").strip();
   }
@@ -147,7 +170,7 @@ class DeterministicDealerDocumentProvider implements DealTermsExtractionProvider
     add(labels, "OFFER_DATE", "DATE", false, null, false, "UNKNOWN", "DATE", "OFFER DATE");
     add(labels, "EXPIRATION_DATE", "DATE", false, null, false, "UNKNOWN", "EXPIRATION DATE", "EXPIRES");
     add(labels, "SELLING_PRICE", "USD_MINOR", true, "SELLING_PRICE", false, "REQUIRED",
-        "SELLING PRICE", "CASH PRICE", "VEHICLE PRICE");
+        "SELLING PRICE", "CASH PRICE", "VEHICLE PRICE", "PRICE");
     add(labels, "DISCOUNT_TOTAL", "USD_MINOR", true, "DISCOUNT", true, "CONDITIONAL", "DISCOUNT");
     add(labels, "REBATE_TOTAL", "USD_MINOR", true, "REBATE", true, "CONDITIONAL", "REBATE");
     add(labels, "DEALER_CHARGES_TOTAL", "USD_MINOR", true, "DEALER_FEE", false, "REQUIRED",
@@ -157,7 +180,7 @@ class DeterministicDealerDocumentProvider implements DealTermsExtractionProvider
     add(labels, "TAX_TOTAL", "USD_MINOR", true, null, false, "UNKNOWN", "TAX", "SALES TAX");
     add(labels, "GOVERNMENT_CHARGES_TOTAL", "USD_MINOR", true, null, false, "UNKNOWN",
         "GOVERNMENT FEES", "DMV FEES", "REGISTRATION FEES");
-    add(labels, "TRADE_ALLOWANCE", "USD_MINOR", true, null, false, "UNKNOWN", "TRADE ALLOWANCE");
+    add(labels, "TRADE_ALLOWANCE", "USD_MINOR", true, null, false, "UNKNOWN", "TRADE ALLOWANCE", "TRADE", "TRADE IN");
     add(labels, "TRADE_PAYOFF", "USD_MINOR", true, null, false, "UNKNOWN", "TRADE PAYOFF");
     add(labels, "CASH_DOWN", "USD_MINOR", true, null, false, "UNKNOWN", "CASH DOWN", "DOWN PAYMENT");
     add(labels, "OUT_THE_DOOR_TOTAL", "USD_MINOR", true, null, false, "UNKNOWN",
