@@ -142,3 +142,34 @@ purchase_totals retains anonymous removed case, paid purchase and refund counts;
 acquisition_channel_totals retains removed paid counts by channel. No purchase ID, case ID,
 operator, timestamp, or price survives in these totals. Deletion retries cannot double-count:
 counter updates and graph erasure share the deletion transaction.
+
+## Contribution measurements and support time (ticket 46)
+
+V28 `case_support_time` stores only case ID, an idempotency entry UUID and integer
+minutes. It belongs to the case and is explicitly erased before the case row.
+Support writes and refunds serialize with deletion on the owning case row.
+The internal `case_contribution_facts` SQL view reads source scalar facts only and
+retains nothing independently; case removal also removes the view's case row.
+
+Before any graph rows are erased, `contribution_totals` retains an anonymous
+distribution of removed cases, grouping identical tuples with a case count: UTC calendar day of case start, qualified/verified/
+completed flags, real-paid/refunded/development counts, revenue and full refund minor
+units and currency, summed known provider/extraction USD cost, unknown-cost call count,
+and summed support minutes. It has no primary key, case, purchase, support entry,
+Buyer, Dealer, document, channel, variant, operator or precise timestamp reference.
+Each anonymous observation contributes its case count to totals; the distribution preserves
+the exact median, unknown-cost exclusions and recalculation under versioned pricing.
+Unlike earlier counters, monetary values and a UTC day intentionally survive here to
+meet the contribution measurement requirement. No price offer/experiment identity or
+individual support record survives. Only aggregate reports are exposed to SUPPORT.
+Small distributions remain sensitive to outside knowledge and must not be used to
+reidentify a Buyer; the service does not expose rows through an operator endpoint.
+
+Usage rows are locked before capture to serialize independently committed meter
+completions with erasure. Insertion and all graph removal share one transaction: failures roll both back and
+retries cannot double-count. All operations in `provider_usage`, including failed calls
+and retries, contribute before removal. Missing cost remains unknown. Older pre-V28
+anonymous purchase counters cannot reconstruct dates or financials and are explicitly
+reported as unavailable historical coverage, never backfilled or imputed. Buyer
+exports and downloaded copies retain their existing scope; this measurement adds no
+external retained dataset or backup-erasure claim.
