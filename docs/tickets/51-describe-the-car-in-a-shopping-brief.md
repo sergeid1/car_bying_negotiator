@@ -4,7 +4,7 @@
 
 **Blocked by:** 50 — Sign in with a passwordless Buyer Account.
 
-**Status:** blocked on 50 — filed on 2026-10-03 from specification 2.0.
+**Status:** ready-for-agent (50 complete) — filed on 2026-10-03 from specification 2.0.
 
 - [ ] A Buying Journey belongs to one Buyer Account and has a state starting at `SHOPPING`.
 - [ ] The brief form validates every field and names the field and correction on error; year, mileage, price, and radius have sane bounds.

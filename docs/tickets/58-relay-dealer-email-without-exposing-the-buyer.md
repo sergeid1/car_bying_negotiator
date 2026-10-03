@@ -4,7 +4,7 @@
 
 **Blocked by:** 50 — Sign in with a passwordless Buyer Account; 57 — Approve a Negotiation Mandate.
 
-**Status:** blocked on 50 and 57 — filed on 2026-10-03 from specification 2.0.
+**Status:** blocked on 57 — filed on 2026-10-03 from specification 2.0.
 
 - [ ] A replaceable relay adapter sends and receives email; a deterministic fake drives the main test suite; the real provider is selected under specification §18 prerequisite 10 and is not enabled by this ticket.
 - [ ] Relay addresses are unguessable per case and stop accepting mail when the case or account is deleted.
