@@ -295,3 +295,83 @@ as such in the offer and purchase contract; these counts do not establish real r
 Channel costPerPaidCase uses cumulative recorded channel spendMinor / paidCases in supported
 jurisdictions, including anonymous deleted paid counts. It is unavailable without recorded
 spend or a positive paid denominator and includes both numerator and denominator.
+
+## Contribution margin from recorded costs (ticket 46)
+
+`GET /api/v1/operator/contribution/metrics?from=2026-10-01&to=2026-11-01`
+requires a SUPPORT Bearer credential and returns `contribution-metrics.v1` with
+`Cache-Control: no-store`. Dates select a half-open window of **case starts in UTC**,
+not purchase, refund, report or call event dates. All recorded lifetime activity of
+those cases is included as of the read, even if an activity falls outside the window.
+UTC-day precision permits the same window selection after deletion without keeping
+precise timestamps. Equal or reversed dates return 400. No pilot freeze is required.
+
+`caseStarts` counts retained cases plus anonymous removed distribution entries in the
+window. `qualifiedCasesStarted` uses an explicit qualified experiment assignment;
+`casesWithVerifiedOffer` requires a persisted Dealer Offer; `completedReports` requires
+at least one persisted report. Each case counts once regardless of report versions.
+These three rates and `paidPurchases` use caseStarts as denominator. `refunds` uses
+paid purchases as denominator, retaining refunded purchases in the paid count.
+Each rate includes numerator, denominator and a null rate for an empty denominator.
+Development no-charge purchases are counted separately as
+`developmentNoChargePurchases`, never as paid conversion, revenue or refunds in this
+report. The older ticket 44 cumulative pilot/channel counters still include development
+checkout completions; they must not be interpreted as real revenue.
+
+There is no shipped fee schedule or support cost rate. Deployment configuration:
+
+| Property | Meaning |
+| --- | --- |
+| `contribution.fees.percentage` | Nonnegative percentage in 0..100 (e.g. 3 means 3%). |
+| `contribution.fees.fixed-minor` | Nonnegative fixed fee per paid purchase, in minor units. |
+| `contribution.fees.currency` | USD; no currency conversion is inferred. |
+| `contribution.fees.version`, `contribution.fees.source` | Required deployment-approved schedule version and provenance. |
+| `contribution.support.usd-per-minute` | Nonnegative USD cost per recorded minute. |
+| `contribution.support.version`, `contribution.support.source` | Required rate version and provenance. |
+
+Missing, partial, malformed, negative or unsupported pricing is `UNAVAILABLE` with
+`NO_VALID_FEE_SCHEDULE` or `NO_VALID_SUPPORT_RATE`, never an assumed zero cost. Explicit
+zero pricing must still carry currency, version and source. The current configured
+versions are returned and applied consistently to retained and removed cases; changing
+a deployment version reprices the report. These are modeled fees from an approved
+schedule, not payment-provider settlement receipts. Fees apply once to the original
+purchase price, rounded HALF_UP to USD cents, and remain charged on a full refund.
+The current purchase model records full refunds only; partial refunds are unsupported.
+
+`POST /api/v1/operator/contribution/cases/{caseId}/support-time` accepts
+`{"entryId":"<uuid>","minutes":10}` from SUPPORT only. Minutes must be 1..1440 per
+entry. Identical case/entry retries succeed; changed minutes return 409. A new UUID
+adds a separate entry. The endpoint locks the case row and refuses missing, expired
+or deletion-pending cases. Buyer credentials and REVIEWER credentials cannot write
+time or read the report. No support prose or operator identity is stored with minutes.
+
+For every real paid case, margin is price minus the recorded full refund, schedule
+fee, all known `provider_usage.cost_usd` (OCR, extraction, listing, market and any
+other metered operation, including retries/failures), and support minutes times the
+configured rate. Calls with null cost are counted in `unknownCostCalls`, make that
+case `NOT_MEASURABLE`, and are never free. No recorded calls or support entries means
+zero recorded consumption; this does not assert that unrecorded activity never occurred.
+`recordedPaidCaseCosts` labels known costs and shows support pricing availability.
+
+`contributionMargin` exposes paidCaseCount, measurable count, sum, mean and continuous
+median of **measurable cases only**, not rows or calls; sums and averages are null
+without measurable cases. `notMeasurableCount` and per-reason case counts identify
+excluded cases (reasons can overlap). Missing pricing makes the overall status
+UNAVAILABLE; unknown provider cost or unsupported currency makes it NOT_MEASURABLE;
+an empty priced cohort is NOT_MEASURABLE with NO_PAID_CASES. Partial measurable totals
+must be read alongside the excluded-case count. USD revenue and refunds and total
+fees are unavailable if any paid purchase has an unsupported currency.
+
+Deletion retains anonymous UTC-day contribution distributions, as described in the
+deletion policy. Pre-V28 removals have no dated financial records: the report exposes
+`historicalDeletionCoverage.removedCasesWithoutWindowRecords` and UNAVAILABLE coverage
+instead of assigning those old counters to a window or inventing their costs.
+The report returns no case, Buyer, Dealer, VIN, document, purchase or support-entry
+identifiers and never returns individual distribution entries. Small aggregates can
+still disclose information when combined with outside knowledge; operators must not
+use window differencing to identify a Buyer. No external analytics dataset is created.
+
+Willingness-to-pay answers remain only in the existing `willingnessToPay` survey output;
+they are not purchases and never contribute to conversion or revenue here. This report
+takes **no continue, reprice or stop decision**, changes no frozen thresholds, and
+publishes no case studies. Ticket 33 owns those decisions and publication.
