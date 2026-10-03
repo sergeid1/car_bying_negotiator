@@ -69,7 +69,8 @@ public class CoreReportService {
     }
     var offer = offers.latestOffer(caseId).orElse(null);
     var worksheet = extractions.latestForCase(caseId).orElse(null);
-    var worksheetFindings = new com.dealanalyzer.report.FourSquareReportPolicy().findings(worksheet);
+    var worksheetPolicy = new com.dealanalyzer.report.FourSquareReportPolicy();
+    var worksheetFindings = worksheetPolicy.findings(worksheet);
     boolean financeCase = "FINANCE".equals(buyingCase.purchaseMethod);
     var finance = financeCase ? financing.snapshot(caseId).orElse(null) : null;
     boolean dealerCurrent = offer != null && ("READY_TO_ANALYZE".equals(buyingCase.status)
@@ -154,9 +155,9 @@ public class CoreReportService {
             : "Resolve the missing, unsupported or stale financing inputs before relying on loan economics.",
         "Financing is not checked against an approved financing baseline; review the full-term cost.")));
     if (!worksheetFindings.isEmpty()) {
-      List<String> reasons = new ArrayList<>(worksheetFindings);
+      List<String> reasons = new ArrayList<>();
       analysis.path("topReasons").forEach(reason -> reasons.add(reason.asText()));
-      analysis.set("topReasons", json.valueToTree(reasons.stream().limit(3).toList()));
+      analysis.set("topReasons", json.valueToTree(worksheetPolicy.topReasons(worksheetFindings, reasons)));
     }
     analysis.put("financingAvailability", financeAvailability);
     analysis.set("financingTerms", json.valueToTree(finance == null ? null : finance.inputs()));

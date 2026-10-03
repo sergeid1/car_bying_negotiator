@@ -58,8 +58,12 @@ class FourSquareWorksheetAcceptanceTest {
       HttpAcceptanceHarness.post(app.client(), path + "/analyses", Map.of(), "analyze-four-square", token);
       var report = HttpAcceptanceHarness.get(app.client(), path + "/reports/latest", token);
       assertThat(report.path("status").asText()).isEqualTo("PARTIAL");
-      assertThat(report.at("/analysis/topReasons/0").asText()).contains("out-the-door total is missing", "hide the total");
-      assertThat(report.at("/analysis/topReasons/1").asText()).contains("loan term is missing", "do not infer");
+      assertThat(report.at("/analysis/topReasons")).hasSize(3);
+      assertThat(report.at("/analysis/topReasons/0").asText()).contains("out-the-door total and loan term are missing", "hide the total", "do not infer either");
+      assertThat(report.at("/analysis/topReasons/1").asText()).isEqualTo("Dealer financing: UNAVAILABLE.");
+      assertThat(report.at("/analysis/topReasons/2").asText()).isEqualTo("Resolve the missing, unsupported or stale financing inputs before relying on loan economics.");
+      assertThat(report.at("/evidence/fourSquareWorksheet/validationIssues")).hasSize(2);
+      assertThat(report.at("/evidence/fourSquareWorksheet/validationIssues").toString()).contains("PAYMENT_LED_MISSING_TOTAL", "PAYMENT_LED_MISSING_TERM");
       assertThat(report.at("/analysis/financingTerms").isNull()).isTrue();
       assertThat(report.at("/evidence/fourSquareWorksheet/id").asText()).isEqualTo(extraction.path("id").asText());
       var renderer = app.context().getBean(StoredReportRenderer.class);
