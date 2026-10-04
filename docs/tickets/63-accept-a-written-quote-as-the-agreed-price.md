@@ -4,10 +4,22 @@
 
 **Blocked by:** 60 — Request an itemized quote and ingest dealer replies.
 
-**Status:** ready-for-agent (60 complete) — filed on 2026-10-03 from specification 2.0.
+**Status:** complete for a Buying Case; the journey-level items wait on ticket 56 — written quote acceptance in
+`com.dealanalyzer.quote` (migration V38), as of 2026-10-04. `AgreedPriceService` accepts only the latest VERIFIED,
+itemized Dealer Offer that traces to a received document in this dealer's conversation; otherwise it prepares a
+gated written-confirmation request. Both messages pass the outbound gate, need the Buyer's approval of the exact
+text, and are sent once through the relay; the acceptance identifies the quote by VIN, out-the-door total and date
+received, and is conditional on a test drive and matching paperwork, with no commitment language. After delivery
+the Approved Baseline is created through `PricePlanService.approve`, and `agreed_prices` records the offer version,
+BUYER actor, time, baseline, and evidence message and document; the case negotiation becomes AGREED. The Buyer can
+download a one-page HTML summary to print. Case export and deletion cover both new tables. Open: Buying Cases are not
+linked to journeys until ticket 56, so the journey does not become `AGREED` and no other negotiations are offered to
+pause or stop yet; `JourneyAgreement` is the seam ticket 56 must implement. Acceptance needs a reviewed price plan,
+which finance-only cases cannot yet produce. A crash after the provider handoff leaves the request reserved, without
+automatic resend.
 
-- [ ] Acceptance requires a verified, itemized Dealer Offer from the conversation; a verbal or partial figure triggers a gated written-confirmation request instead.
-- [ ] The Agreed Price records the accepted offer version, actor, time, and the written evidence, and creates an Approved Baseline through the existing approval path.
-- [ ] The acceptance message passes the gate and contains no commitment language.
+- [x] Acceptance requires a verified, itemized Dealer Offer from the conversation; a verbal or partial figure triggers a gated written-confirmation request instead.
+- [x] The Agreed Price records the accepted offer version, actor, time, and the written evidence, and creates an Approved Baseline through the existing approval path.
+- [x] The acceptance message passes the gate and contains no commitment language.
 - [ ] The journey state becomes `AGREED`; other open negotiations in the journey are offered to the Buyer to pause or stop.
-- [ ] The Buyer can download a one-page summary of the Agreed Price to bring to the dealership.
+- [x] The Buyer can download a one-page summary of the Agreed Price to bring to the dealership.

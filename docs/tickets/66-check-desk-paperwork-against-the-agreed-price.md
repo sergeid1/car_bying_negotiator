@@ -4,7 +4,7 @@
 
 **Blocked by:** 63 — Accept a written quote as the Agreed Price; 14 — Review a revised Dealer Offer; 24 — Upload dealer paperwork from a phone.
 
-**Status:** blocked on 63 — filed on 2026-10-03 from specification 2.0.
+**Status:** ready-for-agent (63, 14 and 24 complete) — filed on 2026-10-03 from specification 2.0.
 
 - [ ] The Desk Check reuses revised-offer review against the Agreed Price as Approved Baseline and leads with additions and changes in plain words with their total effect.
 - [ ] A different VIN on the desk paperwork is a blocking finding that offers to start a fresh case for that car instead.

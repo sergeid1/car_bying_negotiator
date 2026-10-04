@@ -4,7 +4,7 @@
 
 **Blocked by:** 63 — Accept a written quote as the Agreed Price; 58 — Relay dealer email without exposing the Buyer; 64 — Notify the Buyer by email.
 
-**Status:** blocked on 63 — filed on 2026-10-03 from specification 2.0.
+**Status:** ready-for-agent (63, 58 and 64 complete) — filed on 2026-10-03 from specification 2.0.
 
 - [ ] The Buyer enters availability windows; the proposal to the dealer passes the gate and sends after Buyer approval.
 - [ ] A dealer's confirmation is captured from the conversation and shown to the Buyer to confirm before it becomes an appointment.
