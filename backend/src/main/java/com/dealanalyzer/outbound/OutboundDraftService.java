@@ -55,7 +55,7 @@ public class OutboundDraftService {
     long dealers = ((Number) manager.createNativeQuery("select count(*) from dealers where case_id = :caseId and id = :dealer")
         .setParameter("caseId", caseId).setParameter("dealer", draft.dealerId()).getSingleResult()).longValue();
     if (dealers != 1) throw new ResourceNotFoundException("Dealer not found in this case");
-    var context = context(caseId);
+    var context = context(caseId, draft.dealerId());
     var decision = gate.check(draft, context);
     String id = UUID.randomUUID().toString();
     Instant now = com.dealanalyzer.time.PersistedInstant.round(Instant.now());
@@ -86,6 +86,11 @@ public class OutboundDraftService {
   /** Called again by future sending code, under its case lock, to evaluate current policy. */
   @Transactional(readOnly = true)
   public OutboundGate.GateContext context(String caseId) {
+    return context(caseId, null);
+  }
+
+  @Transactional(readOnly = true)
+  public OutboundGate.GateContext context(String caseId, String dealerId) {
     var mandate = mandates.activeMandate(caseId).orElse(null);
     var amounts = new HashSet<Long>();
     offers.latestOffer(caseId).ifPresent(offer -> collectAmounts(offer.terms(), mandate == null ? "" : mandate.currency(), amounts));
@@ -99,7 +104,17 @@ public class OutboundDraftService {
     var reports = manager.createNativeQuery("select payload_json from analysis_reports where case_id = :caseId order by report_version desc")
         .setParameter("caseId", caseId).setMaxResults(1).getResultList();
     if (!reports.isEmpty()) report = parse(reports.getFirst().toString(), JsonNode.class);
-    return new OutboundGate.GateContext(mandate, amounts, Set.of(), personal, Set.of(), report);
+    var questions = new HashSet<String>();
+    if (dealerId != null) {
+      List<?> listings = manager.createNativeQuery("select v.vin, l.listing_url from vehicles v join listing_snapshots l on l.case_id = v.case_id where v.case_id = :caseId and l.dealer_id = :dealer and l.vin = v.vin order by l.retrieved_at desc, l.id")
+          .setParameter("caseId", caseId).setParameter("dealer", dealerId).setMaxResults(1).getResultList();
+      if (!listings.isEmpty()) {
+        Object[] row = (Object[]) listings.getFirst();
+        try { questions.add(com.dealanalyzer.quote.QuoteRequestText.render((String) row[0], (String) row[1])); }
+        catch (IllegalArgumentException unsupported) { /* Invalid source references authorize no language. */ }
+      }
+    }
+    return new OutboundGate.GateContext(mandate, amounts, Set.of(), personal, Set.of(), report, questions);
   }
 
   private Map<String, Object> snapshot(OutboundGate.GateContext context) {
@@ -107,6 +122,7 @@ public class OutboundDraftService {
     snapshot.put("mandate", context.mandate());
     snapshot.put("verifiedAmountsMinor", context.verifiedAmountsMinor().stream().sorted().toList());
     snapshot.put("verifiedDisclosures", context.verifiedDisclosures());
+    snapshot.put("caseQuestions", context.caseQuestions());
     snapshot.put("personalValueCount", context.personalValues().size());
     snapshot.put("releasedForDealer", context.releasedForDealer());
     snapshot.put("reportFingerprint", offers.fingerprint(context.finalizedReport()));
