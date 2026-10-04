@@ -84,6 +84,25 @@ public class MarketAssessmentService {
         .orElseThrow(() -> new ResourceNotFoundException("Market Assessment not found"));
   }
 
+  /** Advertised-price evidence for shopping, using the existing provider contract and assessment policy. */
+  public MarketAssessment advertised(String accountId, String journeyId, MarketVehicle query) {
+    Instant now = clock.instant();
+    ProviderResult result;
+    try {
+      result = meter.callJourneyMarket(accountId, journeyId, () -> provider.retrieve(query), value -> {
+        if (MarketProviderContract.failure(value, now) != null)
+          return com.dealanalyzer.operations.ProviderMeter.Status.CONTRACT_FAILURE;
+        return value.availability() == Availability.AVAILABLE ? com.dealanalyzer.operations.ProviderMeter.Status.SUCCESS
+            : com.dealanalyzer.operations.ProviderMeter.Status.PROVIDER_UNAVAILABLE;
+      });
+      if (MarketProviderContract.failure(result, now) != null)
+        result = unavailable("Market provider returned invalid evidence; market analysis is unavailable.", now);
+    } catch (com.dealanalyzer.operations.ProviderMeter.Failure failure) {
+      result = unavailable("Market provider is unavailable; market analysis is unavailable.", now);
+    }
+    return policy.assess(query, result);
+  }
+
   public MarketAssessmentView version(String caseId, int version, String accessToken) {
     cases.reopen(caseId, accessToken);
     return persistence.version(caseId, version)

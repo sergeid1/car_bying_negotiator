@@ -1633,3 +1633,14 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
 .agreed-price-panel select { width: 100%; min-width: 0; max-width: 100%; }
 .agreed-price-panel button { max-width: 100%; white-space: normal; }
 /* End ticket 63. */
+
+/* Ticket 56: saved shortlist and case confirmation. */
+.journey-shortlist, .candidate-case-form { display: grid; gap: 12px; min-width: 0; overflow-wrap: anywhere; }
+.journey-shortlist { margin-top: 20px; }
+.journey-shortlist button { max-width: 100%; white-space: normal; }
+.journey-shortlist .actions { flex-wrap: wrap; }
+.candidate-market-check p { margin: 0 0 6px; overflow-wrap: anywhere; }
+.candidate-case-form { padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
+.candidate-case-form h4:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.candidate-case-form input, .candidate-case-form select { min-width: 0; max-width: 100%; }
+/* End ticket 56. */

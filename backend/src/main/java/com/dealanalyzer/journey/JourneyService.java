@@ -267,7 +267,7 @@ public class JourneyService {
     var journey = journeys.findLockedByIdAndAccountId(journeyId, accountId).orElseThrow(JourneyProblem::notFound);
     String id = journey.id;
     manager.flush(); manager.detach(journey);
-    for (String table : List.of("reference_vehicles", "provider_usage", "shopping_brief_versions", "buying_journeys")) {
+    for (String table : List.of("journey_candidate_cases", "journey_candidates", "reference_vehicles", "provider_usage", "shopping_brief_versions", "buying_journeys")) {
       String column = table.equals("buying_journeys") ? "id" : "journey_id";
       manager.createNativeQuery("delete from " + table + " where " + column + " = :id").setParameter("id", id).executeUpdate();
       long remaining = ((Number) manager.createNativeQuery("select count(*) from " + table + " where " + column + " = :id")
@@ -307,6 +307,25 @@ public class JourneyService {
         held.put("briefVersion", v.version); held.put("vehicles", vehicles(v.journeyId, v.version));
         return held;
       }).filter(held -> !((List<?>) held.get("vehicles")).isEmpty()).toList());
+      row.put("candidates", manager.createQuery("select c from JourneyCandidateEntity c where c.journeyId = :id order by c.createdAt, c.id",
+          JourneyCandidateEntity.class).setParameter("id", journey.id).getResultList().stream().map(candidate -> {
+            var captured = new LinkedHashMap<String, Object>();
+            captured.put("candidateId", candidate.id); captured.put("briefVersion", candidate.briefVersion);
+            captured.put("searchRunId", candidate.searchRunId); captured.put("matcherVersion", candidate.matcherVersion);
+            captured.put("shortlistPosition", candidate.shortlistPosition); captured.put("createdAt", candidate.createdAt);
+            captured.put("providerVersion", candidate.providerVersion);
+            try {
+              captured.put("candidate", json.readTree(candidate.candidateJson));
+              captured.put("listingSnapshot", json.readTree(candidate.listingJson));
+              captured.put("marketCheck", json.readTree(candidate.marketJson));
+            } catch (java.io.IOException failure) { throw new IllegalStateException("Candidate export unavailable"); }
+            return captured;
+          }).toList());
+      row.put("buyingCases", manager.createNativeQuery("select case_id, candidate_id, created_at from journey_candidate_cases where journey_id = :id order by created_at, case_id")
+          .setParameter("id", journey.id).getResultList().stream().map(item -> {
+            Object[] link = (Object[]) item;
+            return Map.of("caseId", link[0].toString(), "candidateId", link[1].toString(), "createdAt", link[2].toString());
+          }).toList());
       return (Map<String, Object>) row;
     }).toList();
   }

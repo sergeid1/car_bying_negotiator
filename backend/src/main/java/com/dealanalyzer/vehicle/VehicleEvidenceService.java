@@ -126,14 +126,15 @@ public class VehicleEvidenceService {
         .orElseThrow(() -> new InvalidVehicleEvidenceException("Vehicle evidence was not found."));
     ListingSnapshotView snapshot = listingPersistence.findLatest(caseId).orElse(null);
     var conflicts = conflictPersistence.findByCaseId(caseId);
-    boolean reliable = conflicts.stream()
+    boolean incompleteListing = "LISTING_EVIDENCE".equals(vehicle.confirmationSource());
+    boolean reliable = !incompleteListing && conflicts.stream()
         .noneMatch(conflict -> conflict.status().equals("UNRESOLVED"));
     return new VehicleEvidenceView(
         vehicle,
         snapshot,
         null,
         conflicts,
-        reliable ? "VEHICLE_CONFIRMED" : "IDENTITY_CONFLICT",
+        incompleteListing ? "VEHICLE_CONFIRMATION_REQUIRED" : reliable ? "VEHICLE_CONFIRMED" : "IDENTITY_CONFLICT",
         reliable);
   }
 
