@@ -21,10 +21,12 @@ public class AccountExportService {
   private final AccountSessionRepository sessions;
   private final CaseExportService caseExports;
   private final ObjectMapper json;
+  private final com.dealanalyzer.notification.BuyerNotifications notifications;
 
   AccountExportService(BuyerAccountService accounts, AccountSessionRepository sessions, CaseExportService caseExports,
-      ObjectMapper json) {
+      ObjectMapper json, com.dealanalyzer.notification.BuyerNotifications notifications) {
     this.accounts = accounts; this.sessions = sessions; this.caseExports = caseExports; this.json = json;
+    this.notifications = notifications;
   }
 
   @Transactional(readOnly = true)
@@ -35,6 +37,8 @@ public class AccountExportService {
     data.put("schemaVersion", "buyer-account-export.v1");
     data.put("contact", view.contact());
     data.put("createdAt", view.createdAt());
+    data.put("notificationPreferences", notifications.preferencesForAccount(session.accountId));
+    data.put("notificationDeliveries", notifications.deliveryHistory(session.accountId));
     data.put("sessions", sessions.findByAccountIdOrderByCreatedAt(session.accountId).stream()
         .map(s -> { var row = new LinkedHashMap<String, Object>(); row.put("createdAt", s.createdAt);
           row.put("expiresAt", s.expiresAt); row.put("revokedAt", s.revokedAt); return row; }).toList());
@@ -54,7 +58,7 @@ public class AccountExportService {
     data.put("cases", cases);
     try (var output = new ByteArrayOutputStream(); var zip = new ZipOutputStream(output)) {
       entry(zip, "README.txt", ("Buyer Account export\naccount.json holds your contact details, sign-in history "
-          + "(times only) and the Buying Cases attached to the account. Each attached case that can be exported is "
+          + "(times only), email preferences, notification delivery states and the Buying Cases attached to the account. Each attached case that can be exported is "
           + "included as its own case export under cases/, with the same contents as exporting that case directly. "
           + "A case marked PURCHASE_REQUIRED has saved reports that are exported once the report is purchased; "
           + "a case marked UNAVAILABLE has expired or is being deleted. Sign-in links, session credentials and "

@@ -127,6 +127,7 @@ export function BuyerAccount({ caseCredentials }: { caseCredentials?: Credential
       setAccount(await (await call("/api/v1/account/contact", { method: "PUT", session, body: JSON.stringify(body) })).json());
       setMessage("Contact details saved.");
     }, "Contact details could not be saved. Check the phone number format and retry.")} />
+    <NotificationPreferences session={session} onSessionEnded={() => signedOut(ENDED)} />
     <h3>Attached Buying Cases</h3>
     {account.cases.length === 0 ? <p className="muted">No cases attached yet. Open a case by its private link, then attach it here.</p>
       : <ul className="account-cases" aria-label="Attached Buying Cases">
@@ -157,6 +158,57 @@ export function BuyerAccount({ caseCredentials }: { caseCredentials?: Credential
     }, "Deletion request could not be verified. Retry safely.")} />
     {message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
   </section>;
+}
+
+const NOTIFICATION_LABELS: Record<string, string> = {
+  DEALER_REPLY: "Dealer replies", DRAFT_NEEDS_APPROVAL: "Drafts needing approval",
+  MANDATE_EXPIRING: "Mandate expiry", APPOINTMENT: "Appointments", ACCOUNT_SECURITY: "Account security",
+};
+type NotificationPreference = { type: string; enabled: boolean; mandatory: boolean };
+
+function NotificationPreferences({ session, onSessionEnded }: { session: string; onSessionEnded: () => void }) {
+  const [preferences, setPreferences] = useState<NotificationPreference[]>();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [loads, setLoads] = useState(0);
+  useEffect(() => {
+    let current = true;
+    call("/api/v1/account/notifications", { session }).then(response => response.json()).then(value => {
+      if (current) {
+        if (!Array.isArray(value)) throw new Error("Preferences unavailable");
+        setPreferences(value); setError("");
+      }
+    }).catch((problem: Problem) => {
+      if (!current) return;
+      if (problem?.status === 401) onSessionEnded();
+      else setError("Email preferences could not be loaded. Retry safely.");
+    });
+    return () => { current = false; };
+  }, [session, loads]);
+  async function change(type: string, enabled: boolean) {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const value = await (await call("/api/v1/account/notifications", { method: "PUT", session,
+        body: JSON.stringify({ type, enabled }) })).json();
+      setPreferences(value); setNotice("Email preferences saved.");
+    } catch (problem) {
+      if ((problem as Problem)?.status === 401) onSessionEnded();
+      else setError("Email preferences could not be saved. Retry safely.");
+    } finally { setBusy(false); }
+  }
+  return <fieldset>
+    <legend>Email notifications</legend>
+    <p>Emails contain a prompt to sign in and open your journey. Account-security emails are required.</p>
+    {preferences?.map(preference => <label key={preference.type}>
+      <input type="checkbox" checked={preference.enabled} disabled={busy || preference.mandatory}
+        onChange={event => void change(preference.type, event.target.checked)} />
+      {NOTIFICATION_LABELS[preference.type]}{preference.mandatory ? " (required)" : ""}
+    </label>)}
+    {error && <><p role="alert">{error}</p>{!preferences && <button className="btn-secondary" type="button"
+      onClick={() => setLoads(loads + 1)}>Retry email preferences</button>}</>}
+    {notice && <p role="status">{notice}</p>}
+  </fieldset>;
 }
 
 function SignInRequest({ busy, run, setMessage }: {
