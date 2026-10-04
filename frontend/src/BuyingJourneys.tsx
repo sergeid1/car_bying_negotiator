@@ -1,4 +1,5 @@
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { CandidateResults, CandidateVehicles } from "./CandidateVehicles";
 
 type Option = { id: string; label: string };
 type Model = Option & { trims: Option[] };
@@ -144,6 +145,10 @@ export function BuyingJourneys({ session, onSessionEnded }: { session: string; o
           setView({ mode: "open", journey: saved, shown: saved.brief });
           await refreshList().catch(() => undefined);
         }} />}
+      candidates={<CandidateVehicles key={`${journey.id}-${journey.brief.version}`} briefVersion={journey.brief.version}
+        onSessionEnded={onSessionEnded}
+        search={() => call<CandidateResults>(`/api/v1/journeys/${encodeURIComponent(journey.id)}/candidates`, session,
+          { method: "POST" })} />}
       onBack={() => show({ mode: "list" })}
       onEdit={() => show({ mode: "edit", journey })}
       onVersion={version => run(async () => {
@@ -159,7 +164,7 @@ export function BuyingJourneys({ session, onSessionEnded }: { session: string; o
   } else {
     body = <>
       <p>Describe the car you want in a Shopping Brief. Each saved edit becomes a new version and earlier versions stay
-        readable. No inventory is searched yet, and nothing here is shared with a dealer.</p>
+        readable. Inventory is searched only when you ask, and nothing here is shared with a dealer.</p>
       {journeys.length === 0 ? <p className="muted">No Buying Journeys yet.</p>
         : <ul className="journey-list" aria-label="Your Buying Journeys">
           {journeys.map(j => <li key={j.id}>
@@ -184,8 +189,8 @@ export function BuyingJourneys({ session, onSessionEnded }: { session: string; o
   </section>;
 }
 
-function JourneyDetail({ journey, shown, busy, references, onBack, onEdit, onVersion, onDelete }: {
-  journey: Journey; shown: ShoppingBrief; busy: boolean; references: ReactNode; onBack: () => void; onEdit: () => void;
+function JourneyDetail({ journey, shown, busy, references, candidates, onBack, onEdit, onVersion, onDelete }: {
+  journey: Journey; shown: ShoppingBrief; busy: boolean; references: ReactNode; candidates: ReactNode; onBack: () => void; onEdit: () => void;
   onVersion: (version: number) => void; onDelete: () => void;
 }) {
   const [confirmed, setConfirmed] = useState(false);
@@ -218,6 +223,7 @@ function JourneyDetail({ journey, shown, busy, references, onBack, onEdit, onVer
       <button className="btn-ghost" disabled={busy} onClick={onBack}>Back to journeys</button>
     </div>
     {references}
+    {current ? candidates : <p className="muted">Candidate Vehicles are searched for the current brief version only.</p>}
     <h3>Delete this journey</h3>
     <p>Deleting removes this Buying Journey, every version of its Shopping Brief and every Reference Vehicle VIN at once.
       This cannot be undone.</p>

@@ -1,5 +1,6 @@
 package com.dealanalyzer.journey;
 
+import com.dealanalyzer.shopping.matching.CandidateMatchingService;
 import java.util.List;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -18,9 +19,10 @@ public class JourneyController {
   private static final String SESSION = "Account-Session-Token";
   private final JourneyService journeys;
   private final VehicleReference reference;
+  private final CandidateMatchingService candidates;
 
-  JourneyController(JourneyService journeys, VehicleReference reference) {
-    this.journeys = journeys; this.reference = reference;
+  JourneyController(JourneyService journeys, VehicleReference reference, CandidateMatchingService candidates) {
+    this.journeys = journeys; this.reference = reference; this.candidates = candidates;
   }
 
   /** The brief as edited, plus the version it was edited from. */
@@ -98,6 +100,13 @@ public class JourneyController {
     return journeys.removeReferenceVehicle(session, journeyId, referenceId, basedOnVersion);
   }
 
+  /** Searches inventory for the current brief and returns Candidate Vehicles with their reasons; nothing is saved. */
+  @PostMapping("/{journeyId}/candidates")
+  public CandidateMatchingService.CandidateResults candidates(@RequestHeader(value = SESSION, required = false) String session,
+      @PathVariable String journeyId) {
+    return candidates.candidates(journeys.accountId(session), journeyId);
+  }
+
   @DeleteMapping("/{journeyId}")
   public JourneyService.Deletion delete(@RequestHeader(value = SESSION, required = false) String session,
       @PathVariable String journeyId) {
@@ -114,6 +123,12 @@ public class JourneyController {
       body.setProperty("code", problem.code);
       body.setProperty("errors", problem.errors);
       return ResponseEntity.status(problem.status).body(body);
+    }
+
+    @ExceptionHandler(CandidateMatchingService.BriefChangedDuringSearch.class)
+    ResponseEntity<ProblemDetail> briefChanged(CandidateMatchingService.BriefChangedDuringSearch ignored) {
+      return problem(new JourneyProblem(HttpStatus.CONFLICT, "BRIEF_CHANGED",
+          "Your Shopping Brief changed while inventory was searched. Search again for the latest version.", List.of()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
