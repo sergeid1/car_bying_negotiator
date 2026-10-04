@@ -48,6 +48,7 @@ public class AccountExportService {
           row.put("expiresAt", s.expiresAt); row.put("revokedAt", s.revokedAt); return row; }).toList());
     data.put("buyingJourneys", journeys.exportForAccount(session.accountId));
     data.put("inventorySearchRuns", providerUsage.inventoryForAccount(session.accountId));
+    data.put("journeyMarketRetrievals", providerUsage.marketForAccount(session.accountId));
     var archives = new LinkedHashMap<String, byte[]>();
     List<Map<String, Object>> cases = new ArrayList<>();
     for (var attached : view.cases()) {
@@ -64,7 +65,7 @@ public class AccountExportService {
     data.put("cases", cases);
     try (var output = new ByteArrayOutputStream(); var zip = new ZipOutputStream(output)) {
       entry(zip, "README.txt", ("Buyer Account export\naccount.json holds your contact details, sign-in history "
-          + "(times only), email preferences, notification delivery states, inventory search history including search criteria, every Buying Journey with every version of its Shopping Brief and its Reference Vehicles (VINs and decoded details), and the Buying Cases attached to the account. Each attached case that can be exported is "
+          + "(times only), email preferences, notification delivery states, inventory search history including search criteria, every Buying Journey with every version of its Shopping Brief, Reference Vehicles, captured candidates, market checks, shortlist positions and linked Buying Cases, and the Buying Cases attached to the account. Each attached case that can be exported is "
           + "included as its own case export under cases/, with the same contents as exporting that case directly. "
           + "A case marked PURCHASE_REQUIRED has saved reports that are exported once the report is purchased; "
           + "a case marked UNAVAILABLE has expired or is being deleted. Sign-in links, session credentials and "

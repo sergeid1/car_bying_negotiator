@@ -43,6 +43,16 @@ public class VehicleEvidencePersistence {
     return vehicles.findByCaseId(caseId).map(this::view);
   }
 
+  /** Seeds a picked listing without inventing manual facts or a VIN. */
+  @Transactional
+  public VehicleView seedListing(String caseId, ListingSnapshotView listing, Instant now) {
+    if (vehicles.findByCaseId(caseId).isPresent()) throw new IllegalStateException("Vehicle evidence already exists");
+    var entity = new VehicleEntity(UUID.randomUUID().toString(), caseId, listing, now);
+    if (listing.vin() == null && (listing.year() == null || listing.make() == null
+        || listing.model() == null || listing.mileage() == null)) entity.confirmationSource = "LISTING_EVIDENCE";
+    return view(vehicles.save(entity));
+  }
+
   @Transactional
   public VehicleView confirmListing(String caseId, ListingSnapshotView listing, Instant now) {
     VehicleEntity entity = vehicles.findByCaseId(caseId)

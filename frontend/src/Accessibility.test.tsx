@@ -25,6 +25,7 @@ import { ReferralPartnerKit } from "./ReferralPartnerKit";
 import { ACCOUNT_SESSION_KEY, BuyerAccount } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 import { NegotiationConversation } from "./NegotiationConversation";
+import { JourneyCandidates, ShortlistEntry } from "./JourneyCandidates";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 // Ticket 63: acceptance, written confirmation and saved agreement states.
@@ -47,6 +48,25 @@ const AA = {
   // Layout/contrast require the real-browser walkthrough; jsdom has no rendering engine.
   rules: { "color-contrast": { enabled: false } },
 };
+
+// Ticket 56: populated shortlist and candidate case confirmation.
+test("shortlist ordering and case confirmation have no automated AA violations", async () => {
+  const entry: ShortlistEntry = { candidateId: "c1", caseId: null, marketCheck: { status: "UNAVAILABLE", range: null,
+    confidence: "UNAVAILABLE", provider: null, vintage: null, limitation: "No current comparables." },
+    candidate: { listingId: "l1", vin: null, title: "2024 Honda Civic EX", year: 2024, make: "Honda", model: "Civic",
+      trim: "EX", mileage: 10000, distanceMiles: 10, advertisedPriceMinor: 2000000, currency: "USD", matched: [], missed: [],
+      unconfirmed: [], snapshot: { source: "Inventory", retrievedAt: "2026-10-04T12:00:00Z", observedAt: null,
+        staleness: "UNKNOWN", synthetic: false } } };
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ supported: ["US-NC"], consentPolicies: {} })));
+  const { container } = render(<main><h1>Buying Journey</h1><JourneyCandidates journeyId="j1" briefVersion={1}
+    postalCode="27601" request={(async () => [entry]) as never} onSessionEnded={() => {}} /></main>);
+  await screen.findByRole("button", { name: "Open a Buying Case" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Open a Buying Case" }));
+  await screen.findByRole("region", { name: "Confirm your Buying Case" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+// End ticket 56.
 
 test("market freshness, uncertainty and unavailable evidence have no automated AA violations", async () => {
   const { container } = render(<main><h1>Saved report</h1><h2>Evidence</h2><MarketEvidenceSection evidence={{ status: "AVAILABLE", paragraphs: [

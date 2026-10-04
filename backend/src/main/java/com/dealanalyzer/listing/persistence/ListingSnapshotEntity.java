@@ -23,7 +23,7 @@ class ListingSnapshotEntity {
   @Column(name = "provider_listing_id", nullable = false, length = 120)
   String providerListingId;
 
-  @Column(name = "listing_url", nullable = false, length = 1000)
+  @Column(name = "listing_url", length = 1000)
   String listingUrl;
 
   @Column(length = 17)
