@@ -93,6 +93,16 @@ class ShortlistAcceptanceTest {
       assertThat(exchange(client, "GET", base + "/candidates/" + firstId + "/case", null, foreign, null).status()).isEqualTo(404);
       var second = openCase(client, base, secondId, session, "open-second");
       assertThat(second.at("/case/id").asText()).isNotEqualTo(firstCaseId);
+      // Ticket 62: account-only comparison reads the linked cases in the Buyer's saved order.
+      assertThat(exchange(client, "GET", base + "/quote-comparison", null, null, null).status()).isEqualTo(401);
+      assertThat(exchange(client, "GET", base + "/quote-comparison", null, firstToken, null).status()).isEqualTo(401);
+      assertThat(exchange(client, "GET", base + "/quote-comparison", null, foreign, null).status()).isEqualTo(404);
+      var comparison = exchange(client, "GET", base + "/quote-comparison", null, session, null);
+      assertThat(comparison.status()).isEqualTo(200);
+      assertThat(comparison.body().path("cars").findValuesAsText("candidateId")).containsExactly(secondId, firstId);
+      assertThat(comparison.body().path("otdComparable").asBoolean()).isFalse();
+      assertThat(comparison.body().path("cars").get(0).path("amounts")).isEmpty();
+      // End ticket 62.
       var jdbc = jdbc(app);
       assertThat(jdbc.queryForObject("select count(*) from journey_candidate_cases where journey_id = ?", Long.class, journeyId)).isEqualTo(2);
       assertThat(jdbc.queryForObject("select count(*) from buyer_account_cases", Long.class)).isEqualTo(2);

@@ -23,9 +23,18 @@ public class JourneyController {
   private final JourneyService journeys;
   private final VehicleReference reference;
   private final JourneyShortlistService shortlist;
+  private final JourneyQuoteComparisonService comparison;
 
-  JourneyController(JourneyService journeys, VehicleReference reference, JourneyShortlistService shortlist) {
+  JourneyController(JourneyService journeys, VehicleReference reference, JourneyShortlistService shortlist,
+      JourneyQuoteComparisonService comparison) {
     this.journeys = journeys; this.reference = reference; this.shortlist = shortlist;
+    this.comparison = comparison;
+  }
+
+  @GetMapping("/{journeyId}/quote-comparison")
+  public JourneyQuoteComparisonService.Comparison comparison(
+      @RequestHeader(value = SESSION, required = false) String session, @PathVariable String journeyId) {
+    return comparison.view(session, journeyId);
   }
 
   /** The brief as edited, plus the version it was edited from. */

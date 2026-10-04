@@ -188,3 +188,28 @@ test("populated shortlist and case confirmation fit 360 px", async ({ page }) =>
   await expectNoOverflowOrViolations(page);
 });
 // End ticket 56.
+
+// Ticket 62: comparison and evidence in both theme projects.
+test("verified quote comparison, missing figures and expanded evidence fit 360 px", async ({ page }) => {
+  await stubApi(page);
+  await page.route("**/api/v1/journeys/j1/quote-comparison", route => route.fulfill({ json: {
+    otdComparable: false, cars: [{ caseId: "c1", candidateId: "v1", title: "2025 Chevrolet Silverado 1500 High Country",
+      state: "Verified quote", offerVersion: 2, missing: ["Taxes", "Government charges"], reportVersion: 3,
+      marketPosition: "Selling price within the stored market range.", amounts: [{ label: "Selling price", minorUnits: 5100000,
+        currency: "USD", evidence: { sourceNote: null, calculation: null, documentSource: { documentId: "doc", extractionId: "ex",
+          offerVersion: 2, wording: "Vehicle selling price", pageNumber: 2, region: { x: .1, y: .3, width: .5, height: .1 } } } }] },
+      { caseId: "c2", candidateId: "v2", title: "2024 Chevrolet Silverado 1500 High Country", state: "Awaiting quote",
+        offerVersion: null, amounts: [], missing: ["Selling price", "Dealer fees", "Add-ons", "Taxes", "Government charges", "Out-the-door total"],
+        reportVersion: null, marketPosition: "Market position unavailable." }],
+  } }));
+  await page.goto("/#sign-in=link-secret");
+  await page.getByRole("button", { name: "Finish signing in" }).click();
+  await page.getByRole("button", { name: "Open 2019–2025 Chevrolet Silverado 1500" }).click();
+  const comparison = page.getByRole("region", { name: "Compare verified quotes" });
+  await expect(comparison.getByText(/OTD totals cannot be compared/)).toBeVisible();
+  await expectNoOverflowOrViolations(page);
+  await comparison.getByText("Selling price evidence").click();
+  await expect(comparison.getByText(/Read from page 2/)).toBeVisible();
+  await expectNoOverflowOrViolations(page);
+});
+// End ticket 62.
