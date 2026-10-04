@@ -43,3 +43,24 @@ class ShoppingBriefVersionEntity {
     Key() { this(null, 0); }
   }
 }
+
+/** One Reference Vehicle in one brief version. Nothing updates a row once inserted. */
+@Entity @Table(name = "reference_vehicles") @IdClass(ReferenceVehicleEntity.Key.class)
+class ReferenceVehicleEntity {
+  @Id @Column(name = "journey_id", updatable = false) String journeyId;
+  @Id @Column(name = "brief_version", updatable = false) int briefVersion;
+  @Id @Column(updatable = false) int position;
+  @Column(name = "reference_id", updatable = false) String referenceId;
+  @Column(name = "account_id", updatable = false) String accountId;
+  @Column(updatable = false) String vin;
+  @Column(name = "decode_outcome", updatable = false) String decodeOutcome;
+  @Column(updatable = false) String source;
+  @Column(name = "decoder_version", updatable = false) String decoderVersion;
+  @Column(name = "decoded_at", updatable = false) Instant decodedAt;
+  @Column(updatable = false) String attributes;
+  protected ReferenceVehicleEntity() {}
+
+  record Key(String journeyId, int briefVersion, int position) implements Serializable {
+    Key() { this(null, 0, 0); }
+  }
+}

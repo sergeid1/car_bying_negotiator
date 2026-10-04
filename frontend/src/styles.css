@@ -1593,3 +1593,18 @@ fieldset.journey-choices > label:has(> input[type="checkbox"]) { grid-column: au
 .brief-form .field-error { margin-top: -6px; }
 .journeys .facts dd { font-weight: 600; }
 /* End ticket 51. */
+
+/* Ticket 52: Reference Vehicles on the Shopping Brief. */
+.reference-vehicles { display: grid; gap: 12px; margin-top: 8px; }
+.reference-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.reference-vehicle { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card); min-width: 0; }
+.reference-vehicle h4 { margin: 0; overflow-wrap: anywhere; }
+.reference-vehicle .vin { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr)); }
+.reference-attributes label > span { overflow-wrap: anywhere; }
+.reference-source { display: block; font-size: 0.8rem; font-weight: 400; }
+.reference-add { display: grid; gap: 8px; }
+.reference-add input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
+.reference-add .field-error { margin-top: -4px; }
+/* End ticket 52. */

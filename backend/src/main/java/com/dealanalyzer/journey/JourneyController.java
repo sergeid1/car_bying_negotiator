@@ -26,16 +26,22 @@ public class JourneyController {
   /** The brief as edited, plus the version it was edited from. */
   public record Revision(Integer basedOnVersion, BriefInput brief) {}
 
+  /** A VIN to decode and add, plus the brief version it was added to. */
+  public record ReferenceVehicleInput(Integer basedOnVersion, String vin) {}
+  /** The decoded attributes of one Reference Vehicle that matter, by attribute name. */
+  public record Relevance(Integer basedOnVersion, List<String> relevantAttributes) {}
+
   public record BriefOptions(VehicleReference.ReferenceList reference, Bounds bounds) {}
   public record Bounds(int earliestYear, int latestYear, int maxMileage, int minPriceCeiling, int maxPriceCeiling,
-      int minRadiusMiles, int maxRadiusMiles, int maxChoices) {}
+      int minRadiusMiles, int maxRadiusMiles, int maxChoices, int maxReferenceVehicles) {}
 
   @GetMapping("/brief-options")
   public BriefOptions options(@RequestHeader(value = SESSION, required = false) String session) {
     journeys.authorize(session);
     return new BriefOptions(reference.list(), new Bounds(ShoppingBriefValidator.EARLIEST_YEAR, journeys.latestYear(),
         ShoppingBriefValidator.MAX_MILEAGE, ShoppingBriefValidator.MIN_PRICE, ShoppingBriefValidator.MAX_PRICE,
-        ShoppingBriefValidator.MIN_RADIUS, ShoppingBriefValidator.MAX_RADIUS, ShoppingBriefValidator.MAX_CHOICES));
+        ShoppingBriefValidator.MIN_RADIUS, ShoppingBriefValidator.MAX_RADIUS, ShoppingBriefValidator.MAX_CHOICES,
+        JourneyService.MAX_REFERENCE_VEHICLES));
   }
 
   @GetMapping
@@ -65,6 +71,31 @@ public class JourneyController {
   public JourneyService.JourneyView revise(@RequestHeader(value = SESSION, required = false) String session,
       @PathVariable String journeyId, @RequestBody Revision revision) {
     return journeys.revise(session, journeyId, revision.basedOnVersion(), revision.brief());
+  }
+
+  @GetMapping("/{journeyId}/briefs/{version}/reference-vehicles")
+  public List<ReferenceVehicle> referenceVehicles(@RequestHeader(value = SESSION, required = false) String session,
+      @PathVariable String journeyId, @PathVariable int version) {
+    return journeys.referenceVehicles(session, journeyId, version);
+  }
+
+  @PostMapping("/{journeyId}/reference-vehicles")
+  public JourneyService.JourneyView addReferenceVehicle(@RequestHeader(value = SESSION, required = false) String session,
+      @PathVariable String journeyId, @RequestBody ReferenceVehicleInput input) {
+    return journeys.addReferenceVehicle(session, journeyId, input.basedOnVersion(), input.vin());
+  }
+
+  @PutMapping("/{journeyId}/reference-vehicles/{referenceId}/relevance")
+  public JourneyService.JourneyView markRelevant(@RequestHeader(value = SESSION, required = false) String session,
+      @PathVariable String journeyId, @PathVariable String referenceId, @RequestBody Relevance relevance) {
+    return journeys.markRelevant(session, journeyId, referenceId, relevance.basedOnVersion(), relevance.relevantAttributes());
+  }
+
+  @DeleteMapping("/{journeyId}/reference-vehicles/{referenceId}")
+  public JourneyService.JourneyView removeReferenceVehicle(@RequestHeader(value = SESSION, required = false) String session,
+      @PathVariable String journeyId, @PathVariable String referenceId,
+      @RequestParam(required = false) Integer basedOnVersion) {
+    return journeys.removeReferenceVehicle(session, journeyId, referenceId, basedOnVersion);
   }
 
   @DeleteMapping("/{journeyId}")

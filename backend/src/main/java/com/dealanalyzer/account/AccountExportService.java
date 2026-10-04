@@ -61,7 +61,7 @@ public class AccountExportService {
     data.put("cases", cases);
     try (var output = new ByteArrayOutputStream(); var zip = new ZipOutputStream(output)) {
       entry(zip, "README.txt", ("Buyer Account export\naccount.json holds your contact details, sign-in history "
-          + "(times only), email preferences, notification delivery states, every Buying Journey with every version of its Shopping Brief, and the Buying Cases attached to the account. Each attached case that can be exported is "
+          + "(times only), email preferences, notification delivery states, every Buying Journey with every version of its Shopping Brief and its Reference Vehicles (VINs and decoded details), and the Buying Cases attached to the account. Each attached case that can be exported is "
           + "included as its own case export under cases/, with the same contents as exporting that case directly. "
           + "A case marked PURCHASE_REQUIRED has saved reports that are exported once the report is purchased; "
           + "a case marked UNAVAILABLE has expired or is being deleted. Sign-in links, session credentials and "
