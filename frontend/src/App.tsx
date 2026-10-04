@@ -3,6 +3,7 @@ import "./styles.css";
 import { RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess, SaveCaseLink } from "./CasePortability";
 import { CaseLifecycle } from "./CaseLifecycle";
 import { BuyerAccount } from "./BuyerAccount";
+import { BuyingJourneys } from "./BuyingJourneys";
 import { PricePlan } from "./PricePlan";
 import { NegotiationMandate } from "./NegotiationMandate";
 import { DealerRelay } from "./DealerRelay";
@@ -121,6 +122,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   // Tied to its case so a version frozen in one case never reaches another.
   const [frozenOffer, setFrozenOffer] = useState<{ caseId: string; version: number }>();
   const [referral, setReferral] = useState<{ caseId: string; text: string }>();
+  const [accountSession, setAccountSession] = useState("");
+  const [accountRecheck, setAccountRecheck] = useState(0);
   const [guide] = useState(requestedGuide);
   const [partnerKit] = useState(requestedPartnerKit);
   // A guide or the partner kit replaces the start screen at its own shareable address.
@@ -209,6 +212,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
           <div className="column">
             {guide && <ExplainerGuide slug={guide} />}
             {!guide && partnerKit && <ReferralPartnerKit />}
+            {!standalone && accountSession && <BuyingJourneys key={accountSession} session={accountSession}
+              onSessionEnded={() => { setAccountSession(""); setAccountRecheck(value => value + 1); }} />}
             {!standalone && !report && !caseCredentials && <SampleReportEntry />}
             {!standalone && !report && !caseCredentials && <OfferTerms />}
             {!standalone && !report && !caseCredentials && (
@@ -288,7 +293,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             {caseCredentials && !caseRevoked && <SaveCaseLink {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
-            <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined} />
+            <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined}
+              onSignedIn={setAccountSession} recheck={accountRecheck} />
             {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
               onRevoked={() => { setCaseRevoked(true); setReport(undefined); setStage(undefined); setError(undefined); }} />}
           </aside>

@@ -21,6 +21,7 @@ import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 import { ReferralPartnerKit } from "./ReferralPartnerKit";
 import { ACCOUNT_SESSION_KEY, BuyerAccount } from "./BuyerAccount";
+import { BuyingJourneys } from "./BuyingJourneys";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const AA = {
@@ -79,6 +80,53 @@ test("the signed-in Buyer Account, its contact form and its deletion receipt hav
   await screen.findByRole("list", { name: "Attached cases being deleted" });
   result = await axe.run(container, AA);
   expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
+});
+
+test("Buying Journeys: the list, the brief form with field errors, and a journey with versions have no automated AA violations", async () => {
+  const brief = (version: number) => ({ journeyId: "j1", version, referenceListVersion: "vehicle-reference-2026-10-v1", yearFrom: 2020,
+    yearTo: 2024, make: { id: "toyota", label: "Toyota" }, model: { id: "toyota-rav4", label: "RAV4" },
+    trims: [{ id: "toyota-rav4-xle", label: "XLE" }], maxMileage: 60000, priceCeilingMinor: 3_200_000, currency: "USD",
+    postalCode: "27048", jurisdiction: "US-NC", radiusMiles: 50, mustHaveFeatures: [{ id: "all-wheel-drive", label: "All-wheel drive" }],
+    niceToHaveFeatures: [], createdAt: "2026-10-03T12:00:00Z" });
+  const journey = { id: "j1", state: "SHOPPING", createdAt: "2026-10-03T12:00:00Z", updatedAt: "", brief: brief(2),
+    versions: [{ version: 1, createdAt: "2026-10-03T12:00:00Z" }, { version: 2, createdAt: "2026-10-03T13:00:00Z" }] };
+  const options = { reference: { version: "vehicle-reference-2026-10-v1",
+    makes: [{ id: "toyota", label: "Toyota", models: [{ id: "toyota-rav4", label: "RAV4", trims: [{ id: "toyota-rav4-xle", label: "XLE" }] }] }],
+    features: [{ id: "all-wheel-drive", label: "All-wheel drive" }, { id: "heated-seats", label: "Heated seats" }] },
+    bounds: { earliestYear: 1990, latestYear: 2027, maxMileage: 300000, minPriceCeiling: 1000, maxPriceCeiling: 500000,
+      minRadiusMiles: 5, maxRadiusMiles: 500, maxChoices: 20 } };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const [status, body] = url.endsWith("/brief-options") ? [200, options]
+      : url === "/api/v1/journeys" && init?.method === "POST" ? [422, { code: "LOCATION_NOT_SERVED", detail: "Choose your state.", errors: [
+        { field: "yearFrom", message: "Enter the earliest model year as a year from 1990 to 2027." },
+        { field: "mustHaveFeatures", message: "Choose must-have features from the list." },
+        { field: "jurisdiction", message: "That ZIP code crosses a state line. Choose your state.", reason: "POSTAL_CODE_CROSSES_STATE_LINE",
+          candidateJurisdictions: ["US-NC", "US-VA"] }] }]
+      : url === "/api/v1/journeys" ? [200, [{ id: "j1", state: "SHOPPING", createdAt: "2026-10-03T12:00:00Z", updatedAt: "",
+        currentVersion: 2, yearFrom: 2020, yearTo: 2024, make: "Toyota", model: "RAV4" }]]
+      : url.endsWith("/briefs/1") ? [200, brief(1)] : [200, journey];
+    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  });
+  const { container } = render(<main><h1>Buyer Account</h1><BuyingJourneys session="session" onSessionEnded={() => {}} /></main>);
+  const user = userEvent.setup();
+  await screen.findByRole("list", { name: "Your Buying Journeys" });
+  const violations = async () => (await axe.run(container, AA)).violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }));
+  expect(await violations()).toEqual([]);
+
+  await user.click(screen.getByRole("button", { name: "Start a Buying Journey" }));
+  await user.type(screen.getByLabelText("Find a make or model (optional)"), "toy");
+  await user.selectOptions(screen.getByLabelText("Make"), "toyota");
+  await user.selectOptions(screen.getByLabelText("Model"), "toyota-rav4");
+  await user.click(screen.getByRole("button", { name: "Save brief and start journey" }));
+  await screen.findByLabelText("Your state");
+  expect(await violations()).toEqual([]);
+
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  await user.click(await screen.findByRole("button", { name: "Open 2020–2024 Toyota RAV4" }));
+  await user.selectOptions(await screen.findByLabelText("Brief version"), "1");
+  await screen.findByText(/reading an earlier version/);
+  expect(await violations()).toEqual([]);
 });
 
 test("keyboard users can skip to the case workflow", async () => {

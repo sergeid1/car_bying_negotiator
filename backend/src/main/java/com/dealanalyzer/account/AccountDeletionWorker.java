@@ -22,6 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class AccountDeletionWorker {
   /** Child-before-parent, all keyed by account ID. No broad ORM cascades. */
   private static final List<String> ACCOUNT_GRAPH = List.of(
+      "shopping_brief_versions", "buying_journeys",
       "buyer_notification_preferences", "buyer_notification_deliveries",
       "buyer_account_sessions", "buyer_account_sign_in_links", "buyer_account_cases");
 

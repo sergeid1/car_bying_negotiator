@@ -1,0 +1,896 @@
+{
+  "version": "vehicle-reference-2026-10-v1",
+  "description": "Curated starter list of makes, models and trims for Shopping Briefs. Identifiers are stable within a version.",
+  "makes": [
+    {
+      "id": "toyota",
+      "label": "Toyota",
+      "models": [
+        {
+          "id": "toyota-camry",
+          "label": "Camry",
+          "trims": [
+            {
+              "id": "toyota-camry-le",
+              "label": "LE"
+            },
+            {
+              "id": "toyota-camry-se",
+              "label": "SE"
+            },
+            {
+              "id": "toyota-camry-xle",
+              "label": "XLE"
+            },
+            {
+              "id": "toyota-camry-xse",
+              "label": "XSE"
+            }
+          ]
+        },
+        {
+          "id": "toyota-corolla",
+          "label": "Corolla",
+          "trims": [
+            {
+              "id": "toyota-corolla-l",
+              "label": "L"
+            },
+            {
+              "id": "toyota-corolla-le",
+              "label": "LE"
+            },
+            {
+              "id": "toyota-corolla-se",
+              "label": "SE"
+            },
+            {
+              "id": "toyota-corolla-xse",
+              "label": "XSE"
+            }
+          ]
+        },
+        {
+          "id": "toyota-rav4",
+          "label": "RAV4",
+          "trims": [
+            {
+              "id": "toyota-rav4-le",
+              "label": "LE"
+            },
+            {
+              "id": "toyota-rav4-xle",
+              "label": "XLE"
+            },
+            {
+              "id": "toyota-rav4-xle-premium",
+              "label": "XLE Premium"
+            },
+            {
+              "id": "toyota-rav4-adventure",
+              "label": "Adventure"
+            },
+            {
+              "id": "toyota-rav4-trd-off-road",
+              "label": "TRD Off-Road"
+            },
+            {
+              "id": "toyota-rav4-limited",
+              "label": "Limited"
+            }
+          ]
+        },
+        {
+          "id": "toyota-highlander",
+          "label": "Highlander",
+          "trims": [
+            {
+              "id": "toyota-highlander-le",
+              "label": "LE"
+            },
+            {
+              "id": "toyota-highlander-xle",
+              "label": "XLE"
+            },
+            {
+              "id": "toyota-highlander-limited",
+              "label": "Limited"
+            },
+            {
+              "id": "toyota-highlander-platinum",
+              "label": "Platinum"
+            }
+          ]
+        },
+        {
+          "id": "toyota-tacoma",
+          "label": "Tacoma",
+          "trims": [
+            {
+              "id": "toyota-tacoma-sr",
+              "label": "SR"
+            },
+            {
+              "id": "toyota-tacoma-sr5",
+              "label": "SR5"
+            },
+            {
+              "id": "toyota-tacoma-trd-sport",
+              "label": "TRD Sport"
+            },
+            {
+              "id": "toyota-tacoma-trd-off-road",
+              "label": "TRD Off-Road"
+            },
+            {
+              "id": "toyota-tacoma-limited",
+              "label": "Limited"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "honda",
+      "label": "Honda",
+      "models": [
+        {
+          "id": "honda-civic",
+          "label": "Civic",
+          "trims": [
+            {
+              "id": "honda-civic-lx",
+              "label": "LX"
+            },
+            {
+              "id": "honda-civic-sport",
+              "label": "Sport"
+            },
+            {
+              "id": "honda-civic-ex",
+              "label": "EX"
+            },
+            {
+              "id": "honda-civic-touring",
+              "label": "Touring"
+            }
+          ]
+        },
+        {
+          "id": "honda-accord",
+          "label": "Accord",
+          "trims": [
+            {
+              "id": "honda-accord-lx",
+              "label": "LX"
+            },
+            {
+              "id": "honda-accord-sport",
+              "label": "Sport"
+            },
+            {
+              "id": "honda-accord-ex-l",
+              "label": "EX-L"
+            },
+            {
+              "id": "honda-accord-touring",
+              "label": "Touring"
+            }
+          ]
+        },
+        {
+          "id": "honda-cr-v",
+          "label": "CR-V",
+          "trims": [
+            {
+              "id": "honda-cr-v-lx",
+              "label": "LX"
+            },
+            {
+              "id": "honda-cr-v-ex",
+              "label": "EX"
+            },
+            {
+              "id": "honda-cr-v-ex-l",
+              "label": "EX-L"
+            },
+            {
+              "id": "honda-cr-v-sport",
+              "label": "Sport"
+            },
+            {
+              "id": "honda-cr-v-sport-touring",
+              "label": "Sport Touring"
+            }
+          ]
+        },
+        {
+          "id": "honda-pilot",
+          "label": "Pilot",
+          "trims": [
+            {
+              "id": "honda-pilot-sport",
+              "label": "Sport"
+            },
+            {
+              "id": "honda-pilot-ex-l",
+              "label": "EX-L"
+            },
+            {
+              "id": "honda-pilot-trailsport",
+              "label": "TrailSport"
+            },
+            {
+              "id": "honda-pilot-touring",
+              "label": "Touring"
+            },
+            {
+              "id": "honda-pilot-elite",
+              "label": "Elite"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ford",
+      "label": "Ford",
+      "models": [
+        {
+          "id": "ford-f-150",
+          "label": "F-150",
+          "trims": [
+            {
+              "id": "ford-f-150-xl",
+              "label": "XL"
+            },
+            {
+              "id": "ford-f-150-xlt",
+              "label": "XLT"
+            },
+            {
+              "id": "ford-f-150-lariat",
+              "label": "Lariat"
+            },
+            {
+              "id": "ford-f-150-king-ranch",
+              "label": "King Ranch"
+            },
+            {
+              "id": "ford-f-150-platinum",
+              "label": "Platinum"
+            },
+            {
+              "id": "ford-f-150-raptor",
+              "label": "Raptor"
+            }
+          ]
+        },
+        {
+          "id": "ford-escape",
+          "label": "Escape",
+          "trims": [
+            {
+              "id": "ford-escape-active",
+              "label": "Active"
+            },
+            {
+              "id": "ford-escape-st-line",
+              "label": "ST-Line"
+            },
+            {
+              "id": "ford-escape-platinum",
+              "label": "Platinum"
+            }
+          ]
+        },
+        {
+          "id": "ford-explorer",
+          "label": "Explorer",
+          "trims": [
+            {
+              "id": "ford-explorer-active",
+              "label": "Active"
+            },
+            {
+              "id": "ford-explorer-st-line",
+              "label": "ST-Line"
+            },
+            {
+              "id": "ford-explorer-xlt",
+              "label": "XLT"
+            },
+            {
+              "id": "ford-explorer-platinum",
+              "label": "Platinum"
+            },
+            {
+              "id": "ford-explorer-st",
+              "label": "ST"
+            }
+          ]
+        },
+        {
+          "id": "ford-mustang",
+          "label": "Mustang",
+          "trims": [
+            {
+              "id": "ford-mustang-ecoboost",
+              "label": "EcoBoost"
+            },
+            {
+              "id": "ford-mustang-gt",
+              "label": "GT"
+            },
+            {
+              "id": "ford-mustang-dark-horse",
+              "label": "Dark Horse"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chevrolet",
+      "label": "Chevrolet",
+      "models": [
+        {
+          "id": "chevrolet-silverado-1500",
+          "label": "Silverado 1500",
+          "trims": [
+            {
+              "id": "chevrolet-silverado-1500-wt",
+              "label": "WT"
+            },
+            {
+              "id": "chevrolet-silverado-1500-custom",
+              "label": "Custom"
+            },
+            {
+              "id": "chevrolet-silverado-1500-lt",
+              "label": "LT"
+            },
+            {
+              "id": "chevrolet-silverado-1500-rst",
+              "label": "RST"
+            },
+            {
+              "id": "chevrolet-silverado-1500-ltz",
+              "label": "LTZ"
+            },
+            {
+              "id": "chevrolet-silverado-1500-high-country",
+              "label": "High Country"
+            }
+          ]
+        },
+        {
+          "id": "chevrolet-equinox",
+          "label": "Equinox",
+          "trims": [
+            {
+              "id": "chevrolet-equinox-ls",
+              "label": "LS"
+            },
+            {
+              "id": "chevrolet-equinox-lt",
+              "label": "LT"
+            },
+            {
+              "id": "chevrolet-equinox-rs",
+              "label": "RS"
+            },
+            {
+              "id": "chevrolet-equinox-activ",
+              "label": "Activ"
+            }
+          ]
+        },
+        {
+          "id": "chevrolet-malibu",
+          "label": "Malibu",
+          "trims": [
+            {
+              "id": "chevrolet-malibu-ls",
+              "label": "LS"
+            },
+            {
+              "id": "chevrolet-malibu-rs",
+              "label": "RS"
+            },
+            {
+              "id": "chevrolet-malibu-lt",
+              "label": "LT"
+            }
+          ]
+        },
+        {
+          "id": "chevrolet-tahoe",
+          "label": "Tahoe",
+          "trims": [
+            {
+              "id": "chevrolet-tahoe-ls",
+              "label": "LS"
+            },
+            {
+              "id": "chevrolet-tahoe-lt",
+              "label": "LT"
+            },
+            {
+              "id": "chevrolet-tahoe-rst",
+              "label": "RST"
+            },
+            {
+              "id": "chevrolet-tahoe-z71",
+              "label": "Z71"
+            },
+            {
+              "id": "chevrolet-tahoe-premier",
+              "label": "Premier"
+            },
+            {
+              "id": "chevrolet-tahoe-high-country",
+              "label": "High Country"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hyundai",
+      "label": "Hyundai",
+      "models": [
+        {
+          "id": "hyundai-elantra",
+          "label": "Elantra",
+          "trims": [
+            {
+              "id": "hyundai-elantra-se",
+              "label": "SE"
+            },
+            {
+              "id": "hyundai-elantra-sel",
+              "label": "SEL"
+            },
+            {
+              "id": "hyundai-elantra-n-line",
+              "label": "N Line"
+            },
+            {
+              "id": "hyundai-elantra-limited",
+              "label": "Limited"
+            }
+          ]
+        },
+        {
+          "id": "hyundai-tucson",
+          "label": "Tucson",
+          "trims": [
+            {
+              "id": "hyundai-tucson-se",
+              "label": "SE"
+            },
+            {
+              "id": "hyundai-tucson-sel",
+              "label": "SEL"
+            },
+            {
+              "id": "hyundai-tucson-xrt",
+              "label": "XRT"
+            },
+            {
+              "id": "hyundai-tucson-n-line",
+              "label": "N Line"
+            },
+            {
+              "id": "hyundai-tucson-limited",
+              "label": "Limited"
+            }
+          ]
+        },
+        {
+          "id": "hyundai-santa-fe",
+          "label": "Santa Fe",
+          "trims": [
+            {
+              "id": "hyundai-santa-fe-se",
+              "label": "SE"
+            },
+            {
+              "id": "hyundai-santa-fe-sel",
+              "label": "SEL"
+            },
+            {
+              "id": "hyundai-santa-fe-xrt",
+              "label": "XRT"
+            },
+            {
+              "id": "hyundai-santa-fe-limited",
+              "label": "Limited"
+            },
+            {
+              "id": "hyundai-santa-fe-calligraphy",
+              "label": "Calligraphy"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kia",
+      "label": "Kia",
+      "models": [
+        {
+          "id": "kia-forte",
+          "label": "Forte",
+          "trims": [
+            {
+              "id": "kia-forte-lx",
+              "label": "LX"
+            },
+            {
+              "id": "kia-forte-lxs",
+              "label": "LXS"
+            },
+            {
+              "id": "kia-forte-gt-line",
+              "label": "GT-Line"
+            },
+            {
+              "id": "kia-forte-gt",
+              "label": "GT"
+            }
+          ]
+        },
+        {
+          "id": "kia-sportage",
+          "label": "Sportage",
+          "trims": [
+            {
+              "id": "kia-sportage-lx",
+              "label": "LX"
+            },
+            {
+              "id": "kia-sportage-ex",
+              "label": "EX"
+            },
+            {
+              "id": "kia-sportage-x-line",
+              "label": "X-Line"
+            },
+            {
+              "id": "kia-sportage-sx",
+              "label": "SX"
+            },
+            {
+              "id": "kia-sportage-x-pro",
+              "label": "X-Pro"
+            }
+          ]
+        },
+        {
+          "id": "kia-telluride",
+          "label": "Telluride",
+          "trims": [
+            {
+              "id": "kia-telluride-lx",
+              "label": "LX"
+            },
+            {
+              "id": "kia-telluride-s",
+              "label": "S"
+            },
+            {
+              "id": "kia-telluride-ex",
+              "label": "EX"
+            },
+            {
+              "id": "kia-telluride-sx",
+              "label": "SX"
+            },
+            {
+              "id": "kia-telluride-x-pro",
+              "label": "X-Pro"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nissan",
+      "label": "Nissan",
+      "models": [
+        {
+          "id": "nissan-altima",
+          "label": "Altima",
+          "trims": [
+            {
+              "id": "nissan-altima-s",
+              "label": "S"
+            },
+            {
+              "id": "nissan-altima-sv",
+              "label": "SV"
+            },
+            {
+              "id": "nissan-altima-sr",
+              "label": "SR"
+            },
+            {
+              "id": "nissan-altima-sl",
+              "label": "SL"
+            }
+          ]
+        },
+        {
+          "id": "nissan-rogue",
+          "label": "Rogue",
+          "trims": [
+            {
+              "id": "nissan-rogue-s",
+              "label": "S"
+            },
+            {
+              "id": "nissan-rogue-sv",
+              "label": "SV"
+            },
+            {
+              "id": "nissan-rogue-sl",
+              "label": "SL"
+            },
+            {
+              "id": "nissan-rogue-platinum",
+              "label": "Platinum"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subaru",
+      "label": "Subaru",
+      "models": [
+        {
+          "id": "subaru-outback",
+          "label": "Outback",
+          "trims": [
+            {
+              "id": "subaru-outback-base",
+              "label": "Base"
+            },
+            {
+              "id": "subaru-outback-premium",
+              "label": "Premium"
+            },
+            {
+              "id": "subaru-outback-limited",
+              "label": "Limited"
+            },
+            {
+              "id": "subaru-outback-touring",
+              "label": "Touring"
+            },
+            {
+              "id": "subaru-outback-onyx-edition",
+              "label": "Onyx Edition"
+            },
+            {
+              "id": "subaru-outback-wilderness",
+              "label": "Wilderness"
+            }
+          ]
+        },
+        {
+          "id": "subaru-forester",
+          "label": "Forester",
+          "trims": [
+            {
+              "id": "subaru-forester-base",
+              "label": "Base"
+            },
+            {
+              "id": "subaru-forester-premium",
+              "label": "Premium"
+            },
+            {
+              "id": "subaru-forester-sport",
+              "label": "Sport"
+            },
+            {
+              "id": "subaru-forester-limited",
+              "label": "Limited"
+            },
+            {
+              "id": "subaru-forester-touring",
+              "label": "Touring"
+            }
+          ]
+        },
+        {
+          "id": "subaru-crosstrek",
+          "label": "Crosstrek",
+          "trims": [
+            {
+              "id": "subaru-crosstrek-base",
+              "label": "Base"
+            },
+            {
+              "id": "subaru-crosstrek-premium",
+              "label": "Premium"
+            },
+            {
+              "id": "subaru-crosstrek-sport",
+              "label": "Sport"
+            },
+            {
+              "id": "subaru-crosstrek-limited",
+              "label": "Limited"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mazda",
+      "label": "Mazda",
+      "models": [
+        {
+          "id": "mazda-cx-5",
+          "label": "CX-5",
+          "trims": [
+            {
+              "id": "mazda-cx-5-s",
+              "label": "S"
+            },
+            {
+              "id": "mazda-cx-5-select",
+              "label": "Select"
+            },
+            {
+              "id": "mazda-cx-5-preferred",
+              "label": "Preferred"
+            },
+            {
+              "id": "mazda-cx-5-carbon-edition",
+              "label": "Carbon Edition"
+            },
+            {
+              "id": "mazda-cx-5-premium",
+              "label": "Premium"
+            },
+            {
+              "id": "mazda-cx-5-turbo",
+              "label": "Turbo"
+            }
+          ]
+        },
+        {
+          "id": "mazda-mazda3",
+          "label": "Mazda3",
+          "trims": [
+            {
+              "id": "mazda-mazda3-s",
+              "label": "S"
+            },
+            {
+              "id": "mazda-mazda3-select",
+              "label": "Select"
+            },
+            {
+              "id": "mazda-mazda3-preferred",
+              "label": "Preferred"
+            },
+            {
+              "id": "mazda-mazda3-premium",
+              "label": "Premium"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tesla",
+      "label": "Tesla",
+      "models": [
+        {
+          "id": "tesla-model-3",
+          "label": "Model 3",
+          "trims": [
+            {
+              "id": "tesla-model-3-standard-range-plus",
+              "label": "Standard Range Plus"
+            },
+            {
+              "id": "tesla-model-3-long-range",
+              "label": "Long Range"
+            },
+            {
+              "id": "tesla-model-3-performance",
+              "label": "Performance"
+            }
+          ]
+        },
+        {
+          "id": "tesla-model-y",
+          "label": "Model Y",
+          "trims": [
+            {
+              "id": "tesla-model-y-long-range",
+              "label": "Long Range"
+            },
+            {
+              "id": "tesla-model-y-performance",
+              "label": "Performance"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "features": [
+    {
+      "id": "all-wheel-drive",
+      "label": "All-wheel drive"
+    },
+    {
+      "id": "third-row-seating",
+      "label": "Third-row seating"
+    },
+    {
+      "id": "apple-carplay",
+      "label": "Apple CarPlay"
+    },
+    {
+      "id": "android-auto",
+      "label": "Android Auto"
+    },
+    {
+      "id": "adaptive-cruise-control",
+      "label": "Adaptive cruise control"
+    },
+    {
+      "id": "blind-spot-monitoring",
+      "label": "Blind-spot monitoring"
+    },
+    {
+      "id": "backup-camera",
+      "label": "Backup camera"
+    },
+    {
+      "id": "heated-seats",
+      "label": "Heated seats"
+    },
+    {
+      "id": "ventilated-seats",
+      "label": "Ventilated seats"
+    },
+    {
+      "id": "leather-seats",
+      "label": "Leather seats"
+    },
+    {
+      "id": "sunroof-or-moonroof",
+      "label": "Sunroof or moonroof"
+    },
+    {
+      "id": "navigation",
+      "label": "Navigation"
+    },
+    {
+      "id": "remote-start",
+      "label": "Remote start"
+    },
+    {
+      "id": "tow-package",
+      "label": "Tow package"
+    },
+    {
+      "id": "hybrid-powertrain",
+      "label": "Hybrid powertrain"
+    },
+    {
+      "id": "electric-powertrain",
+      "label": "Electric powertrain"
+    }
+  ]
+}
