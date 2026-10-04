@@ -20,8 +20,9 @@ public class ContributionService {
   private static final String COLUMNS = "cohort_day, qualified, verified, completed, paid, refunded, development, revenue_minor, refund_minor, currency, known_cost_usd, unknown_calls, support_minutes";
   private final EntityManager manager;
   private final ContributionPricing pricing;
-  public ContributionService(EntityManager manager, ContributionPricing pricing) {
-    this.manager = manager; this.pricing = pricing;
+  private final ContributionReviewStore reviews;
+  public ContributionService(EntityManager manager, ContributionPricing pricing, ContributionReviewStore reviews) {
+    this.manager = manager; this.pricing = pricing; this.reviews = reviews;
   }
   public record SupportEntry(@NotNull UUID entryId, @Min(1) @Max(1440) int minutes) {}
 
@@ -68,9 +69,10 @@ public class ContributionService {
     }
   }
 
-  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+  @Transactional(isolation = Isolation.REPEATABLE_READ)
   public Map<String, Object> snapshot(LocalDate from, LocalDate to) {
     if (!from.isBefore(to)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+    reviews.lock();
     var rows = manager.createNativeQuery("select " + COLUMNS + ", 1 from case_contribution_facts where cohort_day >= :from and cohort_day < :to"
         + " union all select " + COLUMNS + ", case_count from contribution_totals where cohort_day >= :from and cohort_day < :to")
         .setParameter("from", from).setParameter("to", to).getResultList();
@@ -149,6 +151,7 @@ public class ContributionService {
     summary.put("meanUsd", margins.isEmpty() ? null : sum.divide(BigDecimal.valueOf(measurableCases), 8, RoundingMode.HALF_UP));
     summary.put("medianUsd", margins.isEmpty() ? null : atRank(margins, (measurableCases-1)/2).add(atRank(margins, measurableCases/2)).divide(BigDecimal.valueOf(2)));
     result.put("contributionMargin", summary);
+    reviews.open(from, to, result);
     return result;
   }
   private static long count(Object value) { return ((Number) value).longValue(); }
