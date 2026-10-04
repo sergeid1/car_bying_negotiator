@@ -1608,3 +1608,28 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
 .reference-add input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
 .reference-add .field-error { margin-top: -4px; }
 /* End ticket 52. */
+
+/* Ticket 55: Candidate Vehicles with explained reasons. */
+.candidate-vehicles { display: grid; gap: 12px; margin-top: 8px; }
+.candidate-vehicles > button { justify-self: start; }
+.candidate-results { display: grid; gap: 12px; min-width: 0; }
+.candidate-results h4:focus { outline: none; }
+.candidate-results h4:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.candidate-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.candidate { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card); min-width: 0; }
+.candidate h5 { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+.candidate .vin { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+.candidate-snapshot { margin: 0; overflow-wrap: anywhere; }
+.candidate-stale { display: block; justify-self: start; margin: 0; white-space: normal; border-radius: 12px; }
+.candidate-reasons h6 { margin: 0 0 4px; font-size: 0.9rem; }
+.candidate-reasons ul, .candidate-excluded ul { margin: 0; padding-left: 1.2rem; }
+.candidate-reasons li, .candidate-excluded li { overflow-wrap: anywhere; }
+.candidate-excluded summary { cursor: pointer; }
+/* End ticket 55. */
+
+/* Ticket 63: written quote acceptance and dealership summary controls. */
+.agreed-price-panel, .agreed-price-panel .card { min-width: 0; overflow-wrap: anywhere; }
+.agreed-price-panel select { width: 100%; min-width: 0; max-width: 100%; }
+.agreed-price-panel button { max-width: 100%; white-space: normal; }
+/* End ticket 63. */

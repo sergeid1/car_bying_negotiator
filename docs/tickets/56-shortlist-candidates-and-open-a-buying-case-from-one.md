@@ -4,7 +4,7 @@
 
 **Blocked by:** 55 — Match candidates with explained reasons and Buyer-only ordering; 09 — Produce a transparent Market Assessment.
 
-**Status:** blocked on 55 — filed on 2026-10-03 from specification 2.0.
+**Status:** ready-for-agent (55 and 09 complete) — filed on 2026-10-03 from specification 2.0. Linking cases to journeys must also supply a linked `JourneyAgreement` adapter so ticket 63's journey `AGREED` transition and pause/stop of other negotiations take effect.
 
 - [ ] Each candidate shows a market check from the existing Market Assessment module, labelled as an advertised price, not a quote, with its confidence and freshness.
 - [ ] The shortlist persists per journey; adding, removing, and reordering are immediate and survive reload.

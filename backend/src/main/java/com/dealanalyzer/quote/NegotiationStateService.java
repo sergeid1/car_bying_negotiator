@@ -22,6 +22,7 @@ public class NegotiationStateService {
     locks.lock(caseId);
     var rows = jdbc.query("select mandate_id, state from case_negotiation_states where case_id = ?",
         (r, n) -> new String[] {r.getString(1), r.getString(2)}, caseId);
+    if (!rows.isEmpty() && State.AGREED.name().equals(rows.getFirst()[1])) return State.AGREED;
     var active = mandates.activeMandate(caseId);
     if (active.isEmpty()) {
       var latest = jdbc.query("select id, expires_at from negotiation_mandates where case_id = ? order by version desc limit 1",

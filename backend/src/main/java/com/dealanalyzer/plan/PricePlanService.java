@@ -77,13 +77,7 @@ public class PricePlanService {
     String fingerprint = offers.fingerprint(request);
     var existing = existing(caseId, "BASELINE", key, fingerprint);
     if (existing.isPresent()) return existing.get();
-    requireReady(caseId, token);
-    Snapshot proposal = version(caseId, "PLAN", request.planVersion());
-    if (!proposal.payload().at("/dealerOffer/id").asText()
-        .equals(offers.latestOffer(caseId).orElseThrow().id())
-        || !json.convertValue(proposal.payload().get("vehicleEvidence"), VehicleEvidenceService.VehicleEvidenceView.class)
-            .equals(vehicles.get(caseId, token)))
-      throw new IllegalArgumentException("Deal evidence changed; review a new price plan before approving");
+    Snapshot proposal = reviewApproval(caseId, token, request.planVersion());
     var payload = proposal.payload().deepCopy();
     ((com.fasterxml.jackson.databind.node.ObjectNode) payload).put("approvedPlanId", proposal.id());
     Snapshot baseline = append(caseId, "BASELINE", key, fingerprint, payload);
@@ -91,6 +85,21 @@ public class PricePlanService {
         "BASELINE_APPROVED", "APPROVED_BASELINE", baseline.id(), baseline.version(), key,
         write(Map.of("planId", proposal.id(), "policyVersion", PriceBoundaryPolicy.VERSION)), baseline.createdAt()));
     return baseline;
+  }
+
+  /** Side-effect-free preflight for a gated send; approval itself still uses the one existing path. */
+  @Transactional
+  public Snapshot reviewApproval(String caseId, String token, int planVersion) {
+    locks.lock(caseId);
+    cases.reopen(caseId, token);
+    requireReady(caseId, token);
+    Snapshot proposal = version(caseId, "PLAN", planVersion);
+    if (!proposal.payload().at("/dealerOffer/id").asText()
+        .equals(offers.latestOffer(caseId).orElseThrow().id())
+        || !json.convertValue(proposal.payload().get("vehicleEvidence"), VehicleEvidenceService.VehicleEvidenceView.class)
+            .equals(vehicles.get(caseId, token)))
+      throw new IllegalArgumentException("Deal evidence changed; review a new price plan before approving");
+    return proposal;
   }
 
   public Snapshot get(String caseId, String token, String kind, Integer version) {
