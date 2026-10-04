@@ -15,6 +15,13 @@ const states: Record<string, string> = {
   AWAITING_BUYER: "The dealer replied. Review and verify the quote before analysis.",
   AGREED: "You accepted the quote.", STOPPED: "Negotiation has stopped.", EXPIRED: "Your mandate expired. No more requests can be sent.",
 };
+// Anything other than the documented shape is treated as unavailable rather than rendered.
+function asView(value: unknown): View {
+  const v = value as Partial<View> | null;
+  if (!v || typeof v.negotiationState !== "string" || !Array.isArray(v.requests)
+    || !Array.isArray(v.documents) || !Array.isArray(v.dealers)) throw new Error("Quote requests are unavailable. Try refreshing.");
+  return v as View;
+}
 export function QuoteRequest({ caseId, token }: {
   caseId: string; token: string;
 }) {
@@ -37,12 +44,12 @@ export function QuoteRequest({ caseId, token }: {
     return response.json();
   }
   async function refresh() {
-    setView(await request(path) as View); setRelayVersion(v => v + 1);
+    setView(asView(await request(path))); setRelayVersion(v => v + 1);
   }
   useEffect(() => {
     let current = true;
     setView(undefined); setReview(false); setOfferVersion(undefined); setError(undefined);
-    request(path).then(value => { if (current) setView(value as View); })
+    request(path).then(value => { if (current) setView(asView(value)); })
       .catch(() => { if (current) setError("Quote requests are unavailable. Try refreshing."); });
     return () => { current = false; };
     // The case and its token define this request session.

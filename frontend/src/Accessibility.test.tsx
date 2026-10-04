@@ -7,6 +7,7 @@ import { CaseLifecycle } from "./CaseLifecycle";
 import { PricePlan } from "./PricePlan";
 import { NegotiationMandate } from "./NegotiationMandate";
 import { DealerRelay } from "./DealerRelay";
+import { QuoteRequest } from "./QuoteRequest";
 import { CaseDownloads, RecoveryEmailOptIn, SaveCaseLink } from "./CasePortability";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
@@ -328,5 +329,21 @@ test("the dealer email relay with its address, a dealer opt-out, messages and at
   const { container } = render(<main><h1>Buying Case</h1><DealerRelay caseId="case" token="token" /></main>);
   await user.click(await screen.findByRole("button", { name: /Show message from desk@dealer.example/ }));
   await screen.findByText("Quote attached.");
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+test("the quote request with a gated draft, a sent request and dealer quote sources has no automated AA violations", async () => {
+  const decision = { pass: true, gateVersion: "outbound-gate.v2", reasons: [] };
+  const draft = (id: string, state: string) => ({ id, dealerAddress: "sales@dealer.example", state, messageId: null, approvedAt: null,
+    gatedDraft: { draft: { text: "Could you provide an itemized out-the-door quote for VIN 1HGCM82633A004352?" }, decision } });
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/relay")
+    ? { address: "cabcdefghijklmnopqrstuvwxyz234567@relay.invalid", dealerOptedOut: false, perCaseDailyCap: 10, sentLastDay: 1, messages: [] }
+    : { negotiationState: "AWAITING_BUYER", dealers: [{ id: "d1", name: "Triangle Motors" }],
+      requests: [draft("q1", "SENT"), draft("q2", "DRAFT")],
+      documents: [{ documentId: "doc1", outcome: "ACCEPTED", offerVersion: null, sourceKind: "MESSAGE_BODY", messageId: "m2" },
+        { documentId: null, outcome: "MALWARE_DETECTED", offerVersion: null, sourceKind: "ATTACHMENT", messageId: "m2" }] }))));
+  const { container } = render(<main><h1>Buying Case</h1><QuoteRequest caseId="case" token="token" /></main>);
+  await screen.findByRole("button", { name: "Approve this text and send" });
+  await screen.findByText(/cabcdefghijklmnopqrstuvwxyz234567@relay.invalid/);
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
