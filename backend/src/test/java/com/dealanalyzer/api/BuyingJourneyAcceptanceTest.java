@@ -132,12 +132,31 @@ class BuyingJourneyAcceptanceTest {
           Map.of("basedOnVersion", 2, "brief", brief()), other, null).status()).isEqualTo(404);
       assertThat(exchange(client, "DELETE", "/api/v1/journeys/" + id, null, other, null).status()).isEqualTo(404);
 
+      var search = app.context().getBean(com.dealanalyzer.shopping.inventory.InventorySearchService.class);
+      String accountId = app.context().getBean(com.dealanalyzer.account.AccountJourneyAccess.class).accountId(session);
+      String otherAccount = app.context().getBean(com.dealanalyzer.account.AccountJourneyAccess.class).accountId(other);
+      assertThatThrownBy(() -> search.search(otherAccount, id))
+          .hasMessage("That Buying Journey does not exist in this account. It may have been deleted.");
+      var inventory = search.search(accountId, id);
+      assertThat(inventory.listings()).hasSize(5);
+      assertThat(inventory.notice()).contains("Synthetic");
+      String usageId = jdbc.queryForObject("select id from provider_usage where journey_id = ?", String.class, id);
+
       var deleted = exchange(client, "DELETE", "/api/v1/journeys/" + id, null, session, null);
       assertThat(deleted.status()).isEqualTo(200);
       assertThat(deleted.body().path("state").asText()).isEqualTo("DELETED");
       assertThat(exchange(client, "GET", "/api/v1/journeys/" + id, null, session, null).status()).isEqualTo(404);
       assertThat(exchange(client, "DELETE", "/api/v1/journeys/" + id, null, session, null).status()).isEqualTo(404);
       assertThat(jdbc.queryForObject("select count(*) from shopping_brief_versions where journey_id = ?", Long.class, id)).isZero();
+      assertThat(jdbc.queryForObject("select count(*) from provider_usage where journey_id = ?", Long.class, id)).isZero();
+      // A late response only updates an existing run; deletion cannot be undone by it.
+      var usage = app.context().getBean(com.dealanalyzer.operations.ProviderUsageStore.class);
+      usage.inventoryResult(usageId, inventory); usage.inventoryLatency(usageId, 200);
+      assertThat(jdbc.queryForObject("select count(*) from provider_usage where id = ?", Long.class, usageId)).isZero();
+      assertThatThrownBy(() -> search.search(accountId, id))
+          .hasMessage("That Buying Journey does not exist in this account. It may have been deleted.");
+      assertThatThrownBy(() -> usage.startInventory(accountId, id, inventory.provider(), "{}"))
+          .isInstanceOf(com.dealanalyzer.buyingcase.ResourceNotFoundException.class);
       assertThat(exchange(client, "GET", "/api/v1/journeys", null, session, null).body().findValuesAsText("id"))
           .containsExactly(second);
     }
@@ -232,7 +251,29 @@ class BuyingJourneyAcceptanceTest {
       var edited = brief(); edited.put("radiusMiles", 100);
       exchange(client, "POST", "/api/v1/journeys/" + id + "/briefs", Map.of("basedOnVersion", 1, "brief", edited), session, null);
       String other = signIn(client, "other@example.com");
-      exchange(client, "POST", "/api/v1/journeys", brief(), other, "other");
+      String otherId = exchange(client, "POST", "/api/v1/journeys", brief(), other, "other").body().path("id").asText();
+      var search = app.context().getBean(com.dealanalyzer.shopping.inventory.InventorySearchService.class);
+      var access = app.context().getBean(com.dealanalyzer.account.AccountJourneyAccess.class);
+      String accountId = access.accountId(session);
+      search.search(accountId, id); search.search(access.accountId(other), otherId);
+      var jdbc = new JdbcTemplate(app.context().getBean(javax.sql.DataSource.class));
+      var run = jdbc.queryForMap("select * from provider_usage where journey_id = ?", id);
+      assertThat(run.get("CASE_ID")).isNull();
+      assertThat(run.get("ACCOUNT_ID")).isEqualTo(accountId);
+      assertThat(run.get("OPERATION")).isEqualTo("INVENTORY_SEARCH");
+      assertThat(run.get("PROVIDER")).isEqualTo("SYNTHETIC_INVENTORY");
+      assertThat(run.get("LICENSE")).isEqualTo("SYNTHETIC_DISPLAY_AND_CACHE_PERMITTED");
+      assertThat(run.get("RESULT_COUNT")).isEqualTo(5);
+      assertThat(run.get("RETRIEVED_AT")).isNotNull();
+      assertThat(((Number) run.get("LATENCY_MILLIS")).longValue()).isNotNegative();
+      assertThat(((java.math.BigDecimal) run.get("COST_USD"))).isZero();
+      assertThat(run.get("STATUS")).isEqualTo("SUCCESS");
+      assertThat(run.get("INVENTORY_AVAILABILITY")).isEqualTo("AVAILABLE");
+      String query = jdbc.queryForObject("select query_json from provider_usage where journey_id = ?", String.class, id);
+      assertThat(JSON.readTree(query).at("/criteria/postalCode").asText()).isEqualTo("27601");
+      assertThat(JSON.readTree(query).at("/criteria/briefVersion").asInt()).isEqualTo(2);
+      assertThat(JSON.readTree(query).path("radiusMiles").asInt()).isEqualTo(100);
+      assertThat(query).doesNotContain(accountId, id, "buyer@example.com");
 
       byte[] archive = client.post().uri("/api/v1/account/export").header(SESSION, session).retrieve().body(byte[].class);
       JsonNode account = null;
@@ -244,14 +285,23 @@ class BuyingJourneyAcceptanceTest {
       assertThat(account.path("buyingJourneys")).hasSize(1);
       assertThat(account.at("/buyingJourneys/0/journeyId").asText()).isEqualTo(id);
       assertThat(account.at("/buyingJourneys/0/shoppingBriefVersions").findValuesAsText("radiusMiles")).containsExactly("50", "100");
+      assertThat(account.path("inventorySearchRuns")).hasSize(1);
+      assertThat(account.at("/inventorySearchRuns/0/journeyId").asText()).isEqualTo(id);
+      assertThat(account.at("/inventorySearchRuns/0/query").asText()).contains("27601");
+      assertThat(account.at("/inventorySearchRuns/0/resultCount").asInt()).isEqualTo(5);
 
       assertThat(exchange(client, "POST", "/api/v1/account/deletion", Map.of(), session, null).status()).isEqualTo(202);
       // Access ends at once.
       assertThat(exchange(client, "GET", "/api/v1/journeys", null, session, null).status()).isEqualTo(401);
+      var usage = app.context().getBean(com.dealanalyzer.operations.ProviderUsageStore.class);
+      assertThatThrownBy(() -> usage.startInventory(accountId, id,
+          new com.dealanalyzer.shopping.inventory.DeterministicFakeInventorySearchAdapter().provider(), query))
+          .isInstanceOf(com.dealanalyzer.buyingcase.ResourceNotFoundException.class);
       app.context().getBean(AccountDeletionWorker.class).runOnce();
-      var jdbc = new JdbcTemplate(app.context().getBean(javax.sql.DataSource.class));
       assertThat(jdbc.queryForObject("select count(*) from buying_journeys where id = ?", Long.class, id)).isZero();
       assertThat(jdbc.queryForObject("select count(*) from shopping_brief_versions where journey_id = ?", Long.class, id)).isZero();
+      assertThat(jdbc.queryForObject("select count(*) from provider_usage where journey_id = ?", Long.class, id)).isZero();
+      assertThat(jdbc.queryForObject("select count(*) from provider_usage where journey_id = ?", Long.class, otherId)).isEqualTo(1);
       var receipt = exchange(client, "GET", "/api/v1/account/deletion", null, session, null).body();
       assertThat(receipt.path("state").asText()).isEqualTo("DELETED");
       // The other Buyer's journey is untouched.

@@ -1,8 +1,12 @@
 package com.dealanalyzer.operations;
 
 import com.dealanalyzer.ai.ModelProvenance;
+import com.dealanalyzer.shopping.inventory.InventoryResults;
+import com.dealanalyzer.shopping.inventory.InventorySearchAdapter;
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -12,12 +16,16 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class ProviderMeter {
-  public enum Operation { EXTRACTION, MARKET_RETRIEVAL, LISTING_RETRIEVAL, SYNTHETIC_MARKET, REPLY_DRAFT, EXPLANATION }
+  public enum Operation { EXTRACTION, MARKET_RETRIEVAL, LISTING_RETRIEVAL, SYNTHETIC_MARKET, REPLY_DRAFT, EXPLANATION, INVENTORY_SEARCH }
   public enum Status { SUCCESS, PROVIDER_UNAVAILABLE, PROVIDER_FAILURE, CONTRACT_FAILURE, BUYER_INPUT, INTERNAL }
   /** A safe boundary error: provider text and exception causes must never escape into diagnostics. */
   public static final class Failure extends RuntimeException {
     private final Status status;
-    public Failure(Status status) { super("Provider operation failed"); this.status = status; }
+    private final boolean timedOut;
+    public Failure(Status status) { this(status, false); }
+    private Failure(Status status, boolean timedOut) {
+      super("Provider operation failed"); this.status = status; this.timedOut = timedOut;
+    }
     public Status status() { return status; }
   }
   private final ProviderUsageStore store;
@@ -64,6 +72,31 @@ public class ProviderMeter {
     return run(store.start(caseId, operation, provider, units), invocation, classify, null);
   }
 
+  /** Journey-scoped search uses the same concurrency bound and timeout as case-scoped calls. */
+  public InventorySearchAdapter.SearchResult callInventory(
+      String accountId, String journeyId, InventorySearchAdapter.Provider provider,
+      String query, Supplier<InventorySearchAdapter.SearchResult> invocation) {
+    String id = store.startInventory(accountId, journeyId, provider, query);
+    long started = System.nanoTime();
+    try {
+      return run(id, invocation, result -> {
+        if (!InventoryResults.valid(result, provider))
+          throw new IllegalArgumentException("Invalid inventory contract");
+        store.inventoryResult(id, result);
+        return result.availability() == InventorySearchAdapter.Availability.AVAILABLE
+            ? Status.SUCCESS : Status.PROVIDER_UNAVAILABLE;
+      }, null);
+    } catch (Failure failure) {
+      var unavailable = new InventorySearchAdapter.SearchResult(
+          failure.timedOut ? InventorySearchAdapter.Availability.TIMED_OUT : InventorySearchAdapter.Availability.UNAVAILABLE,
+          provider, Instant.now(), List.of(), null);
+      store.inventoryResult(id, unavailable);
+      return unavailable;
+    } finally {
+      store.inventoryLatency(id, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+    }
+  }
+
   /**
    * A model call under the same timeout, concurrency bound and status taxonomy as any provider,
    * additionally recording the output's provenance and the reported tokens and cost. Usage is read
@@ -100,8 +133,11 @@ public class ProviderMeter {
       }
       pending = task;
       result = pending.get(timeout.toNanos(), TimeUnit.NANOSECONDS);
-    } catch (TimeoutException | RejectedExecutionException unavailable) {
+    } catch (TimeoutException unavailable) {
       if (pending != null) pending.cancel(true);
+      store.finish(id, Status.PROVIDER_UNAVAILABLE);
+      throw new Failure(Status.PROVIDER_UNAVAILABLE, true);
+    } catch (RejectedExecutionException unavailable) {
       store.finish(id, Status.PROVIDER_UNAVAILABLE);
       throw new Failure(Status.PROVIDER_UNAVAILABLE);
     } catch (InterruptedException interrupted) {

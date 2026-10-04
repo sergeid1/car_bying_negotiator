@@ -254,7 +254,7 @@ public class JourneyService {
   }
 
   /**
-   * Deletes a journey, every brief version and every Reference Vehicle under it, then verifies they are gone, as account
+   * Deletes a journey, every brief version, Reference Vehicle and inventory search record under it, then verifies they are gone, as account
    * deletion does for the account graph. Access ends with the transaction; nothing is kept.
    */
   @Transactional
@@ -264,7 +264,7 @@ public class JourneyService {
     var journey = journeys.findLockedByIdAndAccountId(journeyId, accountId).orElseThrow(JourneyProblem::notFound);
     String id = journey.id;
     manager.flush(); manager.detach(journey);
-    for (String table : List.of("reference_vehicles", "shopping_brief_versions", "buying_journeys")) {
+    for (String table : List.of("reference_vehicles", "provider_usage", "shopping_brief_versions", "buying_journeys")) {
       String column = table.equals("buying_journeys") ? "id" : "journey_id";
       manager.createNativeQuery("delete from " + table + " where " + column + " = :id").setParameter("id", id).executeUpdate();
       long remaining = ((Number) manager.createNativeQuery("select count(*) from " + table + " where " + column + " = :id")
