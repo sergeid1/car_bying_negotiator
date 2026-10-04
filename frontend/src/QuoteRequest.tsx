@@ -5,6 +5,7 @@ import { OfferVerification } from "./OfferVerification";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { AgreedPrice } from "./AgreedPrice";
 import { NegotiationConversation } from "./NegotiationConversation";
+import { TestDriveAppointment } from "./TestDriveAppointment";
 
 type Quote = { id: string; dealerAddress: string; state: string;
   gatedDraft: { draft: { text: string }; decision: GateDecision } };
@@ -118,6 +119,7 @@ export function QuoteRequest({ caseId, token }: {
       </>}
     </div>
     {view && <AgreedPrice caseId={caseId} token={token} quotes={view.requests} sources={view.documents} onChanged={refresh} />}
+    {view && <TestDriveAppointment caseId={caseId} token={token} version={relayVersion} />}
     {view && <NegotiationConversation caseId={caseId} token={token} version={relayVersion} />}
     <DealerRelay key={relayVersion} caseId={caseId} token={token} />
     {review && <OfferVerification caseId={caseId} token={token} onOfferFrozen={offer => {
