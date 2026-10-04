@@ -1571,3 +1571,8 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
 }
 .mandate-terms ul, .mandate-history { margin: 6px 0 0; padding-left: 1.2rem; }
 .mandate-panel dd { overflow-wrap: anywhere; }
+.relay-panel dd, .relay-messages p { overflow-wrap: anywhere; }
+.relay-messages { margin: 12px 0 0; padding-left: 1.2rem; }
+.relay-messages > li + li { margin-top: 12px; }
+.relay-untrusted { color: var(--ink-muted); }
+.relay-content pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }

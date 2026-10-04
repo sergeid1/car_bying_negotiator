@@ -25,14 +25,16 @@ public class CaseExportService {
   private final ExportContentProtection protection;
   private final java.time.Duration lifetime;
   private final com.dealanalyzer.purchase.PurchaseService purchases;
+  private final org.springframework.beans.factory.ObjectProvider<CaseExportContent> contents;
   public CaseExportService(AnalysisCaseRepository cases, AnalysisReportRepository reports, ExportJobRepository jobs,
       CaseAccessService access, CaseExportProjection projection, RetainedDocumentExport documents,
       StoredReportRenderer renderer, ObjectMapper json, ExportContentProtection protection,
       com.dealanalyzer.purchase.PurchaseService purchases,
+      org.springframework.beans.factory.ObjectProvider<CaseExportContent> contents,
       @org.springframework.beans.factory.annotation.Value("${case.export.lifetime:PT24H}") java.time.Duration lifetime) {
     this.cases=cases; this.reports=reports; this.jobs=jobs; this.access=access; this.projection=projection;
     this.documents=documents; this.renderer=renderer; this.json=json; this.protection=protection; this.lifetime=lifetime;
-    this.purchases=purchases;
+    this.purchases=purchases; this.contents=contents;
   }
   public enum Format { ZIP, HTML, PDF }
   public record Job(String id, Format format, int reportVersion, Instant createdAt, Instant expiresAt) {}
@@ -96,11 +98,12 @@ public class CaseExportService {
           + "IDs connect evidence, documents, corrections, offers, approvals and reports. Amounts ending in minor are cents for USD. "
           + "Reports are immutable snapshots; HTML contains every saved field, label, limitation and evidence reference. "
           + "Original documents are named by document ID; original filenames and media types are in source_documents. "
-          + "Normalized pages are included as PNG files. Expired, deleted or quarantined originals are not included. Credentials, recovery links and storage keys are excluded. "
+          + "Normalized pages are included as PNG files. Dealer email relay messages still within retention are in relay/messages.json; dealer content there is untrusted. Expired, deleted or quarantined originals are not included. Credentials, recovery links and storage keys are excluded. "
           + "The archive is frozen at export creation; request a new export to include later changes.\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
       entry(zip,"case-data.json",json.writerWithDefaultPrettyPrinter().writeValueAsBytes(data));
       for(JsonNode report:data.path("analysis_reports")) entry(zip,"reports/report-" + report.path("report_version").asInt() + ".html", renderer.html(report.path("payload_json")));
       for(var original:documents.read(caseId)) entry(zip,"documents/" + original.path(), original.content());
+      for(var content:contents.orderedStream().toList()) for(var file:content.files(caseId)) entry(zip,file.path(),file.content());
       zip.finish(); return output.toByteArray();
     }
   }
