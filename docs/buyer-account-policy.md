@@ -116,3 +116,15 @@ states, or `JURISDICTION_NOT_SUPPORTED`) and nothing is stored.
 count-verifies their absence. A journey has no Buying Cases yet (ticket 56 links them). Account
 export lists every journey with every brief version under `buyingJourneys`, and account deletion
 removes both journey tables with the account graph.
+
+Reference Vehicles (ticket 52) are VINs the Buyer adds to a brief, at most five per version.
+`POST /api/v1/journeys/{id}/reference-vehicles` with `{basedOnVersion, vin}` checksum-validates the VIN
+before any decoder call (400 `VIN_INVALID`, never echoing the VIN), decodes it, and inserts the next
+brief version with the vehicle; a VIN the brief already holds returns the journey unchanged. An
+unavailable decoder is 503 `VIN_DECODER_UNAVAILABLE` and saves nothing; an undecodable VIN is kept
+with no attributes. `PUT .../reference-vehicles/{referenceId}/relevance` records which decoded
+attributes matter, and `DELETE .../reference-vehicles/{referenceId}?basedOnVersion=` removes one; both
+insert the next brief version. A brief edit carries the vehicles forward unchanged.
+`GET .../briefs/{version}/reference-vehicles` reads an earlier version's. Reference VINs are personal
+data: journey deletion and account deletion remove `reference_vehicles` before the brief versions,
+and account export lists them per brief version under `referenceVehicles`.

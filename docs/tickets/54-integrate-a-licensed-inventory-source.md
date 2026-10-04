@@ -4,7 +4,7 @@
 
 **Blocked by:** 53 — Define the inventory search adapter with a deterministic fake.
 
-**Status:** blocked on executed inventory provider terms — filed on 2026-10-03 from specification 2.0.
+**Status:** blocked on executed inventory provider terms (53 complete) — filed on 2026-10-03 from specification 2.0.
 
 - [ ] Executed terms, permitted display, caching, attribution, retention, and pricing are recorded in `docs/provider-inventory.md` before production enablement.
 - [ ] The licensed adapter passes ticket 53's conformance suite against recorded fixtures.

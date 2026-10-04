@@ -4,7 +4,7 @@
 
 **Blocked by:** 52 — Add Reference Vehicles by VIN; 53 — Define the inventory search adapter with a deterministic fake.
 
-**Status:** blocked on 52 and 53 — filed on 2026-10-03 from specification 2.0.
+**Status:** ready-for-agent (52 and 53 complete) — filed on 2026-10-03 from specification 2.0.
 
 - [ ] Matching is deterministic and versioned; each candidate lists matched and missed criteria in plain words, with no hidden score.
 - [ ] Must-have criteria exclude non-matching listings; nice-to-have criteria and relevant reference attributes only affect ordering.

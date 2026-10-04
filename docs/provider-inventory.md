@@ -124,3 +124,62 @@ DevelopmentNoChargeCheckout is local, collects no payment or payment credentials
 external processor, and immediately records DEVELOPMENT_NO_CHARGE / PAID. It cannot start
 under production, prod, or pilot. Ticket 32 must select and approve a real payment provider
 before commercial enablement; payment-provider is a blocked readiness prerequisite.
+
+# VIN decoding for Reference Vehicles (ticket 52)
+
+Reference Vehicle VINs are decoded through the replaceable `VinDecoder` adapter, selected by
+`vin-decoder.provider`:
+
+| Value | Implementation | Processes Buyer data | External party |
+| --- | --- | --- | --- |
+| `fake` (default) | `FakeVinDecoder`: a fixed development sample; any other VIN is undecodable | In process | None. `VinDecoderProductionGuard` refuses it under a pilot or production deployment, so sample data is never shown as a real decode |
+| `nhtsa-vpic` | `NhtsaVpicVinDecoder` calling `GET {base-url}/DecodeVinValues/{VIN}?format=json` | The VIN only; no account, case, name, email or location is sent | NHTSA (US Department of Transportation) |
+
+**NHTSA vPIC terms as recorded.** The vPIC API (https://vpic.nhtsa.dot.gov/api/) is a free, public
+US government service: no account, API key, contract or fee. Its data is a US federal government
+work and carries no licence restriction on display or caching. Decodes are built from information
+manufacturers submit to NHTSA (49 CFR Part 565), so coverage and accuracy depend on those
+submissions; NHTSA states no service level and may limit automated traffic. No signed terms exist
+to execute, so this adapter adds no `provider-terms` obligation, but before enabling it for a pilot
+an operator re-reads the current vPIC page for usage limits and records the date checked here.
+
+**How the adapter behaves.** Each attempt has a timeout (`vin-decoder.nhtsa-vpic.timeout`, default
+4 s, at most 30 s). A connection failure, timeout, HTTP 429 or 5xx is retried up to
+`vin-decoder.nhtsa-vpic.attempts` (default 2, at most 3) after `retry-delay`; any other answer is
+not retried. When no usable answer arrives, the Buyer is told the decoder is unavailable and
+nothing is saved or guessed. vPIC values are kept as vPIC states them; an attribute vPIC leaves
+empty stays absent, and a VIN with no year, make or model is stored as undecodable with no
+attributes. Each Reference Vehicle records its source (`NHTSA vPIC`) and decoder version
+(`nhtsa-vpic-decodevinvalues-adapter-v1`). vPIC is free, so it is not metered as a paid provider.
+
+**Retention.** VINs and decoded attributes are stored in `reference_vehicles` with the brief
+version they belong to, exported with the account, and deleted with the journey or the account.
+NHTSA receives VINs only; what it logs is outside this service's control.
+
+# Shopping inventory adapter (ticket 53)
+
+`InventorySearchAdapter` accepts structured Shopping Brief criteria and a radius, returning normalized
+`InventoryListing` records. It has no URL-fetch operation and performs no scraping. No licensed inventory
+source is integrated. `DeterministicFakeInventorySearchAdapter` is development-only, does no I/O, and labels
+its provider, dealer identity, listings, and result notice as synthetic. Its varied fixture includes a
+criteria match, near-miss, duplicate VIN, stale observation, missing VIN, and unknown facts/price.
+
+`InventorySearchProductionGuard` refuses synthetic adapters under `pilot`, `prod`, or `production`
+profiles and under `inventory.deployment=production` or `evidence.deployment=production`. The reusable
+`InventorySearchAdapterConformance` suite must be extended by each future licensed adapter using
+recorded available, unavailable, timed-out, and rate-limited scenarios. Vendor payloads stay inside adapters.
+Listings use minor-unit prices, normalized VINs and explicit unknown fields. Duplicate VINs (or
+source/listing IDs when VIN is absent) keep the newest observation. Observations older than seven days
+are marked `STALE`; missing observation times are `UNKNOWN`. Retained stale listings are for explanation;
+later matching must respect those flags. Fresh retrieval never makes an old observation current.
+
+`InventorySearchService.search(accountId, journeyId)` reads the current Shopping Brief and meters one
+`INVENTORY_SEARCH` call through the existing timeout/concurrency limits. V37 adds journey-scoped usage
+without altering case-scoped callers or the V21/V28 view definitions. Usage stores code-owned provider
+and licence metadata, the brief version and query/radius, normalized result count, retrieval time, elapsed
+latency, status/availability and reported cost (null means unpriced, including failed calls). An unsuccessful
+call records its attempt time as retrieval time and returns stated unavailability with no substituted listings.
+The fixture reports zero cost. No Buyer identity or contact details cross the adapter boundary; queries
+include postal code and are therefore personal data. Account exports include search history; journey and
+account deletion remove and verify usage before deleting the parent graph. Search-start takes account then
+journey locks, and late responses only update existing rows, so deletion cannot recreate search history.

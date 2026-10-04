@@ -8,6 +8,13 @@ import java.time.Instant;
 class ProviderUsageEntity {
   @Id String id;
   @Column(name = "case_id") String caseId;
+  @Column(name = "journey_id") String journeyId;
+  @Column(name = "account_id") String accountId;
+  @Column(name = "query_json", columnDefinition = "text") String queryJson;
+  @Column(name = "result_count") Integer resultCount;
+  @Column(name = "retrieved_at") Instant retrievedAt;
+  @Column(name = "latency_millis") Long latencyMillis;
+  @Column(name = "inventory_availability") String inventoryAvailability;
   String operation;
   String provider;
   @Column(name = "provider_version") String providerVersion;

@@ -130,6 +130,53 @@ test("Buying Journeys: the list, the brief form with field errors, and a journey
   expect(await violations()).toEqual([]);
 });
 
+test("Reference Vehicles: decoded, undecodable and read-only vehicles and a checksum error have no automated AA violations", async () => {
+  const brief = (version: number) => ({ journeyId: "j1", version, referenceListVersion: "vehicle-reference-2026-10-v1", yearFrom: 2020,
+    yearTo: 2024, make: { id: "toyota", label: "Toyota" }, model: { id: "toyota-rav4", label: "RAV4" }, trims: [], maxMileage: 60000,
+    priceCeilingMinor: 3_200_000, currency: "USD", postalCode: "27601", jurisdiction: "US-NC", radiusMiles: 50,
+    mustHaveFeatures: [], niceToHaveFeatures: [], createdAt: "2026-10-03T12:00:00Z" });
+  const source = { source: "NHTSA vPIC", decoderVersion: "nhtsa-vpic-decodevinvalues-adapter-v1" };
+  const decoded = { referenceId: "r1", vin: "2T3P1RFV5MW000001", outcome: "DECODED", ...source, decodedAt: "2026-10-04T12:00:00Z",
+    attributes: [["MODEL_YEAR", "Model year", "2021"], ["MAKE", "Make", "Toyota"], ["MODEL", "Model", "RAV4"], ["TRIM", "Trim", "XLE"],
+      ["DRIVETRAIN", "Drivetrain", "All-wheel drive"]].map(([attribute, label, value]) =>
+      ({ attribute, label, value, relevant: attribute === "TRIM", ...source })) };
+  const undecodable = { referenceId: "r2", vin: "3VW000003AA000006", outcome: "UNDECODABLE", ...source,
+    decodedAt: "2026-10-04T12:00:00Z", attributes: [] };
+  const journey = { id: "j1", state: "SHOPPING", createdAt: "2026-10-03T12:00:00Z", updatedAt: "", brief: brief(3),
+    versions: [1, 2, 3].map(version => ({ version, createdAt: "2026-10-03T12:00:00Z" })), referenceVehicles: [decoded, undecodable] };
+  const options = { reference: { version: "vehicle-reference-2026-10-v1",
+    makes: [{ id: "toyota", label: "Toyota", models: [{ id: "toyota-rav4", label: "RAV4", trims: [] }] }], features: [] },
+    bounds: { earliestYear: 1990, latestYear: 2027, maxMileage: 300000, minPriceCeiling: 1000, maxPriceCeiling: 500000,
+      minRadiusMiles: 5, maxRadiusMiles: 500, maxChoices: 20, maxReferenceVehicles: 5 } };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const [status, body] = url.endsWith("/brief-options") ? [200, options]
+      : url.endsWith("/reference-vehicles") && init?.method === "POST" ? [400, { code: "VIN_INVALID",
+        detail: "That VIN was not decoded because it is not a valid VIN.",
+        errors: [{ field: "vin", message: "This VIN fails the VIN checksum. Enter all 17 characters exactly." }] }]
+      : url === "/api/v1/journeys" ? [200, [{ id: "j1", state: "SHOPPING", createdAt: "2026-10-03T12:00:00Z", updatedAt: "",
+        currentVersion: 3, yearFrom: 2020, yearTo: 2024, make: "Toyota", model: "RAV4" }]]
+      : url.endsWith("/briefs/2/reference-vehicles") ? [200, [decoded]]
+      : url.endsWith("/briefs/2") ? [200, brief(2)] : [200, journey];
+    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  });
+  const { container } = render(<main><h1>Buyer Account</h1><BuyingJourneys session="session" onSessionEnded={() => {}} /></main>);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Open 2020–2024 Toyota RAV4" }));
+  await screen.findByRole("region", { name: "Reference Vehicles" });
+  const violations = async () => (await axe.run(container, AA)).violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }));
+  expect(await violations()).toEqual([]);
+
+  await user.type(screen.getByLabelText("VIN of a car you like"), "2T3P1RFV0MW000001");
+  await user.click(screen.getByRole("button", { name: "Decode and add VIN" }));
+  await screen.findByText(/fails the VIN checksum/);
+  expect(await violations()).toEqual([]);
+
+  await user.selectOptions(screen.getByLabelText("Brief version"), "2");
+  await screen.findByLabelText("Decoded details of Reference Vehicle 1");
+  expect(await violations()).toEqual([]);
+});
+
 test("keyboard users can skip to the case workflow", async () => {
   render(<App />);
   const user = userEvent.setup();
