@@ -29,6 +29,15 @@ public class FakeVinDecoder implements VinDecoder {
           VehicleAttribute.MODEL, "Silverado 1500", VehicleAttribute.TRIM, "High Country", VehicleAttribute.BODY, "Pickup",
           VehicleAttribute.DRIVETRAIN, "Four-wheel drive", VehicleAttribute.ENGINE, "6.2 L 8-cylinder gasoline",
           VehicleAttribute.TRANSMISSION, "10-speed automatic"),
+      // Two EX-trim Civics, for refining a Civic brief by reference trim.
+      "2HGFE2F55NH000008", Map.of(VehicleAttribute.MODEL_YEAR, "2022", VehicleAttribute.MAKE, "Honda",
+          VehicleAttribute.MODEL, "Civic", VehicleAttribute.TRIM, "EX", VehicleAttribute.BODY, "Sedan",
+          VehicleAttribute.DRIVETRAIN, "Front-wheel drive", VehicleAttribute.ENGINE, "1.5 L 4-cylinder turbocharged gasoline",
+          VehicleAttribute.TRANSMISSION, "Continuously variable"),
+      "2HGFE2F5XNH000005", Map.of(VehicleAttribute.MODEL_YEAR, "2022", VehicleAttribute.MAKE, "Honda",
+          VehicleAttribute.MODEL, "Civic", VehicleAttribute.TRIM, "EX", VehicleAttribute.BODY, "Sedan",
+          VehicleAttribute.DRIVETRAIN, "Front-wheel drive", VehicleAttribute.ENGINE, "1.5 L 4-cylinder turbocharged gasoline",
+          VehicleAttribute.TRANSMISSION, "Continuously variable"),
       // A partial decode: trim, engine and transmission are not supplied and stay absent.
       "JTMRWRFV3LD000004", Map.of(VehicleAttribute.MODEL_YEAR, "2020", VehicleAttribute.MAKE, "Toyota",
           VehicleAttribute.MODEL, "RAV4", VehicleAttribute.BODY, "Sport utility vehicle",

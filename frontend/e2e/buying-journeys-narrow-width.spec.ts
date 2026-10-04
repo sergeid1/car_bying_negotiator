@@ -37,6 +37,28 @@ const UNDECODABLE = { referenceId: "r2", vin: "3VW000003AA000006", outcome: "UND
   decodedAt: "2026-10-04T12:00:00Z", attributes: [] };
 const JOURNEY = { referenceVehicles: [DECODED, UNDECODABLE], id: "j1", state: "SHOPPING", createdAt: "2026-10-03T12:00:00Z", updatedAt: "2026-10-03T13:00:00Z",
   brief: brief(2, 5_500_000), versions: [{ version: 1, createdAt: "2026-10-03T12:00:00Z" }, { version: 2, createdAt: "2026-10-03T13:00:00Z" }] };
+const SNAPSHOT = (staleness: string, observedAt: string | null) => ({ source: "SYNTHETIC_INVENTORY",
+  retrievedAt: "2026-10-04T12:00:00Z", observedAt, staleness, synthetic: true });
+const SILVERADO = { title: "2025 Chevrolet Silverado 1500 High Country", year: 2025, make: "Chevrolet", model: "Silverado 1500",
+  trim: "High Country", distanceMiles: 248, currency: "USD",
+  matched: [{ kind: "MUST_HAVE", text: "Trim High Country is one of your trims." },
+    { kind: "MUST_HAVE", text: "Advertised price $54,999.99 is within your $55,000 ceiling." },
+    { kind: "REFERENCE", text: "Matches your reference trim (High Country)." }],
+  missed: [{ kind: "NICE_TO_HAVE", text: "Does not list ventilated seats, a nice-to-have." }] };
+const CANDIDATES = { matcherVersion: "candidate-matching.v1", briefVersion: 2, referenceListVersion: "vehicle-reference-2026-10-v1",
+  availability: "AVAILABLE", notice: "Synthetic inventory for development; these vehicles are not for sale.",
+  provider: { name: "SYNTHETIC_INVENTORY", version: "deterministic-inventory.v1", licence: "SYNTHETIC_DISPLAY_AND_CACHE_PERMITTED",
+    synthetic: true },
+  retrievedAt: "2026-10-04T12:00:00Z",
+  ordering: "Listings that state a fact missing a must-have are left out. The rest are ordered by: fewest must-haves the listing does not state, then most nice-to-have features listed, then most reference details matched.",
+  candidates: [
+    { ...SILVERADO, listingId: "match", vin: "1GCUYHED0KZ000003", mileage: 119999, advertisedPriceMinor: 5_499_999, unconfirmed: [],
+      snapshot: SNAPSHOT("CURRENT", "2026-10-04T11:00:00Z") },
+    { ...SILVERADO, listingId: "stale", vin: null, mileage: null, advertisedPriceMinor: null,
+      unconfirmed: [{ kind: "REFERENCE", text: "The listing does not state its drivetrain, so your reference drivetrain (Four-wheel drive) is unconfirmed." }],
+      snapshot: SNAPSHOT("STALE", "2026-09-26T12:00:00Z") }],
+  excluded: [{ listingId: "near-miss", vin: null, title: "2025 Chevrolet Silverado 1500 High Country", snapshot: SNAPSHOT("CURRENT", null),
+    missed: [{ kind: "MUST_HAVE", text: "121,000 miles is over your 120,000-mile maximum." }] }] };
 
 /** The layout gate needs no real service, only the account and journey shapes the panels render from. */
 async function stubApi(page: Page) {
@@ -58,6 +80,7 @@ async function stubApi(page: Page) {
   await page.route("**/api/v1/journeys/j1", route => route.fulfill({ json: JOURNEY }));
   await page.route("**/api/v1/journeys/j1/briefs/1", route => route.fulfill({ json: brief(1, 6_000_000) }));
   await page.route("**/api/v1/journeys/j1/briefs/1/reference-vehicles", route => route.fulfill({ json: [DECODED] }));
+  await page.route("**/api/v1/journeys/j1/candidates", route => route.fulfill({ json: CANDIDATES }));
   await page.route("**/api/v1/journeys/j1/reference-vehicles", route => route.fulfill({ status: 400, json: { code: "VIN_INVALID",
     detail: "That VIN was not decoded because it is not a valid VIN.",
     errors: [{ field: "vin", message: "This VIN fails the VIN checksum. Enter all 17 characters exactly as shown on the car or its paperwork; VINs never use the letters I, O or Q." }] } }));
@@ -125,5 +148,23 @@ test("Reference Vehicles with decoded details, an unavailable decode, a checksum
 
   await panel.getByLabel("Brief version").selectOption("1");
   await expect(references.getByLabel("Decoded details of Reference Vehicle 1")).toContainText("High Country · Matters");
+  await expectNoOverflowOrViolations(page);
+});
+
+test("Candidate Vehicles with reasons, a stale listing and left-out listings fit 360 px", async ({ page }) => {
+  await stubApi(page);
+  await page.goto("/#sign-in=link-secret");
+  await page.getByRole("button", { name: "Finish signing in" }).click();
+  const panel = page.getByRole("region", { name: "Buying Journeys" });
+  await panel.getByRole("button", { name: "Open 2019–2025 Chevrolet Silverado 1500" }).click();
+  const candidates = panel.getByRole("region", { name: "Candidate Vehicles" });
+  await expect(candidates.getByRole("button", { name: "Search inventory for candidates" })).toBeVisible();
+  await expectNoOverflowOrViolations(page);
+
+  await candidates.getByRole("button", { name: "Search inventory for candidates" }).click();
+  await expect(candidates.getByRole("article", { name: "Candidate 1: 2025 Chevrolet Silverado 1500 High Country" })).toBeVisible();
+  await expect(candidates.getByText(/Stale listing/)).toBeVisible();
+  await candidates.getByText("1 listing was left out for missing a must-have").click();
+  await expect(candidates.getByText("121,000 miles is over your 120,000-mile maximum.")).toBeVisible();
   await expectNoOverflowOrViolations(page);
 });

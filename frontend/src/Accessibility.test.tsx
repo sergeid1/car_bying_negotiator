@@ -177,6 +177,59 @@ test("Reference Vehicles: decoded, undecodable and read-only vehicles and a chec
   expect(await violations()).toEqual([]);
 });
 
+// Ticket 55: Candidate Vehicles results list.
+test("Candidate Vehicles: current, stale and unstated listings with left-out listings have no automated AA violations", async () => {
+  const brief = { journeyId: "j1", version: 2, referenceListVersion: "vehicle-reference-2026-10-v1", yearFrom: 2020, yearTo: 2024,
+    make: { id: "honda", label: "Honda" }, model: { id: "honda-civic", label: "Civic" }, trims: [{ id: "honda-civic-ex", label: "EX" }],
+    maxMileage: 60000, priceCeilingMinor: 3_200_000, currency: "USD", postalCode: "27601", jurisdiction: "US-NC", radiusMiles: 50,
+    mustHaveFeatures: [], niceToHaveFeatures: [], createdAt: "2026-10-03T12:00:00Z" };
+  const journey = { id: "j1", state: "SHOPPING", createdAt: "2026-10-03T12:00:00Z", updatedAt: "", brief, referenceVehicles: [],
+    versions: [1, 2].map(version => ({ version, createdAt: "2026-10-03T12:00:00Z" })) };
+  const options = { reference: { version: "vehicle-reference-2026-10-v1",
+    makes: [{ id: "honda", label: "Honda", models: [{ id: "honda-civic", label: "Civic", trims: [] }] }], features: [] },
+    bounds: { earliestYear: 1990, latestYear: 2027, maxMileage: 300000, minPriceCeiling: 1000, maxPriceCeiling: 500000,
+      minRadiusMiles: 5, maxRadiusMiles: 500, maxChoices: 20, maxReferenceVehicles: 5 } };
+  const snapshot = (staleness: string, observedAt: string | null) => ({ source: "SYNTHETIC_INVENTORY",
+    retrievedAt: "2026-10-04T12:00:00Z", observedAt, staleness, synthetic: true });
+  const civic = { title: "2024 Honda Civic EX", year: 2024, make: "Honda", model: "Civic", trim: "EX", distanceMiles: 10,
+    currency: "USD", matched: [{ kind: "MUST_HAVE", text: "Trim EX is one of your trims." },
+      { kind: "REFERENCE", text: "Matches your reference trim (EX)." }],
+    missed: [{ kind: "NICE_TO_HAVE", text: "Does not list heated seats, a nice-to-have." }] };
+  const results = { matcherVersion: "candidate-matching.v1", briefVersion: 2, referenceListVersion: "vehicle-reference-2026-10-v1",
+    availability: "AVAILABLE", notice: "Synthetic inventory for development; these vehicles are not for sale.",
+    provider: { name: "SYNTHETIC_INVENTORY", version: "deterministic-inventory.v1", licence: "SYNTHETIC", synthetic: true },
+    retrievedAt: "2026-10-04T12:00:00Z", ordering: "The rest are ordered by your brief and what each listing states.",
+    candidates: [
+      { ...civic, listingId: "match", vin: "2HGFE2F55NH000011", mileage: 30000, advertisedPriceMinor: 3_200_000, unconfirmed: [],
+        snapshot: snapshot("CURRENT", "2026-10-04T11:00:00Z") },
+      { ...civic, listingId: "stale", vin: null, mileage: null, advertisedPriceMinor: null,
+        unconfirmed: [{ kind: "MUST_HAVE", text: "The listing does not state its mileage." }],
+        snapshot: snapshot("STALE", "2026-09-26T12:00:00Z") },
+      { ...civic, listingId: "unknown", vin: null, mileage: 1000, advertisedPriceMinor: 3_000_050, unconfirmed: [],
+        snapshot: snapshot("UNKNOWN", null) }],
+    excluded: [{ listingId: "near-miss", vin: null, title: "2024 Honda Civic EX", snapshot: snapshot("CURRENT", null),
+      missed: [{ kind: "MUST_HAVE", text: "61,000 miles is over your 60,000-mile maximum." }] }] };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => {
+    const url = String(input);
+    const body = url.endsWith("/brief-options") ? options : url.endsWith("/candidates") ? results
+      : url === "/api/v1/journeys" ? [{ id: "j1", state: "SHOPPING", createdAt: "2026-10-03T12:00:00Z", updatedAt: "",
+        currentVersion: 2, yearFrom: 2020, yearTo: 2024, make: "Honda", model: "Civic" }] : journey;
+    return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+  });
+  const { container } = render(<main><h1>Buyer Account</h1><BuyingJourneys session="session" onSessionEnded={() => {}} /></main>);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "Open 2020–2024 Honda Civic" }));
+  await screen.findByRole("region", { name: "Candidate Vehicles" });
+  const violations = async () => (await axe.run(container, AA)).violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }));
+  expect(await violations()).toEqual([]);
+
+  await user.click(screen.getByRole("button", { name: "Search inventory for candidates" }));
+  await screen.findByRole("list", { name: "Candidate Vehicles, brief version 2" });
+  await user.click(screen.getByText("1 listing was left out for missing a must-have"));
+  expect(await violations()).toEqual([]);
+});
+// End ticket 55.
+
 test("keyboard users can skip to the case workflow", async () => {
   render(<App />);
   const user = userEvent.setup();

@@ -76,6 +76,9 @@ public class JourneyService {
   /** Refuses a request without a live account session. */
   public void authorize(String session) { accounts.accountId(session); }
 
+  /** The signed-in account, for later shopping steps that take an account id. */
+  public String accountId(String session) { return accounts.accountId(session); }
+
   int latestYear() { return validator.latestYear(); }
 
   @Transactional(readOnly = true)
