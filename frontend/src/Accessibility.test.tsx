@@ -7,6 +7,7 @@ import { CaseLifecycle } from "./CaseLifecycle";
 import { PricePlan } from "./PricePlan";
 import { NegotiationMandate } from "./NegotiationMandate";
 import { DealerRelay } from "./DealerRelay";
+import { QuoteRequest } from "./QuoteRequest";
 import { CaseDownloads, RecoveryEmailOptIn, SaveCaseLink } from "./CasePortability";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
@@ -21,6 +22,7 @@ import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 import { ReferralPartnerKit } from "./ReferralPartnerKit";
 import { ACCOUNT_SESSION_KEY, BuyerAccount } from "./BuyerAccount";
+import { BuyingJourneys } from "./BuyingJourneys";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const AA = {
@@ -79,6 +81,53 @@ test("the signed-in Buyer Account, its contact form and its deletion receipt hav
   await screen.findByRole("list", { name: "Attached cases being deleted" });
   result = await axe.run(container, AA);
   expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
+});
+
+test("Buying Journeys: the list, the brief form with field errors, and a journey with versions have no automated AA violations", async () => {
+  const brief = (version: number) => ({ journeyId: "j1", version, referenceListVersion: "vehicle-reference-2026-10-v1", yearFrom: 2020,
+    yearTo: 2024, make: { id: "toyota", label: "Toyota" }, model: { id: "toyota-rav4", label: "RAV4" },
+    trims: [{ id: "toyota-rav4-xle", label: "XLE" }], maxMileage: 60000, priceCeilingMinor: 3_200_000, currency: "USD",
+    postalCode: "27048", jurisdiction: "US-NC", radiusMiles: 50, mustHaveFeatures: [{ id: "all-wheel-drive", label: "All-wheel drive" }],
+    niceToHaveFeatures: [], createdAt: "2026-10-03T12:00:00Z" });
+  const journey = { id: "j1", state: "SHOPPING", createdAt: "2026-10-03T12:00:00Z", updatedAt: "", brief: brief(2),
+    versions: [{ version: 1, createdAt: "2026-10-03T12:00:00Z" }, { version: 2, createdAt: "2026-10-03T13:00:00Z" }] };
+  const options = { reference: { version: "vehicle-reference-2026-10-v1",
+    makes: [{ id: "toyota", label: "Toyota", models: [{ id: "toyota-rav4", label: "RAV4", trims: [{ id: "toyota-rav4-xle", label: "XLE" }] }] }],
+    features: [{ id: "all-wheel-drive", label: "All-wheel drive" }, { id: "heated-seats", label: "Heated seats" }] },
+    bounds: { earliestYear: 1990, latestYear: 2027, maxMileage: 300000, minPriceCeiling: 1000, maxPriceCeiling: 500000,
+      minRadiusMiles: 5, maxRadiusMiles: 500, maxChoices: 20 } };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const [status, body] = url.endsWith("/brief-options") ? [200, options]
+      : url === "/api/v1/journeys" && init?.method === "POST" ? [422, { code: "LOCATION_NOT_SERVED", detail: "Choose your state.", errors: [
+        { field: "yearFrom", message: "Enter the earliest model year as a year from 1990 to 2027." },
+        { field: "mustHaveFeatures", message: "Choose must-have features from the list." },
+        { field: "jurisdiction", message: "That ZIP code crosses a state line. Choose your state.", reason: "POSTAL_CODE_CROSSES_STATE_LINE",
+          candidateJurisdictions: ["US-NC", "US-VA"] }] }]
+      : url === "/api/v1/journeys" ? [200, [{ id: "j1", state: "SHOPPING", createdAt: "2026-10-03T12:00:00Z", updatedAt: "",
+        currentVersion: 2, yearFrom: 2020, yearTo: 2024, make: "Toyota", model: "RAV4" }]]
+      : url.endsWith("/briefs/1") ? [200, brief(1)] : [200, journey];
+    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  });
+  const { container } = render(<main><h1>Buyer Account</h1><BuyingJourneys session="session" onSessionEnded={() => {}} /></main>);
+  const user = userEvent.setup();
+  await screen.findByRole("list", { name: "Your Buying Journeys" });
+  const violations = async () => (await axe.run(container, AA)).violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }));
+  expect(await violations()).toEqual([]);
+
+  await user.click(screen.getByRole("button", { name: "Start a Buying Journey" }));
+  await user.type(screen.getByLabelText("Find a make or model (optional)"), "toy");
+  await user.selectOptions(screen.getByLabelText("Make"), "toyota");
+  await user.selectOptions(screen.getByLabelText("Model"), "toyota-rav4");
+  await user.click(screen.getByRole("button", { name: "Save brief and start journey" }));
+  await screen.findByLabelText("Your state");
+  expect(await violations()).toEqual([]);
+
+  await user.click(screen.getByRole("button", { name: "Cancel" }));
+  await user.click(await screen.findByRole("button", { name: "Open 2020–2024 Toyota RAV4" }));
+  await user.selectOptions(await screen.findByLabelText("Brief version"), "1");
+  await screen.findByText(/reading an earlier version/);
+  expect(await violations()).toEqual([]);
 });
 
 test("keyboard users can skip to the case workflow", async () => {
@@ -280,5 +329,21 @@ test("the dealer email relay with its address, a dealer opt-out, messages and at
   const { container } = render(<main><h1>Buying Case</h1><DealerRelay caseId="case" token="token" /></main>);
   await user.click(await screen.findByRole("button", { name: /Show message from desk@dealer.example/ }));
   await screen.findByText("Quote attached.");
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+test("the quote request with a gated draft, a sent request and dealer quote sources has no automated AA violations", async () => {
+  const decision = { pass: true, gateVersion: "outbound-gate.v2", reasons: [] };
+  const draft = (id: string, state: string) => ({ id, dealerAddress: "sales@dealer.example", state, messageId: null, approvedAt: null,
+    gatedDraft: { draft: { text: "Could you provide an itemized out-the-door quote for VIN 1HGCM82633A004352?" }, decision } });
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/relay")
+    ? { address: "cabcdefghijklmnopqrstuvwxyz234567@relay.invalid", dealerOptedOut: false, perCaseDailyCap: 10, sentLastDay: 1, messages: [] }
+    : { negotiationState: "AWAITING_BUYER", dealers: [{ id: "d1", name: "Triangle Motors" }],
+      requests: [draft("q1", "SENT"), draft("q2", "DRAFT")],
+      documents: [{ documentId: "doc1", outcome: "ACCEPTED", offerVersion: null, sourceKind: "MESSAGE_BODY", messageId: "m2" },
+        { documentId: null, outcome: "MALWARE_DETECTED", offerVersion: null, sourceKind: "ATTACHMENT", messageId: "m2" }] }))));
+  const { container } = render(<main><h1>Buying Case</h1><QuoteRequest caseId="case" token="token" /></main>);
+  await screen.findByRole("button", { name: "Approve this text and send" });
+  await screen.findByText(/cabcdefghijklmnopqrstuvwxyz234567@relay.invalid/);
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });

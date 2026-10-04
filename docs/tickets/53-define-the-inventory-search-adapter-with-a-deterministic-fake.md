@@ -4,7 +4,7 @@
 
 **Blocked by:** 51 — Describe the car in a Shopping Brief; 38 — Make market evidence provider-ready without a licensed source.
 
-**Status:** blocked on 51 — filed on 2026-10-03 from specification 2.0.
+**Status:** ready-for-agent (51 and 38 complete) — filed on 2026-10-03 from specification 2.0.
 
 - [ ] The adapter interface accepts brief criteria and a radius and returns normalized listings; provider response objects do not leak past it.
 - [ ] A deterministic fake returns a varied, labelled-synthetic inventory that exercises matches, near-misses, duplicates, stale listings, and missing VINs.

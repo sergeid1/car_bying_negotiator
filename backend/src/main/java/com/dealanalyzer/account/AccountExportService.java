@@ -22,11 +22,13 @@ public class AccountExportService {
   private final CaseExportService caseExports;
   private final ObjectMapper json;
   private final com.dealanalyzer.notification.BuyerNotifications notifications;
+  private final com.dealanalyzer.journey.JourneyService journeys;
 
   AccountExportService(BuyerAccountService accounts, AccountSessionRepository sessions, CaseExportService caseExports,
-      ObjectMapper json, com.dealanalyzer.notification.BuyerNotifications notifications) {
+      ObjectMapper json, com.dealanalyzer.notification.BuyerNotifications notifications,
+      com.dealanalyzer.journey.JourneyService journeys) {
     this.accounts = accounts; this.sessions = sessions; this.caseExports = caseExports; this.json = json;
-    this.notifications = notifications;
+    this.notifications = notifications; this.journeys = journeys;
   }
 
   @Transactional(readOnly = true)
@@ -42,6 +44,7 @@ public class AccountExportService {
     data.put("sessions", sessions.findByAccountIdOrderByCreatedAt(session.accountId).stream()
         .map(s -> { var row = new LinkedHashMap<String, Object>(); row.put("createdAt", s.createdAt);
           row.put("expiresAt", s.expiresAt); row.put("revokedAt", s.revokedAt); return row; }).toList());
+    data.put("buyingJourneys", journeys.exportForAccount(session.accountId));
     var archives = new LinkedHashMap<String, byte[]>();
     List<Map<String, Object>> cases = new ArrayList<>();
     for (var attached : view.cases()) {
@@ -58,7 +61,7 @@ public class AccountExportService {
     data.put("cases", cases);
     try (var output = new ByteArrayOutputStream(); var zip = new ZipOutputStream(output)) {
       entry(zip, "README.txt", ("Buyer Account export\naccount.json holds your contact details, sign-in history "
-          + "(times only), email preferences, notification delivery states and the Buying Cases attached to the account. Each attached case that can be exported is "
+          + "(times only), email preferences, notification delivery states, every Buying Journey with every version of its Shopping Brief, and the Buying Cases attached to the account. Each attached case that can be exported is "
           + "included as its own case export under cases/, with the same contents as exporting that case directly. "
           + "A case marked PURCHASE_REQUIRED has saved reports that are exported once the report is purchased; "
           + "a case marked UNAVAILABLE has expired or is being deleted. Sign-in links, session credentials and "

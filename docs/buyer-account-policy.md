@@ -89,3 +89,30 @@ every `account.notifications.mandate-expiring-sweep` (default `PT5M`). A mandate
 lifetime fits inside the notice window gets no warning. The other producers arrive with tickets
 60, 61 and 65. Account export includes preferences and delivery states, and account deletion
 removes both notification tables.
+
+## Buying Journeys
+
+A signed-in Buyer starts a Buying Journey under `/api/v1/journeys`, authorized only by
+`Account-Session-Token`; a case token never opens a journey. A journey starts in `SHOPPING`
+(the other spec §6 journey states arrive with later tickets) and is created with Shopping Brief
+version 1. `POST /api/v1/journeys` needs an `Idempotency-Key`; a replay returns the same journey.
+
+A Shopping Brief version is an immutable row in `shopping_brief_versions`. An edit
+(`POST /api/v1/journeys/{id}/briefs` with `basedOnVersion`) inserts the next version; a stale
+`basedOnVersion` is refused with 409 `BRIEF_CHANGED`, and a retried save of the same edit returns
+the version it already made. `GET /api/v1/journeys/{id}/briefs/{version}` reads any earlier version.
+
+Make, model, trim and feature choices are identifiers from the versioned reference list
+`backend/src/main/resources/shopping/vehicle-reference-v1.json`, served with the field bounds by
+`GET /api/v1/journeys/brief-options`; each version records the list version it used. The client's
+free-text lookup only filters that list and is never sent. Every field problem is returned at
+once as `errors[{field, message}]` (400 `BRIEF_INVALID`) with authored text that never echoes
+input. The ZIP is resolved with `PostalJurisdictionResolver` and the jurisdiction must have a
+policy pack, as for a Buying Case; otherwise 422 `LOCATION_NOT_SERVED` explains why with a
+`reason` (`UNRECOGNIZED_POSTAL_CODE`, `POSTAL_CODE_CROSSES_STATE_LINE` with the candidate
+states, or `JURISDICTION_NOT_SUPPORTED`) and nothing is stored.
+
+`DELETE /api/v1/journeys/{id}` removes the journey and every brief version in one transaction and
+count-verifies their absence. A journey has no Buying Cases yet (ticket 56 links them). Account
+export lists every journey with every brief version under `buyingJourneys`, and account deletion
+removes both journey tables with the account graph.

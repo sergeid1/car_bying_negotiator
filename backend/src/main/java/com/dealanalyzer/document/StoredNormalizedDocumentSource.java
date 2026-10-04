@@ -38,6 +38,9 @@ class StoredNormalizedDocumentSource implements DocumentExtractionSource {
   }
 
   private List<String> recognizedText(DocumentIntakePersistence.ExtractionDocument document) {
+    if (document.mediaType().equals("text/plain"))
+      return RelayTextPages.pages(new String(storage.readOriginal(document.caseId(), document.documentId(),
+          document.originalObjectKey()), java.nio.charset.StandardCharsets.UTF_8));
     if (!document.mediaType().equals("application/pdf")) {
       return java.util.Collections.nCopies(document.pages().size(), "");
     }

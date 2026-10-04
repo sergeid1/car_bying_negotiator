@@ -45,7 +45,13 @@ const LINK_MESSAGES: Record<string, string> = {
 };
 const ENDED = "Your sign-in has ended. Request a new sign-in link to continue.";
 
-export function BuyerAccount({ caseCredentials }: { caseCredentials?: Credentials }) {
+/**
+ * `onSignedIn` reports the session once the account has loaded, and an empty value when it ends.
+ * Changing `recheck` re-reads the account, so a panel that saw the session end can sign it out here.
+ */
+export function BuyerAccount({ caseCredentials, onSignedIn, recheck = 0 }: {
+  caseCredentials?: Credentials; onSignedIn?: (session: string) => void; recheck?: number;
+}) {
   const [session, setSession] = useState(storedSession);
   const [linkSecret, setLinkSecret] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get("sign-in") ?? "");
   const [account, setAccount] = useState<Account>();
@@ -69,7 +75,8 @@ export function BuyerAccount({ caseCredentials }: { caseCredentials?: Credential
         if (problem?.status === 401) signedOut(ENDED); else setError("Your account could not be loaded. Retry safely.");
       });
     return () => { current = false; };
-  }, [session, loads]);
+  }, [session, loads, recheck]);
+  useEffect(() => { onSignedIn?.(session && account ? session : ""); }, [session, account]);
 
   function signedOut(notice = "") {
     storeSession(""); setSession(""); setAccount(undefined); setMessage(""); setError(notice);

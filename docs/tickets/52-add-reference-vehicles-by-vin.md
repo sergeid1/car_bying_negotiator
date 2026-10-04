@@ -4,7 +4,7 @@
 
 **Blocked by:** 51 — Describe the car in a Shopping Brief.
 
-**Status:** blocked on 51 — filed on 2026-10-03 from specification 2.0.
+**Status:** ready-for-agent (51 complete) — filed on 2026-10-03 from specification 2.0.
 
 - [ ] A replaceable VIN decoder adapter interface exists with a deterministic fake used by the main test suite; no main test calls a live endpoint.
 - [ ] A live adapter for the free public NHTSA vPIC decoder exists behind configuration, with timeout, retry, and stated unavailability; its terms are recorded in `docs/provider-inventory.md`.

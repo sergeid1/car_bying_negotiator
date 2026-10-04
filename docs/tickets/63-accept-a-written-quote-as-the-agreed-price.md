@@ -4,7 +4,7 @@
 
 **Blocked by:** 60 — Request an itemized quote and ingest dealer replies.
 
-**Status:** blocked on 60 — filed on 2026-10-03 from specification 2.0.
+**Status:** ready-for-agent (60 complete) — filed on 2026-10-03 from specification 2.0.
 
 - [ ] Acceptance requires a verified, itemized Dealer Offer from the conversation; a verbal or partial figure triggers a gated written-confirmation request instead.
 - [ ] The Agreed Price records the accepted offer version, actor, time, and the written evidence, and creates an Approved Baseline through the existing approval path.
