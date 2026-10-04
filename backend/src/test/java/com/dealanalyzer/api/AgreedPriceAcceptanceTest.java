@@ -108,6 +108,13 @@ class AgreedPriceAcceptanceTest {
       assertThat(prepared.path("kind").asText()).isEqualTo("ACCEPTANCE");
       assertThat(prepared.at("/gatedDraft/decision/pass").asBoolean()).isTrue();
       assertThat(prepared.path("evidenceMessageId").asText()).isEqualTo(received.messageId());
+      var context = app.context().getBean(com.dealanalyzer.outbound.OutboundDraftService.class).context(caseId, dealer);
+      String quoteQuestion = com.dealanalyzer.quote.QuoteRequestText.render("1HGCM82633A004352", "https://dealer.example/vehicle/42");
+      assertThat(context.quoteRequestQuestion()).isEqualTo(quoteQuestion);
+      assertThat(context.caseQuestions()).contains(quoteQuestion, com.dealanalyzer.quote.WrittenQuoteEvidence.CONFIRMATION,
+          prepared.at("/gatedDraft/draft/text").asText());
+      var anotherQuote = post(client, base + "/quote-requests", Map.of("dealerId", dealer, "dealerAddress", "sales@dealer.example"), "another-quote", token);
+      assertThat(anotherQuote.at("/gatedDraft/draft/text").asText()).isEqualTo(quoteQuestion);
       String approvalPath = path + "/" + prepared.path("id").asText() + "/approval";
       assertThatThrownBy(() -> post(client, approvalPath, Map.of("approved", true, "text", "The Buyer will buy"), "tampered", token))
           .isInstanceOf(HttpClientErrorException.BadRequest.class);
@@ -134,13 +141,17 @@ class AgreedPriceAcceptanceTest {
       assertThat(sent.path("state").asText()).isEqualTo("SENT");
       assertThat(post(client, freshPath, approval(fresh), "repeat", token)).isEqualTo(sent);
       assertThat(provider.sent()).hasSize(3);
-      assertThat(provider.sent().getLast().body()).contains("subject to a test drive", "final paperwork matching", received.messageId())
-          .doesNotContain("will buy", "deposit", "commit to");
+      String receivedDate = jdbc.queryForObject("select created_at from dealer_relay_messages where id = ?", java.sql.Timestamp.class, received.messageId())
+          .toInstant().atZone(java.time.ZoneOffset.UTC).toLocalDate().toString();
+      assertThat(provider.sent().getLast().body()).contains("your itemized quote for VIN 1HGCM82633A004352", "out-the-door total of USD 26800.00",
+          "received on " + receivedDate + " (UTC)", "subject to a test drive", "final paperwork matching")
+          .doesNotContain(received.messageId(), documentId, offer.path("id").asText(), "verified offer version", "will buy", "deposit", "commit to");
       var agreed = get(client, path, token).path("agreedPrice");
       assertThat(agreed.path("offerVersion").asInt()).isEqualTo(version);
       assertThat(agreed.path("actor").asText()).isEqualTo("BUYER");
       assertThat(agreed.path("acceptedAt").asText()).isNotBlank();
       assertThat(agreed.path("evidenceDocumentId").asText()).isEqualTo(documentId);
+      assertThat(agreed.path("evidenceMessageId").asText()).isEqualTo(received.messageId());
       assertThat(agreed.at("/journey/journeyLinked").asBoolean()).isFalse();
       assertThat(agreed.at("/journey/otherOpenNegotiations")).isEmpty();
       assertThatThrownBy(() -> post(client, path + "/other-negotiations/another-case", Map.of("action", "STOP"), "stop-unlinked", token))

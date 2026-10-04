@@ -49,8 +49,8 @@ public class QuoteRequestService {
         || request.dealerAddress().length() > 254)
       throw new IllegalArgumentException("Choose a dealer and provide its email address.");
     var context = drafts.context(caseId, request.dealerId());
-    String text = context.caseQuestions().stream().filter(question -> question.startsWith("Could you provide an itemized out-the-door quote for VIN ")).findFirst()
-        .orElseThrow(() -> new IllegalArgumentException("Confirm the VIN and listing before requesting a quote."));
+    String text = context.quoteRequestQuestion();
+    if (text == null) throw new IllegalArgumentException("Confirm the VIN and listing before requesting a quote.");
     var draft = drafts.create(caseId, token, key, new OutboundGate.Draft(request.dealerId(), text));
     var existing = jdbc.queryForList("select id from quote_requests where draft_id = ?", String.class, draft.id());
     if (!existing.isEmpty()) {
@@ -120,7 +120,7 @@ public class QuoteRequestService {
           select 1 from listing_snapshots l where l.case_id = d.case_id and l.dealer_id = d.id and l.vin = v.vin
         ) order by d.name, d.id
         """, (r, n) -> new Dealer(r.getString(1), r.getString(2)), caseId).stream()
-        .filter(dealer -> !drafts.context(caseId, dealer.id()).caseQuestions().isEmpty()).toList();
+        .filter(dealer -> drafts.context(caseId, dealer.id()).quoteRequestQuestion() != null).toList();
     var ids = jdbc.queryForList("select id from quote_requests where case_id = ? order by created_at, id", String.class, caseId);
     var documents = jdbc.query("""
         select a.document_id, a.outcome, o.offer_version, a.ordinal, a.message_id from dealer_relay_attachments a

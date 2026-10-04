@@ -3,6 +3,9 @@ package com.dealanalyzer.quote;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence.DealerOfferView;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,10 +19,13 @@ public class WrittenQuoteEvidence {
   public WrittenQuoteEvidence(JdbcTemplate jdbc, DealerOfferPersistence offers) {
     this.jdbc = jdbc; this.offers = offers;
   }
-  public record Evidence(String messageId, String documentId, DealerOfferView offer) {
+  public record Evidence(String messageId, String documentId, DealerOfferView offer, String vin, Instant receivedAt) {
     public String text() {
-      return "The Buyer accepts the itemized quote in message " + messageId + " (verified offer version "
-          + offer.version() + "), subject to a test drive and the final paperwork matching that quote.";
+      com.dealanalyzer.vehicle.Vin.validated(vin);
+      return "The Buyer accepts your itemized quote for VIN " + vin + " with an out-the-door total of USD "
+          + BigDecimal.valueOf(amount(offer.terms(), "OUT_THE_DOOR_TOTAL"), 2).toPlainString()
+          + ", received on " + receivedAt.atZone(ZoneOffset.UTC).toLocalDate()
+          + " (UTC), subject to a test drive and the final paperwork matching that quote.";
     }
   }
   public static final String CONFIRMATION = "Could you confirm the proposed figure in a current itemized written offer, including the selling price, taxes, all fees and all add-ons?";
@@ -27,7 +33,8 @@ public class WrittenQuoteEvidence {
   public Optional<Evidence> latest(String caseId, String dealerId) {
     return offers.latestOffer(caseId).filter(WrittenQuoteEvidence::itemized).flatMap(offer -> {
       var rows = jdbc.query("""
-          select m.id, a.document_id from dealer_relay_attachments a
+          select m.id, a.document_id, v.vin, m.created_at from dealer_relay_attachments a
+          join vehicles v on v.case_id = a.case_id and v.vin is not null
           join dealer_relay_messages m on m.id = a.message_id and m.case_id = a.case_id
           join document_extractions e on e.document_id = a.document_id and e.case_id = a.case_id
           where a.case_id = ? and e.id = ? and a.outcome = 'ACCEPTED'
@@ -37,7 +44,8 @@ public class WrittenQuoteEvidence {
               where q.case_id = a.case_id and d.dealer_id = ? and q.state = 'SENT'
                 and q.dealer_address = m.dealer_address)
           order by a.created_at, a.id
-          """, (r, n) -> new Evidence(r.getString(1), r.getString(2), offer), caseId, offer.extractionId(), dealerId);
+          """, (r, n) -> new Evidence(r.getString(1), r.getString(2), offer, r.getString(3), r.getTimestamp(4).toInstant()),
+          caseId, offer.extractionId(), dealerId);
       return rows.stream().findFirst();
     });
   }

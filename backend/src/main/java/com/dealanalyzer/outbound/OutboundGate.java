@@ -26,7 +26,11 @@ public final class OutboundGate {
   /** Only trusted callers build context. Released values are specific to draft.dealerId. */
   public record GateContext(Mandate mandate, Set<Long> verifiedAmountsMinor,
       Set<Disclosure> verifiedDisclosures, Set<String> personalValues,
-      Set<String> releasedForDealer, JsonNode finalizedReport, Set<String> caseQuestions) {
+      Set<String> releasedForDealer, JsonNode finalizedReport, Set<String> caseQuestions, String quoteRequestQuestion) {
+    public GateContext(Mandate mandate, Set<Long> amounts, Set<Disclosure> disclosures,
+        Set<String> personal, Set<String> released, JsonNode report, Set<String> questions) {
+      this(mandate, amounts, disclosures, personal, released, report, questions, null);
+    }
     public GateContext(Mandate mandate, Set<Long> amounts, Set<Disclosure> disclosures,
         Set<String> personal, Set<String> released, JsonNode report) {
       this(mandate, amounts, disclosures, personal, released, report, Set.of());
@@ -37,6 +41,8 @@ public final class OutboundGate {
       personalValues = Set.copyOf(personalValues);
       releasedForDealer = Set.copyOf(releasedForDealer);
       caseQuestions = Set.copyOf(caseQuestions);
+      if (quoteRequestQuestion != null && !caseQuestions.contains(quoteRequestQuestion))
+        throw new IllegalArgumentException("The quote request must be included in the grounded questions.");
       finalizedReport = finalizedReport == null ? null : finalizedReport.deepCopy();
     }
   }
