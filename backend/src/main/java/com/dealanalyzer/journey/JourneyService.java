@@ -132,7 +132,7 @@ public class JourneyService {
     var journey = journeys.findLockedByIdAndAccountId(journeyId, accountId).orElseThrow(JourneyProblem::notFound);
     String id = journey.id;
     manager.flush(); manager.detach(journey);
-    for (String table : List.of("shopping_brief_versions", "buying_journeys")) {
+    for (String table : List.of("provider_usage", "shopping_brief_versions", "buying_journeys")) {
       String column = table.equals("buying_journeys") ? "id" : "journey_id";
       manager.createNativeQuery("delete from " + table + " where " + column + " = :id").setParameter("id", id).executeUpdate();
       long remaining = ((Number) manager.createNativeQuery("select count(*) from " + table + " where " + column + " = :id")

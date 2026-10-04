@@ -124,3 +124,30 @@ DevelopmentNoChargeCheckout is local, collects no payment or payment credentials
 external processor, and immediately records DEVELOPMENT_NO_CHARGE / PAID. It cannot start
 under production, prod, or pilot. Ticket 32 must select and approve a real payment provider
 before commercial enablement; payment-provider is a blocked readiness prerequisite.
+# Shopping inventory adapter (ticket 53)
+
+`InventorySearchAdapter` accepts structured Shopping Brief criteria and a radius, returning normalized
+`InventoryListing` records. It has no URL-fetch operation and performs no scraping. No licensed inventory
+source is integrated. `DeterministicFakeInventorySearchAdapter` is development-only, does no I/O, and labels
+its provider, dealer identity, listings, and result notice as synthetic. Its varied fixture includes a
+criteria match, near-miss, duplicate VIN, stale observation, missing VIN, and unknown facts/price.
+
+`InventorySearchProductionGuard` refuses synthetic adapters under `pilot`, `prod`, or `production`
+profiles and under `inventory.deployment=production` or `evidence.deployment=production`. The reusable
+`InventorySearchAdapterConformance` suite must be extended by each future licensed adapter using
+recorded available, unavailable, timed-out, and rate-limited scenarios. Vendor payloads stay inside adapters.
+Listings use minor-unit prices, normalized VINs and explicit unknown fields. Duplicate VINs (or
+source/listing IDs when VIN is absent) keep the newest observation. Observations older than seven days
+are marked `STALE`; missing observation times are `UNKNOWN`. Retained stale listings are for explanation;
+later matching must respect those flags. Fresh retrieval never makes an old observation current.
+
+`InventorySearchService.search(accountId, journeyId)` reads the current Shopping Brief and meters one
+`INVENTORY_SEARCH` call through the existing timeout/concurrency limits. V37 adds journey-scoped usage
+without altering case-scoped callers or the V21/V28 view definitions. Usage stores code-owned provider
+and licence metadata, the brief version and query/radius, normalized result count, retrieval time, elapsed
+latency, status/availability and reported cost (null means unpriced, including failed calls). An unsuccessful
+call records its attempt time as retrieval time and returns stated unavailability with no substituted listings.
+The fixture reports zero cost. No Buyer identity or contact details cross the adapter boundary; queries
+include postal code and are therefore personal data. Account exports include search history; journey and
+account deletion remove and verify usage before deleting the parent graph. Search-start takes account then
+journey locks, and late responses only update existing rows, so deletion cannot recreate search history.
