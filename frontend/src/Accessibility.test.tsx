@@ -6,6 +6,7 @@ import App from "./App";
 import { CaseLifecycle } from "./CaseLifecycle";
 import { PricePlan } from "./PricePlan";
 import { NegotiationMandate } from "./NegotiationMandate";
+import { DealerRelay } from "./DealerRelay";
 import { CaseDownloads, RecoveryEmailOptIn, SaveCaseLink } from "./CasePortability";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
@@ -262,5 +263,22 @@ test("an unavailable Negotiation Mandate explains why without automated AA viola
       targetMinor: null, ceilingMinor: null, disclosures: [] } : [])));
   const { container } = render(<main><h1>Buying Case</h1><NegotiationMandate caseId="case" token="token" /></main>);
   await screen.findByText("Review price boundaries first.");
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+test("the dealer email relay with its address, a dealer opt-out, messages and attachments has no automated AA violations", async () => {
+  const user = userEvent.setup();
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => new Response(JSON.stringify(String(input).includes("/messages/")
+    ? { id: "m2", direction: "INBOUND", trust: "UNTRUSTED", subject: "Your quote", body: "Quote attached." }
+    : { address: "cabcdefghijklmnopqrstuvwxyz234567@relay.invalid", dealerOptedOut: true, dealerOptedOutAt: "2026-10-03T13:00:00Z",
+      optOutChannel: "REPLY", perCaseDailyCap: 10, sentLastDay: 1, messages: [
+        { id: "m2", direction: "INBOUND", trust: "UNTRUSTED", dealerAddress: "desk@dealer.example", state: "RECEIVED",
+          createdAt: "2026-10-03T12:30:00Z", completedAt: "2026-10-03T12:30:00Z", contentAvailable: true,
+          attachments: [{ ordinal: 0, documentId: "d1", outcome: "ACCEPTED" }, { ordinal: 1, documentId: null, outcome: "MALWARE_DETECTED" }] },
+        { id: "m1", direction: "OUTBOUND", trust: "PLATFORM", dealerAddress: "desk@dealer.example", state: "DELIVERED",
+          createdAt: "2026-10-03T12:00:00Z", completedAt: "2026-10-03T12:01:00Z", contentAvailable: false, attachments: [] }] })));
+  const { container } = render(<main><h1>Buying Case</h1><DealerRelay caseId="case" token="token" /></main>);
+  await user.click(await screen.findByRole("button", { name: /Show message from desk@dealer.example/ }));
+  await screen.findByText("Quote attached.");
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
