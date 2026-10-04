@@ -124,3 +124,34 @@ DevelopmentNoChargeCheckout is local, collects no payment or payment credentials
 external processor, and immediately records DEVELOPMENT_NO_CHARGE / PAID. It cannot start
 under production, prod, or pilot. Ticket 32 must select and approve a real payment provider
 before commercial enablement; payment-provider is a blocked readiness prerequisite.
+
+# VIN decoding for Reference Vehicles (ticket 52)
+
+Reference Vehicle VINs are decoded through the replaceable `VinDecoder` adapter, selected by
+`vin-decoder.provider`:
+
+| Value | Implementation | Processes Buyer data | External party |
+| --- | --- | --- | --- |
+| `fake` (default) | `FakeVinDecoder`: a fixed development sample; any other VIN is undecodable | In process | None. `VinDecoderProductionGuard` refuses it under a pilot or production deployment, so sample data is never shown as a real decode |
+| `nhtsa-vpic` | `NhtsaVpicVinDecoder` calling `GET {base-url}/DecodeVinValues/{VIN}?format=json` | The VIN only; no account, case, name, email or location is sent | NHTSA (US Department of Transportation) |
+
+**NHTSA vPIC terms as recorded.** The vPIC API (https://vpic.nhtsa.dot.gov/api/) is a free, public
+US government service: no account, API key, contract or fee. Its data is a US federal government
+work and carries no licence restriction on display or caching. Decodes are built from information
+manufacturers submit to NHTSA (49 CFR Part 565), so coverage and accuracy depend on those
+submissions; NHTSA states no service level and may limit automated traffic. No signed terms exist
+to execute, so this adapter adds no `provider-terms` obligation, but before enabling it for a pilot
+an operator re-reads the current vPIC page for usage limits and records the date checked here.
+
+**How the adapter behaves.** Each attempt has a timeout (`vin-decoder.nhtsa-vpic.timeout`, default
+4 s, at most 30 s). A connection failure, timeout, HTTP 429 or 5xx is retried up to
+`vin-decoder.nhtsa-vpic.attempts` (default 2, at most 3) after `retry-delay`; any other answer is
+not retried. When no usable answer arrives, the Buyer is told the decoder is unavailable and
+nothing is saved or guessed. vPIC values are kept as vPIC states them; an attribute vPIC leaves
+empty stays absent, and a VIN with no year, make or model is stored as undecodable with no
+attributes. Each Reference Vehicle records its source (`NHTSA vPIC`) and decoder version
+(`nhtsa-vpic-decodevinvalues-adapter-v1`). vPIC is free, so it is not metered as a paid provider.
+
+**Retention.** VINs and decoded attributes are stored in `reference_vehicles` with the brief
+version they belong to, exported with the account, and deleted with the journey or the account.
+NHTSA receives VINs only; what it logs is outside this service's control.

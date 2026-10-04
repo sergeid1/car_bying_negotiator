@@ -1,10 +1,11 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 
 type Option = { id: string; label: string };
 type Model = Option & { trims: Option[] };
 type Make = Option & { models: Model[] };
 type Bounds = { earliestYear: number; latestYear: number; maxMileage: number; minPriceCeiling: number;
-  maxPriceCeiling: number; minRadiusMiles: number; maxRadiusMiles: number; maxChoices: number };
+  maxPriceCeiling: number; minRadiusMiles: number; maxRadiusMiles: number; maxChoices: number;
+  maxReferenceVehicles?: number };
 export type BriefOptions = { reference: { version: string; makes: Make[]; features: Option[] }; bounds: Bounds };
 export type ShoppingBrief = {
   journeyId: string; version: number; referenceListVersion: string; yearFrom: number; yearTo: number; make: Option;
@@ -12,8 +13,12 @@ export type ShoppingBrief = {
   jurisdiction: string; radiusMiles: number; mustHaveFeatures: Option[]; niceToHaveFeatures: Option[]; createdAt: string;
 };
 type JourneyState = "SHOPPING" | "NEGOTIATING" | "AGREED" | "TEST_DRIVE_SCHEDULED" | "CLOSED" | "ABANDONED";
+export type ReferenceAttribute = { attribute: string; label: string; value: string; source: string; decoderVersion: string;
+  relevant: boolean };
+export type ReferenceVehicle = { referenceId: string; vin: string; outcome: "DECODED" | "UNDECODABLE"; source: string;
+  decoderVersion: string; decodedAt: string; attributes: ReferenceAttribute[] };
 export type Journey = { id: string; state: JourneyState; createdAt: string; updatedAt: string; brief: ShoppingBrief;
-  versions: { version: number; createdAt: string }[] };
+  versions: { version: number; createdAt: string }[]; referenceVehicles?: ReferenceVehicle[] };
 type JourneySummary = { id: string; state: JourneyState; createdAt: string; updatedAt: string; currentVersion: number;
   yearFrom: number; yearTo: number; make: string; model: string };
 type FieldError = { field: string; message: string; reason?: string | null; candidateJurisdictions?: string[] };
@@ -133,6 +138,12 @@ export function BuyingJourneys({ session, onSessionEnded }: { session: string; o
   } else if (view.mode === "open") {
     const { journey, shown } = view;
     body = <JourneyDetail journey={journey} shown={shown} busy={busy}
+      references={<ReferenceVehicles key={journey.id} session={session} journey={journey} shownVersion={shown.version}
+        maxVehicles={options.bounds.maxReferenceVehicles ?? 5} onSessionEnded={onSessionEnded}
+        onSaved={async saved => {
+          setView({ mode: "open", journey: saved, shown: saved.brief });
+          await refreshList().catch(() => undefined);
+        }} />}
       onBack={() => show({ mode: "list" })}
       onEdit={() => show({ mode: "edit", journey })}
       onVersion={version => run(async () => {
@@ -173,8 +184,8 @@ export function BuyingJourneys({ session, onSessionEnded }: { session: string; o
   </section>;
 }
 
-function JourneyDetail({ journey, shown, busy, onBack, onEdit, onVersion, onDelete }: {
-  journey: Journey; shown: ShoppingBrief; busy: boolean; onBack: () => void; onEdit: () => void;
+function JourneyDetail({ journey, shown, busy, references, onBack, onEdit, onVersion, onDelete }: {
+  journey: Journey; shown: ShoppingBrief; busy: boolean; references: ReactNode; onBack: () => void; onEdit: () => void;
   onVersion: (version: number) => void; onDelete: () => void;
 }) {
   const [confirmed, setConfirmed] = useState(false);
@@ -206,11 +217,170 @@ function JourneyDetail({ journey, shown, busy, onBack, onEdit, onVersion, onDele
       <button disabled={busy} onClick={onEdit}>Edit brief</button>
       <button className="btn-ghost" disabled={busy} onClick={onBack}>Back to journeys</button>
     </div>
+    {references}
     <h3>Delete this journey</h3>
-    <p>Deleting removes this Buying Journey and every version of its Shopping Brief at once. This cannot be undone.</p>
+    <p>Deleting removes this Buying Journey, every version of its Shopping Brief and every Reference Vehicle VIN at once.
+      This cannot be undone.</p>
     <label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I want to permanently delete this Buying Journey and every version of its Shopping Brief.</label>
     <button className="btn-danger" disabled={busy || !confirmed} onClick={onDelete}>Delete Buying Journey</button>
   </>;
+}
+
+const vehicleName = (vehicle: ReferenceVehicle, position: number) => {
+  const value = (attribute: string) => vehicle.attributes.find(a => a.attribute === attribute)?.value;
+  const named = ["MODEL_YEAR", "MAKE", "MODEL", "TRIM"].map(value).filter(Boolean).join(" ");
+  return `Reference Vehicle ${position}${named ? `: ${named}` : ""}`;
+};
+
+/**
+ * VINs of cars the Buyer likes. Each is checksum-checked and decoded by the server; the Buyer marks
+ * which decoded details matter, and only those refine matching. Every change saves a new brief version.
+ */
+function ReferenceVehicles({ session, journey, shownVersion, maxVehicles, onSaved, onSessionEnded }: {
+  session: string; journey: Journey; shownVersion: number; maxVehicles: number;
+  onSaved: (journey: Journey) => Promise<void>; onSessionEnded: () => void;
+}) {
+  const current = shownVersion === journey.brief.version;
+  const [earlier, setEarlier] = useState<ReferenceVehicle[]>();
+  const [vin, setVin] = useState("");
+  const [vinError, setVinError] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const vinInput = useRef<HTMLInputElement>(null);
+  const base = `/api/v1/journeys/${encodeURIComponent(journey.id)}`;
+
+  useEffect(() => {
+    setEarlier(undefined); setError("");
+    if (current) return;
+    let live = true;
+    call<ReferenceVehicle[]>(`${base}/briefs/${shownVersion}/reference-vehicles`, session)
+      .then(loaded => { if (live) setEarlier(Array.isArray(loaded) ? loaded : []); })
+      .catch((failure: Problem) => {
+        if (!live) return;
+        if (failure?.status === 401) onSessionEnded();
+        else setError("The Reference Vehicles of this version could not be loaded. Choose the version again to retry.");
+      });
+    return () => { live = false; };
+  }, [current, shownVersion, journey.id, session]);
+
+  const vehicles = current ? journey.referenceVehicles ?? [] : earlier;
+  const full = (vehicles?.length ?? 0) >= maxVehicles;
+
+  async function save(action: () => Promise<Journey>, notice: (saved: Journey) => string, failure: string) {
+    setBusy(true); setError(""); setMessage(""); setVinError("");
+    try {
+      const saved = await action();
+      await onSaved(saved);
+      setMessage(notice(saved));
+      return true;
+    } catch (thrown) {
+      const outcome = thrown as Problem;
+      const vinProblem = outcome?.errors?.find(e => e.field === "vin");
+      if (outcome?.status === 401) onSessionEnded();
+      else if (vinProblem) {
+        setVinError(vinProblem.message);
+        window.setTimeout(() => vinInput.current?.focus(), 0);
+      } else if (outcome?.status === 409) {
+        const latest = await call<Journey>(base, session).catch(() => undefined);
+        if (latest) await onSaved(latest);
+        setError(outcome.detail ?? "This Shopping Brief changed since you opened it. Review the latest version and try again.");
+      } else setError(outcome?.detail ?? failure);
+      return false;
+    } finally { setBusy(false); }
+  }
+
+  async function add(event: FormEvent) {
+    event.preventDefault();
+    const added = await save(() => call<Journey>(`${base}/reference-vehicles`, session, { method: "POST",
+      body: JSON.stringify({ basedOnVersion: journey.brief.version, vin: vin.trim() }) }), saved => {
+      if (saved.brief.version === journey.brief.version) return "That VIN is already a Reference Vehicle in this brief, so nothing changed.";
+      const last = saved.referenceVehicles?.at(-1);
+      return last?.outcome === "UNDECODABLE"
+        ? `Added as brief version ${saved.brief.version}. The decoder returned no details for this VIN, so it cannot refine matching.`
+        : `Added as brief version ${saved.brief.version}. Mark which decoded details matter to you.`;
+    }, "The VIN could not be added. Retry safely.");
+    if (added) setVin("");
+  }
+
+  return <section className="reference-vehicles" aria-labelledby="reference-vehicles-heading">
+    <h3 id="reference-vehicles-heading">Reference Vehicles</h3>
+    <p>Add the VIN of up to {maxVehicles} cars you like. Each VIN is checked and decoded into its year, make, model, trim,
+      body, drivetrain, engine and transmission. You choose which decoded details matter, and only those refine matching.
+      Every change saves a new brief version. VINs are personal data and are deleted with this journey.</p>
+    {!current && <p className="muted">Reference Vehicles of brief version {shownVersion}, read only.</p>}
+    {vehicles === undefined ? !error && <p role="status">Loading Reference Vehicles…</p>
+      : vehicles.length === 0 ? <p className="muted">No Reference Vehicles in this version.</p>
+      : <ol className="reference-list" aria-label={`Reference Vehicles, version ${shownVersion}`}>
+        {vehicles.map((vehicle, index) => <li key={`${vehicle.referenceId}-${shownVersion}`}>
+          <ReferenceVehicleCard vehicle={vehicle} position={index + 1} editable={current} busy={busy}
+            onRelevance={relevant => save(() => call<Journey>(
+              `${base}/reference-vehicles/${encodeURIComponent(vehicle.referenceId)}/relevance`, session, { method: "PUT",
+                body: JSON.stringify({ basedOnVersion: journey.brief.version, relevantAttributes: relevant }) }),
+              saved => saved.brief.version === journey.brief.version ? "Nothing changed, so no new version was saved."
+                : `Saved which details matter as brief version ${saved.brief.version}.`,
+              "Your choice could not be saved. Retry safely.")}
+            onRemove={() => save(() => call<Journey>(`${base}/reference-vehicles/${encodeURIComponent(vehicle.referenceId)}`
+              + `?basedOnVersion=${journey.brief.version}`, session, { method: "DELETE" }),
+              saved => `Removed as brief version ${saved.brief.version}. Earlier versions still list it.`,
+              "The Reference Vehicle could not be removed. Retry safely.")} />
+        </li>)}
+      </ol>}
+    {current && (full
+      ? <p className="notice">This brief holds the most Reference Vehicles it can ({maxVehicles}). Remove one to add another.</p>
+      : <form className="reference-add" aria-label="Add a Reference Vehicle" noValidate onSubmit={add}>
+        <label>VIN of a car you like
+          <input ref={vinInput} value={vin} maxLength={17} autoComplete="off" spellCheck={false} autoCapitalize="characters"
+            aria-describedby={vinError ? "reference-vin-help reference-vin-error" : "reference-vin-help"}
+            {...(vinError ? { "aria-invalid": true } : {})} onChange={event => { setVin(event.target.value); setVinError(""); }} />
+        </label>
+        <p className="muted" id="reference-vin-help">The 17-character VIN is on the dashboard by the windshield, the driver's door
+          frame, or the listing. {vehicles?.length ?? 0} of {maxVehicles} added.</p>
+        {vinError && <p className="error field-error" id="reference-vin-error">{vinError}</p>}
+        <button disabled={busy || vin.trim() === ""}>Decode and add VIN</button>
+      </form>)}
+    {message && <p role="status">{message}</p>}
+    {error && <p role="alert">{error}</p>}
+  </section>;
+}
+
+function ReferenceVehicleCard({ vehicle, position, editable, busy, onRelevance, onRemove }: {
+  vehicle: ReferenceVehicle; position: number; editable: boolean; busy: boolean;
+  onRelevance: (relevant: string[]) => void; onRemove: () => void;
+}) {
+  const marked = vehicle.attributes.filter(a => a.relevant).map(a => a.attribute);
+  const [relevant, setRelevant] = useState<string[]>(marked);
+  const changed = relevant.length !== marked.length || relevant.some(a => !marked.includes(a));
+  const name = vehicleName(vehicle, position);
+  const provenance = (attribute: ReferenceAttribute) => `decoded by ${attribute.source}, decoder version ${attribute.decoderVersion}`;
+  return <article className="reference-vehicle" aria-label={name}>
+    <h4>{name}</h4>
+    <p className="muted">VIN <span className="vin">{vehicle.vin}</span>{day(vehicle.decodedAt) && ` · decoded ${day(vehicle.decodedAt)}`}</p>
+    {vehicle.outcome === "UNDECODABLE" || vehicle.attributes.length === 0
+      ? <p className="notice">Decoded details unavailable. {vehicle.source} returned no details for this VIN, so nothing was
+        filled in and this vehicle cannot refine matching.</p>
+      : editable
+        ? <fieldset className="journey-choices reference-attributes">
+          <legend>Details that matter for Reference Vehicle {position}</legend>
+          {vehicle.attributes.map(a => <label key={a.attribute}>
+            <input type="checkbox" checked={relevant.includes(a.attribute)} disabled={busy}
+              onChange={event => setRelevant(event.target.checked ? [...relevant, a.attribute] : relevant.filter(v => v !== a.attribute))} />
+            <span><strong>{a.label}:</strong> {a.value} <span className="muted reference-source">({provenance(a)})</span></span>
+          </label>)}
+        </fieldset>
+        : <dl className="facts" aria-label={`Decoded details of Reference Vehicle ${position}`}>
+          {vehicle.attributes.map(a => <div key={a.attribute}>
+            <dt>{a.label}</dt>
+            <dd>{a.value} · {a.relevant ? "Matters" : "Does not matter"} <span className="muted reference-source">({provenance(a)})</span></dd>
+          </div>)}
+        </dl>}
+    {editable && <div className="actions">
+      {vehicle.outcome === "DECODED" && vehicle.attributes.length > 0 &&
+        <button className="btn-secondary" disabled={busy || !changed} onClick={() => onRelevance(relevant)}>
+          Save details that matter for Reference Vehicle {position}</button>}
+      <button className="btn-ghost" disabled={busy} onClick={onRemove}>Remove Reference Vehicle {position}</button>
+    </div>}
+  </article>;
 }
 
 const whole = (value: string) => {

@@ -18,3 +18,7 @@ interface ShoppingBriefVersionRepository extends JpaRepository<ShoppingBriefVers
   Optional<ShoppingBriefVersionEntity> findFirstByJourneyIdOrderByVersionDesc(String journeyId);
   Optional<ShoppingBriefVersionEntity> findByJourneyIdAndVersion(String journeyId, int version);
 }
+
+interface ReferenceVehicleRepository extends JpaRepository<ReferenceVehicleEntity, ReferenceVehicleEntity.Key> {
+  List<ReferenceVehicleEntity> findByJourneyIdAndBriefVersionOrderByPosition(String journeyId, int briefVersion);
+}
