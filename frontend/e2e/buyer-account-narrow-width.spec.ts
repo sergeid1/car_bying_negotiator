@@ -10,11 +10,20 @@ const ACCOUNT = {
 
 /** The layout gate needs no real service, only the account shapes the panel renders from. */
 async function stubAccountApi(page: Page) {
+  let preferences = ["DEALER_REPLY", "DRAFT_NEEDS_APPROVAL", "MANDATE_EXPIRING", "APPOINTMENT", "ACCOUNT_SECURITY"]
+    .map(type => ({ type, enabled: true, mandatory: type === "ACCOUNT_SECURITY" }));
   await page.route("**/api/v1/**", route => route.fulfill({ status: 204, body: "" }));
   await page.route("**/api/v1/intake-options", route => route.fulfill({ json: { supported: ["US-NC"], consentPolicies: {} } }));
   await page.route("**/api/v1/account/sign-in/verify", route =>
     route.fulfill({ json: { sessionToken: "session-1", expiresAt: "2026-10-17T00:00:00Z" } }));
   await page.route("**/api/v1/account", route => route.fulfill({ json: ACCOUNT }));
+  await page.route("**/api/v1/account/notifications", route => {
+    if (route.request().method() === "PUT") {
+      const change = route.request().postDataJSON();
+      preferences = preferences.map(value => value.type === change.type ? { ...value, enabled: change.enabled } : value);
+    }
+    return route.fulfill({ json: preferences });
+  });
   await page.route("**/api/v1/account/deletion", route => route.fulfill({ status: 202,
     json: { state: "DELETION_PENDING", failureCode: null, cases: [{ caseId: ACCOUNT.cases[0].caseId, state: "DELETION_PENDING" }] } }));
 }
@@ -56,11 +65,20 @@ test("signing in, the account screen and the deletion receipt fit 360 px", async
   await panel.getByRole("button", { name: "Finish signing in" }).click();
   await expect(panel.getByText(ACCOUNT.contact.email)).toBeVisible();
   await expect(panel.getByRole("list", { name: "Attached Buying Cases" })).toContainText("Open");
+  await expect(panel.getByLabel("Account security (required)")).toBeChecked();
+  await expect(panel.getByLabel("Account security (required)")).toBeDisabled();
+  for (const label of ["Dealer replies", "Drafts needing approval", "Mandate expiry", "Appointments"]) {
+    await expect(panel.getByLabel(label)).toBeChecked();
+    await panel.getByLabel(label).click();
+    await expect(panel.getByLabel(label)).not.toBeChecked();
+    await expect(panel.getByLabel(label)).toBeEnabled();
+  }
   await expectNoOverflowOrViolations(page);
 
   // The session survives a page reload.
   await page.reload();
   await expect(panel.getByText(ACCOUNT.contact.email)).toBeVisible();
+  await expect(panel.getByLabel("Dealer replies")).not.toBeChecked();
 
   await panel.getByLabel(/permanently delete my Buyer Account/).check();
   await panel.getByRole("button", { name: "Delete Buyer Account" }).click();

@@ -62,3 +62,30 @@ job `DELETED` with verification `ACCOUNT_GRAPH_AND_CASES_ABSENT_V1` once every a
 verified `DELETED`. `GET /api/v1/account/deletion` with the old session token reads the receipt,
 which holds no contact details or credentials. Backup expiry is reported as `UNKNOWN`, as for
 cases.
+
+## Notifications
+
+`BuyerNotifications.notify(accountId, type, dedupeKey)` emails the account's verified address
+through the `RecoveryEmail` adapter, after the producer's own transaction commits. Types are
+`DEALER_REPLY`, `DRAFT_NEEDS_APPROVAL`, `MANDATE_EXPIRING`, `APPOINTMENT` and the mandatory
+`ACCOUNT_SECURITY`. Each email is a fixed prompt plus the journey URL. It holds no amounts,
+dealer names, VINs, document content, case credential or sign-in token, so reading the journey
+still requires sign-in.
+
+`GET`/`PUT /api/v1/account/notifications` (`Account-Session-Token`) read and set each optional
+type. Every optional type is on until turned off. `ACCOUNT_SECURITY` cannot be turned off.
+
+Each `(account, type, dedupeKey)` is attempted at most once. The key is stored only as a keyed
+hash. Optional and security email each have a rolling-hour quota
+(`account.notifications.hourly-limit`, default 10). Every attempt records its delivery state
+(`DELIVERY_UNKNOWN`, `SENT`, `FAILED`, `OPTED_OUT` or `RATE_LIMITED`); no address, body or link is
+stored or logged. `SENT` means the adapter accepted the message. Failed and uncertain attempts
+are not retried.
+
+`MandateExpiryNotifier` sends `MANDATE_EXPIRING` once per mandate version
+(`mandate-expiring:<mandate id>`), when an active mandate on an account-attached case comes
+within `account.notifications.mandate-expiring-notice` (default `PT24H`) of expiry. It checks
+every `account.notifications.mandate-expiring-sweep` (default `PT5M`). A mandate whose whole
+lifetime fits inside the notice window gets no warning. The other producers arrive with tickets
+60, 61 and 65. Account export includes preferences and delivery states, and account deletion
+removes both notification tables.

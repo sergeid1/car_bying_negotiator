@@ -876,7 +876,7 @@ class DocumentExtractionAcceptanceTest {
     }
   }
 
-  private static JsonNode awaitExtraction(
+  static JsonNode awaitExtraction(
       RunningApplication application, String operationId, String token) throws Exception {
     long deadline = System.nanoTime() + java.time.Duration.ofSeconds(10).toNanos();
     JsonNode operation;
@@ -892,7 +892,7 @@ class DocumentExtractionAcceptanceTest {
     throw new AssertionError("Extraction did not finish: " + operation);
   }
 
-  private static JsonNode find(JsonNode values, String property, String expected) {
+  static JsonNode find(JsonNode values, String property, String expected) {
     for (JsonNode value : values) {
       if (value.path(property).asText().equals(expected)) {
         return value;
@@ -901,7 +901,7 @@ class DocumentExtractionAcceptanceTest {
     throw new AssertionError("Missing " + property + "=" + expected);
   }
 
-  private static Map<String, Object> validCase() {
+  static Map<String, Object> validCase() {
     return Map.of(
         "buyerPostalCode", "27601",
         "dealerPostalCode", "27604",
@@ -912,7 +912,7 @@ class DocumentExtractionAcceptanceTest {
             "anonymizedResearch", Map.of("granted", false, "policyVersion", "research.v1")));
   }
 
-  private static byte[] twoPagePdf() throws Exception {
+  static byte[] twoPagePdf() throws Exception {
     try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
       document.addPage(new PDPage());
       document.addPage(new PDPage());
@@ -961,10 +961,10 @@ class DocumentExtractionAcceptanceTest {
     }
   }
 
-  private static final class NamedBytes extends ByteArrayResource {
+  static final class NamedBytes extends ByteArrayResource {
     private final String filename;
 
-    private NamedBytes(String filename, byte[] bytes) {
+    NamedBytes(String filename, byte[] bytes) {
       super(bytes);
       this.filename = filename;
     }

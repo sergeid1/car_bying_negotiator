@@ -4,6 +4,7 @@ import { RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess, Sav
 import { CaseLifecycle } from "./CaseLifecycle";
 import { BuyerAccount } from "./BuyerAccount";
 import { PricePlan } from "./PricePlan";
+import { NegotiationMandate } from "./NegotiationMandate";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { BuyingCaseIntake } from "./BuyingCaseIntake";
 import { ReferralDisclosure } from "./AcquisitionChannel";
@@ -271,6 +272,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             {caseCredentials && !caseRevoked && <OfferVerification key={`verify-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
               onOfferFrozen={offer => setFrozenOffer({ caseId: caseCredentials.caseId, version: offer.version })} />}
             {caseCredentials && !caseRevoked && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
+            {caseCredentials && !caseRevoked && <NegotiationMandate key={`mandate-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <VerifiedOfferAnalysis key={`analysis-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
               offerVersion={frozenOffer?.caseId === caseCredentials.caseId ? frozenOffer.version : undefined} pollDelayMs={pollDelayMs} />}
           </div>

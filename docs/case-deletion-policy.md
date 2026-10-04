@@ -173,3 +173,12 @@ anonymous purchase counters cannot reconstruct dates or financials and are expli
 reported as unavailable historical coverage, never backfilled or imputed. Buyer
 exports and downloaded copies retain their existing scope; this measurement adds no
 external retained dataset or backup-erasure claim.
+
+## Negotiation Mandates (ticket 57)
+
+V30 `negotiation_mandates` and `negotiation_mandate_revocations` belong to the case. Each row holds
+the approved target, walk-away ceiling, permitted disclosure codes, autonomy mode, expiry and
+approval or revocation time. CaseGraphDeletionPlan erases revocations, then mandates, before the
+Deal Plan snapshots they reference. Approval, revocation and expiry audit events are erased with
+`audit_events`. Nothing about a mandate is kept in any anonymous total. Both tables are included
+in the case export.
