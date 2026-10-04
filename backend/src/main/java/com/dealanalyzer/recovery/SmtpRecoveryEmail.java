@@ -23,10 +23,20 @@ class SmtpRecoveryEmail implements RecoveryEmail {
       message.setSubject("Your Deal X-Ray sign-in link");
       message.setText("You asked to sign in to your Buyer Account. This single-use link expires in 15 minutes.\n"
           + link + "\nIf you did not request this, ignore this email. No account is used until the link is opened.");
-    } else {
+    } else if (purpose == Purpose.CASE_RECOVERY) {
       message.setSubject("Your Buying Case access link");
       message.setText("You requested Buying Case access. This single-use link expires in 15 minutes.\n"
           + link + "\nIf you did not request this, ignore this email.");
+    } else {
+      message.setSubject("Your Buyer Account has an update");
+      String prompt = switch (purpose) {
+        case DEALER_REPLY -> "A reply is ready to review.";
+        case DRAFT_NEEDS_APPROVAL -> "A draft needs your approval.";
+        case MANDATE_EXPIRING -> "Your negotiation mandate is about to expire.";
+        case APPOINTMENT -> "An appointment update is ready to review.";
+        default -> "An account-security update is ready to review.";
+      };
+      message.setText(prompt + "\nOpen your journey and sign in to review it.\n" + link);
     }
     try { mailer.send(message); } catch (org.springframework.mail.MailException failure) { throw unavailable(); }
   }

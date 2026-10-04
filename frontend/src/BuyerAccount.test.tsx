@@ -138,3 +138,49 @@ test("contact details never reach the console or analytics-style calls", () => {
   const source = readFileSync("src/BuyerAccount.tsx", "utf8");
   for (const api of ["console.", "sendBeacon", "document.cookie", "sessionStorage", "indexedDB"]) expect(source).not.toContain(api);
 });
+
+test("saves each email preference independently and keeps security email required", async () => {
+  storage.setItem(ACCOUNT_SESSION_KEY, "session-1");
+  let preferences = ["DEALER_REPLY", "DRAFT_NEEDS_APPROVAL", "MANDATE_EXPIRING", "APPOINTMENT", "ACCOUNT_SECURITY"]
+    .map(type => ({ type, enabled: true, mandatory: type === "ACCOUNT_SECURITY" }));
+  const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input) !== "/api/v1/account/notifications") return json(account());
+    if (init?.method === "PUT") {
+      const change = JSON.parse(String(init.body));
+      preferences = preferences.map(value => value.type === change.type ? { ...value, enabled: change.enabled } : value);
+    }
+    return json(preferences);
+  });
+  vi.stubGlobal("fetch", fetcher);
+  render(<BuyerAccount />);
+  const user = userEvent.setup();
+  const security = await screen.findByLabelText("Account security (required)");
+  expect(security).toBeChecked(); expect(security).toBeDisabled();
+  for (const label of ["Dealer replies", "Drafts needing approval", "Mandate expiry", "Appointments"]) {
+    await user.click(screen.getByLabelText(label));
+    await waitFor(() => expect(screen.getByLabelText(label)).not.toBeChecked());
+    expect(screen.getByLabelText(label)).not.toBeDisabled();
+  }
+  expect(screen.getByRole("status")).toHaveTextContent("Email preferences saved.");
+  expect(fetcher.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(4);
+  cleanup(); render(<BuyerAccount />);
+  expect(await screen.findByLabelText("Dealer replies")).not.toBeChecked();
+});
+
+test("failed email preference saves retain the saved value and can be retried", async () => {
+  storage.setItem(ACCOUNT_SESSION_KEY, "session-1");
+  let fail = true;
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input) !== "/api/v1/account/notifications") return json(account());
+    if (init?.method === "PUT" && fail) return json({}, 503);
+    return json([{ type: "DEALER_REPLY", enabled: init?.method !== "PUT", mandatory: false }]);
+  }));
+  render(<BuyerAccount />);
+  const user = userEvent.setup();
+  await user.click(await screen.findByLabelText("Dealer replies"));
+  expect(await screen.findByRole("alert")).toHaveTextContent("could not be saved");
+  expect(screen.getByLabelText("Dealer replies")).toBeChecked();
+  fail = false;
+  await user.click(screen.getByLabelText("Dealer replies"));
+  await waitFor(() => expect(screen.getByLabelText("Dealer replies")).not.toBeChecked());
+});
