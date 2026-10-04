@@ -376,6 +376,79 @@ they are not purchases and never contribute to conversion or revenue here. This 
 takes **no continue, reprice or stop decision**, changes no frozen thresholds, and
 publishes no case studies. Ticket 33 owns those decisions and publication.
 
+## Frozen financial decision thresholds (ticket 33 machinery)
+
+All `/api/v1/operator/contribution/decisions` endpoints require the same SUPPORT
+Bearer credential and no-store responses as contribution metrics. There are no
+default thresholds, automatic decisions, or real pilot conclusions supplied here.
+Dates use the report's half-open UTC-day case-start window, with lifetime activity
+as of the first read. The report's paid denominator is all case starts, **not only
+qualified cases**; do not relabel it as qualified-case conversion.
+
+`POST /decisions/thresholds` (relative to `/api/v1/operator/contribution`) accepts:
+
+```json
+{
+  "from": "2026-10-01", "to": "2026-11-01",
+  "thresholds": [
+    {"decision":"CONTINUE", "metric":"PAID_PURCHASE_RATE", "bound":"AT_LEAST", "value":0.5, "minimumDenominator":20},
+    {"decision":"REPRICE", "metric":"MEDIAN_CONTRIBUTION_USD", "bound":"AT_MOST", "value":10, "minimumDenominator":10},
+    {"decision":"STOP", "metric":"REFUND_RATE", "bound":"AT_LEAST", "value":0.2, "minimumDenominator":10}
+  ]
+}
+```
+
+These numbers are API examples, not approved thresholds. Operators supply values
+for all three actions. Allowed metrics also include `COMPLETED_REPORT_RATE`.
+Rate values are in [0,1]; margin values are USD and may be negative. Minimum
+denominators must be positive. One action/metric pair appears once in each version.
+Each successful freeze appends a timestamped version; prior versions never change.
+
+The first successful contribution `/metrics` read or `POST /decisions/review?from=…&to=…`
+opens outcome review and durably saves the first full aggregate snapshot, even if
+no threshold has been frozen. Freeze is then refused with 409 for that window or
+any overlapping window. A shared database row lock serializes freeze and review,
+including concurrent callers. No update, unfreeze, or review reset endpoint exists.
+The guard is updated inside the transaction so a concurrent repeatable-read caller
+with stale history aborts rather than committing a late freeze; retry an aborted
+request to read the current state.
+`GET /decisions?from=…&to=…` reads threshold/review/decision history without opening
+review. Ordinary metric reads still return current values; `/decisions/review`
+returns the original snapshot. The guard covers these service endpoints, not
+off-platform knowledge or past cumulative pilot reports without this window model;
+operators must preregister before examining that evidence too.
+
+After opening review, `POST /decisions?from=…&to=…` accepts
+`{"thresholdVersion":1,"decision":"REPRICE","rationale":"INSUFFICIENT_EVIDENCE"}`.
+Rationale is one of `ECONOMICS_ACCEPTABLE`, `PRICE_OR_COST_CHANGE_NEEDED`,
+`ECONOMICS_UNACCEPTABLE`, or `INSUFFICIENT_EVIDENCE`; no free text or caller-supplied
+metric values are retained. A human chooses the action, including when evidence
+does not meet the thresholds. The immutable record references the selected frozen
+version and freeze/review times, includes the saved snapshot and all thresholds'
+`MET`, `NOT_MET`, or `NOT_MEASURABLE` evaluations, and carries denominators.
+Identical decision retries succeed; changed decisions return 409. One decision is
+recorded per window. A follow-up review needs a new non-overlapping window.
+
+Zero or below-minimum denominators are not measurable. A margin with unavailable
+pricing, unknown costs, unsupported currency, or any excluded paid cases cannot
+count as met, even if its partial median passes. Incomplete historical deletion
+coverage makes all threshold evaluations not measurable. Rate denominators are
+case starts (purchase/completion), paid purchases (refund), or all paid cases
+(margin, with measurable/excluded counts also supplied).
+
+V43 stores only global immutable threshold, review, and decision records, with no
+case associations or identifiers. They need no case export/deletion projections;
+the source records still follow existing export/deletion rules. The saved snapshot
+is an aggregate historical record, not retained Buyer feedback. Small windows
+require the same prohibition on identifying Buyers through differencing.
+Buyer-reported outcomes and willingness-to-pay responses are excluded entirely:
+verified offer presence is document evidence, not proof of an improved outcome;
+neither self-reports nor surveys establish paid revenue or verified savings.
+Actual paid conversion, margin evidence, and a pilot decision remain open pending
+real records and operator review. No case study is invented; publication follows
+`docs/case-study-policy.md` and `docs/case-studies/template.md`, with the test gate
+checking every file in `docs/case-studies/published/`.
+
 ## Explainer guide channel codes (ticket 47)
 
 Two first-party explainer guides link to case intake with a channel code through the existing

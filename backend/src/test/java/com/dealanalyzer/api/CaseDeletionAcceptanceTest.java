@@ -124,7 +124,8 @@ class CaseDeletionAcceptanceTest {
           "case_deletion_jobs", "case_deletion_attempts",
           "pilot_protocol", "pilot_cohort_totals", "pilot_observations",
           "acquisition_channels", "acquisition_channel_spend", "acquisition_channel_totals",
-          "purchase_totals", "contribution_totals").contains(table)) continue;
+          "purchase_totals", "contribution_totals", "contribution_review_guard",
+          "contribution_decision_records").contains(table)) continue;
       assertThat(jdbc.queryForObject("select count(*) from " + table, Long.class)).as(table).isZero();
     }
     try (var files = java.nio.file.Files.list(objects)) { assertThat(files.toList()).isEmpty(); }
