@@ -12,6 +12,8 @@ class CaseExportProjection {
   CaseExportProjection(EntityManager manager, ObjectMapper json) { this.manager=manager; this.json=json; }
   ObjectNode read(String caseId) {
     var result=json.createObjectNode();
+    result.set("negotiation_drafts", rows("negotiation_drafts", "id, case_id, quote_request_id, mandate_id, report_version, dealer_offer_id, proposal_minor, grounds_json, state, cancel_reason, message_id, created_at, decided_at", "case_id = :caseId", caseId));
+    result.set("negotiation_draft_revisions", rows("negotiation_draft_revisions", "id, case_id, negotiation_draft_id, revision, outbound_draft_id, edited_by_buyer, created_at", "case_id = :caseId", caseId));
     result.set("agreed_prices", rows("agreed_prices", "id, case_id, acceptance_request_id, dealer_offer_id, offer_version, baseline_id, baseline_version, actor, accepted_at, evidence_message_id, evidence_document_id, journey_result_json", "case_id = :caseId", caseId));
     result.set("quote_acceptance_requests", rows("quote_acceptance_requests", "id, case_id, quote_request_id, draft_id, offer_version, plan_version, evidence_message_id, evidence_document_id, kind, state, message_id, created_at", "case_id = :caseId", caseId));
     result.set("quote_requests", rows("quote_requests", "id, case_id, draft_id, dealer_address, state, message_id, approved_at, created_at", "case_id = :caseId", caseId));

@@ -45,6 +45,9 @@ public class NegotiationStateService {
       throw new IllegalArgumentException("This state is determined by the mandate.");
     save(caseId, mandates.activeMandate(caseId).orElseThrow().id(), next);
   }
+  /** Revocation and recorded expiry settle the state, and cancel queued drafts, in the mandate's own transaction. */
+  @org.springframework.context.event.EventListener
+  public void mandateEnded(MandateService.MandateEnded event) { current(event.caseId()); }
   @Transactional
   public void dealerReply(String caseId) {
     if (current(caseId) == State.AWAITING_DEALER) transition(caseId, State.AWAITING_BUYER);
@@ -54,5 +57,9 @@ public class NegotiationStateService {
     if (jdbc.update("update case_negotiation_states set mandate_id = ?, state = ?, updated_at = ? where case_id = ?",
         mandate, state.name(), now, caseId) == 0)
       jdbc.update("insert into case_negotiation_states(case_id, mandate_id, state, updated_at) values (?, ?, ?, ?)", caseId, mandate, state.name(), now);
+    // Any state in which nothing may be sent cancels drafts still waiting for the Buyer's approval.
+    if (state == State.STOPPED || state == State.PAUSED || state == State.AGREED || state == State.EXPIRED)
+      jdbc.update("update negotiation_drafts set state = 'CANCELLED', cancel_reason = ?, decided_at = ? where case_id = ? and state = 'PROPOSED'",
+          state.name(), now, caseId);
   }
 }
