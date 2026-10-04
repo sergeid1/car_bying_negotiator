@@ -8,6 +8,7 @@ import { PricePlan } from "./PricePlan";
 import { NegotiationMandate } from "./NegotiationMandate";
 import { DealerRelay } from "./DealerRelay";
 import { QuoteRequest } from "./QuoteRequest";
+import { AgreedPrice } from "./AgreedPrice";
 import { CaseDownloads, RecoveryEmailOptIn, SaveCaseLink } from "./CasePortability";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
@@ -24,6 +25,21 @@ import { ReferralPartnerKit } from "./ReferralPartnerKit";
 import { ACCOUNT_SESSION_KEY, BuyerAccount } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+// Ticket 63: acceptance, written confirmation and saved agreement states.
+test.each(["ACCEPTANCE", "WRITTEN_CONFIRMATION", "AGREED", "BLOCKED", "JOURNEY_OPTIONS"])("Agreed Price %s has no automated AA violations", async state => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+    requests: [{ id: "a1", kind: state === "WRITTEN_CONFIRMATION" ? state : "ACCEPTANCE", state: state === "WRITTEN_CONFIRMATION" ? "SENT" : "DRAFT",
+      offerVersion: 3, planVersion: 2, gatedDraft: { draft: { text: "The Buyer accepts the itemized quote, subject to a test drive and matching paperwork." },
+        decision: { pass: state !== "BLOCKED", gateVersion: "outbound-gate.v2", reasons: state === "BLOCKED" ? [{ code: "NO_ACTIVE_MANDATE", text: "Approve a current mandate." }] : [] } } }],
+    agreedPrice: state === "AGREED" || state === "JOURNEY_OPTIONS" ? { offerVersion: 3, baselineVersion: 2, actor: "BUYER", acceptedAt: "2026-10-04T12:00:00Z",
+      journey: { journeyLinked: state === "JOURNEY_OPTIONS", otherOpenNegotiations: state === "JOURNEY_OPTIONS" ? [{ caseId: "other", label: "Another dealer" }] : [] } } : null,
+  })));
+  const { container } = render(<main><h1>Buying Case</h1><AgreedPrice caseId="case" token="token"
+    quotes={[{ id: "q1", state: "SENT", dealerAddress: "sales@dealer.example" }]} sources={[{ offerVersion: 3 }]} onChanged={async () => {}} /></main>);
+  await screen.findByText(state === "WRITTEN_CONFIRMATION" ? "Request written confirmation" : "Accept verified offer 3");
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
 
 const AA = {
   runOnly: { type: "tag" as const, values: ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"] },

@@ -50,6 +50,20 @@ class OutboundGateTest {
     }
   }
 
+  @Test void conditionalAcceptanceRequiresTheExactCaseBackedQuoteDetails() {
+    String text = "The Buyer accepts your itemized quote for VIN 1HGCM82633A004352 with an out-the-door total of USD 23500.00, received on 2026-10-05 (UTC), subject to a test drive and the final paperwork matching that quote.";
+    String request = "Please send a written, itemized quote for this vehicle.";
+    var ctx = new OutboundGate.GateContext(mandate, Set.of(2_350_000L), Set.of(), Set.of(), Set.of(), null,
+        Set.of(text, request, com.dealanalyzer.quote.WrittenQuoteEvidence.CONFIRMATION), request);
+    assertThat(ctx.quoteRequestQuestion()).isEqualTo(request);
+    assertThat(gate.check(new OutboundGate.Draft("dealer", text), ctx).pass()).isTrue();
+    for (String changed : List.of(text.replace("23500.00", "23500.01"), text.replace("004352", "004353"),
+        text.replace("2026-10-05", "2026-10-06"), text.replace(", subject to a test drive and the final paperwork matching that quote", ""),
+        text + "\n\nThe Buyer will buy."))
+      assertThat(gate.check(new OutboundGate.Draft("dealer", changed), ctx).pass()).as(changed).isFalse();
+    assertThat(check(text).pass()).isFalse();
+  }
+
   @Test void onlyTraceableAmountsAtOrBelowCeilingInTheMandateCurrencyPass() {
     for (String amount : List.of("23000.00", "23500.00", "24000.00"))
       assertThat(check("Would you consider USD " + amount + " as the selling price in a revised written offer?").pass()).isTrue();

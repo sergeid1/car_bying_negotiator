@@ -12,6 +12,8 @@ class CaseExportProjection {
   CaseExportProjection(EntityManager manager, ObjectMapper json) { this.manager=manager; this.json=json; }
   ObjectNode read(String caseId) {
     var result=json.createObjectNode();
+    result.set("agreed_prices", rows("agreed_prices", "id, case_id, acceptance_request_id, dealer_offer_id, offer_version, baseline_id, baseline_version, actor, accepted_at, evidence_message_id, evidence_document_id, journey_result_json", "case_id = :caseId", caseId));
+    result.set("quote_acceptance_requests", rows("quote_acceptance_requests", "id, case_id, quote_request_id, draft_id, offer_version, plan_version, evidence_message_id, evidence_document_id, kind, state, message_id, created_at", "case_id = :caseId", caseId));
     result.set("quote_requests", rows("quote_requests", "id, case_id, draft_id, dealer_address, state, message_id, approved_at, created_at", "case_id = :caseId", caseId));
     result.set("case_negotiation_states", rows("case_negotiation_states", "case_id, mandate_id, state, updated_at", "case_id = :caseId", caseId));
     result.set("analysis_cases", rows("analysis_cases", "id, buyer_zip, dealer_zip, purchase_method, status, vehicle_json, dealer_offer_json, input_json, input_fingerprint, current_report_version, created_at, updated_at, buyer_jurisdiction, dealer_location, max_selling_price_minor, max_out_the_door_price_minor, access_expires_at, core_review_blocked, acquisition_channel", "id = :caseId", caseId));

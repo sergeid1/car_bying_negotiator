@@ -25,13 +25,15 @@ public class OutboundDraftService {
   private final ObjectMapper json;
   private final OutboundGate gate = new OutboundGate();
   private final AccountOutboundPrivacy privacy;
+  private final com.dealanalyzer.quote.WrittenQuoteEvidence writtenQuotes;
 
   public OutboundDraftService(EphemeralBuyingCaseService cases, EphemeralCasePersistence locks,
       MandateService mandates, DealerOfferPersistence offers, EntityManager manager, ObjectMapper json,
-      AccountOutboundPrivacy privacy) {
+      AccountOutboundPrivacy privacy, com.dealanalyzer.quote.WrittenQuoteEvidence writtenQuotes) {
     this.cases = cases; this.locks = locks; this.mandates = mandates; this.offers = offers;
     this.manager = manager; this.json = json;
     this.privacy = privacy;
+    this.writtenQuotes = writtenQuotes;
   }
 
   public record StoredDraft(String id, String caseId, OutboundGate.Draft draft,
@@ -105,16 +107,25 @@ public class OutboundDraftService {
         .setParameter("caseId", caseId).setMaxResults(1).getResultList();
     if (!reports.isEmpty()) report = parse(reports.getFirst().toString(), JsonNode.class);
     var questions = new HashSet<String>();
+    String quoteRequestQuestion = null;
     if (dealerId != null) {
       List<?> listings = manager.createNativeQuery("select v.vin, l.listing_url from vehicles v join listing_snapshots l on l.case_id = v.case_id where v.case_id = :caseId and l.dealer_id = :dealer and l.vin = v.vin order by l.retrieved_at desc, l.id")
           .setParameter("caseId", caseId).setParameter("dealer", dealerId).setMaxResults(1).getResultList();
       if (!listings.isEmpty()) {
         Object[] row = (Object[]) listings.getFirst();
-        try { questions.add(com.dealanalyzer.quote.QuoteRequestText.render((String) row[0], (String) row[1])); }
+        try {
+          quoteRequestQuestion = com.dealanalyzer.quote.QuoteRequestText.render((String) row[0], (String) row[1]);
+          questions.add(quoteRequestQuestion);
+          questions.add(com.dealanalyzer.quote.WrittenQuoteEvidence.CONFIRMATION);
+          writtenQuotes.latest(caseId, dealerId).ifPresent(evidence -> {
+            Long selling = com.dealanalyzer.quote.WrittenQuoteEvidence.amount(evidence.offer().terms(), "SELLING_PRICE");
+            if (mandate != null && selling != null && selling <= mandate.ceilingMinor()) questions.add(evidence.text());
+          });
+        }
         catch (IllegalArgumentException unsupported) { /* Invalid source references authorize no language. */ }
       }
     }
-    return new OutboundGate.GateContext(mandate, amounts, Set.of(), personal, Set.of(), report, questions);
+    return new OutboundGate.GateContext(mandate, amounts, Set.of(), personal, Set.of(), report, questions, quoteRequestQuestion);
   }
 
   private Map<String, Object> snapshot(OutboundGate.GateContext context) {
@@ -123,6 +134,7 @@ public class OutboundDraftService {
     snapshot.put("verifiedAmountsMinor", context.verifiedAmountsMinor().stream().sorted().toList());
     snapshot.put("verifiedDisclosures", context.verifiedDisclosures());
     snapshot.put("caseQuestions", context.caseQuestions());
+    snapshot.put("quoteRequestQuestion", context.quoteRequestQuestion());
     snapshot.put("personalValueCount", context.personalValues().size());
     snapshot.put("releasedForDealer", context.releasedForDealer());
     snapshot.put("reportFingerprint", offers.fingerprint(context.finalizedReport()));

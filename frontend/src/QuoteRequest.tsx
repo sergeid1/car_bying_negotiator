@@ -3,6 +3,7 @@ import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision"
 import { DealerRelay } from "./DealerRelay";
 import { OfferVerification } from "./OfferVerification";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
+import { AgreedPrice } from "./AgreedPrice";
 
 type Quote = { id: string; dealerAddress: string; state: string;
   gatedDraft: { draft: { text: string }; decision: GateDecision } };
@@ -114,6 +115,7 @@ export function QuoteRequest({ caseId, token }: {
             onClick={() => setOfferVersion(document.offerVersion!)}>Open analysis of verified quote {document.offerVersion}</button>)}
       </>}
     </div>
+    {view && <AgreedPrice caseId={caseId} token={token} quotes={view.requests} sources={view.documents} onChanged={refresh} />}
     <DealerRelay key={relayVersion} caseId={caseId} token={token} />
     {review && <OfferVerification caseId={caseId} token={token} onOfferFrozen={offer => {
       setOfferVersion(offer.version); void refresh().catch(() => setError("Refresh to see the latest quote status."));

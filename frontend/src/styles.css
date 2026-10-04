@@ -1627,3 +1627,9 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
 .candidate-reasons li, .candidate-excluded li { overflow-wrap: anywhere; }
 .candidate-excluded summary { cursor: pointer; }
 /* End ticket 55. */
+
+/* Ticket 63: written quote acceptance and dealership summary controls. */
+.agreed-price-panel, .agreed-price-panel .card { min-width: 0; overflow-wrap: anywhere; }
+.agreed-price-panel select { width: 100%; min-width: 0; max-width: 100%; }
+.agreed-price-panel button { max-width: 100%; white-space: normal; }
+/* End ticket 63. */
