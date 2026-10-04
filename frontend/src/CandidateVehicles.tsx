@@ -1,4 +1,8 @@
-import { useRef, useState } from "react";
+import { ReactNode, useRef, useState } from "react";
+
+export type CandidateMarketCheck = { status: string; range: { lowMinor: number; highMinor: number; currency: string } | null;
+  confidence: string; provider: { retrievedAt: string } | null; limitation: string | null;
+  vintage: { oldestObservationAt: string; newestObservationAt: string } | null };
 
 type Reason = { kind: "MUST_HAVE" | "NICE_TO_HAVE" | "REFERENCE"; text: string };
 type Snapshot = { source: string; retrievedAt: string; observedAt: string | null; staleness: "CURRENT" | "STALE" | "UNKNOWN";
@@ -6,7 +10,7 @@ type Snapshot = { source: string; retrievedAt: string; observedAt: string | null
 export type CandidateVehicle = { listingId: string; vin: string | null; title: string; year: number | null; make: string | null;
   model: string | null; trim: string | null; mileage: number | null; distanceMiles: number | null;
   advertisedPriceMinor: number | null; currency: string | null; matched: Reason[]; missed: Reason[]; unconfirmed: Reason[];
-  snapshot: Snapshot };
+  snapshot: Snapshot; candidateId?: string; marketCheck?: CandidateMarketCheck };
 type Excluded = { listingId: string; vin: string | null; title: string; missed: Reason[]; snapshot: Snapshot };
 export type CandidateResults = { matcherVersion: string; briefVersion: number; referenceListVersion: string;
   availability: "AVAILABLE" | "UNAVAILABLE" | "TIMED_OUT" | "RATE_LIMITED"; notice: string | null;
@@ -30,8 +34,9 @@ const amount = (minor: number, currency: string | null) => {
  * words which criteria and reference details it matches, misses, or the listing does not state; the
  * order comes only from the brief, the Reference Vehicles and what each listing states.
  */
-export function CandidateVehicles({ briefVersion, search, onSessionEnded }: {
+export function CandidateVehicles({ briefVersion, search, onSessionEnded, actions }: {
   briefVersion: number; search: () => Promise<CandidateResults>; onSessionEnded: () => void;
+  actions?: (candidate: CandidateVehicle) => ReactNode;
 }) {
   const [results, setResults] = useState<CandidateResults>();
   const [busy, setBusy] = useState(false);
@@ -71,6 +76,7 @@ export function CandidateVehicles({ briefVersion, search, onSessionEnded }: {
           : <ol className="candidate-list" aria-label={`Candidate Vehicles, brief version ${results.briefVersion}`}>
             {results.candidates.map((candidate, index) => <li key={`${candidate.snapshot.source}-${candidate.listingId}`}>
               <CandidateCard candidate={candidate} position={index + 1} />
+              {actions?.(candidate)}
             </li>)}
           </ol>}
         {results.excluded.length > 0 && <details className="candidate-excluded">
@@ -88,7 +94,7 @@ export function CandidateVehicles({ briefVersion, search, onSessionEnded }: {
   </section>;
 }
 
-function CandidateCard({ candidate, position }: { candidate: CandidateVehicle; position: number }) {
+export function CandidateCard({ candidate, position }: { candidate: CandidateVehicle; position: number }) {
   const { snapshot } = candidate;
   const name = `Candidate ${position}: ${candidate.title}`;
   const reasons = (label: string, list: Reason[]) => list.length > 0 && <div className="candidate-reasons">
@@ -104,6 +110,7 @@ function CandidateCard({ candidate, position }: { candidate: CandidateVehicle; p
         : `${amount(candidate.advertisedPriceMinor, candidate.currency)} (advertised, not a quote)`}</dd></div>
       <div><dt>VIN</dt><dd className="vin">{candidate.vin ?? "Not stated"}</dd></div>
     </dl>
+    <CandidateMarketAssessment check={candidate.marketCheck} />
     <p className="muted candidate-snapshot">Listing Snapshot from {snapshot.source}, retrieved {moment(snapshot.retrievedAt)}
       {snapshot.observedAt && `; listing last seen ${moment(snapshot.observedAt)}`}.
       {snapshot.synthetic && " Synthetic listing, not for sale."}</p>
@@ -115,4 +122,16 @@ function CandidateCard({ candidate, position }: { candidate: CandidateVehicle; p
     {reasons("Misses", candidate.missed)}
     {reasons("Not stated in the listing", candidate.unconfirmed)}
   </article>;
+}
+
+export function CandidateMarketAssessment({ check }: { check?: CandidateMarketCheck }) {
+  if (!check) return <p className="muted">Advertised-price market check unavailable.</p>;
+  return <div className="candidate-market-check">
+    <p><strong>Advertised-price market check</strong> — not a dealer quote.</p>
+    <p>{check.range ? `Estimated selling-price range: ${amount(check.range.lowMinor, check.range.currency)}–${amount(check.range.highMinor, check.range.currency)}.`
+      : "No estimated price range is available."} Confidence: {check.confidence.toLowerCase().replaceAll("_", " ")}.</p>
+    <p className="muted">Freshness: {check.provider?.retrievedAt ? `retrieved ${moment(check.provider.retrievedAt)}` : "retrieval time unavailable"}
+      {check.vintage ? `; observations ${moment(check.vintage.oldestObservationAt)} to ${moment(check.vintage.newestObservationAt)}` : ""}.</p>
+    {check.limitation && <p className="muted">{check.limitation}</p>}
+  </div>;
 }

@@ -1633,3 +1633,27 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
 .agreed-price-panel select { width: 100%; min-width: 0; max-width: 100%; }
 .agreed-price-panel button { max-width: 100%; white-space: normal; }
 /* End ticket 63. */
+
+/* Ticket 61: negotiation conversation view. */
+.negotiation-conversation, .negotiation-conversation .card { min-width: 0; overflow-wrap: anywhere; }
+.negotiation-conversation pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; margin: 8px 0; font: inherit; }
+.negotiation-conversation select, .negotiation-conversation textarea { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.negotiation-conversation button { max-width: 100%; white-space: normal; }
+.negotiation-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin: 12px 0; }
+.negotiation-controls form { flex: 1 1 100%; min-width: 0; }
+.conversation-timeline { margin: 12px 0; padding-left: 1.2rem; }
+.conversation-timeline > li + li { margin-top: 16px; }
+.conversation-when { color: var(--ink-muted); margin: 0 0 4px; }
+.conversation-revision { border-top: 1px solid var(--line, currentColor); padding-top: 8px; margin-top: 8px; min-width: 0; }
+/* End ticket 61. */
+
+/* Ticket 56: saved shortlist and case confirmation. */
+.journey-shortlist, .candidate-case-form { display: grid; gap: 12px; min-width: 0; overflow-wrap: anywhere; }
+.journey-shortlist { margin-top: 20px; }
+.journey-shortlist button { max-width: 100%; white-space: normal; }
+.journey-shortlist .actions { flex-wrap: wrap; }
+.candidate-market-check p { margin: 0 0 6px; overflow-wrap: anywhere; }
+.candidate-case-form { padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
+.candidate-case-form h4:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.candidate-case-form input, .candidate-case-form select { min-width: 0; max-width: 100%; }
+/* End ticket 56. */

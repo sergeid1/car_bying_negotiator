@@ -93,4 +93,9 @@ class VehicleEntity {
     this.confirmedAt = now;
     this.updatedAt = now;
   }
+
+  VehicleEntity(String id, String caseId, ListingSnapshotView listing, Instant now) {
+    this.id = id; this.caseId = caseId;
+    confirmListing(listing, now);
+  }
 }

@@ -24,6 +24,8 @@ import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 import { ReferralPartnerKit } from "./ReferralPartnerKit";
 import { ACCOUNT_SESSION_KEY, BuyerAccount } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
+import { NegotiationConversation } from "./NegotiationConversation";
+import { JourneyCandidates, ShortlistEntry } from "./JourneyCandidates";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 // Ticket 63: acceptance, written confirmation and saved agreement states.
@@ -46,6 +48,25 @@ const AA = {
   // Layout/contrast require the real-browser walkthrough; jsdom has no rendering engine.
   rules: { "color-contrast": { enabled: false } },
 };
+
+// Ticket 56: populated shortlist and candidate case confirmation.
+test("shortlist ordering and case confirmation have no automated AA violations", async () => {
+  const entry: ShortlistEntry = { candidateId: "c1", caseId: null, marketCheck: { status: "UNAVAILABLE", range: null,
+    confidence: "UNAVAILABLE", provider: null, vintage: null, limitation: "No current comparables." },
+    candidate: { listingId: "l1", vin: null, title: "2024 Honda Civic EX", year: 2024, make: "Honda", model: "Civic",
+      trim: "EX", mileage: 10000, distanceMiles: 10, advertisedPriceMinor: 2000000, currency: "USD", matched: [], missed: [],
+      unconfirmed: [], snapshot: { source: "Inventory", retrievedAt: "2026-10-04T12:00:00Z", observedAt: null,
+        staleness: "UNKNOWN", synthetic: false } } };
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ supported: ["US-NC"], consentPolicies: {} })));
+  const { container } = render(<main><h1>Buying Journey</h1><JourneyCandidates journeyId="j1" briefVersion={1}
+    postalCode="27601" request={(async () => [entry]) as never} onSessionEnded={() => {}} /></main>);
+  await screen.findByRole("button", { name: "Open a Buying Case" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  await userEvent.setup().click(screen.getByRole("button", { name: "Open a Buying Case" }));
+  await screen.findByRole("region", { name: "Confirm your Buying Case" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+// End ticket 56.
 
 test("market freshness, uncertainty and unavailable evidence have no automated AA violations", async () => {
   const { container } = render(<main><h1>Saved report</h1><h2>Evidence</h2><MarketEvidenceSection evidence={{ status: "AVAILABLE", paragraphs: [
@@ -462,4 +483,30 @@ test("the quote request with a gated draft, a sent request and dealer quote sour
   await screen.findByRole("button", { name: "Approve this text and send" });
   await screen.findByText(/cabcdefghijklmnopqrstuvwxyz234567@relay.invalid/);
   expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+// Ticket 61: the negotiation conversation with drafts, gate decisions, messages and a paused state.
+test.each(["AWAITING_BUYER", "PAUSED"])("the negotiation conversation (%s) has no automated AA violations", async state => {
+  const pass = { pass: true, gateVersion: "outbound-gate.v2", reasons: [] };
+  const counter = "Would you consider USD 18500.00 as the selling price in a revised written offer?";
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+    negotiationState: state, targetReached: false,
+    mandate: { version: 2, currency: "USD", targetMinor: 1850000, ceilingMinor: 1950000, expiresAt: "2026-10-18T12:00:00Z" },
+    conversations: [{ quoteRequestId: "q1", dealerAddress: "sales@dealer.example" }],
+    entries: [
+      { kind: "INBOUND_MESSAGE", at: "2026-10-04T13:00:00Z", quoteRequest: null, acceptance: null, counteroffer: null,
+        message: { id: "m2", direction: "INBOUND", dealerAddress: "sales@dealer.example", deliveryState: "RECEIVED", createdAt: "2026-10-04T13:00:00Z",
+          completedAt: null, contentAvailable: true, subject: "Quote", body: "Selling price $25,000.",
+          attachments: [{ ordinal: -1, documentId: "doc1", outcome: "ACCEPTED", offerVersion: 2 }] } },
+      { kind: "COUNTEROFFER", at: "2026-10-04T14:00:00Z", quoteRequest: null, acceptance: null, message: null,
+        counteroffer: { id: "n1", quoteRequestId: "q1", dealerAddress: "sales@dealer.example", state: state === "PAUSED" ? "CANCELLED" : "PROPOSED",
+          cancelReason: state === "PAUSED" ? "PAUSED" : null, proposalMinor: 1850000, reportVersion: 3, offerVersion: 2, grounds: [], messageId: null,
+          createdAt: "2026-10-04T14:00:00Z", revisions: [{ revision: 1, editedByBuyer: false, text: counter, decision: pass, createdAt: "2026-10-04T14:00:00Z" }] } },
+    ] }))));
+  const user = userEvent.setup();
+  const { container } = render(<main><h1>Buying Case</h1><NegotiationConversation caseId="case" token="token" /></main>);
+  await screen.findByRole("list", { name: "Conversation, oldest first" });
+  if (state === "AWAITING_BUYER") await user.click(screen.getByRole("button", { name: "Edit this draft" }));
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  vi.unstubAllGlobals();
 });

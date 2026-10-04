@@ -1,6 +1,9 @@
 package com.dealanalyzer.journey;
 
 import com.dealanalyzer.shopping.matching.CandidateMatchingService;
+import com.dealanalyzer.buyingcase.CreateBuyingCaseRequest;
+import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService;
+import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -19,10 +22,10 @@ public class JourneyController {
   private static final String SESSION = "Account-Session-Token";
   private final JourneyService journeys;
   private final VehicleReference reference;
-  private final CandidateMatchingService candidates;
+  private final JourneyShortlistService shortlist;
 
-  JourneyController(JourneyService journeys, VehicleReference reference, CandidateMatchingService candidates) {
-    this.journeys = journeys; this.reference = reference; this.candidates = candidates;
+  JourneyController(JourneyService journeys, VehicleReference reference, JourneyShortlistService shortlist) {
+    this.journeys = journeys; this.reference = reference; this.shortlist = shortlist;
   }
 
   /** The brief as edited, plus the version it was edited from. */
@@ -100,11 +103,40 @@ public class JourneyController {
     return journeys.removeReferenceVehicle(session, journeyId, referenceId, basedOnVersion);
   }
 
-  /** Searches inventory for the current brief and returns Candidate Vehicles with their reasons; nothing is saved. */
+  /** Captures candidates and market evidence for the current brief; the Buyer chooses the shortlist order. */
   @PostMapping("/{journeyId}/candidates")
-  public CandidateMatchingService.CandidateResults candidates(@RequestHeader(value = SESSION, required = false) String session,
+  public JourneyShortlistService.Results candidates(@RequestHeader(value = SESSION, required = false) String session,
       @PathVariable String journeyId) {
-    return candidates.candidates(journeys.accountId(session), journeyId);
+    return shortlist.search(session, journeyId);
+  }
+
+  public record ShortlistInput(List<String> candidateIds) {}
+
+  @GetMapping("/{journeyId}/shortlist")
+  public List<JourneyShortlistService.Entry> shortlist(@RequestHeader(value = SESSION, required = false) String session,
+      @PathVariable String journeyId) {
+    return shortlist.shortlist(session, journeyId);
+  }
+
+  @PutMapping("/{journeyId}/shortlist")
+  public List<JourneyShortlistService.Entry> shortlist(@RequestHeader(value = SESSION, required = false) String session,
+      @PathVariable String journeyId, @RequestBody ShortlistInput input) {
+    return shortlist.replace(session, journeyId, input.candidateIds());
+  }
+
+  @PostMapping("/{journeyId}/candidates/{candidateId}/case")
+  @ResponseStatus(HttpStatus.CREATED)
+  public EphemeralBuyingCaseService.CreatedBuyingCase openCandidateCase(
+      @RequestHeader(value = SESSION, required = false) String session, @PathVariable String journeyId,
+      @PathVariable String candidateId, @Valid @RequestBody CreateBuyingCaseRequest input) {
+    return shortlist.openCase(session, journeyId, candidateId, input);
+  }
+
+  @GetMapping("/{journeyId}/candidates/{candidateId}/case")
+  public EphemeralBuyingCaseService.CreatedBuyingCase linkedCandidateCase(
+      @RequestHeader(value = SESSION, required = false) String session, @PathVariable String journeyId,
+      @PathVariable String candidateId) {
+    return shortlist.linkedCase(session, journeyId, candidateId);
   }
 
   @DeleteMapping("/{journeyId}")

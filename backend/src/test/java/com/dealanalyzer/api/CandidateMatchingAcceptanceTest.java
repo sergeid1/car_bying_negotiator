@@ -101,9 +101,16 @@ class CandidateMatchingAcceptanceTest {
           .doesNotContain("Synthetic Example Dealer");
       // The same brief gives the same candidates and wording.
       var again = exchange(client, "POST", base + "/candidates", null, session, null).body();
-      assertThat(again.path("candidates").toString().replaceAll("\"(retrievedAt|observedAt)\":\"[^\"]+\"", ""))
-          .isEqualTo(candidates.toString().replaceAll("\"(retrievedAt|observedAt)\":\"[^\"]+\"", ""));
+      assertThat(coreCandidates(again.path("candidates"))).isEqualTo(coreCandidates(candidates));
     }
+  }
+
+  /** Captured shortlist identifiers and separate market checks do not change matching facts. */
+  private static String coreCandidates(JsonNode candidates) {
+    JsonNode copy = candidates.deepCopy();
+    copy.forEach(candidate -> ((com.fasterxml.jackson.databind.node.ObjectNode) candidate)
+        .remove(List.of("candidateId", "marketCheck")));
+    return copy.toString().replaceAll("\"(retrievedAt|observedAt)\":\"[^\"]+\"", "");
   }
 
   private static String signIn(RestClient client, String email) throws Exception {

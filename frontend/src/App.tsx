@@ -213,7 +213,11 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             {guide && <ExplainerGuide slug={guide} />}
             {!guide && partnerKit && <ReferralPartnerKit />}
             {!standalone && accountSession && <BuyingJourneys key={accountSession} session={accountSession}
-              onSessionEnded={() => { setAccountSession(""); setAccountRecheck(value => value + 1); }} />}
+              onSessionEnded={() => { setAccountSession(""); setAccountRecheck(value => value + 1); }}
+              onCaseOpened={(value, disclosure) => {
+                setReferral(disclosure ? { caseId: value.caseId, text: disclosure } : undefined);
+                setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId);
+              }} />}
             {!standalone && !report && !caseCredentials && <SampleReportEntry />}
             {!standalone && !report && !caseCredentials && <OfferTerms />}
             {!standalone && !report && !caseCredentials && (

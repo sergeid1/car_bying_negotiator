@@ -72,6 +72,11 @@ public class ProviderMeter {
     return run(store.start(caseId, operation, provider, units), invocation, classify, null);
   }
 
+  public <T> T callJourneyMarket(String accountId, String journeyId, Supplier<T> invocation,
+      Function<T, Status> classify) {
+    return run(store.startJourneyMarket(accountId, journeyId), invocation, classify, null);
+  }
+
   /** Journey-scoped search uses the same concurrency bound and timeout as case-scoped calls. */
   public InventorySearchAdapter.SearchResult callInventory(
       String accountId, String journeyId, InventorySearchAdapter.Provider provider,

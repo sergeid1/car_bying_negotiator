@@ -3,6 +3,7 @@ package com.dealanalyzer.shopping.matching;
 import com.dealanalyzer.journey.JourneyService;
 import com.dealanalyzer.shopping.inventory.InventorySearchAdapter;
 import com.dealanalyzer.shopping.inventory.InventorySearchService;
+import com.dealanalyzer.shopping.inventory.InventoryListing;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -27,10 +28,18 @@ public class CandidateMatchingService {
 
   /** The brief was revised while the search ran, so its results would describe an older brief. */
   public static class BriefChangedDuringSearch extends RuntimeException {
-    BriefChangedDuringSearch() { super(null, null, false, false); }
+    public BriefChangedDuringSearch() { super(null, null, false, false); }
   }
 
   public CandidateResults candidates(String accountId, String journeyId) {
+    return search(accountId, journeyId).results();
+  }
+
+  /** Retains the licensed listing evidence for journey shortlist capture without searching twice. */
+  public record MatchedSearch(CandidateResults results,
+      List<InventoryListing> listings) {}
+
+  public MatchedSearch search(String accountId, String journeyId) {
     var brief = journeys.currentBrief(accountId, journeyId);
     var references = journeys.referenceVehicles(accountId, journeyId);
     var result = inventory.search(accountId, journeyId);
@@ -38,9 +47,9 @@ public class CandidateMatchingService {
     if (journeys.currentBrief(accountId, journeyId).version() != brief.version()) throw new BriefChangedDuringSearch();
     var matched = CandidateMatcher.match(brief, references, result.listings());
     var provider = result.provider();
-    return new CandidateResults(CandidateMatcher.VERSION, brief.version(), brief.referenceListVersion(),
+    return new MatchedSearch(new CandidateResults(CandidateMatcher.VERSION, brief.version(), brief.referenceListVersion(),
         result.availability(), result.notice(),
         new Provider(provider.name(), provider.version(), provider.licenceMetadata(), provider.synthetic()),
-        result.retrievedAt(), CandidateMatcher.ORDERING, matched.candidates(), matched.excluded());
+        result.retrievedAt(), CandidateMatcher.ORDERING, matched.candidates(), matched.excluded()), result.listings());
   }
 }

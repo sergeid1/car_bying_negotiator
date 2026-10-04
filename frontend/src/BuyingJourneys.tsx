@@ -1,5 +1,5 @@
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
-import { CandidateResults, CandidateVehicles } from "./CandidateVehicles";
+import { JourneyCandidates, JourneyCaseCredentials } from "./JourneyCandidates";
 
 type Option = { id: string; label: string };
 type Model = Option & { trims: Option[] };
@@ -61,7 +61,8 @@ type View = { mode: "list" } | { mode: "new" } | { mode: "open"; journey: Journe
   | { mode: "edit"; journey: Journey };
 
 /** A signed-in Buyer's Buying Journeys: each starts with a Shopping Brief, and every saved edit is a new version. */
-export function BuyingJourneys({ session, onSessionEnded }: { session: string; onSessionEnded: () => void }) {
+export function BuyingJourneys({ session, onSessionEnded, onCaseOpened }: { session: string; onSessionEnded: () => void;
+  onCaseOpened?: (value: JourneyCaseCredentials, disclosure?: string) => void }) {
   const [options, setOptions] = useState<BriefOptions>();
   const [journeys, setJourneys] = useState<JourneySummary[]>();
   const [view, setView] = useState<View>({ mode: "list" });
@@ -145,10 +146,9 @@ export function BuyingJourneys({ session, onSessionEnded }: { session: string; o
           setView({ mode: "open", journey: saved, shown: saved.brief });
           await refreshList().catch(() => undefined);
         }} />}
-      candidates={<CandidateVehicles key={`${journey.id}-${journey.brief.version}`} briefVersion={journey.brief.version}
-        onSessionEnded={onSessionEnded}
-        search={() => call<CandidateResults>(`/api/v1/journeys/${encodeURIComponent(journey.id)}/candidates`, session,
-          { method: "POST" })} />}
+      candidates={<JourneyCandidates key={`${journey.id}-${journey.brief.version}`} journeyId={journey.id}
+        briefVersion={journey.brief.version} postalCode={journey.brief.postalCode} onSessionEnded={onSessionEnded}
+        onCaseOpened={onCaseOpened} request={(path, init) => call(path, session, init)} />}
       onBack={() => show({ mode: "list" })}
       onEdit={() => show({ mode: "edit", journey })}
       onVersion={version => run(async () => {
@@ -159,7 +159,7 @@ export function BuyingJourneys({ session, onSessionEnded }: { session: string; o
       onDelete={() => run(async () => {
         await call(`/api/v1/journeys/${encodeURIComponent(journey.id)}`, session, { method: "DELETE" });
         await refreshList();
-        show({ mode: "list" }, "Buying Journey deleted with every version of its Shopping Brief.");
+        show({ mode: "list" }, "Buying Journey deleted with every version of its Shopping Brief, Reference Vehicles, captured candidates, shortlist and case links. Buying Cases opened from it remain available separately.");
       }, "The journey could not be deleted. Retry safely.")} />;
   } else {
     body = <>
@@ -225,7 +225,8 @@ function JourneyDetail({ journey, shown, busy, references, candidates, onBack, o
     {references}
     {current ? candidates : <p className="muted">Candidate Vehicles are searched for the current brief version only.</p>}
     <h3>Delete this journey</h3>
-    <p>Deleting removes this Buying Journey, every version of its Shopping Brief and every Reference Vehicle VIN at once.
+    <p>Deleting removes this Buying Journey, every version of its Shopping Brief, every Reference Vehicle VIN, captured
+      candidates, shortlist and case links at once. Buying Cases opened from it remain available separately.
       This cannot be undone.</p>
     <label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I want to permanently delete this Buying Journey and every version of its Shopping Brief.</label>
     <button className="btn-danger" disabled={busy || !confirmed} onClick={onDelete}>Delete Buying Journey</button>

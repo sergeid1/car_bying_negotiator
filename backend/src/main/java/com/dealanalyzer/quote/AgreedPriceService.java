@@ -158,6 +158,9 @@ public class AgreedPriceService {
         || context.mandate() == null || !context.mandate().id().equals(request.gatedDraft().mandateId())
         || negotiation.current(caseId) == NegotiationStateService.State.AGREED)
       throw new IllegalArgumentException("The current mandate or policy no longer permits this message. Prepare a new request.");
+    var state = negotiation.current(caseId);
+    if (state == NegotiationStateService.State.STOPPED) throw new IllegalArgumentException("Negotiation has stopped.");
+    if (state == NegotiationStateService.State.PAUSED) throw new IllegalArgumentException("Negotiation is paused. Resume it before sending.");
     if ("ACCEPTANCE".equals(request.kind())) {
       var written = evidence.latest(caseId, request.gatedDraft().draft().dealerId())
           .orElseThrow(() -> new IllegalArgumentException("Review and verify a current itemized written quote first."));

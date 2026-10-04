@@ -4,7 +4,7 @@
 
 **Blocked by:** 60 — Request an itemized quote and ingest dealer replies; 56 — Shortlist candidates and open a Buying Case from one.
 
-**Status:** blocked on 56 (60 complete) — filed on 2026-10-03 from specification 2.0.
+**Status:** ready-for-agent (60 and 56 complete) — filed on 2026-10-03 from specification 2.0.
 
 - [ ] The comparison uses only verified Dealer Offers; cars without one show their state instead of an estimate.
 - [ ] OTD totals are compared only when each is complete; otherwise the comparison says which figures are missing.

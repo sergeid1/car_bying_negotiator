@@ -57,10 +57,37 @@ public class ProviderUsageStore {
       String query, Integer resultCount, Instant retrievedAt, Long latencyMillis, BigDecimal costUsd,
       String status, String availability, Instant createdAt, Instant finishedAt) {}
 
+  /** Journey market calls use the same deletion locks as inventory search. */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public String startJourneyMarket(String accountId, String journeyId) {
+    var accounts = manager.createNativeQuery("select lifecycle from buyer_accounts where id = :id for update")
+        .setParameter("id", accountId).getResultList();
+    if (accounts.isEmpty() || !"ACTIVE".equals(accounts.getFirst()))
+      throw new com.dealanalyzer.buyingcase.ResourceNotFoundException("Buying Journey not found");
+    if (manager.createNativeQuery("select id from buying_journeys where id = :id and account_id = :account for update")
+        .setParameter("id", journeyId).setParameter("account", accountId).getResultList().isEmpty())
+      throw new com.dealanalyzer.buyingcase.ResourceNotFoundException("Buying Journey not found");
+    var row = new ProviderUsageEntity();
+    row.id = UUID.randomUUID().toString(); row.journeyId = journeyId; row.accountId = accountId;
+    row.operation = ProviderMeter.Operation.MARKET_RETRIEVAL.name(); row.provider = "MARKET_PROVIDER";
+    row.providerVersion = "UNREGISTERED"; row.modelVersion = "none"; row.schemaVersion = "market-provider.v1";
+    row.license = "UNVERIFIED"; row.unit = "REQUEST"; row.units = 1;
+    row.status = "STARTED"; row.createdAt = Instant.now(); manager.persist(row); return row.id;
+  }
+
   @Transactional(readOnly = true)
   public java.util.List<InventoryUsage> inventoryForAccount(String accountId) {
-    return manager.createQuery("select u from ProviderUsageEntity u where u.accountId = :account order by u.createdAt, u.id",
-        ProviderUsageEntity.class).setParameter("account", accountId).getResultList().stream()
+    return journeyUsage(accountId, "INVENTORY_SEARCH");
+  }
+
+  @Transactional(readOnly = true)
+  public java.util.List<InventoryUsage> marketForAccount(String accountId) {
+    return journeyUsage(accountId, "MARKET_RETRIEVAL");
+  }
+
+  private java.util.List<InventoryUsage> journeyUsage(String accountId, String operation) {
+    return manager.createQuery("select u from ProviderUsageEntity u where u.accountId = :account and u.operation = :operation order by u.createdAt, u.id",
+        ProviderUsageEntity.class).setParameter("account", accountId).setParameter("operation", operation).getResultList().stream()
         .map(u -> new InventoryUsage(u.id, u.journeyId, u.provider, u.providerVersion, u.license, u.queryJson,
             u.resultCount, u.retrievedAt, u.latencyMillis, u.costUsd, u.status, u.inventoryAvailability, u.createdAt, u.finishedAt)).toList();
   }

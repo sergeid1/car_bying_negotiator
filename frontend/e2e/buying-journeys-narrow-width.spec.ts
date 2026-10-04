@@ -168,3 +168,23 @@ test("Candidate Vehicles with reasons, a stale listing and left-out listings fit
   await expect(candidates.getByText("121,000 miles is over your 120,000-mile maximum.")).toBeVisible();
   await expectNoOverflowOrViolations(page);
 });
+
+// Ticket 56: saved candidate controls and confirmation at the narrow-width floor.
+test("populated shortlist and case confirmation fit 360 px", async ({ page }) => {
+  await stubApi(page);
+  const marketCheck = { status: "AVAILABLE", confidence: "MEDIUM", range: { lowMinor: 5000000, highMinor: 5600000, currency: "USD" },
+    provider: { retrievedAt: "2026-10-04T12:00:00Z" }, vintage: { oldestObservationAt: "2026-10-01T12:00:00Z", newestObservationAt: "2026-10-03T12:00:00Z" },
+    limitation: "A small sample supports a broad estimated range." };
+  await page.route("**/api/v1/journeys/j1/shortlist", route => route.fulfill({ json: [{ candidateId: "c1", caseId: null,
+    candidate: CANDIDATES.candidates[0], marketCheck }] }));
+  await page.goto("/#sign-in=link-secret");
+  await page.getByRole("button", { name: "Finish signing in" }).click();
+  await page.getByRole("button", { name: "Open 2019–2025 Chevrolet Silverado 1500" }).click();
+  const shortlist = page.getByRole("region", { name: "Your shortlist" });
+  await expect(shortlist.getByText(/Confidence: medium/)).toBeVisible();
+  await expectNoOverflowOrViolations(page);
+  await shortlist.getByRole("button", { name: "Open a Buying Case" }).click();
+  await expect(shortlist.getByLabel("Dealer ZIP code")).toBeVisible();
+  await expectNoOverflowOrViolations(page);
+});
+// End ticket 56.

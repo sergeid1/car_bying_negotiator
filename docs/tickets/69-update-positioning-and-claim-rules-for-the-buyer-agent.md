@@ -4,7 +4,7 @@
 
 **Blocked by:** 68 — Obtain counsel review for acting as the Buyer's representative; 61 — Negotiate in supervised mode with a full conversation view.
 
-**Status:** blocked on 68 and 61 — filed on 2026-10-03 from specification 2.0.
+**Status:** blocked on 68 (61 complete) — filed on 2026-10-03 from specification 2.0.
 
 - [ ] Start screen, footer, guides, and partner kit describe the journey in counsel-approved wording and state the credo.
 - [ ] `PilotCopyClaimsTest` rules and reviewed phrases are updated so "negotiates on your behalf" is allowed only with the within-your-limits qualifier, and "autonomous negotiator", "safe to sign", and guaranteed savings stay prohibited.
