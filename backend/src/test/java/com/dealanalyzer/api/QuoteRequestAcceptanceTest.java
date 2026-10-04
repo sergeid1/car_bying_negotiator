@@ -28,6 +28,7 @@ class QuoteRequestAcceptanceTest {
       String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
       String base = "/api/v1/cases/" + caseId, path = base + "/quote-requests";
       var jdbc = app.context().getBean(JdbcTemplate.class);
+      assertThat(get(client, path, token).path("dealers")).isEmpty();
       OutboundDraftAcceptanceTest.verifyAndPlan(app, base, token);
       jdbc.update("update vehicles set vin = '1HGCM82633A004352' where case_id = ?", caseId);
       String dealer = UUID.randomUUID().toString();
@@ -36,6 +37,22 @@ class QuoteRequestAcceptanceTest {
           insert into listing_snapshots(id, case_id, dealer_id, provider_listing_id, listing_url, vin, source, retrieved_at, provider_version, license_metadata, created_at)
           values (?, ?, ?, 'listing', 'https://dealer.example/vehicle/42', '1HGCM82633A004352', 'TEST', current_timestamp, 'v1', 'test', current_timestamp)
           """, UUID.randomUUID().toString(), caseId, dealer);
+      for (String scenario : List.of("without-listing", "wrong-vin", "unsupported-url")) {
+        String excluded = UUID.randomUUID().toString();
+        jdbc.update("insert into dealers(id, case_id, source, provider_dealer_id, name, created_at) values (?, ?, 'TEST', ?, ?, current_timestamp)",
+            excluded, caseId, scenario, scenario);
+        if (!scenario.equals("without-listing"))
+          jdbc.update("""
+              insert into listing_snapshots(id, case_id, dealer_id, provider_listing_id, listing_url, vin, source, retrieved_at, provider_version, license_metadata, created_at)
+              values (?, ?, ?, ?, ?, ?, 'TEST', current_timestamp, 'v1', 'test', current_timestamp)
+              """, UUID.randomUUID().toString(), caseId, excluded, scenario,
+              scenario.equals("unsupported-url") ? "javascript:unsupported" : "https://dealer.example/vehicle/other",
+              scenario.equals("wrong-vin") ? "1M8GDM9AXKP042788" : "1HGCM82633A004352");
+      }
+      var eligible = get(client, path, token).path("dealers");
+      assertThat(eligible).hasSize(1);
+      assertThat(eligible.get(0).path("id").asText()).isEqualTo(dealer);
+      assertThat(eligible.get(0).path("name").asText()).isEqualTo("Dealer");
       var request = Map.of("dealerId", dealer, "dealerAddress", "sales@dealer.example");
       var early = post(client, path, request, "early", token);
       assertThat(early.at("/gatedDraft/decision/pass").asBoolean()).isFalse();

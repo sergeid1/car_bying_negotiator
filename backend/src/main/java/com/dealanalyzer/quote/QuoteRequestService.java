@@ -37,7 +37,9 @@ public class QuoteRequestService {
   public record Quote(String id, String dealerAddress, String state, String messageId,
       Instant approvedAt, OutboundDraftService.StoredDraft gatedDraft) {}
   public record ReplyDocument(String documentId, String outcome, Integer offerVersion, String sourceKind, String messageId) {}
-  public record View(NegotiationStateService.State negotiationState, List<Quote> requests, List<ReplyDocument> documents) {}
+  public record Dealer(String id, String name) {}
+  public record View(NegotiationStateService.State negotiationState, List<Quote> requests,
+      List<ReplyDocument> documents, List<Dealer> dealers) {}
 
   @Transactional
   public Quote create(String caseId, String token, String key, Create request) {
@@ -112,6 +114,13 @@ public class QuoteRequestService {
   @Transactional
   public View view(String caseId, String token) {
     locks.lock(caseId); cases.reopen(caseId, token);
+    var dealers = jdbc.query("""
+        select d.id, d.name from dealers d join vehicles v on v.case_id = d.case_id
+        where d.case_id = ? and exists (
+          select 1 from listing_snapshots l where l.case_id = d.case_id and l.dealer_id = d.id and l.vin = v.vin
+        ) order by d.name, d.id
+        """, (r, n) -> new Dealer(r.getString(1), r.getString(2)), caseId).stream()
+        .filter(dealer -> !drafts.context(caseId, dealer.id()).caseQuestions().isEmpty()).toList();
     var ids = jdbc.queryForList("select id from quote_requests where case_id = ? order by created_at, id", String.class, caseId);
     var documents = jdbc.query("""
         select a.document_id, a.outcome, o.offer_version, a.ordinal, a.message_id from dealer_relay_attachments a
@@ -120,7 +129,7 @@ public class QuoteRequestService {
         where a.case_id = ? order by a.created_at, a.id
         """, (r, n) -> new ReplyDocument(r.getString(1), r.getString(2), (Integer) r.getObject(3),
             r.getInt(4) == -1 ? "MESSAGE_BODY" : "ATTACHMENT", r.getString(5)), caseId);
-    return new View(negotiation.current(caseId), ids.stream().map(id -> get(caseId, token, id)).toList(), documents);
+    return new View(negotiation.current(caseId), ids.stream().map(id -> get(caseId, token, id)).toList(), documents, dealers);
   }
 
   private Quote get(String caseId, String token, String id) {
