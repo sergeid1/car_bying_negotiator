@@ -182,3 +182,17 @@ approval or revocation time. CaseGraphDeletionPlan erases revocations, then mand
 Deal Plan snapshots they reference. Approval, revocation and expiry audit events are erased with
 `audit_events`. Nothing about a mandate is kept in any anonymous total. Both tables are included
 in the case export.
+
+## Dealer email relay (ticket 58)
+
+V32 `dealer_relay_identities`, `dealer_relay_messages`, `dealer_relay_attachments` and
+`dealer_relay_send_attempts` belong to the case. A relay address stops accepting mail and refuses
+sends as soon as the case is being deleted, has expired, or its Buyer Account is being deleted;
+mail to it is then refused unstored, exactly like mail to an address that never existed.
+CaseGraphDeletionPlan erases attachments, send attempts, messages and the identity first, before the
+source documents the attachments point to. Message subjects and bodies are AES-GCM ciphertext and are
+erased at the case's document retention deadline (`dealer-relay.retention-sweep`, default `PT5M`);
+delivery metadata stays until case deletion. The relay identity's dealer opt-out is kept with the
+identity and goes with the case. Nothing is kept in any anonymous total. Metadata from all four
+tables is in `case-data.json`, and retained message content is in `relay/messages.json` of the
+case export, and so of the account export.

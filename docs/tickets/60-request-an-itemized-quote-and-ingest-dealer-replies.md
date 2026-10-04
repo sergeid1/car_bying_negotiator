@@ -4,7 +4,7 @@
 
 **Blocked by:** 58 — Relay dealer email without exposing the Buyer; 59 — Gate every outbound dealer message; 25 — Verify and correct extracted terms.
 
-**Status:** blocked on 58 and 59 — filed on 2026-10-03 from specification 2.0.
+**Status:** ready-for-agent (58 and 59 complete) — filed on 2026-10-03 from specification 2.0.
 
 - [ ] The Quote Request names the Vehicle (VIN, listing), asks for an itemized OTD quote including all fees and add-ons, passes the gate, and sends only after Buyer approval.
 - [ ] Inbound attachments enter document intake; a quote stated only in the message body is captured as a text Document Artifact with its source quoted.

@@ -77,7 +77,21 @@ public class DocumentIntakeService {
       String idempotencyKey,
       MultipartFile upload) {
     requireServiceProcessingConsent(caseId, accessToken);
-    byte[] bytes = read(upload);
+    return intake(caseId, accessToken, idempotencyKey, upload.getOriginalFilename(), read(upload));
+  }
+
+  /**
+   * A dealer attachment received through the email relay. It takes the same inspection, malware scan,
+   * consent check and processing pipeline as a Buyer upload; the relay has already authorized the case.
+   */
+  public StartedDocumentUpload intakeRelayAttachment(
+      String caseId, String idempotencyKey, String filename, byte[] bytes) {
+    requireServiceProcessingConsent(caseId, null);
+    return intake(caseId, null, idempotencyKey, filename, bytes);
+  }
+
+  private StartedDocumentUpload intake(
+      String caseId, String accessToken, String idempotencyKey, String originalFilename, byte[] bytes) {
     String checksum = sha256(bytes);
     Optional<UploadRecords> existing = persistence.findByIdempotencyKey(caseId, idempotencyKey);
     if (existing.isPresent()) {
@@ -93,7 +107,7 @@ public class DocumentIntakeService {
     requireServiceProcessingConsent(caseId, accessToken);
     String documentId = UUID.randomUUID().toString();
     String operationId = UUID.randomUUID().toString();
-    String filename = safeFilename(upload.getOriginalFilename());
+    String filename = safeFilename(originalFilename);
     Instant now = Instant.now();
     DocumentObjectStorage.StoredObject stored = objectStorage.store(caseId, documentId, bytes);
     try {
