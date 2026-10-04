@@ -47,11 +47,13 @@ public class MandateService {
   private final EntityManager manager;
   private final ObjectMapper json;
   private final MandatePolicy policy = new MandatePolicy();
+  private final org.springframework.context.ApplicationEventPublisher events;
 
   MandateService(EphemeralBuyingCaseService cases, EphemeralCasePersistence locks,
       MarketAssessmentPersistence market, PricePlanService plans, MandateRepository mandates,
       RevocationRepository revocations, AuditEventRepository auditEvents, DealerOfferPersistence fingerprints,
-      EntityManager manager, ObjectMapper json) {
+      EntityManager manager, ObjectMapper json, org.springframework.context.ApplicationEventPublisher events) {
+    this.events = events;
     this.cases = cases; this.locks = locks; this.market = market; this.plans = plans;
     this.mandates = mandates; this.revocations = revocations; this.auditEvents = auditEvents;
     this.fingerprints = fingerprints; this.manager = manager; this.json = json;
@@ -127,6 +129,7 @@ public class MandateService {
     auditEvents.save(new AuditEventEntity(UUID.randomUUID().toString(), caseId, "MANDATE_REVOKED",
         "NEGOTIATION_MANDATE", mandate.id, mandate.version, key,
         write(Map.of("policyVersion", MandatePolicy.VERSION)), now));
+    events.publishEvent(new MandateEnded(caseId));
     return view(mandate, now);
   }
 
@@ -210,6 +213,7 @@ public class MandateService {
         .setParameter("metadata", write(Map.of("policyVersion", MandatePolicy.VERSION,
             "expiresAt", mandate.expiresAt.toString())))
         .setParameter("now", PersistedInstant.round(now)).executeUpdate();
+    events.publishEvent(new MandateEnded(caseId));
     return true;
   }
 
@@ -250,6 +254,12 @@ public class MandateService {
     try { return json.writeValueAsString(value); }
     catch (java.io.IOException failure) { throw new IllegalStateException(failure); }
   }
+
+  /**
+   * Published synchronously inside the revoking or expiry-recording transaction, under the case lock,
+   * so negotiation state and queued drafts change in the same commit that ends the mandate.
+   */
+  public record MandateEnded(String caseId) {}
 
   /** PLAN_CHANGED: a newer Deal Plan replaced the one this mandate was approved against, so it no longer applies. */
   public enum Status { ACTIVE, SUPERSEDED, REVOKED, PLAN_CHANGED, EXPIRED }

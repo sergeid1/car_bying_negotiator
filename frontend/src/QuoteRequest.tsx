@@ -4,6 +4,7 @@ import { DealerRelay } from "./DealerRelay";
 import { OfferVerification } from "./OfferVerification";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { AgreedPrice } from "./AgreedPrice";
+import { NegotiationConversation } from "./NegotiationConversation";
 
 type Quote = { id: string; dealerAddress: string; state: string;
   gatedDraft: { draft: { text: string }; decision: GateDecision } };
@@ -14,6 +15,7 @@ const states: Record<string, string> = {
   MANDATE_ACTIVE: "Your mandate is active. Review a quote request before sending it.",
   AWAITING_DEALER: "Your request was sent. Waiting for the dealer to reply.",
   AWAITING_BUYER: "The dealer replied. Review and verify the quote before analysis.",
+  PAUSED: "Negotiation is paused. Nothing is sent until you resume it.",
   AGREED: "You accepted the quote.", STOPPED: "Negotiation has stopped.", EXPIRED: "Your mandate expired. No more requests can be sent.",
 };
 // Anything other than the documented shape is treated as unavailable rather than rendered.
@@ -116,6 +118,7 @@ export function QuoteRequest({ caseId, token }: {
       </>}
     </div>
     {view && <AgreedPrice caseId={caseId} token={token} quotes={view.requests} sources={view.documents} onChanged={refresh} />}
+    {view && <NegotiationConversation caseId={caseId} token={token} version={relayVersion} />}
     <DealerRelay key={relayVersion} caseId={caseId} token={token} />
     {review && <OfferVerification caseId={caseId} token={token} onOfferFrozen={offer => {
       setOfferVersion(offer.version); void refresh().catch(() => setError("Refresh to see the latest quote status."));
