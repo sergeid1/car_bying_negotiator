@@ -1576,3 +1576,20 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
 .relay-messages > li + li { margin-top: 12px; }
 .relay-untrusted { color: var(--ink-muted); }
 .relay-content pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }
+
+/* Ticket 51: Buying Journeys and the Shopping Brief form. */
+.journeys h2:focus { outline: none; }
+.journeys h2:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.journey-list, .journey-matches { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.journey-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.journey-list button, .journey-matches button { max-width: 100%; text-align: left; overflow-wrap: anywhere; }
+.journey-list .muted { font-size: 0.85rem; }
+.journey-matches { grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr)); }
+.journey-matches button { width: 100%; }
+/* Many short options: a compact multi-column grid instead of full-width consent rows. */
+fieldset.journey-choices { grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr)); gap: 8px 12px; }
+fieldset.journey-choices > legend { grid-column: 1 / -1; margin-bottom: 4px; }
+fieldset.journey-choices > label:has(> input[type="checkbox"]) { grid-column: auto; padding: 10px 12px; }
+.brief-form .field-error { margin-top: -6px; }
+.journeys .facts dd { font-weight: 600; }
+/* End ticket 51. */

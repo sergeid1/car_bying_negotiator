@@ -82,7 +82,8 @@ public class AccountController {
   }
 
   /** Reviewed account outcomes keep their code and fixed detail; nothing echoes Buyer input. */
-  @RestControllerAdvice(assignableTypes = {AccountController.class, com.dealanalyzer.notification.NotificationController.class})
+  @RestControllerAdvice(assignableTypes = {AccountController.class, com.dealanalyzer.notification.NotificationController.class,
+      com.dealanalyzer.journey.JourneyController.class})
   @Order(Ordered.HIGHEST_PRECEDENCE)
   static class Problems {
     @ExceptionHandler(AccountProblem.class)
