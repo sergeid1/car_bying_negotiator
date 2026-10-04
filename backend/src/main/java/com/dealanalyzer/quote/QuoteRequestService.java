@@ -108,6 +108,8 @@ public class QuoteRequestService {
     var state = negotiation.current(caseId);
     if (state == NegotiationStateService.State.STOPPED || state == NegotiationStateService.State.AGREED)
       throw new IllegalArgumentException("Negotiation has stopped.");
+    if (state == NegotiationStateService.State.PAUSED)
+      throw new IllegalArgumentException("Negotiation is paused.");
   }
   private record Reservation(Quote quote, boolean reserved) {}
 

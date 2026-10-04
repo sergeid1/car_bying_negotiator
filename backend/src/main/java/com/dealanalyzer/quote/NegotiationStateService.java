@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class NegotiationStateService {
-  public enum State { NO_MANDATE, MANDATE_ACTIVE, AWAITING_DEALER, AWAITING_BUYER, AGREED, STOPPED, EXPIRED }
+  public enum State { NO_MANDATE, MANDATE_ACTIVE, AWAITING_DEALER, AWAITING_BUYER, PAUSED, AGREED, STOPPED, EXPIRED }
   private final JdbcTemplate jdbc;
   private final MandateService mandates;
   private final EphemeralCasePersistence locks;
