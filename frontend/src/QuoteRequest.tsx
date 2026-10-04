@@ -6,7 +6,7 @@ import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 
 type Quote = { id: string; dealerAddress: string; state: string;
   gatedDraft: { draft: { text: string }; decision: GateDecision } };
-type View = { negotiationState: string; requests: Quote[];
+type View = { negotiationState: string; requests: Quote[]; dealers: { id: string; name: string }[];
   documents: { documentId: string | null; outcome: string; offerVersion: number | null; sourceKind: string; messageId: string }[] };
 const states: Record<string, string> = {
   NO_MANDATE: "Approve a negotiation mandate to contact the dealer.",
@@ -15,8 +15,8 @@ const states: Record<string, string> = {
   AWAITING_BUYER: "The dealer replied. Review and verify the quote before analysis.",
   AGREED: "You accepted the quote.", STOPPED: "Negotiation has stopped.", EXPIRED: "Your mandate expired. No more requests can be sent.",
 };
-export function QuoteRequest({ caseId, token, dealers }: {
-  caseId: string; token: string; dealers: { id: string; name: string }[];
+export function QuoteRequest({ caseId, token }: {
+  caseId: string; token: string;
 }) {
   const [view, setView] = useState<View>();
   const [error, setError] = useState<string>();
@@ -70,13 +70,13 @@ export function QuoteRequest({ caseId, token, dealers }: {
       <h2>Request an itemized quote</h2>
       <p>Review the request for this Vehicle. Sending requires your current mandate and your approval.</p>
       <p role="status">{view ? states[view.negotiationState] : "Loading quote requests…"}</p>
-      <form onSubmit={event => void create(event)}>
+      {view && (view.dealers.length > 0 ? <form onSubmit={event => void create(event)}>
         <label>Dealer<select name="dealer" required disabled={busy}>
-          <option value="">Choose a dealer</option>{dealers.map(dealer => <option key={dealer.id} value={dealer.id}>{dealer.name}</option>)}
+          <option value="">Choose a dealer</option>{view.dealers.map(dealer => <option key={dealer.id} value={dealer.id}>{dealer.name}</option>)}
         </select></label>
         <label>Dealer email<input name="email" type="email" required disabled={busy} /></label>
         <button type="submit" disabled={busy || !view}>Prepare request</button>
-      </form>
+      </form> : <p>No dealers have a listing that matches this Vehicle's confirmed VIN. Add a matching dealer listing before preparing a quote request.</p>)}
       <button type="button" disabled={busy} onClick={() => {
         setError(undefined); void refresh().catch(() => setError("Quote requests could not be refreshed."));
       }}>Refresh conversation</button>
