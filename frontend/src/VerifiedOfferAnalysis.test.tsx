@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 const report = { version: 1, asOf: "2026-09-30", status: "COMPLETE", analysis: {
@@ -17,8 +17,10 @@ test("frozen offer advances through the endpoints and opens the focused report",
     return new Response(JSON.stringify(payload));
   }));
   render(<VerifiedOfferAnalysis caseId="current" token="secret" offerVersion={2} pollDelayMs={0} />);
-  expect(await screen.findByRole("heading", { name: "Deal Analysis Report" })).toHaveFocus();
-  expect(calls.filter(path => !path.includes("/feedback/report-total"))).toEqual(["/api/v1/cases/current/dealer-offers/latest", "/api/v1/cases/current/reports/latest", "/api/v1/cases/current/market-assessments", "/api/v1/cases/current", "/api/v1/cases/current/cash-economics", "/api/v1/cases/current/analyses", "/api/v1/operations/op", "/api/v1/cases/current/reports/latest", "/api/v1/cases/current/reports/1/explanation", "/api/v1/cases/current/reports/1/negotiation"]);
+  // The heading is focused by an effect after it renders, so wait for focus rather than for the heading alone.
+  const heading = await screen.findByRole("heading", { name: "Deal Analysis Report" });
+  await waitFor(() => expect(heading).toHaveFocus());
+  await waitFor(() => expect(calls.filter(path => !path.includes("/feedback/report-total"))).toEqual(["/api/v1/cases/current/dealer-offers/latest", "/api/v1/cases/current/reports/latest", "/api/v1/cases/current/market-assessments", "/api/v1/cases/current", "/api/v1/cases/current/cash-economics", "/api/v1/cases/current/analyses", "/api/v1/operations/op", "/api/v1/cases/current/reports/latest", "/api/v1/cases/current/reports/1/explanation", "/api/v1/cases/current/reports/1/negotiation"]));
 });
 test("failure retries the saved offer without uploads and preserves analysis request identity", async () => {
   let reportReads = 0;
