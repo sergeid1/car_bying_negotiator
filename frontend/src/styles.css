@@ -1676,3 +1676,20 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
 .test-drive-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 12px; }
 .test-drive-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 /* End ticket 65. */
+
+/* Ticket 66: Desk Check against the Agreed Price. */
+.desk-check, .desk-check .panel, .desk-fresh-case { min-width: 0; overflow-wrap: anywhere; }
+.desk-check-result h2:focus { outline: none; }
+.desk-check-result h2:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.desk-check-lead { font-weight: 600; }
+.desk-check-findings { margin: 12px 0; padding-left: 1.3rem; display: grid; gap: 12px; }
+.desk-check-findings > li { min-width: 0; padding-left: 4px; }
+.desk-check-findings > li > p { margin: 0 0 6px; }
+.desk-check-findings > li:first-child > p:first-child { font-size: 1.05rem; font-weight: 600; }
+.desk-check-meta { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; color: var(--ink-muted); font-size: 0.9rem; }
+.desk-check-meta .badge, .desk-check-meta .cash-badge { white-space: normal; }
+.desk-check details { margin: 12px 0; }
+.desk-check details summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.desk-check button, .desk-fresh-case button { max-width: 100%; white-space: normal; min-height: 44px; }
+.desk-check input, .desk-check select { min-width: 0; max-width: 100%; }
+/* End ticket 66. */

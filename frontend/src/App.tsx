@@ -12,6 +12,7 @@ import { BuyingCaseIntake } from "./BuyingCaseIntake";
 import { ReferralDisclosure } from "./AcquisitionChannel";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
+import { DeskCheck, DeskFreshCase, type FreshDeskCase } from "./DeskCheck";
 import { ThemeMenu } from "./ThemeMenu";
 import { OfferTerms } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
@@ -122,6 +123,9 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   // Tied to its case so a version frozen in one case never reaches another.
   const [frozenOffer, setFrozenOffer] = useState<{ caseId: string; version: number }>();
   const [referral, setReferral] = useState<{ caseId: string; text: string }>();
+  // A case started at the desk for another car, remembered so it is shown apart from the agreed one.
+  const [deskFresh, setDeskFresh] = useState<FreshDeskCase>();
+  const [deskRefresh, setDeskRefresh] = useState(0);
   const [accountSession, setAccountSession] = useState("");
   const [accountRecheck, setAccountRecheck] = useState(0);
   const [guide] = useState(requestedGuide);
@@ -278,9 +282,16 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             {report && <DealReport report={report} />}
 
             {caseCredentials && !caseRevoked && referral?.caseId === caseCredentials.caseId && <ReferralDisclosure text={referral.text} />}
-            {caseCredentials && !caseRevoked && <DealerDocumentUpload key={`documents-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
+            {caseCredentials && !caseRevoked && deskFresh?.caseId === caseCredentials.caseId && <DeskFreshCase value={deskFresh}
+              onBack={() => { setCaseRevoked(false); setCaseCredentials(deskFresh.agreed); setRecoveryCaseId(deskFresh.agreed.caseId); setDeskFresh(undefined); }} />}
+            {caseCredentials && !caseRevoked && <DeskCheck key={`desk-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
+              refreshKey={deskRefresh} onFreshCase={value => {
+                setDeskFresh(value); setCaseRevoked(false); setCaseCredentials({ caseId: value.caseId, token: value.token }); setRecoveryCaseId(value.caseId);
+              }} />}
+            {caseCredentials && !caseRevoked && <DealerDocumentUpload key={`documents-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
+              initialFiles={deskFresh?.caseId === caseCredentials.caseId ? deskFresh.files : undefined} />}
             {caseCredentials && !caseRevoked && <OfferVerification key={`verify-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
-              onOfferFrozen={offer => setFrozenOffer({ caseId: caseCredentials.caseId, version: offer.version })} />}
+              onOfferFrozen={offer => { setFrozenOffer({ caseId: caseCredentials.caseId, version: offer.version }); setDeskRefresh(value => value + 1); }} />}
             {caseCredentials && !caseRevoked && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <NegotiationMandate key={`mandate-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <QuoteRequest key={`quote-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
