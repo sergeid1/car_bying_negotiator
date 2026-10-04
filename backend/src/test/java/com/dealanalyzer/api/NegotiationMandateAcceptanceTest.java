@@ -29,7 +29,7 @@ class NegotiationMandateAcceptanceTest {
   @TempDir Path temporaryDirectory;
 
   @Test
-  void buyerApprovesImmutableMandatesWithinTheDealPlanAndRevocationAndExpiryApplyAtOnce() throws Exception {
+  void buyerApprovesImmutableMandatesWithinTheDealPlanAndRevocationExpiryAndPlanChangesApplyAtOnce() throws Exception {
     try (RunningApplication application = new HttpAcceptanceHarness(temporaryDirectory).startWithConfiguration(
         "mandates", true, DocumentExtractionAcceptanceTest.FixtureExtractionProvider.class,
         "--document.storage.path=" + temporaryDirectory.resolve("mandate-objects"),
@@ -133,10 +133,33 @@ class NegotiationMandateAcceptanceTest {
       assertThat(jdbc.queryForList("select event_type from audit_events where case_id = ? and event_type like 'MANDATE_%' order by created_at, event_type",
           String.class, caseId)).containsExactlyInAnyOrder("MANDATE_APPROVED", "MANDATE_APPROVED", "MANDATE_REVOKED", "MANDATE_EXPIRED");
 
+      // A newer Deal Plan replaces the one a mandate was approved against; the mandate stops applying at once.
+      JsonNode third = HttpAcceptanceHarness.post(client, mandates, request, "approve-three", token);
+      assertThat(third.path("status").asText()).isEqualTo("ACTIVE");
+      JsonNode lowerPlan = HttpAcceptanceHarness.post(client, casePath + "/price-plans",
+          Map.of("maxSellingPriceMinor", planCeiling - 50_000), "plan-two", token);
+      long lowerCeiling = lowerPlan.at("/payload/plan/sellingPrice/walkAwayMinor").asLong();
+      assertThat(lowerCeiling).isLessThan(third.path("ceilingMinor").asLong());
+      assertThat(HttpAcceptanceHarness.get(client, mandates + "/3", token).path("status").asText()).isEqualTo("PLAN_CHANGED");
+      assertThat(service.activeMandate(caseId)).isEmpty();
+      assertThat(service.expiringBefore(Instant.parse(third.path("expiresAt").asText()).plusSeconds(1)))
+          .extracting(MandateService.Mandate::id).doesNotContain(third.path("id").asText());
+      JsonNode newProposal = HttpAcceptanceHarness.get(client, mandates + "/proposal", token);
+      assertThat(newProposal.path("planVersion").asInt()).isEqualTo(2);
+      assertThat(newProposal.path("ceilingMinor").asLong()).isEqualTo(lowerCeiling);
+      assertThatThrownBy(() -> HttpAcceptanceHarness.post(client, mandates, request, "approve-stale", token))
+          .isInstanceOf(HttpClientErrorException.BadRequest.class);
+      var current = new HashMap<>(request);
+      current.putAll(Map.of("planVersion", 2, "ceilingMinor", lowerCeiling,
+          "targetMinor", Math.min(newProposal.path("targetMinor").asLong(), lowerCeiling)));
+      JsonNode fourth = HttpAcceptanceHarness.post(client, mandates, current, "approve-four", token);
+      assertThat(fourth.path("status").asText()).isEqualTo("ACTIVE");
+      assertThat(service.activeMandate(caseId)).get().extracting(MandateService.Mandate::version).isEqualTo(4);
+
       assertThatThrownBy(() -> HttpAcceptanceHarness.get(client, mandates, "wrong-token"))
           .isInstanceOf(HttpClientErrorException.class);
       assertThat(jdbc.queryForObject("select count(*) from negotiation_mandates where case_id = ?", Integer.class, caseId))
-          .isEqualTo(2);
+          .isEqualTo(4);
     }
   }
 

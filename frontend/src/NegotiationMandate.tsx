@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 
 type Disclosure = "PAYING_CASH" | "HAS_OUTSIDE_FINANCING" | "FIRST_NAME" | "PURCHASE_TIMELINE";
-type Status = "ACTIVE" | "SUPERSEDED" | "REVOKED" | "EXPIRED";
+type Status = "ACTIVE" | "SUPERSEDED" | "REVOKED" | "PLAN_CHANGED" | "EXPIRED";
 export type MandateProposal = {
   available: boolean; unavailableReason: string | null; planVersion: number | null; currency: string | null;
   targetMinor: number | null; ceilingMinor: number | null; disclosures: Disclosure[];
@@ -19,7 +19,8 @@ const DISCLOSURE_LABELS: Record<Disclosure, string> = {
   PURCHASE_TIMELINE: "When I plan to buy",
 };
 const STATUS_LABELS: Record<Status, string> = {
-  ACTIVE: "Active", SUPERSEDED: "Replaced by a newer approval", REVOKED: "Revoked", EXPIRED: "Expired",
+  ACTIVE: "Active", SUPERSEDED: "Replaced by a newer approval", REVOKED: "Revoked",
+  PLAN_CHANGED: "No longer applies: price boundaries changed", EXPIRED: "Expired",
 };
 const LIFETIMES = [3, 7, 14, 30];
 
@@ -84,6 +85,7 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
     new Intl.NumberFormat("en-US", { style: "currency", currency: currency ?? "USD" }).format(minor / 100);
   const when = (iso: string) => new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
   const current = mandates.find(mandate => mandate.status === "ACTIVE");
+  const planChanged = mandates[0]?.status === "PLAN_CHANGED";
 
   return <section className="panel mandate-panel" aria-labelledby="mandate-heading">
     <h2 id="mandate-heading">Approve a Negotiation Mandate</h2>
@@ -110,6 +112,7 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
     </div>
     {error && <p role="alert">{error}</p>}
     {proposal && !proposal.available && <p role="status">{proposal.unavailableReason}</p>}
+    {planChanged && <p className="notice">Your price boundaries changed after mandate version {mandates[0].version} was approved, so it no longer applies. Approve a new mandate to continue.</p>}
     {current && <section aria-labelledby="mandate-current">
       <h3 id="mandate-current">Current mandate, version {current.version}</h3>
       <dl className="facts">

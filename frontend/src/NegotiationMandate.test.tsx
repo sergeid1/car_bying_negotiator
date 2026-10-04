@@ -74,3 +74,15 @@ test("the current mandate can be revoked at once and refusals are shown", async 
   expect(await screen.findByRole("alert")).toHaveTextContent("Only the current mandate can be revoked");
   expect(screen.getByRole("heading", { name: "Approve a new version" })).toBeInTheDocument();
 });
+
+test("a mandate whose price boundaries changed is shown as no longer applying, with a new approval offered", async () => {
+  stub({
+    "GET /api/v1/cases/case/mandates/proposal": PROPOSAL,
+    "GET /api/v1/cases/case/mandates": [{ ...ACTIVE, status: "PLAN_CHANGED" }],
+  });
+  render(<NegotiationMandate caseId="case" token="token" />);
+  expect(await screen.findByText(/price boundaries changed after mandate version 1 was approved/)).toBeInTheDocument();
+  expect(screen.getByText(/No longer applies: price boundaries changed/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Revoke mandate now" })).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Review and approve" })).toBeInTheDocument();
+});

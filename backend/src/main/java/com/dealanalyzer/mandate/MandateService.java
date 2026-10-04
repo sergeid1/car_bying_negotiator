@@ -31,7 +31,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 
 /**
  * Buyer-approved Negotiation Mandates. Nothing here contacts a dealer; later tickets read the active
- * mandate through {@link #activeMandate(String)} and must stop when it is revoked or expired.
+ * mandate through {@link #activeMandate(String)} and must stop when it is revoked, expired, or its Deal
+ * Plan has been replaced.
  */
 @Service
 public class MandateService {
@@ -165,7 +166,8 @@ public class MandateService {
 
   @Transactional(readOnly = true)
   public List<Mandate> expiringBetween(Instant after, Instant cutoff) {
-    return mandates.currentExpiringBetween(after, cutoff).stream().map(value -> view(value, after)).toList();
+    return mandates.currentExpiringBetween(after, cutoff).stream().map(value -> view(value, after))
+        .filter(value -> value.status() == Status.ACTIVE).toList();
   }
 
   /** Audits each current mandate that has expired by now; expiry itself already applies at read time. */
@@ -230,8 +232,10 @@ public class MandateService {
   private Mandate view(MandateEntity entity, Instant now) {
     var revocation = revocations.findById(entity.id);
     int latest = mandates.findTopByCaseIdOrderByVersionDesc(entity.caseId).map(value -> value.version).orElse(entity.version);
+    boolean planCurrent = plans.latest(entity.caseId, "PLAN").map(plan -> plan.id().equals(entity.planSnapshotId)).orElse(false);
     Status status = revocation.isPresent() ? Status.REVOKED
         : entity.version < latest ? Status.SUPERSEDED
+        : !planCurrent ? Status.PLAN_CHANGED
         : !entity.expiresAt.isAfter(now) ? Status.EXPIRED : Status.ACTIVE;
     List<Disclosure> disclosures = entity.disclosures.isEmpty() ? List.of()
         : Arrays.stream(entity.disclosures.split(",")).map(Disclosure::valueOf).collect(Collectors.toList());
@@ -247,7 +251,8 @@ public class MandateService {
     catch (java.io.IOException failure) { throw new IllegalStateException(failure); }
   }
 
-  public enum Status { ACTIVE, SUPERSEDED, REVOKED, EXPIRED }
+  /** PLAN_CHANGED: a newer Deal Plan replaced the one this mandate was approved against, so it no longer applies. */
+  public enum Status { ACTIVE, SUPERSEDED, REVOKED, PLAN_CHANGED, EXPIRED }
 
   public record Proposal(boolean available, String unavailableReason, Integer planVersion, String currency,
       Long targetMinor, Long ceilingMinor, List<Disclosure> disclosures, List<AutonomyMode> autonomyModes,
