@@ -29,11 +29,13 @@ class IsolatedDocumentPageNormalizer implements DocumentPageNormalizer {
     try {
       byte[] original = storage.readOriginal(document.caseId(), document.id(), document.objectKey());
       for (int number = 1; number <= document.pageCount(); number++) {
-        var page = parser.render(original, number);
-        var stored = storage.storeNormalized(document.caseId(), document.id(), number, page.png());
+        boolean text = document.mediaType().equals("text/plain");
+        var page = text ? null : parser.render(original, number);
+        byte[] png = text ? RelayTextPages.png(RelayTextPages.pages(new String(original, java.nio.charset.StandardCharsets.UTF_8)).get(number - 1)) : page.png();
+        var stored = storage.storeNormalized(document.caseId(), document.id(), number, png);
         written.add(stored.objectKey());
         persistence.recordNormalizedPage(document.id(), number, stored.objectKey(),
-            page.width(), page.height(), page.dpi(), Instant.now());
+            text ? 1275 : page.width(), text ? 1650 : page.height(), text ? 150 : page.dpi(), Instant.now());
       }
       if (written.size() != document.pageCount()) {
         throw new IllegalStateException("Normalizer produced an incomplete page set");

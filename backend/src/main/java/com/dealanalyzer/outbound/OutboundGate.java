@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 
 /** A closed language policy: unknown prose fails rather than guessing its meaning. No I/O or clock. */
 public final class OutboundGate {
-  public static final String VERSION = "outbound-gate.v1";
+  public static final String VERSION = "outbound-gate.v2";
   private static final Set<String> QUESTIONS = Set.of(
       "Could you provide a current itemized written offer?",
       "Is there flexibility in the written selling price?",
@@ -26,12 +26,17 @@ public final class OutboundGate {
   /** Only trusted callers build context. Released values are specific to draft.dealerId. */
   public record GateContext(Mandate mandate, Set<Long> verifiedAmountsMinor,
       Set<Disclosure> verifiedDisclosures, Set<String> personalValues,
-      Set<String> releasedForDealer, JsonNode finalizedReport) {
+      Set<String> releasedForDealer, JsonNode finalizedReport, Set<String> caseQuestions) {
+    public GateContext(Mandate mandate, Set<Long> amounts, Set<Disclosure> disclosures,
+        Set<String> personal, Set<String> released, JsonNode report) {
+      this(mandate, amounts, disclosures, personal, released, report, Set.of());
+    }
     public GateContext {
       verifiedAmountsMinor = Set.copyOf(verifiedAmountsMinor);
       verifiedDisclosures = Set.copyOf(verifiedDisclosures);
       personalValues = Set.copyOf(personalValues);
       releasedForDealer = Set.copyOf(releasedForDealer);
+      caseQuestions = Set.copyOf(caseQuestions);
       finalizedReport = finalizedReport == null ? null : finalizedReport.deepCopy();
     }
   }
@@ -57,6 +62,7 @@ public final class OutboundGate {
       add(reasons, "PERSONAL_DATA", "The draft includes personal contact or identity details. Remove them before review.");
 
     Set<String> grounded = new HashSet<>(QUESTIONS);
+    grounded.addAll(ctx.caseQuestions());
     if (ctx.finalizedReport() != null) {
       try {
         var language = new GroundedLanguage().generate(ctx.finalizedReport());

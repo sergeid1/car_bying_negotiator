@@ -51,7 +51,7 @@ class OutboundDraftAcceptanceTest {
           "targetMinor", target, "ceilingMinor", ceiling, "approved", true), "mandate", token);
       var passed = post(client, path, question, "pass", token);
       assertThat(passed.at("/decision/pass").asBoolean()).isTrue();
-      assertThat(passed.at("/decision/gateVersion").asText()).isEqualTo("outbound-gate.v1");
+      assertThat(passed.at("/decision/gateVersion").asText()).isEqualTo("outbound-gate.v2");
       assertThat(passed.path("mandateId")).isEqualTo(mandate.path("id"));
       assertThat(post(client, path, question, "pass", token)).isEqualTo(passed);
       assertThat(get(client, path + "/" + passed.path("id").asText(), token)).isEqualTo(passed);
@@ -89,7 +89,7 @@ class OutboundDraftAcceptanceTest {
         for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry())
           if (entry.getName().equals("case-data.json")) data = new String(zip.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
       }
-      assertThat(data).contains("outbound_drafts", "outbound-gate.v1", "ABOVE_CEILING", passed.path("id").asText())
+      assertThat(data).contains("outbound_drafts", "outbound-gate.v2", "ABOVE_CEILING", passed.path("id").asText())
           .doesNotContain(token, "request_fingerprint", "idempotency_key");
       post(client, base + "/deletion", Map.of(), "delete", token);
       assertThatThrownBy(() -> get(client, path, token)).isInstanceOf(HttpClientErrorException.NotFound.class);
@@ -99,7 +99,7 @@ class OutboundDraftAcceptanceTest {
     }
   }
 
-  private static void verifyAndPlan(RunningApplication app, String base, String token) throws Exception {
+  static void verifyAndPlan(RunningApplication app, String base, String token) throws Exception {
     var client = app.client();
     post(client, base + "/vehicle-evidence", Map.of("confirmed", true, "manualFacts",
         Map.of("year", 2021, "make", "Honda", "model", "Accord", "trim", "EX-L", "mileage", 38000)), "vehicle", token);

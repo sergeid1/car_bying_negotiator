@@ -92,6 +92,22 @@ public class DocumentIntakeService {
 
   private StartedDocumentUpload intake(
       String caseId, String accessToken, String idempotencyKey, String originalFilename, byte[] bytes) {
+    return intake(caseId, accessToken, idempotencyKey, originalFilename, bytes, null);
+  }
+
+  /** A quoted dealer body, kept as text and routed through the normal extraction/review pipeline. */
+  public StartedDocumentUpload intakeRelayBody(String caseId, String messageId, String body) {
+    if (body == null || body.isBlank() || body.length() > 40000)
+      throw new InvalidDocumentException("FILE_TOO_LARGE", "The dealer quote text is too large.");
+    String quoted = "Source: dealer relay message " + messageId + " (untrusted dealer content)\n\n"
+        + body.lines().map(line -> "> " + line).collect(java.util.stream.Collectors.joining("\n"));
+    byte[] bytes = quoted.getBytes(StandardCharsets.UTF_8);
+    return intake(caseId, null, "relay-body:" + messageId, "dealer-reply-" + messageId + ".txt", bytes,
+        new InspectedDocument("text/plain", RelayTextPages.pages(quoted).size(), null, null, 150, false, false, false, false));
+  }
+
+  private StartedDocumentUpload intake(String caseId, String accessToken, String idempotencyKey,
+      String originalFilename, byte[] bytes, InspectedDocument trustedText) {
     String checksum = sha256(bytes);
     Optional<UploadRecords> existing = persistence.findByIdempotencyKey(caseId, idempotencyKey);
     if (existing.isPresent()) {
@@ -102,7 +118,7 @@ public class DocumentIntakeService {
       return started(records);
     }
 
-    InspectedDocument inspected = inspector.inspect(bytes);
+    InspectedDocument inspected = trustedText == null ? inspector.inspect(bytes) : trustedText;
     malwareScanner.requireClean(bytes);
     requireServiceProcessingConsent(caseId, accessToken);
     String documentId = UUID.randomUUID().toString();

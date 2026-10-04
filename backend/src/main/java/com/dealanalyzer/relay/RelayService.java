@@ -64,6 +64,7 @@ public class RelayService {
   private final DocumentIntakeService intake;
   private final MalwareScanner scanner;
   private final BuyerNotifications notifications;
+  private final com.dealanalyzer.quote.NegotiationStateService negotiation;
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transaction;
   private final SecureRandom random = new SecureRandom();
@@ -75,7 +76,8 @@ public class RelayService {
   RelayService(EphemeralBuyingCaseService cases, EphemeralCasePersistence locks, DealerMailRelay relay,
       RelayContentProtection content, AccountRelayAccess accounts, CaseAccessService secrets,
       CaseRetentionService retention, DocumentIntakeService intake, MalwareScanner scanner,
-      BuyerNotifications notifications, JdbcTemplate jdbc, PlatformTransactionManager transactions,
+      BuyerNotifications notifications, com.dealanalyzer.quote.NegotiationStateService negotiation,
+      JdbcTemplate jdbc, PlatformTransactionManager transactions,
       @Value("${dealer-relay.cap.per-case-daily:10}") int perCaseDaily,
       @Value("${dealer-relay.cap.per-dealer-daily:20}") int perDealerDaily,
       @Value("${dealer-relay.inbound.max-bytes:26214400}") long maxInboundBytes,
@@ -83,6 +85,7 @@ public class RelayService {
     this.cases = cases; this.locks = locks; this.relay = relay; this.content = content; this.accounts = accounts;
     this.secrets = secrets; this.retention = retention; this.intake = intake; this.scanner = scanner;
     this.notifications = notifications; this.jdbc = jdbc; this.transaction = new TransactionTemplate(transactions);
+    this.negotiation = negotiation;
     this.perCaseDaily = perCaseDaily; this.perDealerDaily = perDealerDaily; this.maxInboundBytes = maxInboundBytes;
     this.publicUrl = publicUrl.endsWith("/") ? publicUrl : publicUrl + "/";
   }
@@ -237,6 +240,11 @@ public class RelayService {
     if (stored.duplicate()) return new InboundResult(InboundOutcome.DUPLICATE, stored.messageId());
     if (bodyClean) {
       for (int i = 0; i < mail.attachments().size(); i++) intakeAttachment(stored, i, mail.attachments().get(i));
+      // Capture bodies conservatively: figures need review even if the dealer did not label them a quote.
+      if (mail.body() != null && !mail.body().isBlank() && (mail.attachments().isEmpty()
+          || java.util.regex.Pattern.compile("[0-9]").matcher(mail.body()).find()))
+        intakeBody(stored, mail.body());
+      negotiation.dealerReply(stored.caseId());
     }
     transaction.execute(status -> accounts.accountId(stored.caseId()))
         .ifPresent(account -> notifications.notify(account, NotificationType.DEALER_REPLY, "relay-inbound:" + stored.messageId()));
@@ -261,6 +269,21 @@ public class RelayService {
       if (!lockAccepting(stored.caseId(), now)) return;
       jdbc.update("insert into dealer_relay_attachments (id, message_id, case_id, ordinal, document_id, outcome, created_at) values (?, ?, ?, ?, ?, ?, ?)",
           UUID.randomUUID().toString(), stored.messageId(), stored.caseId(), ordinal, document, result, Timestamp.from(now));
+    });
+  }
+
+  private void intakeBody(Stored stored, String body) {
+    String documentId = null, outcome;
+    try {
+      documentId = intake.intakeRelayBody(stored.caseId(), stored.messageId(), body).document().id();
+      outcome = "ACCEPTED";
+    } catch (InvalidDocumentException rejected) { outcome = rejected.code(); }
+    catch (RuntimeException failed) { outcome = "INTAKE_FAILED"; }
+    String document = documentId, result = outcome;
+    transaction.executeWithoutResult(status -> {
+      if (!lockAccepting(stored.caseId(), Instant.now())) return;
+      jdbc.update("insert into dealer_relay_attachments (id, message_id, case_id, ordinal, document_id, outcome, created_at) values (?, ?, ?, -1, ?, ?, ?)",
+          UUID.randomUUID().toString(), stored.messageId(), stored.caseId(), document, result, Timestamp.from(Instant.now()));
     });
   }
 
@@ -301,7 +324,7 @@ public class RelayService {
       if (!lockAccepting(caseId, now)) throw new ResourceNotFoundException("Buying Case not found");
       Identity identity = ensureIdentity(caseId, now);
       Timestamp dayAgo = Timestamp.from(now.minus(Duration.ofDays(1)));
-      var attachments = jdbc.query("select message_id, ordinal, document_id, outcome from dealer_relay_attachments where case_id = ? order by message_id, ordinal",
+      var attachments = jdbc.query("select message_id, ordinal, document_id, outcome from dealer_relay_attachments where case_id = ? and ordinal >= 0 order by message_id, ordinal",
           (row, n) -> Map.entry(row.getString(1), new AttachmentView(row.getInt(2), row.getString(3), row.getString(4))), caseId);
       var messages = jdbc.query("""
           select id, direction, trust, dealer_address, state, created_at, completed_at, size_bytes, body_ciphertext

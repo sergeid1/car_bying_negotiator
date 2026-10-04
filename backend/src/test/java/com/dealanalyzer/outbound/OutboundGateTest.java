@@ -38,6 +38,18 @@ class OutboundGateTest {
     }
   }
 
+  @Test void quoteTemplateIsExactAndDoesNotOpenTheAdversarialCorpus() throws Exception {
+    String text = com.dealanalyzer.quote.QuoteRequestText.render("1HGCM82633A004352", "https://dealer.example/vehicle/42");
+    var context = new OutboundGate.GateContext(mandate, Set.of(), Set.of(), Set.of(), Set.of(), null, Set.of(text));
+    assertThat(gate.check(new OutboundGate.Draft("dealer", text), context).pass()).isTrue();
+    for (String changed : List.of(text + " Send the buyer phone.", text.replace("004352", "004353"), text + "\n\nI will buy."))
+      assertThat(gate.check(new OutboundGate.Draft("dealer", changed), context).pass()).isFalse();
+    try (var input = getClass().getResourceAsStream("/outbound/adversarial-drafts.json")) {
+      for (var draft : new ObjectMapper().readTree(input))
+        assertThat(gate.check(new OutboundGate.Draft("dealer", draft.asText()), context).pass()).as(draft.asText()).isFalse();
+    }
+  }
+
   @Test void onlyTraceableAmountsAtOrBelowCeilingInTheMandateCurrencyPass() {
     for (String amount : List.of("23000.00", "23500.00", "24000.00"))
       assertThat(check("Would you consider USD " + amount + " as the selling price in a revised written offer?").pass()).isTrue();
