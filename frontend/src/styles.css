@@ -1657,3 +1657,11 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
 .candidate-case-form h4:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 .candidate-case-form input, .candidate-case-form select { min-width: 0; max-width: 100%; }
 /* End ticket 56. */
+/* Ticket 62: Buyer quote comparison. */
+.quote-comparison { margin-block: 2rem; min-width: 0; }
+.quote-comparison-cars { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: 1rem; }
+.quote-comparison-cars article { min-width: 0; padding: 1rem; border: 1px solid var(--line-strong); border-radius: .5rem; overflow-wrap: anywhere; }
+.quote-comparison select { max-width: 100%; }
+.quote-comparison dd { margin-inline-start: 0; margin-block-end: .75rem; }
+.quote-comparison .amount-evidence { margin-block: .75rem; }
+/* End ticket 62. */

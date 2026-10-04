@@ -26,6 +26,7 @@ import { ACCOUNT_SESSION_KEY, BuyerAccount } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 import { NegotiationConversation } from "./NegotiationConversation";
 import { JourneyCandidates, ShortlistEntry } from "./JourneyCandidates";
+import { QuoteComparison } from "./QuoteComparison";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 // Ticket 63: acceptance, written confirmation and saved agreement states.
@@ -48,6 +49,23 @@ const AA = {
   // Layout/contrast require the real-browser walkthrough; jsdom has no rendering engine.
   rules: { "color-contrast": { enabled: false } },
 };
+
+// Ticket 62: partial quotes and expanded source evidence.
+test("quote comparison and its document evidence have no automated AA violations", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ otdComparable: false, cars: [{
+    caseId: "one", candidateId: "one", title: "2024 Honda Civic", state: "Verified quote", offerVersion: 2,
+    missing: ["Taxes"], reportVersion: null, marketPosition: "Market position unavailable.",
+    amounts: [{ label: "Selling price", minorUnits: 2000000, currency: "USD", evidence: { sourceNote: null,
+      calculation: null, documentSource: { documentId: "doc", extractionId: "ex", offerVersion: 2, pageNumber: 1,
+        wording: "Selling price", region: { x: .1, y: .2, width: .5, height: .1 } } } }],
+  }] })));
+  const { container } = render(<main><h1>Buying Journey</h1><QuoteComparison journeyId="j1" session="session" onSessionEnded={() => {}} /></main>);
+  await screen.findByText("Selling price evidence");
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  await userEvent.setup().click(screen.getByText("Selling price evidence"));
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+// End ticket 62.
 
 // Ticket 56: populated shortlist and candidate case confirmation.
 test("shortlist ordering and case confirmation have no automated AA violations", async () => {
