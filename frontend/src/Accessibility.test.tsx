@@ -5,6 +5,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import App from "./App";
 import { CaseLifecycle } from "./CaseLifecycle";
 import { PricePlan } from "./PricePlan";
+import { NegotiationMandate } from "./NegotiationMandate";
 import { CaseDownloads, RecoveryEmailOptIn, SaveCaseLink } from "./CasePortability";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
@@ -240,4 +241,26 @@ test("the referral partner kit, its example disclosure, and its built links have
   await screen.findByRole("list", { name: "Referral links for inspector-1" });
   result = await axe.run(container, AA);
   expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
+});
+
+test("the Negotiation Mandate with its limits, disclosures, current version and history has no automated AA violations", async () => {
+  const mandate = { version: 2, status: "ACTIVE", currency: "USD", targetMinor: 2250000, ceilingMinor: 2350000, planCeilingMinor: 2400000,
+    disclosures: ["PAYING_CASH", "FIRST_NAME"], autonomyMode: "SUPERVISED", expiresAt: "2026-10-17T12:00:00Z",
+    approvedAt: "2026-10-03T12:00:00Z", revokedAt: null };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => new Response(JSON.stringify(String(input).endsWith("/proposal")
+    ? { available: true, unavailableReason: null, planVersion: 1, currency: "USD", targetMinor: 2300000, ceilingMinor: 2400000,
+      disclosures: ["PAYING_CASH", "HAS_OUTSIDE_FINANCING", "FIRST_NAME", "PURCHASE_TIMELINE"] }
+    : [mandate, { ...mandate, version: 1, status: "REVOKED", revokedAt: "2026-10-03T13:00:00Z" }])));
+  const { container } = render(<main><h1>Buying Case</h1><NegotiationMandate caseId="case" token="token" /></main>);
+  await screen.findByRole("button", { name: "Approve mandate" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+test("an unavailable Negotiation Mandate explains why without automated AA violations", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => new Response(JSON.stringify(String(input).endsWith("/proposal")
+    ? { available: false, unavailableReason: "Review price boundaries first.", planVersion: null, currency: null,
+      targetMinor: null, ceilingMinor: null, disclosures: [] } : [])));
+  const { container } = render(<main><h1>Buying Case</h1><NegotiationMandate caseId="case" token="token" /></main>);
+  await screen.findByText("Review price boundaries first.");
+  expect((await axe.run(container, AA)).violations).toEqual([]);
 });

@@ -31,6 +31,8 @@ class CaseGraphDeletionPlan {
       new Step("outside_finance_offers", "case_id = :caseId"),
       new Step("financing_results", "case_id = :caseId"),
       new Step("finance_offers", "case_id = :caseId"),
+      new Step("negotiation_mandate_revocations", "case_id = :caseId"),
+      new Step("negotiation_mandates", "case_id = :caseId"),
       new Step("price_plan_snapshots", "case_id = :caseId"),
       new Step("market_assessments", "case_id = :caseId"),
       new Step("comparable_snapshots", "provider_snapshot_id in (select id from market_provider_snapshots where case_id = :caseId)"),
