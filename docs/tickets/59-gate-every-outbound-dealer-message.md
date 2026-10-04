@@ -4,7 +4,7 @@
 
 **Blocked by:** 57 — Approve a Negotiation Mandate.
 
-**Status:** blocked on 57 — filed on 2026-10-03 from specification 2.0.
+**Status:** ready-for-agent (57 complete) — filed on 2026-10-03 from specification 2.0.
 
 - [ ] The gate is deterministic, versioned, and has no model call; it returns pass or a list of reasons per violation.
 - [ ] Every money amount in a draft must equal a value derived from the mandate or verified case facts; an amount above the ceiling, or not traceable to one, fails.
