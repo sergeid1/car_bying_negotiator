@@ -1,6 +1,7 @@
 package com.dealanalyzer.journey;
 
 import com.dealanalyzer.account.AccountJourneyAccess;
+import com.dealanalyzer.economics.persistence.CashEconomicsPersistence;
 import com.dealanalyzer.report.AmountEvidence;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -19,15 +20,17 @@ public class JourneyQuoteComparisonService {
   private final JdbcTemplate jdbc;
   private final DealerOfferPersistence offers;
   private final ObjectMapper json;
+  private final CashEconomicsPersistence economics;
 
   JourneyQuoteComparisonService(AccountJourneyAccess accounts, BuyingJourneyRepository journeys,
-      JdbcTemplate jdbc, DealerOfferPersistence offers, ObjectMapper json) {
+      JdbcTemplate jdbc, DealerOfferPersistence offers, ObjectMapper json, CashEconomicsPersistence economics) {
     this.accounts = accounts; this.journeys = journeys; this.jdbc = jdbc; this.offers = offers; this.json = json;
+    this.economics = economics;
   }
 
   public record Amount(String label, long minorUnits, String currency, AmountEvidence.Explanation evidence) {}
   public record Car(String candidateId, String caseId, String title, String state, Integer offerVersion,
-      List<Amount> amounts, List<String> missing, String marketPosition, Integer reportVersion) {}
+      List<Amount> amounts, List<String> missing, List<String> noneListed, String marketPosition, Integer reportVersion) {}
   public record Comparison(List<Car> cars, boolean otdComparable) {}
   private record Link(String candidateId, String caseId, String candidateJson, String state, boolean blocked) {}
 
@@ -57,13 +60,14 @@ public class JourneyQuoteComparisonService {
     var offer = offers.latestOffer(link.caseId()).filter(o -> "VERIFIED".equals(o.status())).orElse(null);
     var amounts = new ArrayList<Amount>();
     var missing = new ArrayList<String>();
+    var noneListed = new ArrayList<String>();
     String market = "Market position unavailable; analyze the current verified offer.";
     Integer reportVersion = null;
     if (offer == null || link.blocked()) {
       missing.addAll(List.of("Selling price", "Dealer fees", "Add-ons", "Taxes", "Government charges", "Out-the-door total"));
       boolean received = !jdbc.queryForList("select id from document_extractions where case_id = ?", String.class, link.caseId()).isEmpty();
       return new Car(link.candidateId(), link.caseId(), title,
-          received || offer != null ? "Quote unverified" : "Awaiting quote", null, amounts, missing, market, null);
+          received || offer != null ? "Quote unverified" : "Awaiting quote", null, amounts, missing, noneListed, market, null);
     }
     String document = jdbc.queryForList("select document_id from document_extractions where case_id = ? and id = ?",
         String.class, link.caseId(), offer.extractionId()).stream().findFirst().orElse(null);
@@ -74,11 +78,31 @@ public class JourneyQuoteComparisonService {
     collect(amounts, missing, terms, "Taxes", "TAX", "TAX_TOTAL", document, offer.version());
     collect(amounts, missing, terms, "Government charges", "GOVERNMENT_CHARGE", "GOVERNMENT_CHARGES_TOTAL", document, offer.version());
     collect(amounts, missing, terms, "Out-the-door total", null, "OUT_THE_DOOR_TOTAL", document, offer.version());
+    // Read the existing calculation for this exact offer; comparison never recalculates charges or tax.
+    var cash = economics.forOffer(offer.id()).orElse(null);
+    JsonNode reconciliation = cash == null ? json.missingNode() : cash.result().path("reconciliation");
+    boolean quoted = amounts.stream().anyMatch(amount -> amount.label().equals("Out-the-door total"));
+    boolean reconciled = quoted && reconciliation.path("quotedTotal").isObject()
+        && reconciliation.path("withinTolerance").asBoolean();
+    if (!quoted) missing.add("No Buyer-verified quoted OTD");
+    else if (cash == null) missing.add("Cash reconciliation unavailable; analyze the verified offer");
+    else if (!reconciliation.path("quotedTotal").isObject()) missing.add("No quoted OTD in the cash reconciliation");
+    else if (!reconciliation.path("withinTolerance").asBoolean()) {
+      JsonNode difference = reconciliation.at("/discrepancy/minorUnits");
+      missing.add(difference.isIntegralNumber()
+          ? "Figures do not add up to the quoted OTD by " + java.math.BigDecimal.valueOf(difference.asLong(), 2).abs().toPlainString()
+              + " " + reconciliation.at("/discrepancy/currency").asText("USD")
+          : "Figures do not add up to the quoted OTD; reconciliation difference unavailable");
+    }
+    if (reconciled) for (String category : List.of("Dealer fees", "Add-ons", "Taxes", "Government charges")) {
+      boolean listed = amounts.stream().anyMatch(amount -> amount.label().equals(category) || amount.label().startsWith(category + ":"));
+      if (!listed && absent(terms, category)) { missing.remove(category); noneListed.add(category); }
+    }
     if (!jdbc.queryForList("select id from document_extractions where case_id = ? and id = ? and suspected_missing_pages = true",
-        String.class, link.caseId(), offer.extractionId()).isEmpty()) missing.add("Document pages");
+        String.class, link.caseId(), offer.extractionId()).isEmpty()) missing.add("Suspected missing document pages");
     for (JsonNode line : terms.path("lineItems")) {
       if (!List.of("SELLING_PRICE", "DEALER_FEE", "ADD_ON", "TAX", "GOVERNMENT_CHARGE", "DISCOUNT", "REBATE", "TRADE", "CREDIT").contains(line.path("category").asText())) {
-        missing.add("Classification of " + line.path("originalLabel").asText("charge"));
+        missing.add("Unclassified charge: " + line.path("originalLabel").asText("charge"));
       }
     }
     var reports = jdbc.queryForList("select payload_json from analysis_reports where case_id = ? order by report_version desc", String.class, link.caseId());
@@ -103,7 +127,25 @@ public class JourneyQuoteComparisonService {
       }
     }
     return new Car(link.candidateId(), link.caseId(), title, "AGREED".equals(link.state()) ? "Agreed" : "Verified quote",
-        offer.version(), List.copyOf(amounts), List.copyOf(missing), market, reportVersion);
+        offer.version(), List.copyOf(amounts), List.copyOf(missing), List.copyOf(noneListed), market, reportVersion);
+  }
+
+  private boolean absent(JsonNode terms, String label) {
+    String category = switch (label) {
+      case "Dealer fees" -> "DEALER_FEE";
+      case "Add-ons" -> "ADD_ON";
+      case "Taxes" -> "TAX";
+      default -> "GOVERNMENT_CHARGE";
+    };
+    String field = switch (label) {
+      case "Dealer fees" -> "DEALER_CHARGES_TOTAL";
+      case "Add-ons" -> "ADD_ON_TOTAL";
+      case "Taxes" -> "TAX_TOTAL";
+      default -> "GOVERNMENT_CHARGES_TOTAL";
+    };
+    for (JsonNode line : terms.path("lineItems")) if (category.equals(line.path("category").asText())) return false;
+    for (JsonNode term : terms.path("candidates")) if (field.equals(term.path("field").asText())) return false;
+    return true;
   }
 
   private void collect(List<Amount> amounts, List<String> missing, JsonNode terms, String label, String category,

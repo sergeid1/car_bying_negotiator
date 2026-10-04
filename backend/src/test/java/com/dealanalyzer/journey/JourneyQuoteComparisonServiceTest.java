@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.dealanalyzer.account.AccountJourneyAccess;
+import com.dealanalyzer.economics.persistence.CashEconomicsPersistence;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence.DealerOfferView;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,6 +19,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 class JourneyQuoteComparisonServiceTest {
   JdbcTemplate jdbc;
   DealerOfferPersistence offers;
+  CashEconomicsPersistence economics;
   AccountJourneyAccess accounts;
   BuyingJourneyRepository journeys;
   JourneyQuoteComparisonService service;
@@ -35,10 +37,11 @@ class JourneyQuoteComparisonServiceTest {
     jdbc.execute("create table analysis_reports(case_id varchar, report_version int, payload_json varchar)");
     jdbc.update("insert into buyer_accounts values ('buyer', 'ACTIVE')");
     offers = mock(DealerOfferPersistence.class); accounts = mock(AccountJourneyAccess.class); journeys = mock(BuyingJourneyRepository.class);
+    economics = mock(CashEconomicsPersistence.class);
     when(accounts.accountId("session")).thenReturn("buyer");
     when(journeys.findByIdAndAccountId("journey", "buyer")).thenReturn(Optional.of(new BuyingJourneyEntity("journey")));
     when(offers.latestOffer(anyString())).thenReturn(Optional.empty());
-    service = new JourneyQuoteComparisonService(accounts, journeys, jdbc, offers, json);
+    service = new JourneyQuoteComparisonService(accounts, journeys, jdbc, offers, json, economics);
   }
 
   @Test void onlyOwnedActiveLinkedCasesInBuyerShortlistOrderAreRead() {
@@ -73,11 +76,13 @@ class JourneyQuoteComparisonServiceTest {
     });
   }
 
-  @Test void missingComponentsAndNewUnverifiedQuotesCannotEnterOtdComparison() throws Exception {
+  @Test void reconciledQuotesAllowOmittedCategoriesWithoutInventingAmounts() throws Exception {
     add("one", 0); verified("one", false);
     var result = service.view("session", "journey");
-    assertThat(result.otdComparable()).isFalse();
-    assertThat(result.cars().getFirst().missing()).containsExactly("Add-ons");
+    assertThat(result.otdComparable()).isTrue();
+    assertThat(result.cars().getFirst().missing()).isEmpty();
+    assertThat(result.cars().getFirst().noneListed()).containsExactly("Add-ons");
+    assertThat(result.cars().getFirst().amounts()).noneMatch(amount -> amount.label().startsWith("Add-ons"));
     jdbc.update("update analysis_cases set status = 'NEEDS_REVIEW'");
     var car = service.view("session", "journey").cars().getFirst();
     assertThat(car.amounts()).isEmpty();
@@ -85,7 +90,37 @@ class JourneyQuoteComparisonServiceTest {
     jdbc.update("update analysis_cases set status = 'READY_TO_ANALYZE', core_review_blocked = true");
     assertThat(service.view("session", "journey").cars().getFirst().amounts()).isNotEmpty();
     jdbc.update("update document_extractions set suspected_missing_pages = true");
-    assertThat(service.view("session", "journey").cars().getFirst().missing()).contains("Document pages");
+    assertThat(service.view("session", "journey").cars().getFirst().missing()).contains("Suspected missing document pages");
+  }
+
+  @Test void unreconciledQuotesExplainDifferenceAndKeepAbsentChargesMissing() throws Exception {
+    add("one", 0); verified("one", false);
+    reconciliation("one", true, false, 12500);
+    var result = service.view("session", "journey");
+    assertThat(result.otdComparable()).isFalse();
+    assertThat(result.cars().getFirst().noneListed()).isEmpty();
+    assertThat(result.cars().getFirst().missing()).contains("Add-ons", "Figures do not add up to the quoted OTD by 125.00 USD");
+    reconciliation("one", false, true, 0);
+    assertThat(service.view("session", "journey").cars().getFirst().missing()).contains("No quoted OTD in the cash reconciliation");
+    when(economics.forOffer("offer-one")).thenReturn(Optional.empty());
+    assertThat(service.view("session", "journey").cars().getFirst().missing()).contains("Cash reconciliation unavailable; analyze the verified offer");
+  }
+
+  @Test void allComparedCarsMustReconcileAndUnclassifiedOrMissingEvidenceStillBlocks() throws Exception {
+    add("one", 0); verified("one", false); add("two", 1); verified("two", true);
+    reconciliation("two", true, false, 100);
+    assertThat(service.view("session", "journey").otdComparable()).isFalse();
+    reconciliation("two", true, true, 0);
+    assertThat(service.view("session", "journey").otdComparable()).isTrue();
+    var offer = offers.latestOffer("two").orElseThrow();
+    var terms = (com.fasterxml.jackson.databind.node.ObjectNode) offer.terms();
+    ((com.fasterxml.jackson.databind.node.ArrayNode) terms.path("lineItems")).addObject().put("category", "UNKNOWN").put("originalLabel", "Package charge");
+    assertThat(service.view("session", "journey").cars().get(1).missing()).contains("Unclassified charge: Package charge");
+    ((com.fasterxml.jackson.databind.node.ArrayNode) terms.path("lineItems")).removeAll();
+    var candidates = (com.fasterxml.jackson.databind.node.ArrayNode) terms.path("candidates");
+    candidates.remove(candidates.size() - 1);
+    assertThat(service.view("session", "journey").cars().get(1).missing()).contains("No Buyer-verified quoted OTD");
+    assertThat(service.view("session", "journey").otdComparable()).isFalse();
   }
 
   @Test void marketPositionUsesOnlyLatestReportForThisOffer() throws Exception {
@@ -126,5 +161,16 @@ class JourneyQuoteComparisonServiceTest {
     jdbc.update("insert into document_extractions(id, case_id, document_id) values (?, ?, 'doc')", "ex-" + id, id);
     when(offers.latestOffer(id)).thenReturn(Optional.of(new DealerOfferView("offer-" + id, id, "ex-" + id,
         2, "VERIFIED", "schema", "fingerprint", terms, Instant.now())));
+    reconciliation(id, true, true, 0);
+  }
+
+  private void reconciliation(String id, boolean quoted, boolean withinTolerance, long discrepancy) {
+    var result = json.createObjectNode(); var reconciliation = result.putObject("reconciliation");
+    if (quoted) reconciliation.putObject("quotedTotal").put("minorUnits", 2200000).put("currency", "USD");
+    else reconciliation.putNull("quotedTotal");
+    reconciliation.put("withinTolerance", withinTolerance);
+    reconciliation.putObject("discrepancy").put("minorUnits", discrepancy).put("currency", "USD");
+    when(economics.forOffer("offer-" + id)).thenReturn(Optional.of(new CashEconomicsPersistence.CashEconomicsView(
+        "cash-" + id, id, "schema", "offer-" + id, "policy", result, Instant.now())));
   }
 }

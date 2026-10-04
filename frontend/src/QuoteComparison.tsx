@@ -4,7 +4,7 @@ import { Arithmetic, Calculation, DocumentSource, DocumentSourceView, formatMone
 export type QuoteAmount = { label: string; minorUnits: number; currency: string;
   evidence: { documentSource: DocumentSource | null; sourceNote: string | null; calculation: Calculation | null } };
 export type ComparisonCar = { candidateId: string; caseId: string; title: string; state: string; offerVersion: number | null;
-  amounts: QuoteAmount[]; missing: string[]; marketPosition: string; reportVersion: number | null };
+  amounts: QuoteAmount[]; missing: string[]; noneListed?: string[]; marketPosition: string; reportVersion: number | null };
 export type QuoteComparisonView = { cars: ComparisonCar[]; otdComparable: boolean };
 type Order = "shortlist" | "selling" | "fees" | "addons" | "otd";
 const prefixes = { selling: "Selling price", fees: "Dealer fees", addons: "Add-ons", otd: "Out-the-door total" };
@@ -56,16 +56,17 @@ export function QuoteComparison({ journeyId, session, onSessionEnded }: {
             <option value="otd" disabled={!view.otdComparable}>Out-the-door total, lowest first</option>
           </select>
         </label>
-        <p>{view.otdComparable ? "Every car has a complete quoted OTD breakdown. You can order by OTD total."
-          : "OTD totals cannot be compared yet. Missing figures are listed for each car; an absent charge is never treated as zero."}</p>
+        <p>{view.otdComparable ? "Every verified quoted OTD reconciles within the recorded tolerance. You can order by OTD total."
+          : "OTD totals cannot be compared yet. Each car explains what needs review; an absent charge in an unreconciled quote is never treated as zero."}</p>
         <p className="muted">Ordering is your choice. Cars with missing figures follow those with figures. Market ranges are stored estimates of selling price.</p>
         <div className="quote-comparison-cars">
           {cars.map(car => <article key={car.caseId} aria-label={car.title}>
             <h4>{car.title}</h4>
             <p>{car.state}{car.offerVersion != null && ` · Dealer Offer version ${car.offerVersion}`}</p>
-            {car.missing.length > 0 && <p>Missing: {car.missing.join(", ")}.</p>}
+            {car.missing.length > 0 && <p>OTD comparison unavailable: {car.missing.join("; ")}.</p>}
             <p>{car.marketPosition}{car.reportVersion != null && ` Report version ${car.reportVersion}.`}</p>
             <dl>
+              {(car.noneListed ?? []).map(category => <div key={category}><dt>{category}</dt><dd>None listed</dd></div>)}
               {car.amounts.map((amount, index) => <div key={index}>
                 <dt>{amount.label}</dt>
                 <dd>{formatMoney(amount.minorUnits, amount.currency)} · <a href={`#${id}-${car.caseId}-${index}`}

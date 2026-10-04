@@ -41,8 +41,32 @@ test("partial quotes disable OTD ordering and missing cars display state without
   expect(screen.getByRole("option", { name: "Out-the-door total, lowest first" })).toBeDisabled();
   const car = screen.getByRole("article", { name: /awaiting/ });
   expect(car).toHaveTextContent("Awaiting quote");
-  expect(car).toHaveTextContent("Missing: Taxes, Out-the-door total");
+  expect(car).toHaveTextContent("OTD comparison unavailable: Taxes; Out-the-door total");
   expect(car).not.toHaveTextContent("$0.00");
+});
+test("reconciled omitted categories show None listed without an amount or source and sort last", async () => {
+  const first = { ...comparisonCar("first", 2000000), noneListed: ["Dealer fees", "Add-ons"] };
+  const second = comparisonCar("second", 1900000);
+  second.amounts.push({ label: "Dealer fees: Document fee", minorUnits: 50000, currency: "USD",
+    evidence: { documentSource: null, sourceNote: "Verified fee.", calculation: null } });
+  mock({ cars: [first, second], otdComparable: true });
+  render(<QuoteComparison journeyId="journey" session="session" onSessionEnded={() => {}} />);
+  await screen.findByText(/Every verified quoted OTD reconciles/);
+  const card = screen.getByRole("article", { name: /first/ });
+  expect(within(card).getAllByText("None listed")).toHaveLength(2);
+  expect(within(card).queryByRole("link", { name: "Source for Add-ons" })).not.toBeInTheDocument();
+  expect(card).not.toHaveTextContent("$0.00");
+  expect(screen.getByRole("option", { name: "Out-the-door total, lowest first" })).not.toBeDisabled();
+  fireEvent.change(screen.getByLabelText("Order quotes by"), { target: { value: "fees" } });
+  expect(screen.getAllByRole("article")[0]).toHaveAccessibleName(/second/);
+  fireEvent.change(screen.getByLabelText("Order quotes by"), { target: { value: "otd" } });
+  expect(screen.getAllByRole("article")[0]).toHaveAccessibleName(/second/);
+});
+test("unreconciled quotes show the per-car reason", async () => {
+  mock({ cars: [{ ...comparisonCar("one", 2000000), missing: ["Figures do not add up to the quoted OTD by 125.00 USD"] }], otdComparable: false });
+  render(<QuoteComparison journeyId="journey" session="session" onSessionEnded={() => {}} />);
+  await screen.findByText(/Figures do not add up to the quoted OTD by 125.00 USD/);
+  expect(screen.getByRole("option", { name: "Out-the-door total, lowest first" })).toBeDisabled();
 });
 test("refreshes, handles expired sessions and explains load failure", async () => {
   const fetcher = mock({ cars: [], otdComparable: false }); const ended = vi.fn();
