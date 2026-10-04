@@ -25,13 +25,15 @@ public class OutboundDraftService {
   private final ObjectMapper json;
   private final OutboundGate gate = new OutboundGate();
   private final AccountOutboundPrivacy privacy;
+  private final com.dealanalyzer.quote.WrittenQuoteEvidence writtenQuotes;
 
   public OutboundDraftService(EphemeralBuyingCaseService cases, EphemeralCasePersistence locks,
       MandateService mandates, DealerOfferPersistence offers, EntityManager manager, ObjectMapper json,
-      AccountOutboundPrivacy privacy) {
+      AccountOutboundPrivacy privacy, com.dealanalyzer.quote.WrittenQuoteEvidence writtenQuotes) {
     this.cases = cases; this.locks = locks; this.mandates = mandates; this.offers = offers;
     this.manager = manager; this.json = json;
     this.privacy = privacy;
+    this.writtenQuotes = writtenQuotes;
   }
 
   public record StoredDraft(String id, String caseId, OutboundGate.Draft draft,
@@ -110,7 +112,14 @@ public class OutboundDraftService {
           .setParameter("caseId", caseId).setParameter("dealer", dealerId).setMaxResults(1).getResultList();
       if (!listings.isEmpty()) {
         Object[] row = (Object[]) listings.getFirst();
-        try { questions.add(com.dealanalyzer.quote.QuoteRequestText.render((String) row[0], (String) row[1])); }
+        try {
+          questions.add(com.dealanalyzer.quote.QuoteRequestText.render((String) row[0], (String) row[1]));
+          questions.add(com.dealanalyzer.quote.WrittenQuoteEvidence.CONFIRMATION);
+          writtenQuotes.latest(caseId, dealerId).ifPresent(evidence -> {
+            Long selling = com.dealanalyzer.quote.WrittenQuoteEvidence.amount(evidence.offer().terms(), "SELLING_PRICE");
+            if (mandate != null && selling != null && selling <= mandate.ceilingMinor()) questions.add(evidence.text());
+          });
+        }
         catch (IllegalArgumentException unsupported) { /* Invalid source references authorize no language. */ }
       }
     }

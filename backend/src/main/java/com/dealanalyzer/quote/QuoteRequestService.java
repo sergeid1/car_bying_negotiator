@@ -49,7 +49,7 @@ public class QuoteRequestService {
         || request.dealerAddress().length() > 254)
       throw new IllegalArgumentException("Choose a dealer and provide its email address.");
     var context = drafts.context(caseId, request.dealerId());
-    String text = context.caseQuestions().stream().findFirst()
+    String text = context.caseQuestions().stream().filter(question -> question.startsWith("Could you provide an itemized out-the-door quote for VIN ")).findFirst()
         .orElseThrow(() -> new IllegalArgumentException("Confirm the VIN and listing before requesting a quote."));
     var draft = drafts.create(caseId, token, key, new OutboundGate.Draft(request.dealerId(), text));
     var existing = jdbc.queryForList("select id from quote_requests where draft_id = ?", String.class, draft.id());
