@@ -99,6 +99,15 @@ public class RelayService {
    * is metered, including refusals.
    */
   public String send(String caseId, String dealerAddress, String subject, String body) {
+    return send(caseId, dealerAddress, subject, body, java.util.Set.of());
+  }
+
+  /**
+   * As {@link #send(String, String, String, String)}, except that {@code released} values are the Buyer's
+   * explicit, audited release to this dealer (ACCT-03): only those values may appear; every other email,
+   * phone or surname is still refused. Callers pass values only from a recorded release.
+   */
+  public String send(String caseId, String dealerAddress, String subject, String body, java.util.Set<String> released) {
     String to = normalizeAddress(dealerAddress);
     if (subject == null || subject.isBlank() || subject.length() > MAX_SUBJECT || subject.matches("(?s).*[\\r\\n].*"))
       throw new RelayRefusedException(Reason.INVALID, "A one-line subject of up to " + MAX_SUBJECT + " characters is required.");
@@ -111,7 +120,7 @@ public class RelayService {
       Identity identity = ensureIdentity(caseId, now);
       if (identity.optedOutAt() != null) return refuse(caseId, dealerHash, Reason.OPTED_OUT, now);
       String rendered = body.strip() + FOOTER + optOutUrl(identity.id());
-      if (!BuyerIdentityScreen.find(subject + "\n" + rendered, buyerIdentity(caseId)).isEmpty())
+      if (!BuyerIdentityScreen.find(subject + "\n" + rendered, buyerIdentity(caseId, released)).isEmpty())
         return refuse(caseId, dealerHash, Reason.BUYER_DATA, now);
       Timestamp dayAgo = Timestamp.from(now.minus(Duration.ofDays(1)));
       if (count("case_id = ?", caseId, dayAgo) >= perCaseDaily) return refuse(caseId, dealerHash, Reason.CASE_CAP, now);
@@ -176,7 +185,7 @@ public class RelayService {
         UUID.randomUUID().toString(), caseId, dealerHash, messageId, outcome, Timestamp.from(now));
   }
 
-  private BuyerIdentityScreen.Identity buyerIdentity(String caseId) {
+  private BuyerIdentityScreen.Identity buyerIdentity(String caseId, java.util.Set<String> released) {
     var emails = new ArrayList<String>();
     var phones = new ArrayList<String>();
     var surnames = new ArrayList<String>();
@@ -185,6 +194,11 @@ public class RelayService {
     });
     emails.addAll(jdbc.queryForList("select email from case_recovery_contacts where case_id = ?", String.class, caseId));
     emails.addAll(jdbc.queryForList("select email from case_delivery_requests where case_id = ?", String.class, caseId));
+    if (!released.isEmpty()) {
+      var kept = (java.util.function.Predicate<String>) value -> value == null || !released.contains(value.strip());
+      return new BuyerIdentityScreen.Identity(emails.stream().filter(kept).toList(), phones.stream().filter(kept).toList(),
+          surnames.stream().filter(kept).toList());
+    }
     return new BuyerIdentityScreen.Identity(emails, phones, surnames);
   }
 

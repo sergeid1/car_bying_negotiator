@@ -1665,3 +1665,14 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
 .quote-comparison dd { margin-inline-start: 0; margin-block-end: .75rem; }
 .quote-comparison .amount-evidence { margin-block: .75rem; }
 /* End ticket 62. */
+
+/* Ticket 65: test-drive scheduling and contact release. */
+.test-drive-panel, .test-drive-panel .card { min-width: 0; overflow-wrap: anywhere; }
+.test-drive-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; margin: 8px 0; font: inherit; }
+.test-drive-panel blockquote { margin: 8px 0; padding-left: 12px; border-left: 3px solid var(--line); min-width: 0; }
+.test-drive-panel input, .test-drive-panel select { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.test-drive-panel input[type="checkbox"] { width: 20px; }
+.test-drive-panel button { max-width: 100%; white-space: normal; }
+.test-drive-list { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 12px; }
+.test-drive-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+/* End ticket 65. */
