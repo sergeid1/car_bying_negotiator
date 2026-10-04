@@ -1,5 +1,6 @@
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { JourneyCandidates, JourneyCaseCredentials } from "./JourneyCandidates";
+import { QuoteComparison } from "./QuoteComparison";
 
 type Option = { id: string; label: string };
 type Model = Option & { trims: Option[] };
@@ -146,9 +147,10 @@ export function BuyingJourneys({ session, onSessionEnded, onCaseOpened }: { sess
           setView({ mode: "open", journey: saved, shown: saved.brief });
           await refreshList().catch(() => undefined);
         }} />}
-      candidates={<JourneyCandidates key={`${journey.id}-${journey.brief.version}`} journeyId={journey.id}
+      candidates={<><JourneyCandidates key={`${journey.id}-${journey.brief.version}`} journeyId={journey.id}
         briefVersion={journey.brief.version} postalCode={journey.brief.postalCode} onSessionEnded={onSessionEnded}
-        onCaseOpened={onCaseOpened} request={(path, init) => call(path, session, init)} />}
+        onCaseOpened={onCaseOpened} request={(path, init) => call(path, session, init)} />
+        <QuoteComparison key={journey.id} journeyId={journey.id} session={session} onSessionEnded={onSessionEnded} /></>}
       onBack={() => show({ mode: "list" })}
       onEdit={() => show({ mode: "edit", journey })}
       onVersion={version => run(async () => {

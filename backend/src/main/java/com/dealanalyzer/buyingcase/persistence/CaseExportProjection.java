@@ -12,6 +12,9 @@ class CaseExportProjection {
   CaseExportProjection(EntityManager manager, ObjectMapper json) { this.manager=manager; this.json=json; }
   ObjectNode read(String caseId) {
     var result=json.createObjectNode();
+    result.set("test_drive_appointments", rows("test_drive_appointments", "id, case_id, agreed_price_id, proposal_id, slot_option, starts_at, ends_at, time_zone, confirmation_message_id, replaces_appointment_id, state, created_at, scheduled_at, ended_at", "case_id = :caseId", caseId));
+    result.set("test_drive_messages", rows("test_drive_messages", "id, case_id, agreed_price_id, quote_request_id, appointment_id, kind, time_zone, slots_json, message_text, draft_id, state, message_id, created_at, sent_at", "case_id = :caseId", caseId));
+    result.set("test_drive_contact_releases", rows("test_drive_contact_releases", "id, case_id, appointment_id, dealer_id, released_fields, state, decided_at, released_at", "case_id = :caseId", caseId));
     result.set("negotiation_drafts", rows("negotiation_drafts", "id, case_id, quote_request_id, mandate_id, report_version, dealer_offer_id, proposal_minor, grounds_json, state, cancel_reason, message_id, created_at, decided_at", "case_id = :caseId", caseId));
     result.set("negotiation_draft_revisions", rows("negotiation_draft_revisions", "id, case_id, negotiation_draft_id, revision, outbound_draft_id, edited_by_buyer, created_at", "case_id = :caseId", caseId));
     result.set("journey_candidate_cases", rows("journey_candidate_cases", "case_id, journey_id, account_id, candidate_id, created_at", "case_id = :caseId", caseId));

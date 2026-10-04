@@ -26,14 +26,17 @@ public class OutboundDraftService {
   private final OutboundGate gate = new OutboundGate();
   private final AccountOutboundPrivacy privacy;
   private final com.dealanalyzer.quote.WrittenQuoteEvidence writtenQuotes;
+  private final org.springframework.beans.factory.ObjectProvider<OutboundCaseLanguage> caseLanguage;
 
   public OutboundDraftService(EphemeralBuyingCaseService cases, EphemeralCasePersistence locks,
       MandateService mandates, DealerOfferPersistence offers, EntityManager manager, ObjectMapper json,
-      AccountOutboundPrivacy privacy, com.dealanalyzer.quote.WrittenQuoteEvidence writtenQuotes) {
+      AccountOutboundPrivacy privacy, com.dealanalyzer.quote.WrittenQuoteEvidence writtenQuotes,
+      org.springframework.beans.factory.ObjectProvider<OutboundCaseLanguage> caseLanguage) {
     this.cases = cases; this.locks = locks; this.mandates = mandates; this.offers = offers;
     this.manager = manager; this.json = json;
     this.privacy = privacy;
     this.writtenQuotes = writtenQuotes;
+    this.caseLanguage = caseLanguage;
   }
 
   public record StoredDraft(String id, String caseId, OutboundGate.Draft draft,
@@ -124,6 +127,7 @@ public class OutboundDraftService {
         }
         catch (IllegalArgumentException unsupported) { /* Invalid source references authorize no language. */ }
       }
+      caseLanguage.orderedStream().forEach(language -> questions.addAll(language.paragraphs(caseId, dealerId)));
     }
     return new OutboundGate.GateContext(mandate, amounts, Set.of(), personal, Set.of(), report, questions, quoteRequestQuestion);
   }

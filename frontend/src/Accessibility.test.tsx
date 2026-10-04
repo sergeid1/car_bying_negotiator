@@ -26,6 +26,7 @@ import { ACCOUNT_SESSION_KEY, BuyerAccount } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 import { NegotiationConversation } from "./NegotiationConversation";
 import { JourneyCandidates, ShortlistEntry } from "./JourneyCandidates";
+import { QuoteComparison } from "./QuoteComparison";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 // Ticket 63: acceptance, written confirmation and saved agreement states.
@@ -48,6 +49,23 @@ const AA = {
   // Layout/contrast require the real-browser walkthrough; jsdom has no rendering engine.
   rules: { "color-contrast": { enabled: false } },
 };
+
+// Ticket 62: partial quotes and expanded source evidence.
+test("quote comparison and its document evidence have no automated AA violations", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ otdComparable: false, cars: [{
+    caseId: "one", candidateId: "one", title: "2024 Honda Civic", state: "Verified quote", offerVersion: 2,
+    missing: ["Taxes"], reportVersion: null, marketPosition: "Market position unavailable.",
+    amounts: [{ label: "Selling price", minorUnits: 2000000, currency: "USD", evidence: { sourceNote: null,
+      calculation: null, documentSource: { documentId: "doc", extractionId: "ex", offerVersion: 2, pageNumber: 1,
+        wording: "Selling price", region: { x: .1, y: .2, width: .5, height: .1 } } } }],
+  }] })));
+  const { container } = render(<main><h1>Buying Journey</h1><QuoteComparison journeyId="j1" session="session" onSessionEnded={() => {}} /></main>);
+  await screen.findByText("Selling price evidence");
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  await userEvent.setup().click(screen.getByText("Selling price evidence"));
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+// End ticket 62.
 
 // Ticket 56: populated shortlist and candidate case confirmation.
 test("shortlist ordering and case confirmation have no automated AA violations", async () => {
@@ -510,3 +528,33 @@ test.each(["AWAITING_BUYER", "PAUSED"])("the negotiation conversation (%s) has n
   expect((await axe.run(container, AA)).violations).toEqual([]);
   vi.unstubAllGlobals();
 });
+
+// Ticket 65: test-drive availability, dealer reply confirmation with contact release, and booked states.
+import { TestDriveAppointment } from "./TestDriveAppointment";
+function testDriveFixture(state: string) {
+  const pass = { pass: true, gateVersion: "outbound-gate.v2", reasons: [] };
+  const slot = { option: 1, startsAt: "2026-10-10T15:00:00Z", endsAt: "2026-10-10T16:00:00Z", label: "Saturday, October 10, 2026, 10:00 to 11:00 (America/Chicago)" };
+  const proposal = { id: "p1", kind: "PROPOSAL", appointmentId: null, slots: [slot], release: [], state: "SENT", createdAt: "2026-10-04T12:00:00Z",
+    sentAt: "2026-10-04T12:01:00Z", gatedDraft: { draft: { text: "The Buyer would like to arrange a test drive of the vehicle in your written quote at one of these times:\n\nOption 1: " + slot.label }, decision: pass } };
+  return { agreedPrice: { id: "ap", offerVersion: 3, baselineVersion: 2, outTheDoorMinor: 2680000 }, dealerAddress: "sales@dealer.example",
+    contactFields: ["FIRST_NAME", "LAST_NAME", "EMAIL", "PHONE"],
+    messages: state === "PROPOSE" ? [] : [proposal, ...(state === "CONFIRM" ? [{ ...proposal, id: "b1", kind: "BOOKING", appointmentId: "a1",
+      release: ["EMAIL"], state: "DRAFT", sentAt: null, gatedDraft: { draft: { text: "Thank you for confirming. The Buyer will attend the test drive on " + slot.label + "." },
+        decision: { pass: false, gateVersion: "outbound-gate.v2", reasons: [{ code: "NO_ACTIVE_MANDATE", text: "Approve a current mandate." }] } } }] : [])],
+    appointments: state === "BOOKED" ? [{ id: "a1", option: 1, startsAt: slot.startsAt, endsAt: slot.endsAt, label: slot.label, state: "SCHEDULED",
+      replacesAppointmentId: null, release: { fields: [], state: "WITHHELD", decidedAt: "2026-10-04T13:00:00Z", releasedAt: null } }] : [],
+    confirmations: state === "CONFIRM" ? [{ proposalId: "p1", messageId: "m9", receivedAt: "2026-10-04T13:00:00Z",
+      excerpt: "Option 1 works for us. Ask for the sales desk when you arrive.", detectedOption: 1 }] : [] };
+}
+test.each(["PROPOSE", "CONFIRM", "BOOKED"])("the test-drive panel (%s) has no automated AA violations", async state => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(testDriveFixture(state)))));
+  const { container } = render(<main><h1>Buying Case</h1><TestDriveAppointment caseId="case" token="token" /></main>);
+  await screen.findByRole("heading", { name: "Schedule a test drive" });
+  await screen.findByRole("button", { name: "Refresh test-drive status" });
+  if (state === "CONFIRM") await screen.findByRole("checkbox", { name: "Email" });
+  if (state === "BOOKED") await screen.findByRole("button", { name: "Move this test drive" });
+  if (state === "PROPOSE") await screen.findByRole("button", { name: "Prepare proposed times" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  vi.unstubAllGlobals();
+});
+// End ticket 65.
