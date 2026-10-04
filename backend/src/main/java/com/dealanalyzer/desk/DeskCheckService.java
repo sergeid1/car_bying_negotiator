@@ -1,0 +1,256 @@
+package com.dealanalyzer.desk;
+
+import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService;
+import com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence;
+import com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence.ExtractionView;
+import com.dealanalyzer.plan.PricePlanService;
+import com.dealanalyzer.review.RevisedOfferPolicy;
+import com.dealanalyzer.verification.persistence.DealerOfferPersistence;
+import com.dealanalyzer.verification.persistence.DealerOfferPersistence.DealerOfferView;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.*;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Compares the paperwork presented at the desk with the Agreed Price's Approved Baseline. It reuses
+ * revised-offer review: the saved Deal Review when the Buyer has verified the paperwork and run the
+ * analysis, otherwise {@link RevisedOfferPolicy} over the verified offer or, before verification, over
+ * the terms as read, each of which is reported as unverified.
+ */
+@Service
+public class DeskCheckService {
+  public static final String VERSION = "desk-check.v1";
+  private static final List<String> FINANCING = List.of("AMOUNT_FINANCED", "APR", "TERM_MONTHS",
+      "MONTHLY_PAYMENT", "FINANCE_CHARGE", "TOTAL_OF_PAYMENTS", "CASH_DOWN");
+  private static final List<String> PRICE = List.of("SELLING_PRICE", "DISCOUNT_TOTAL", "REBATE_TOTAL");
+  private static final List<String> TRADE = List.of("TRADE_ALLOWANCE", "TRADE_PAYOFF");
+  private static final List<String> TOTALS = List.of("OUT_THE_DOOR_TOTAL", "SUBTOTAL", "TAX_TOTAL",
+      "DEALER_CHARGES_TOTAL", "GOVERNMENT_CHARGES_TOTAL", "ADD_ON_TOTAL");
+  /** Lead order: a different car first, then money added to the deal, then changed terms. */
+  private static final List<String> ORDER = List.of("VEHICLE", "ADDED", "REMOVED", "CHANGED_CHARGE",
+      "PRICE", "FINANCING", "TRADE", "LIMIT", "TOTAL");
+
+  private final EphemeralBuyingCaseService cases;
+  private final PricePlanService plans;
+  private final DealerOfferPersistence offers;
+  private final DocumentExtractionPersistence extractions;
+  private final JdbcTemplate jdbc;
+  private final ObjectMapper json;
+  private final com.dealanalyzer.purchase.PurchaseService purchases;
+
+  public DeskCheckService(EphemeralBuyingCaseService cases, PricePlanService plans, DealerOfferPersistence offers,
+      DocumentExtractionPersistence extractions, JdbcTemplate jdbc, ObjectMapper json,
+      com.dealanalyzer.purchase.PurchaseService purchases) {
+    this.cases = cases; this.plans = plans; this.offers = offers; this.extractions = extractions;
+    this.jdbc = jdbc; this.json = json; this.purchases = purchases;
+  }
+
+  public record View(String policyVersion, String status, String source, Agreed agreedPrice, Paperwork paperwork,
+      List<Finding> findings, List<Finding> otherDifferences, int unchangedTerms, TotalEffect totalEffect,
+      FreshCase freshCase, Integer dealReviewVersion) {}
+  public record Agreed(int offerVersion, int baselineVersion, String vin, Long sellingPriceMinor,
+      Long outTheDoorMinor, Instant acceptedAt) {}
+  public record Paperwork(String documentId, Instant uploadedAt, String extractionId, Integer offerVersion, String vin) {}
+  /** One difference from the Agreed Price; {@code verified} only when it rests on Buyer-verified evidence. */
+  public record Finding(String group, String term, String label, String kind, JsonNode agreed, JsonNode desk,
+      BigDecimal delta, String unit, String severity, boolean verified, JsonNode evidence, String buyerAction) {}
+  /** basis: CALCULATED (saved review), QUOTED (totals on the paperwork) or UNAVAILABLE. Missing is never zero. */
+  public record TotalEffect(String basis, String currency, Long outTheDoorDeltaMinor, Long preTaxDeltaMinor,
+      Long taxEffectMinor, Long addedChargesMinor) {}
+  /** The case-start details for the car on the paperwork, kept apart from the agreed car. */
+  public record FreshCase(String vin, String dealerPostalCode, String purchaseMethod) {}
+  private record AgreedRow(int offerVersion, int baselineVersion, String baselineId, Instant acceptedAt) {}
+  private record CaseRow(String dealerLocation, String purchaseMethod) {}
+  private record Document(String id, Instant createdAt) {}
+
+  @Transactional(readOnly = true)
+  public View view(String caseId, String token) {
+    cases.reopen(caseId, token);
+    var agreedRow = jdbc.query("select offer_version, baseline_version, baseline_id, accepted_at from agreed_prices where case_id = ?",
+        (r, n) -> new AgreedRow(r.getInt(1), r.getInt(2), r.getString(3), r.getTimestamp(4).toInstant()), caseId)
+        .stream().findFirst().orElse(null);
+    if (agreedRow == null) return empty("NO_AGREED_PRICE", null);
+    // The check reads the Approved Baseline and saved Deal Reviews, so it shares their purchase gate.
+    purchases.requireReport(caseId, token);
+    var baseline = plans.get(caseId, token, "BASELINE", agreedRow.baselineVersion());
+    JsonNode agreedTerms = baseline.payload().at("/dealerOffer/terms");
+    String agreedVin = text(baseline.payload().at("/vehicleEvidence/vehicle/vin"));
+    if (agreedVin == null) agreedVin = candidate(agreedTerms, "VEHICLE_VIN");
+    var agreed = new Agreed(agreedRow.offerVersion(), agreedRow.baselineVersion(), agreedVin,
+        amount(agreedTerms, "SELLING_PRICE"), amount(agreedTerms, "OUT_THE_DOOR_TOTAL"), agreedRow.acceptedAt());
+    // Desk paperwork is whatever the Buyer adds after accepting; the accepted quote itself never counts.
+    var document = jdbc.query("""
+        select id, created_at from source_documents where case_id = ? and created_at > ?
+        order by created_at desc, id desc fetch first 1 rows only
+        """, (r, n) -> new Document(r.getString(1), r.getTimestamp(2).toInstant()), caseId,
+        java.sql.Timestamp.from(agreedRow.acceptedAt())).stream().findFirst().orElse(null);
+    if (document == null) return empty("AWAITING_PAPERWORK", agreed);
+    ExtractionView extraction;
+    try { extraction = extractions.requireLatest(caseId, document.id()); }
+    catch (com.dealanalyzer.buyingcase.ResourceNotFoundException reading) {
+      return new View(VERSION, "READING", null, agreed, new Paperwork(document.id(), document.createdAt(), null, null, null),
+          List.of(), List.of(), 0, unavailable(), null, null);
+    }
+    String deskVin = extraction.candidates().stream().filter(c -> c.field().equals("VEHICLE_VIN")).findFirst()
+        .map(c -> c.currentCorrection() == null ? c.normalizedValue() : c.currentCorrection().normalizedValue()).orElse(null);
+    DealerOfferView offer = offers.latestOffer(caseId)
+        .filter(value -> value.version() > agreedRow.offerVersion() && "VERIFIED".equals(value.status())
+            && value.extractionId().equals(extraction.id())).orElse(null);
+    var paperwork = new Paperwork(document.id(), document.createdAt(), extraction.id(),
+        offer == null ? null : offer.version(), deskVin);
+    var policy = new RevisedOfferPolicy();
+    if (agreedVin != null && deskVin != null && !agreedVin.equals(deskVin)) {
+      var place = jdbc.queryForObject("select dealer_location, purchase_method from analysis_cases where id = ?",
+          (r, n) -> new CaseRow(r.getString(1), r.getString(2)), caseId);
+      ObjectNode agreedValue = json.createObjectNode().put("value", agreedVin).put("unit", "VIN");
+      ObjectNode deskValue = json.createObjectNode().put("value", deskVin).put("unit", "VIN");
+      var vin = new Finding("VEHICLE", "candidate:VEHICLE_VIN#1", "VEHICLE_VIN", "CHANGED", agreedValue, deskValue,
+          null, "VIN", "BLOCKING", false, evidence(extraction, "VEHICLE_VIN"),
+          "Start a separate case for this car. Nothing on this paperwork is compared with or added to the agreed car.");
+      return new View(VERSION, "DIFFERENT_VIN", "READ_FROM_PAPERWORK", agreed, paperwork, List.of(vin), List.of(), 0,
+          unavailable(), new FreshCase(deskVin, place.dealerLocation(), place.purchaseMethod()), null);
+    }
+    String source;
+    List<JsonNode> discrepancies = new ArrayList<>();
+    JsonNode cash = null;
+    Integer reviewVersion = null;
+    JsonNode deskTerms;
+    var review = offer == null ? null : jdbc.query("""
+        select version, payload_json from deal_reviews where case_id = ? and current_offer_id = ? and baseline_id = ?
+        order by version desc fetch first 1 rows only
+        """, (r, n) -> Map.entry(r.getInt(1), read(r.getString(2))), caseId, offer.id(), agreedRow.baselineId())
+        .stream().findFirst().orElse(null);
+    if (review != null) {
+      source = "DEAL_REVIEW";
+      reviewVersion = review.getKey();
+      for (JsonNode row : review.getValue().path("discrepancies"))
+        if ("BASELINE".equals(row.path("comparison").asText())) discrepancies.add(row);
+      cash = review.getValue().at("/cashDeltas/baseline");
+      deskTerms = offer.terms();
+    } else {
+      source = offer == null ? "READ_FROM_PAPERWORK" : "VERIFIED_OFFER";
+      deskTerms = offer == null ? asRead(extraction) : offer.terms();
+      for (var row : policy.compare("BASELINE", agreedTerms, deskTerms)) discrepancies.add(json.valueToTree(row));
+    }
+    List<Finding> lead = new ArrayList<>(), other = new ArrayList<>();
+    int differing = 0;
+    long added = 0;
+    boolean addedKnown = true;
+    for (JsonNode row : discrepancies) {
+      String term = row.path("term").asText(), kind = row.path("kind").asText();
+      boolean line = term.startsWith("line:");
+      String field = line ? null : term.replaceFirst("^candidate:", "").replaceFirst("#\\d+$", "");
+      JsonNode expected = row.path("expected"), observed = row.path("observed");
+      boolean equal = !expected.isMissingNode() && expected.equals(observed);
+      String label = line ? (observed.isObject() ? row.at("/observedEvidence/originalLabel") : row.at("/expectedEvidence/originalLabel")).asText(term)
+          : field;
+      boolean verified = !"READ_FROM_PAPERWORK".equals(source)
+          && (observed.isNull() || observed.isMissingNode() || row.at("/observedEvidence/buyerVerified").asBoolean(true));
+      String group;
+      if (kind.equals("LIMIT_VIOLATION")) group = "LIMIT";
+      else if (equal) continue; // Same as agreed; only unverified, which the source already says.
+      else if (line && kind.equals("ADDED")) group = "ADDED";
+      else if (line && kind.equals("MISSING")) group = "REMOVED";
+      // Same amount under a different classification is shown, but does not lead the check.
+      else if (line) group = decimal(row.path("delta")) != null && decimal(row.path("delta")).signum() == 0 ? "OTHER" : "CHANGED_CHARGE";
+      else if (field.equals("VEHICLE_VIN")) group = "VEHICLE";
+      else if (PRICE.contains(field)) group = "PRICE";
+      else if (FINANCING.contains(field)) group = "FINANCING";
+      else if (TRADE.contains(field)) group = "TRADE";
+      else if (TOTALS.contains(field)) group = "TOTAL";
+      else group = "OTHER";
+      if (!group.equals("ADDED") && !group.equals("LIMIT")) differing++;
+      if (group.equals("ADDED")) {
+        if (observed.path("amountMinor").isIntegralNumber() && "USD".equals(observed.path("currency").asText()))
+          added = Math.addExact(added, observed.path("amountMinor").longValue());
+        else addedKnown = false;
+      }
+      var finding = new Finding(group, term, label, kind, nullable(expected), nullable(observed), decimal(row.path("delta")),
+          row.path("unit").asText(null), row.path("severity").asText(), verified,
+          nullable(row.at("/observedEvidence/evidence")), row.path("buyerAction").asText(null));
+      (group.equals("OTHER") ? other : lead).add(finding);
+    }
+    lead.sort(Comparator.comparingInt(finding -> ORDER.indexOf(finding.group())));
+    Long addedCharges = addedKnown ? added : null;
+    TotalEffect effect;
+    if (cash != null && "ESTIMATED".equals(cash.path("availability").asText()))
+      effect = new TotalEffect("CALCULATED", cash.path("currency").asText(), cash.path("outTheDoorDeltaMinor").longValue(),
+          cash.path("preTaxDeltaMinor").longValue(), cash.path("taxEffectMinor").longValue(), addedCharges);
+    else {
+      Long desk = amount(deskTerms, "OUT_THE_DOOR_TOTAL");
+      effect = desk == null || agreed.outTheDoorMinor() == null
+          ? new TotalEffect("UNAVAILABLE", "USD", null, null, null, addedCharges)
+          : new TotalEffect("QUOTED", "USD", Math.subtractExact(desk, agreed.outTheDoorMinor()), null, null, addedCharges);
+    }
+    return new View(VERSION, lead.isEmpty() ? "NO_DIFFERENCES" : "DIFFERENCES", source, agreed, paperwork,
+        List.copyOf(lead), List.copyOf(other), Math.max(0, count(agreedTerms) - differing), effect, null, reviewVersion);
+  }
+
+  /** The extraction in the verified-offer term shape, every value marked as not yet verified by the Buyer. */
+  private JsonNode asRead(ExtractionView extraction) {
+    ObjectNode terms = json.createObjectNode();
+    ArrayNode candidates = terms.putArray("candidates");
+    for (var candidate : extraction.candidates()) {
+      var correction = candidate.currentCorrection();
+      ObjectNode term = candidates.addObject();
+      term.put("field", candidate.field());
+      term.put("value", correction == null ? candidate.normalizedValue() : correction.normalizedValue());
+      term.put("unit", correction == null ? candidate.normalizedUnit() : correction.normalizedUnit());
+      term.put("originalWording", candidate.originalWording());
+      term.put("confidence", candidate.confidence());
+      term.set("evidence", json.valueToTree(candidate.evidence()));
+      term.put("buyerVerified", false);
+    }
+    ArrayNode lines = terms.putArray("lineItems");
+    for (var line : extraction.lineItems()) {
+      var correction = line.currentCorrection();
+      ObjectNode term = lines.addObject();
+      term.put("originalLabel", line.originalLabel());
+      term.put("category", correction == null ? line.category() : correction.category());
+      term.put("amountMinor", correction == null ? line.amountMinor() : correction.amountMinor());
+      term.put("currency", line.currency());
+      term.put("taxClaim", line.taxClaim());
+      term.put("optionalityClaim", line.optionalityClaim());
+      term.put("confidence", line.confidence());
+      term.set("evidence", json.valueToTree(line.evidence()));
+      term.put("buyerVerified", false);
+    }
+    return terms;
+  }
+
+  private View empty(String status, Agreed agreed) {
+    return new View(VERSION, status, null, agreed, null, List.of(), List.of(), 0, unavailable(), null, null);
+  }
+  private static TotalEffect unavailable() { return new TotalEffect("UNAVAILABLE", "USD", null, null, null, null); }
+  private JsonNode evidence(ExtractionView extraction, String field) {
+    return extraction.candidates().stream().filter(c -> c.field().equals(field)).findFirst()
+        .map(c -> (JsonNode) json.valueToTree(c.evidence())).orElse(null);
+  }
+  private static int count(JsonNode terms) { return terms.path("candidates").size() + terms.path("lineItems").size(); }
+  private static JsonNode nullable(JsonNode value) { return value == null || value.isMissingNode() || value.isNull() ? null : value; }
+  private static String text(JsonNode value) { return value.isTextual() && !value.asText().isBlank() ? value.asText() : null; }
+  private static BigDecimal decimal(JsonNode value) {
+    return value.isNumber() ? value.decimalValue() : null;
+  }
+  private static String candidate(JsonNode terms, String field) {
+    for (JsonNode term : terms.path("candidates"))
+      if (term.path("field").asText().equals(field)) return text(term.path("value"));
+    return null;
+  }
+  private static Long amount(JsonNode terms, String field) {
+    String value = candidate(terms, field);
+    try { return value == null ? null : Long.valueOf(value); }
+    catch (NumberFormatException unreadable) { return null; }
+  }
+  private JsonNode read(String payload) {
+    try { return json.readTree(payload); }
+    catch (java.io.IOException failure) { throw new IllegalStateException("Unable to read Deal Review", failure); }
+  }
+}

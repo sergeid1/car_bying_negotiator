@@ -558,3 +558,48 @@ test.each(["PROPOSE", "CONFIRM", "BOOKED"])("the test-drive panel (%s) has no au
   vi.unstubAllGlobals();
 });
 // End ticket 65.
+
+// Ticket 66: Desk Check against the Agreed Price, the different-VIN block, the fresh-case start and its label.
+import { DeskCheck, DeskFreshCase } from "./DeskCheck";
+function deskCheckFixture(state: string) {
+  const agreedPrice = { offerVersion: 2, baselineVersion: 1, vin: "1HGCM82633A004352", sellingPriceMinor: 2500000, outTheDoorMinor: 2680000, acceptedAt: "2026-10-04T12:00:00Z" };
+  const none = { basis: "UNAVAILABLE", currency: "USD", outTheDoorDeltaMinor: null, preTaxDeltaMinor: null, taxEffectMinor: null, addedChargesMinor: null };
+  const base = { status: "AWAITING_PAPERWORK", source: null, agreedPrice, paperwork: null, findings: [], otherDifferences: [], unchangedTerms: 0,
+    totalEffect: none, freshCase: null, dealReviewVersion: null };
+  if (state === "AWAITING") return base;
+  if (state === "OTHER_CAR") return { ...base, status: "DIFFERENT_VIN", source: "READ_FROM_PAPERWORK",
+    findings: [{ group: "VEHICLE", term: "candidate:VEHICLE_VIN#1", label: "VEHICLE_VIN", kind: "CHANGED", agreed: { value: agreedPrice.vin, unit: "VIN" },
+      desk: { value: "1M8GDM9AXKP042788", unit: "VIN" }, delta: null, unit: "VIN", severity: "BLOCKING", verified: false, evidence: null, buyerAction: null }],
+    freshCase: { vin: "1M8GDM9AXKP042788", dealerPostalCode: "27604", purchaseMethod: "CASH" } };
+  const verified = state === "REVIEWED";
+  return { ...base, status: "DIFFERENCES", source: verified ? "DEAL_REVIEW" : "READ_FROM_PAPERWORK", dealReviewVersion: verified ? 1 : null,
+    findings: [{ group: "ADDED", term: "line:service contract#1", label: "Service contract", kind: "ADDED", agreed: null,
+      desk: { amountMinor: 149500, currency: "USD" }, delta: null, unit: "USD_MINOR", severity: "MATERIAL", verified, evidence: { pageNumber: 2 },
+      buyerAction: "Review this difference with the dealer before accepting." }],
+    otherDifferences: [{ group: "OTHER", term: "candidate:OFFER_DATE#1", label: "OFFER_DATE", kind: "CHANGED", agreed: { value: "2026-08-30", unit: "DATE" },
+      desk: { value: "2026-10-04", unit: "DATE" }, delta: null, unit: "DATE", severity: "MATERIAL", verified, evidence: null, buyerAction: null }],
+    totalEffect: { basis: verified ? "CALCULATED" : "QUOTED", currency: "USD", outTheDoorDeltaMinor: 149500, preTaxDeltaMinor: verified ? 149500 : null,
+      taxEffectMinor: verified ? 0 : null, addedChargesMinor: 149500 } };
+}
+test.each(["AWAITING", "READ", "REVIEWED", "OTHER_CAR"])("the Desk Check (%s) has no automated AA violations", async state => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => {
+    const url = String(input);
+    if (url.endsWith("/desk-check")) return new Response(JSON.stringify(deskCheckFixture(state)));
+    if (url.endsWith("/intake-options")) return new Response(JSON.stringify({ supported: ["US-NC"], consentPolicies: {} }));
+    return new Response(null, { status: 404 });
+  });
+  const { container } = render(<main><h1>Buying Case</h1><DeskCheck caseId="case" token="token" /></main>);
+  await screen.findByRole("heading", { name: "Desk Check" });
+  await screen.findByRole("heading", { name: "Photograph the desk paperwork" });
+  if (state === "OTHER_CAR") {
+    await userEvent.click(await screen.findByRole("button", { name: "Start a fresh case for this car" }));
+    await screen.findByRole("heading", { name: "Start a fresh case for VIN 1M8GDM9AXKP042788" });
+  } else if (state !== "AWAITING") await screen.findByRole("list", { name: "Differences from your Agreed Price" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+test("the fresh desk case label has no automated AA violations", async () => {
+  const { container } = render(<main><h1>Buying Case</h1><DeskFreshCase value={{ caseId: "fresh", token: "t", agreed: { caseId: "case", token: "token" },
+    agreedVin: "1HGCM82633A004352", vin: "1M8GDM9AXKP042788", files: [] }} onBack={() => undefined} /></main>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+// End ticket 66.

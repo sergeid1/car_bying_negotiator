@@ -281,9 +281,20 @@ async function problem(response: Response) {
 }
 
 export function DealerDocumentUpload({
-  caseId, token, pollDelayMs = 700,
-}: { caseId: string; token: string; pollDelayMs?: number }) {
+  caseId, token, pollDelayMs = 700, heading, onChosen, onExtracted, initialFiles,
+}: {
+  caseId: string; token: string; pollDelayMs?: number;
+  /** Lets another panel, such as the Desk Check, present this intake under its own heading. */
+  heading?: { id: string; step: string; title: string };
+  /** The chosen files stay in memory only, so a fresh case can be given the same paperwork. */
+  onChosen?: (files: File[]) => void;
+  onExtracted?: (documentId: string) => void;
+  /** Paperwork already chosen elsewhere, sent once through the same pre-checks. */
+  initialFiles?: File[];
+}) {
   const [limits, setLimits] = useState<DocumentLimits>();
+  const [limitsSettled, setLimitsSettled] = useState(false);
+  const initialSent = useRef(false);
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [replacing, setReplacing] = useState<string>();
   const [tick, setTick] = useState(0);
@@ -296,11 +307,22 @@ export function DealerDocumentUpload({
       .then(value => {
         if (!cancelled && value) setLimits(value as DocumentLimits);
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setLimitsSettled(true);
+      });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!limitsSettled || !initialFiles?.length || initialSent.current) return;
+    initialSent.current = true;
+    void sendAll(initialFiles);
+    // Sent once, after the published limits are known.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [limitsSettled]);
 
   function update(key: string, change: Partial<Upload>) {
     setUploads(current => current.map(item => (item.key === key ? { ...item, ...change } : item)));
@@ -311,6 +333,11 @@ export function DealerDocumentUpload({
     // Clearing the control lets the same file be chosen again after a correction.
     event.target.value = "";
     setReplacing(undefined);
+    if (chosen.length > 0) onChosen?.(chosen);
+    await sendAll(chosen);
+  }
+
+  async function sendAll(chosen: File[]) {
     for (const file of chosen) {
       const key = crypto.randomUUID();
       setUploads(current => [...current, { key, filename: file.name, state: "SENDING" }]);
@@ -390,6 +417,7 @@ export function DealerDocumentUpload({
         change.pages = (await pagesOf(item.documentId)) ?? item.pages;
       }
       update(item.key, change);
+      if (operation.stage === "EXTRACTION_COMPLETE" && item.documentId) onExtracted?.(item.documentId);
     } catch {
       // A dropped request on a dealership connection is retried by the next poll.
     }
@@ -473,11 +501,11 @@ export function DealerDocumentUpload({
     .join(",");
 
   return (
-    <section className="panel" aria-labelledby="documents-heading">
+    <section className="panel" aria-labelledby={heading?.id ?? "documents-heading"}>
       <div className="section-heading">
         <div>
-          <p className="step">Step 2 of 3</p>
-          <h2 id="documents-heading">Add the Dealer's paperwork</h2>
+          <p className="step">{heading?.step ?? "Step 2 of 3"}</p>
+          <h2 id={heading?.id ?? "documents-heading"}>{heading?.title ?? "Add the Dealer's paperwork"}</h2>
         </div>
       </div>
 

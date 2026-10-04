@@ -209,7 +209,7 @@ class TestDriveAcceptanceTest {
   }
 
   /** The ticket 63 path to an Agreed Price for one dealer; returns the dealer id. */
-  private static String agree(RunningApplication app, RestClient client, String base, String caseId, String token) throws Exception {
+  static String agree(RunningApplication app, RestClient client, String base, String caseId, String token) throws Exception {
     var jdbc = app.context().getBean(JdbcTemplate.class);
     OutboundDraftAcceptanceTest.verifyAndPlan(app, base, token);
     jdbc.update("update vehicles set vin = ? where case_id = ?", VIN, caseId);

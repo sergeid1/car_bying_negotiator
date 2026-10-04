@@ -71,8 +71,11 @@ async function send<T>(path: string, options: RequestInit): Promise<T> {
   throw new IntakeProblem(problem);
 }
 
-export function BuyingCaseIntake({ onCaseOpened }: {
+export function BuyingCaseIntake({ onCaseOpened, initial, title }: {
   onCaseOpened: (value: CaseCredentials, referralDisclosure?: string) => void;
+  /** Starting values the Buyer can still change, such as the VIN read from desk paperwork. */
+  initial?: { vin?: string; dealerPostalCode?: string; purchaseMethod?: string };
+  title?: string;
 }) {
   const [options, setOptions] = useState<IntakeOptions>();
   const [identifyBy, setIdentifyBy] = useState<"vin" | "details">("vin");
@@ -236,7 +239,7 @@ export function BuyingCaseIntake({ onCaseOpened }: {
       <div className="section-heading">
         <div>
           <p className="step">Step 1 of 3</p>
-          <h2 id="intake-heading">Start your Buying Case</h2>
+          <h2 id="intake-heading">{title ?? "Start your Buying Case"}</h2>
         </div>
       </div>
 
@@ -314,6 +317,7 @@ export function BuyingCaseIntake({ onCaseOpened }: {
               name="dealerPostalCode"
               inputMode="numeric"
               required
+              defaultValue={initial?.dealerPostalCode}
               aria-describedby={fieldProblem("dealerPostalCode") ? "dealer-postal-error" : undefined}
             />
           </label>
@@ -351,7 +355,7 @@ export function BuyingCaseIntake({ onCaseOpened }: {
 
           <label>
             How you are paying
-            <select name="purchaseMethod" defaultValue="CASH">
+            <select name="purchaseMethod" defaultValue={initial?.purchaseMethod ?? "CASH"}>
               <option value="CASH">Cash</option>
               <option value="FINANCE">Dealer financing</option>
             </select>
@@ -385,7 +389,7 @@ export function BuyingCaseIntake({ onCaseOpened }: {
             {identifyBy === "vin" ? (
               <label>
                 VIN
-                <input name="vin" required autoComplete="off" />
+                <input name="vin" required autoComplete="off" defaultValue={initial?.vin} />
               </label>
             ) : (
               <>
