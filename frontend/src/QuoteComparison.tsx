@@ -10,6 +10,7 @@ type Order = "shortlist" | "selling" | "fees" | "addons" | "otd";
 const prefixes = { selling: "Selling price", fees: "Dealer fees", addons: "Add-ons", otd: "Out-the-door total" };
 function total(car: ComparisonCar, order: Exclude<Order, "shortlist">) {
   if (car.missing.includes(prefixes[order])) return null;
+  if (car.noneListed?.includes(prefixes[order])) return 0;
   const amounts = car.amounts.filter(amount => amount.label === prefixes[order] || amount.label.startsWith(`${prefixes[order]}:`));
   return amounts.length ? amounts.reduce((sum, amount) => sum + amount.minorUnits, 0) : null;
 }

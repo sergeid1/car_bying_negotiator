@@ -44,7 +44,7 @@ test("partial quotes disable OTD ordering and missing cars display state without
   expect(car).toHaveTextContent("OTD comparison unavailable: Taxes; Out-the-door total");
   expect(car).not.toHaveTextContent("$0.00");
 });
-test("reconciled omitted categories show None listed without an amount or source and sort last", async () => {
+test("reconciled omitted categories show None listed without an amount or source and sort as zero", async () => {
   const first = { ...comparisonCar("first", 2000000), noneListed: ["Dealer fees", "Add-ons"] };
   const second = comparisonCar("second", 1900000);
   second.amounts.push({ label: "Dealer fees: Document fee", minorUnits: 50000, currency: "USD",
@@ -58,9 +58,23 @@ test("reconciled omitted categories show None listed without an amount or source
   expect(card).not.toHaveTextContent("$0.00");
   expect(screen.getByRole("option", { name: "Out-the-door total, lowest first" })).not.toBeDisabled();
   fireEvent.change(screen.getByLabelText("Order quotes by"), { target: { value: "fees" } });
-  expect(screen.getAllByRole("article")[0]).toHaveAccessibleName(/second/);
+  expect(screen.getAllByRole("article")[0]).toHaveAccessibleName(/first/);
   fireEvent.change(screen.getByLabelText("Order quotes by"), { target: { value: "otd" } });
   expect(screen.getAllByRole("article")[0]).toHaveAccessibleName(/second/);
+});
+test.each(["fees", "addons"])("%s ordering puts None listed first and missing figures last", async order => {
+  const listed = comparisonCar("listed", 1900000);
+  listed.amounts.push(...["Dealer fees", "Add-ons"].map(label => ({ label, minorUnits: 50000, currency: "USD",
+    evidence: { documentSource: null, sourceNote: "Verified charge.", calculation: null } })));
+  const absent = { ...comparisonCar("absent", 2000000), noneListed: ["Dealer fees", "Add-ons"] };
+  const missing = { ...comparisonCar("missing", 2000000), missing: ["Dealer fees", "Add-ons"] };
+  mock({ cars: [missing, listed, absent], otdComparable: false });
+  render(<QuoteComparison journeyId="journey" session="session" onSessionEnded={() => {}} />);
+  await screen.findByRole("article", { name: /absent/ });
+  fireEvent.change(screen.getByLabelText("Order quotes by"), { target: { value: order } });
+  expect(screen.getAllByRole("article").map(card => card.getAttribute("aria-label"))).toEqual([
+    absent.title, listed.title, missing.title,
+  ]);
 });
 test("unreconciled quotes show the per-car reason", async () => {
   mock({ cars: [{ ...comparisonCar("one", 2000000), missing: ["Figures do not add up to the quoted OTD by 125.00 USD"] }], otdComparable: false });
