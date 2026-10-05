@@ -20,6 +20,7 @@ type Entry = {
 };
 export type ConversationView = {
   negotiationState: string; targetReached: boolean;
+  dealerDeclined?: { source: "BUYER" | "RULE"; rounds: number; lastVerifiedSellingPriceMinor: number | null; currency: string | null } | null;
   mandate: { version: number; currency: string; targetMinor: number; ceilingMinor: number; expiresAt: string } | null;
   conversations: { quoteRequestId: string; dealerAddress: string }[]; entries: Entry[];
 };
@@ -39,6 +40,7 @@ const DRAFT_STATES: Record<string, string> = {
 const CANCEL_REASONS: Record<string, string> = {
   SUPERSEDED: "a newer draft replaced it", STOPPED: "negotiation stopped", PAUSED: "negotiation was paused",
   AGREED: "you accepted a quote", EXPIRED: "the mandate expired", TARGET_REACHED: "the verified quote reached your target",
+  DEALER_DECLINED: "the dealer declined to lower the selling price",
 };
 const DELIVERY: Record<string, string> = {
   DELIVERY_UNKNOWN: "Delivery not confirmed", SENT: "Sent", DELIVERED: "Delivered", BOUNCED: "Bounced", FAILED: "Not sent",
@@ -65,8 +67,8 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
   const key = useRef(crypto.randomUUID());
   const path = `/api/v1/cases/${encodeURIComponent(caseId)}/negotiation-conversation`;
 
-  async function request(url: string, body?: unknown) {
-    const response = await fetch(url, { method: body === undefined ? "GET" : "POST",
+  async function request(url: string, body?: unknown, method = body === undefined ? "GET" : "POST") {
+    const response = await fetch(url, { method,
       headers: { "Case-Access-Token": token, "Content-Type": "application/json", "Idempotency-Key": key.current },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     if (!response.ok) {
@@ -85,10 +87,10 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, token, version]);
 
-  async function act(url: string, body: unknown = {}) {
+  async function act(url: string, body: unknown = {}, method = "POST") {
     setBusy(true); setError(undefined);
     try {
-      await request(url, body);
+      await request(url, body, method);
       key.current = crypto.randomUUID();
       setView(asView(await request(path)));
       return true;
@@ -110,8 +112,18 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
     </dl>}
     {view?.targetReached && <p className="notice">The verified quote is at or below your target, so no counteroffer is drafted.
       You can accept the written quote.</p>}
+    {view?.dealerDeclined && <p className="notice" role="status">
+      {view.dealerDeclined.source === "BUYER" ? "You recorded that the dealer won't move."
+        : `After ${view.dealerDeclined.rounds} counteroffers, the dealer's verified selling price did not fall.`}
+      {" "}Counteroffers have stopped.
+      {view.dealerDeclined.lastVerifiedSellingPriceMinor !== null && view.dealerDeclined.currency
+        ? ` Last verified selling price: ${(view.dealerDeclined.lastVerifiedSellingPriceMinor / 100).toLocaleString("en-US", {
+          style: "currency", currency: view.dealerDeclined.currency })}.`
+        : " There is no verified selling price yet."}
+      {" "}You can still accept the latest written quote or stop negotiation.
+    </p>}
     {view && <div className="negotiation-controls">
-      {active && view.conversations.length > 0 && !view.targetReached && <form onSubmit={event => {
+      {active && view.conversations.length > 0 && !view.targetReached && !view.dealerDeclined && <form onSubmit={event => {
         event.preventDefault();
         void act(drafts, { quoteRequestId: new FormData(event.currentTarget).get("conversation") });
       }}>
@@ -121,6 +133,11 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
         </select></label>
         <button type="submit" disabled={busy}>Draft a counteroffer</button>
       </form>}
+      {active && view.dealerDeclined?.source !== "BUYER" && <button type="button" disabled={busy}
+        onClick={() => void act(`${path}/dealer-declined`)}>The dealer won't move</button>}
+      {view.dealerDeclined?.source === "BUYER" && <button type="button" disabled={busy}
+        onClick={() => void act(`${path}/dealer-declined`, undefined, "DELETE")}>
+        Undo the dealer won't move</button>}
       {view.negotiationState === "PAUSED" && <button type="button" disabled={busy} onClick={() => void act(`${path}/resume`)}>
         Resume negotiation</button>}
       {(active || view.negotiationState === "PAUSED") && <button type="button" disabled={busy} onClick={() => void act(`${path}/stop`)}>
@@ -150,7 +167,7 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
                 <pre>{revision.text}</pre>
                 <OutboundGateDecision decision={revision.decision} />
               </section>)}
-              {draft.state === "PROPOSED" && <>
+              {draft.state === "PROPOSED" && !view.dealerDeclined && <>
                 {edit === undefined
                   ? <button type="button" disabled={busy} onClick={() => setEditing(previous => ({ ...previous, [draft.id]: current.text }))}>
                     Edit this draft</button>
