@@ -4,6 +4,10 @@
 
 **Blocked by:** 50 — Sign in with a passwordless Buyer Account; 57 — Approve a Negotiation Mandate.
 
+**Superseded on 2026-10-05 by specification 2.1:** the platform no longer emails dealers in its own name.
+Outbound relay sending, the footer and the dealer opt-out are retired by ticket 84; the inbound side becomes each
+case's private reply-intake address. The Buyer sends from their own address through tickets 82 and 83.
+
 **Status:** complete — a per-case Dealer relay in `com.dealanalyzer.relay` (migration V32), as of
 2026-10-03. Each case gets an unguessable relay address that stops accepting mail once the case is being deleted, has
 expired, or its account is pending deletion. Every outbound message carries a fixed footer (acting for a Buyer,

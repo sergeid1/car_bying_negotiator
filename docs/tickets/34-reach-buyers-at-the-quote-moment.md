@@ -4,7 +4,7 @@
 
 **Blocked by:** 32 — Publish an honest sample report and a defined one-time offer.
 
-**Status:** ready-for-agent — narrowed on 2026-10-02: ticket 42 builds first-party channel
+**Status:** blocked on 32 and on the operator choosing channels and recruiting partners (relabelled on 2026-10-05) — narrowed on 2026-10-02: ticket 42 builds first-party channel
 attribution, qualified uploads per channel, and cost per qualified upload from entered spend. This
 ticket keeps choosing and testing the channels and partner arrangements and reporting their results.
 Narrowed again on 2026-10-03: ticket 47 publishes two quote and fee explainer guides that start a case

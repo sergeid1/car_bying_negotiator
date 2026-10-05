@@ -178,3 +178,22 @@ and the public pilot remains blocked.
 DevelopmentNoChargeCheckout completes development purchases without collecting payment.
 CheckoutProductionGuard refuses it under production, prod, or pilot profiles, even without
 an active offer. Ticket 32 owns a real approved payment provider and commercial enablement.
+
+## Specification 2.1 update — 2026-10-05
+
+The product owner chose **Florida** as the pilot state and moved the product to the tool model in
+specification 2.1. The platform drafts and checks; the Buyer sends every dealer email from the Buyer's
+own address, either from their own mail app (ticket 82) or through a send-only Gmail or Outlook
+connection (ticket 83). The platform relay and delegated mode are retired (ticket 84), and the
+counsel-review ticket 68 is withdrawn.
+
+This changes no prerequisite status above, and the startup gate is unchanged. What it changes is the
+evidence each blocked prerequisite needs:
+
+- `jurisdiction-pack` needs Florida rules sourced from statute and agency publications with
+  citations, rather than counsel sign-off on acting as the Buyer's representative.
+- `provider-terms` no longer includes an outbound email relay provider. It adds Google and Microsoft
+  as send-only processors for Mailbox Connections, which need OAuth app verification, and an inbound
+  provider for each case's reply-intake address.
+- Specification §18 adds published Terms of Service and a Privacy Policy before the pilot, and a
+  legal review before charging Buyers.

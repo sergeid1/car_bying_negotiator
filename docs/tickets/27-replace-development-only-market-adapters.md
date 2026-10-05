@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 — Establish Vehicle and listing evidence; 09 — Produce a transparent Market Assessment.
 
-**Status:** ready-for-agent — narrowed on 2026-10-02: ticket 38 delivered the production guard, the
+**Status:** blocked on executed market-data provider terms (relabelled on 2026-10-05; it was never agent-ready without them) — narrowed on 2026-10-02: ticket 38 delivered the production guard, the
 adapter conformance suite, freshness/uncertainty/thin-comparable wording, and stated unavailability.
 This ticket keeps the licensed-source integration, executed terms, measured coverage, and per-call
 cost against the pilot budget, and still needs an executed provider contract before it can start.
