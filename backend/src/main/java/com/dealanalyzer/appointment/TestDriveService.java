@@ -378,6 +378,8 @@ public class TestDriveService implements RelayMessageOwner {
 
   /** A booking releases contact details, so it requires the signed-in owner; returns the account for any kind. */
   private String ownerIfBooking(String caseId, String token, String session, String id) {
+    // The case credential is checked first, so a wrong one cannot learn which messages are bookings.
+    cases.reopen(caseId, token);
     var kind = jdbc.queryForList("select kind from test_drive_messages where case_id = ? and id = ?", String.class, caseId, id);
     if (kind.isEmpty()) throw new ResourceNotFoundException("Test-drive message not found");
     return "BOOKING".equals(kind.getFirst()) ? contacts.requireOwner(session, caseId) : null;

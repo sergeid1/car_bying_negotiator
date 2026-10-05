@@ -7,11 +7,11 @@ is a bearer credential. A Buying Case is the isolation unit; knowledge of a UUID
 | Boundary / abuse | Controls and executable evidence | Residual release obligation |
 | --- | --- | --- |
 | Case link theft, guessing, replay | Token hashes, expiry, generic 404; `EphemeralBuyingCaseAcceptanceTest`; fragment-only recovery link, single-use rotation in `CasePortabilityAcceptanceTest` | HTTPS, ingress redaction and no third-party scripts on credential-bearing pages |
-| Tenant / case substitution | Case authorization before object/report access; compound report key; `PersistenceHardeningTest`, ephemeral, portability and operations suites | Re-run every new endpoint with another case's token and object IDs |
+| Tenant / case substitution | Case authorization before object/report access; compound report key; `CaseIsolationInventoryAcceptanceTest` classifies every registered endpoint and calls each case-scoped one with no, a malformed, an expired and another case's token and with another case's object IDs, requiring the same response as an unknown case or object; `PersistenceHardeningTest`, ephemeral, portability and operations suites | Classify each new endpoint in `CaseIsolationInventoryAcceptanceTest`, which fails until it is listed, and give it fixture objects of its own kind |
 | Object-key enumeration | Encrypted storage, case-bound keys, no anonymous object HTTP route; document and portability acceptance suites | Private volume/object ACLs must be exercised on deployed storage |
 | Signed URL leakage / expiry | No signed object URLs are issued: downloads proxy through authenticated, expiring exports | Any future signed URL implementation needs TTL, audience and revocation tests before use |
-| Upload MIME confusion, executables, malware | Signatures, file/page/pixel/expansion limits, fail-closed scanner; `DealerDocumentAcceptanceTest`, `ClamAvMalwareScannerTest` | Production ClamAV service and signature freshness must be measured; the test scanner is forbidden for real uploads |
-| Parser CPU, memory and active content | Disposable parser JVM for inspection/rendering/text, bounded heap/time/concurrency/IPC, incremental PDF expansion limits; `DocumentParserProcessTest` and packaged-JAR integration test; partial output cleanup | Pilot profile requires per-request containers with filesystem/network isolation and native resource quotas; local process mode remains development-only. Exercise daemon/host crash recovery on the chosen deployment; see [parser policy](document-parser-policy.md) |
+| Upload MIME confusion, executables, malware | Signatures, file/page/pixel/expansion limits, fail-closed scanner; shared deployment decision refuses `document.malware-scanner=test` and missing/short storage keys at pilot/production startup; `DealerDocumentAcceptanceTest`, `ClamAvMalwareScannerTest`, `DeploymentStageGuardTest` | Production ClamAV service and signature freshness must be measured; the test scanner is forbidden for real uploads |
+| Parser CPU, memory and active content | Disposable parser JVM for inspection/rendering/text, bounded heap/time/concurrency/IPC, incremental PDF expansion limits; `DocumentParserProcessTest`, `DeploymentStageGuardTest` and packaged-JAR integration test; partial output cleanup | Every pilot/production declaration requires per-request containers with filesystem/network isolation and native resource quotas; local process mode remains development-only. Exercise daemon/host crash recovery on the chosen deployment; see [parser policy](document-parser-policy.md) |
 | Worker redelivery / partial writes | Durable operation keys, database locking, terminal completion; `PersistenceHardeningTest`, synthetic restart and document concurrent retry tests | Multiple live worker instances and kill-during-work scenarios require deployment testing |
 | Provider outages / prompt injection | Safe failure categories, bounded provider concurrency and deadlines (`ProviderMeterTest`), grounded output, frozen provider contracts; market, extraction, operations and evaluation suites | Provider adapters must set transport deadlines; `ProviderMeter` cancels timed-out calls and discards late results, but cannot forcibly terminate an adapter that ignores interruption. Adapters must not persist case state themselves; an exhausted provider pool fails closed until calls finish or the service restarts |
 | Support overreach | Disabled-by-default named accounts, assigned field scope and current consent; `ServiceOperationsAcceptanceTest` | Sergei is the sole operator; exercise grant/revocation and delivery to his alert destination |
@@ -26,6 +26,13 @@ peer buckets per process. Limits are configurable with `security.rate-limit.requ
 startup. `server.forward-headers-strategy=none` prevents client headers from changing the peer.
 The edge must apply lower write/upload/recovery quotas and a global cap before forwarding traffic.
 The service deliberately returns the same limit response for invalid and valid case IDs.
+
+Declare pilot/production with `SPRING_PROFILES_ACTIVE=pilot` or `production`, or equivalently
+`EVIDENCE_DEPLOYMENT=pilot` or `production`. The shared `DeploymentStage` decision recognizes
+`pilot`, `production` and `prod` case-insensitively with surrounding whitespace trimmed.
+`checkout.deployment` and `inventory.deployment` are restrictive legacy aliases; development
+settings cannot override any production-like declaration. Every development-only guard uses
+this decision. Storage requires at least 32 UTF-8 bytes in `DOCUMENT_STORAGE_ENCRYPTION_KEY`.
 
 Deletion uses a batch size of 100 (valid range 1–1000). Oldest last-attempt/request time wins,
 so a repeatedly failing job does not permanently monopolize the first batch. HTTP transport

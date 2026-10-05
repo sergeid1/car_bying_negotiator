@@ -1,5 +1,6 @@
 package com.dealanalyzer.document;
 
+import com.dealanalyzer.deployment.DeploymentStage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -11,6 +12,7 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -24,10 +26,14 @@ class EncryptedFileDocumentStorage implements DocumentObjectStorage {
   EncryptedFileDocumentStorage(
       @Value("${document.storage.path:./var/document-objects}") Path storagePath,
       @Value("${document.storage.encryption-key:}") String configuredKey,
-      com.dealanalyzer.buyingcase.persistence.CaseWriteGuard guard) {
+      com.dealanalyzer.buyingcase.persistence.CaseWriteGuard guard, Environment environment) {
     this.guard = guard;
     this.storagePath = storagePath;
     this.configuredKey = configuredKey;
+    if (DeploymentStage.from(environment).productionLike()
+        && configuredKey.getBytes(StandardCharsets.UTF_8).length < 32) {
+      throw new IllegalStateException("DOCUMENT_STORAGE_ENCRYPTION_KEY must contain at least 32 bytes for pilot/production");
+    }
   }
 
   @Override

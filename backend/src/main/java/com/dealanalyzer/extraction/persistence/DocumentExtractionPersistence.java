@@ -121,6 +121,8 @@ public class DocumentExtractionPersistence {
   /** Returns only summary rows, with an enforced upper bound, and never fetches child collections. */
   @Transactional(readOnly = true)
   public List<ExtractionSummary> history(String caseId, String documentId, int limit) {
+    // Another case's document is refused like an unknown one, as the latest and version reads do.
+    if (extractions.countCaseDocument(caseId, documentId) == 0) throw new ResourceNotFoundException("Document Extraction not found");
     int bounded = Math.max(1, Math.min(limit, 20));
     return extractions.findByDocumentIdOrderByExtractionVersionDesc(
             documentId, PageRequest.of(0, bounded)).stream()

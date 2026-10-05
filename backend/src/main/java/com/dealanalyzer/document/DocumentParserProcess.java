@@ -1,5 +1,6 @@
 package com.dealanalyzer.document;
 
+import com.dealanalyzer.deployment.DeploymentStage;
 import com.dealanalyzer.document.DocumentFileInspector.InspectedDocument;
 import java.io.*;
 import java.nio.file.*;
@@ -31,8 +32,8 @@ class DocumentParserProcess {
     String mode = environment.getProperty("document.parser.mode", "process");
     if (mode.equals("container")) container = new ContainerParserRuntime(environment);
     else if (!mode.equals("process")) throw new IllegalArgumentException("Unknown document parser mode");
-    if (environment.matchesProfiles("pilot") && container == null) {
-      throw new IllegalArgumentException("Pilot requires confined document parsing");
+    if (DeploymentStage.from(environment).productionLike() && container == null) {
+      throw new IllegalArgumentException("Pilot/production requires confined document parsing; set document.parser.mode=container");
     }
   }
 
