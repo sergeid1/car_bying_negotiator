@@ -1,12 +1,17 @@
-# 69 — Update positioning and claim rules for the Buyer Agent
+# 69 — Update positioning and claim rules for the Message Assistant
 
-**What to build:** Buyer-facing copy, the referral partner kit, and the copy claim rules move from "second set of eyes" to the specification 2.0 positioning: the Buyer's side of the deal, negotiating on the Buyer's behalf within limits the Buyer approves. The partner kit line that the product "does not contact dealers for the Buyer" is replaced. Spec §1.2, §1.3.
+**What to build:** Buyer-facing copy, the referral partner kit, and the copy claim rules describe the
+specification 2.1 positioning: the Buyer's side of the deal, as a tool that finds cars, checks quotes, drafts
+the Buyer's emails to dealers, and checks desk paperwork, while the Buyer sends every email and makes every
+decision. The partner kit line that the product "does not contact dealers for the Buyer" stays true and is
+kept. Spec 2.1 §1.2, §1.3.
 
-**Blocked by:** 68 — Obtain counsel review for acting as the Buyer's representative; 61 — Negotiate in supervised mode with a full conversation view.
+**Blocked by:** 82 — Send dealer email from the Buyer's own email app (copy should describe a send path that
+exists). Re-scoped on 2026-10-05 from specification 2.0; it no longer waits on ticket 68, which is withdrawn.
 
-**Status:** blocked on 68 (61 complete) — filed on 2026-10-03 from specification 2.0.
+**Status:** ready-for-agent after 82 — re-scoped on 2026-10-05 from specification 2.1.
 
-- [ ] Start screen, footer, guides, and partner kit describe the journey in counsel-approved wording and state the credo.
-- [ ] `PilotCopyClaimsTest` rules and reviewed phrases are updated so "negotiates on your behalf" is allowed only with the within-your-limits qualifier, and "autonomous negotiator", "safe to sign", and guaranteed savings stay prohibited.
-- [ ] No copy claims a capability before its phase gate has passed.
+- [ ] Start screen, footer, guides, and partner kit describe the journey as help the Buyer uses (find, check, draft, send from your own email) and state the credo.
+- [ ] `PilotCopyClaimsTest` rules and reviewed phrases prohibit claims that the platform negotiates, contacts dealers, or acts on the Buyer's behalf ("negotiates for you", "on your behalf", "our agent", "AI negotiator", "autonomous"), and keep "safe to sign" and guaranteed savings prohibited.
+- [ ] No copy claims a capability before it is built and enabled; the connected-mailbox path is mentioned only once ticket 83 is enabled.
 - [ ] The footer and partner kit still state that no dealer pays for leads, placement, or referrals.

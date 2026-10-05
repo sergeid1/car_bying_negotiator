@@ -39,9 +39,23 @@ public class EphemeralCasePersistence {
         && !"READY_TO_ANALYZE".equals(value.status)).orElse(true);
   }
 
-  /** An unknown case is refused like a wrong credential, so the lock taken before authorization reveals nothing. */
+  /**
+   * An unknown case is refused like a wrong credential, so the lock taken before authorization reveals nothing.
+   * A case this transaction already read is refreshed under the row lock: a write committed between that read and
+   * the lock is then waited for and seen, instead of failing the entity's version check.
+   */
   @Transactional
   public void lock(String caseId) {
+    // Looked up without creating a proxy: entity fields are written directly, and a write to a proxy is lost.
+    var session = entities.unwrap(org.hibernate.engine.spi.SessionImplementor.class);
+    var persister = session.getFactory().getMappingMetamodel().getEntityDescriptor(AnalysisCaseEntity.class);
+    Object managed = session.getPersistenceContextInternal().getEntity(session.generateEntityKey(caseId, persister));
+    if (managed != null) {
+      // Changes this transaction already made are written first, so the refresh cannot discard them.
+      entities.flush();
+      entities.refresh(managed, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+      return;
+    }
     cases.findLockedById(caseId)
         .orElseThrow(() -> new com.dealanalyzer.buyingcase.ResourceNotFoundException("Buying Case not found"));
   }

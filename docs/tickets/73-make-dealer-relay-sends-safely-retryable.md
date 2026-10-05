@@ -4,6 +4,9 @@
 
 **Blocked by:** 58 — Relay dealer email without exposing the Buyer; 59 — Gate every outbound dealer message; 65 — Schedule a test drive and release contact details.
 
+**Superseded on 2026-10-05 by specification 2.1:** relay sending is retired by ticket 77, and this retry
+machinery with it. Unclear Connected-mailbox sends are handled by ticket 83 (AGT-13).
+
 **Status:** complete — idempotent relay sends with a delivery check and Buyer retry in `com.dealanalyzer.relay`
 (no migration; the relay message id is the provider idempotency key), as of 2026-10-05. Each caller implements
 `RelayMessageOwner` to re-check its send and apply its first-send state once. Open: a lookup that misses an unclear

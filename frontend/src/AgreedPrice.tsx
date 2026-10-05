@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { DealerHandoff } from "./DealerHandoff";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
 
 type SentQuote = { id: string; dealerAddress: string; state: string };
 type Source = { offerVersion: number | null };
-type Draft = { id: string; kind: string; state: string; offerVersion: number | null; planVersion: number | null;
+type Draft = { id: string; kind: string; state: string; offerVersion: number | null; planVersion: number | null; messageId?: string | null;
   gatedDraft: { draft: { text: string }; decision: GateDecision } };
 type View = { requests: Draft[]; agreedPrice: null | { offerVersion: number; baselineVersion: number;
   acceptedAt: string; actor: string; journey: { journeyLinked: boolean; otherOpenNegotiations: { caseId: string; label: string }[] } } };
@@ -97,14 +98,18 @@ export function AgreedPrice({ caseId, token, quotes, sources, onChanged }: {
     {view?.requests.map(draft => <article className="card" key={draft.id}>
       <h3>{draft.kind === "ACCEPTANCE" ? `Accept verified offer ${draft.offerVersion}` : "Request written confirmation"}</h3>
       <p>{draft.gatedDraft.draft.text}</p>
-      {draft.kind === "ACCEPTANCE" && <p>Approval also creates an Approved Baseline from reviewed price plan {draft.planVersion}.</p>}
+      {draft.kind === "ACCEPTANCE" && <p>Once you send it and tell us, the Agreed Price is saved with an Approved Baseline from reviewed price plan {draft.planVersion}.</p>}
       <OutboundGateDecision decision={draft.gatedDraft.decision} />
       {draft.state === "DRAFT" ? <button type="button" disabled={busy || !draft.gatedDraft.decision.pass || Boolean(view.agreedPrice)}
         onClick={() => void update(`${path}/${encodeURIComponent(draft.id)}/approval`, { approved: true, text: draft.gatedDraft.draft.text })}>
-        {draft.kind === "ACCEPTANCE" ? "Accept this quote, approve baseline and send this text" : "Approve written-confirmation text and send"}
-      </button> : <p role="status">{draft.state === "SENT"
+        {draft.kind === "ACCEPTANCE" ? "Approve this acceptance text and baseline" : "Approve written-confirmation text"}
+      </button> : draft.state === "HANDED_OFF" && draft.messageId
+        ? <DealerHandoff caseId={caseId} token={token} messageId={draft.messageId}
+          onChanged={async () => { await refresh(); await onChanged(); }} />
+        : <p role="status">{draft.state === "SENT"
         ? draft.kind === "ACCEPTANCE" ? "Conditional acceptance message sent." : "Written confirmation requested. Review and verify the dealer's reply before accepting."
         : draft.state === "BLOCKED" ? "The mandate or quote changed. Prepare a new request."
+        : draft.state === "DISCARDED" ? "Discarded. It was not sent."
         : "Delivery was not confirmed. Check the conversation before preparing another request."}</p>}
     </article>)}
     <button type="button" disabled={busy} onClick={() => { setError(undefined); void refresh().catch(failure => setError((failure as Error).message)); }}>Refresh acceptance status</button>

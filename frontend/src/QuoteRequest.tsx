@@ -1,23 +1,28 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
 import { DealerRelay } from "./DealerRelay";
+import { DealerHandoff, DealerReplyPaste } from "./DealerHandoff";
 import { OfferVerification } from "./OfferVerification";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { AgreedPrice } from "./AgreedPrice";
 import { NegotiationConversation } from "./NegotiationConversation";
 import { TestDriveAppointment } from "./TestDriveAppointment";
 
-type Quote = { id: string; dealerAddress: string; state: string;
+type Quote = { id: string; dealerAddress: string; state: string; messageId?: string | null;
   gatedDraft: { draft: { text: string }; decision: GateDecision } };
 type View = { negotiationState: string; requests: Quote[]; dealers: { id: string; name: string }[];
   documents: { documentId: string | null; outcome: string; offerVersion: number | null; sourceKind: string; messageId: string }[] };
 const states: Record<string, string> = {
   NO_MANDATE: "Approve a negotiation mandate to contact the dealer.",
-  MANDATE_ACTIVE: "Your mandate is active. Review a quote request before sending it.",
-  AWAITING_DEALER: "Your request was sent. Waiting for the dealer to reply.",
+  MANDATE_ACTIVE: "Your mandate is active. Review a quote request, approve it, and send it from your own email.",
+  AWAITING_DEALER: "Your request was sent. When the dealer replies, add the reply to the conversation.",
   AWAITING_BUYER: "The dealer replied. Review and verify the quote before analysis.",
   PAUSED: "Negotiation is paused. Nothing is sent until you resume it.",
   AGREED: "You accepted the quote.", STOPPED: "Negotiation has stopped.", EXPIRED: "Your mandate expired. No more requests can be sent.",
+};
+const QUOTE_STATES: Record<string, string> = {
+  SENT: "Request sent.", DISCARDED: "Discarded. It was not sent.",
+  BLOCKED: "The mandate or policy changed before sending. This request was stopped.",
 };
 // Anything other than the documented shape is treated as unavailable rather than rendered.
 function asView(value: unknown): View {
@@ -77,15 +82,16 @@ export function QuoteRequest({ caseId, token }: {
     finally { setBusy(false); }
   }
   return <section className="stack" aria-label="Request a dealer quote">
-    <div className="panel">
+    <div className="panel quote-request-panel">
       <h2>Request an itemized quote</h2>
-      <p>Review the request for this Vehicle. Sending requires your current mandate and your approval.</p>
+      <p>Review the request for this Vehicle. Approving it requires your current mandate; you then send it from your own email.</p>
       <p role="status">{view ? states[view.negotiationState] : "Loading quote requests…"}</p>
       {view && (view.dealers.length > 0 ? <form onSubmit={event => void create(event)}>
         <label>Dealer<select name="dealer" required disabled={busy}>
           <option value="">Choose a dealer</option>{view.dealers.map(dealer => <option key={dealer.id} value={dealer.id}>{dealer.name}</option>)}
         </select></label>
-        <label>Dealer email<input name="email" type="email" required disabled={busy} /></label>
+        <label>Dealer email<input name="email" type="email" required disabled={busy} autoComplete="off" /></label>
+        <p>Check the address against the dealer's listing. Every message in this conversation goes to it.</p>
         <button type="submit" disabled={busy || !view}>Prepare request</button>
       </form> : <p>No dealers have a listing that matches this Vehicle's confirmed VIN. Add a matching dealer listing before preparing a quote request.</p>)}
       <button type="button" disabled={busy} onClick={() => {
@@ -96,14 +102,14 @@ export function QuoteRequest({ caseId, token }: {
         <h3>Quote request to {quote.dealerAddress}</h3>
         <p>Subject: Request for an itemized vehicle quote</p>
         <p>{quote.gatedDraft.draft.text}</p>
-        <p>Every sent message includes the relay's notice that Deal X-Ray acts on behalf of a Buyer,
-          uses AI assistance, and lets the dealer opt out.</p>
         <OutboundGateDecision decision={quote.gatedDraft.decision} />
         {quote.state === "DRAFT" ? <button type="button" disabled={busy || !quote.gatedDraft.decision.pass}
-          onClick={() => void approve(quote)}>Approve this text and send</button>
-          : <p>{quote.state === "SENT" ? "Request sent."
-            : quote.state === "BLOCKED" ? "The mandate or policy changed before sending. This request was stopped."
-            : "Delivery was not confirmed. Check the conversation before preparing another request."}</p>}
+          onClick={() => void approve(quote)}>Approve this text</button>
+          : quote.state === "HANDED_OFF" && quote.messageId
+            ? <DealerHandoff caseId={caseId} token={token} messageId={quote.messageId} onChanged={refresh} />
+            : <p>{QUOTE_STATES[quote.state] ?? "Delivery was not confirmed. Check the conversation before preparing another request."}</p>}
+        {quote.state === "SENT" && <DealerReplyPaste caseId={caseId} token={token} quoteRequestId={quote.id}
+          dealerAddress={quote.dealerAddress} onAdded={refresh} />}
       </article>)}
       {!!view?.documents.length && <>
         <p>Dealer quotes enter document review. Confirm or correct the extracted amounts against the source before analysis.</p>

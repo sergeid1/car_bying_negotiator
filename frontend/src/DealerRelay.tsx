@@ -15,6 +15,7 @@ type Content = { subject: string | null; body: string | null };
 const STATE_LABELS: Record<string, string> = {
   DELIVERY_UNKNOWN: "Delivery not confirmed", SENT: "Sent", DELIVERED: "Delivered", BOUNCED: "Bounced",
   FAILED: "Not sent", RECEIVED: "Received", REJECTED_MALWARE: "Blocked: failed the malware scan",
+  HANDED_OFF: "Not sent yet", DISCARDED: "Discarded",
 };
 export type DeliveryAction = "delivery-check" | "retry";
 const DELIVERY_OUTCOMES: Record<string, string> = {
@@ -102,8 +103,8 @@ export function DealerRelay({ caseId, token }: { caseId: string; token: string }
 
   return <section className="panel relay-panel" aria-labelledby="relay-heading">
     <h2 id="relay-heading">Dealer email relay</h2>
-    <p>Dealers reach you through this case's own relay address, never your email address, phone number, or surname.
-      Every message to a dealer says it comes from Deal X-Ray for a Buyer, that it was prepared with AI assistance, and how the dealer can opt out.</p>
+    <p>Every message for this case's dealers is listed here. You send approved messages from your own email; replies you add,
+      and any that reach this case's relay address, are dealer content.</p>
     {failed && !relay && <p>The dealer email relay is not available for this case right now.</p>}
     {relay && <>
       <dl className="facts">

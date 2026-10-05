@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 
 /** A closed language policy: unknown prose fails rather than guessing its meaning. No I/O or clock. */
 public final class OutboundGate {
-  public static final String VERSION = "outbound-gate.v2";
+  public static final String VERSION = "outbound-gate.v3";
   private static final Set<String> QUESTIONS = Set.of(
       "Could you provide a current itemized written offer?",
       "Is there flexibility in the written selling price?",

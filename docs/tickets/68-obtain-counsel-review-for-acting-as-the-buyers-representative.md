@@ -4,7 +4,12 @@
 
 **Blocked by:** 22 — Run the controlled pilot release (pilot state selection).
 
-**Status:** blocked on pilot state selection and counsel engagement — filed on 2026-10-03 from specification 2.0. Operator work, not agent work.
+**Status:** withdrawn on 2026-10-05 — specification 2.1 makes the platform a tool: it drafts and checks, and
+the Buyer sends every dealer email from their own address, so the platform never acts as the Buyer's
+representative and sends no commercial email of its own. Pilot state: Florida. What remains moves to spec §18:
+published Terms of Service and a Privacy Policy before the pilot (prerequisite 9), and a legal review before
+charging Buyers, to confirm a paid tool is not a motor vehicle broker under Fla. Stat. 320.27 (open decision,
+Pricing for the Message Assistant). Operator work, not agent work.
 
 - [ ] The licensing analysis for the pilot state is recorded, with any licence obtained or the reason none is needed.
 - [ ] The mandate wording, dealer-message footer, and Buyer-facing agent copy are reviewed and approved.

@@ -4,7 +4,8 @@
 
 **Blocked by:** 61 — Negotiate in supervised mode with a full conversation view; 69 — Update positioning and claim rules for the Buyer Agent.
 
-**Status:** blocked on the Phase 3 delegated-mode gate — filed on 2026-10-03 from specification 2.0.
+**Status:** withdrawn on 2026-10-05 — specification 2.1 excludes delegated or automatic sending: every message
+reaches a dealer only after the Buyer approves its exact text (AGT-06). Ticket 84 removes the autonomy mode.
 
 - [ ] Thresholds (unchanged-approval rate, gate-escape count, volume) are frozen before supervised outcomes are reviewed and recorded against.
 - [ ] Delegated mode is opt-in per mandate with plain-words consent and can be switched back to supervised at any time.

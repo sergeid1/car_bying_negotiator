@@ -155,7 +155,11 @@ class CaseIsolationInventoryAcceptanceTest {
       caseRow("GET", C + "/relay", null),
       caseRow("GET", C + "/relay/messages/{messageId}", null),
       caseRow("POST", C + "/relay/messages/{messageId}/delivery-check", "{}"),
-      caseRow("POST", C + "/relay/messages/{messageId}/retry", "{}"));
+      caseRow("POST", C + "/relay/messages/{messageId}/retry", "{}"),
+      caseRow("GET", C + "/handoffs/{messageId}", null),
+      caseRow("POST", C + "/handoffs/{messageId}/sent", "{}"),
+      caseRow("POST", C + "/handoffs/{messageId}/discard", "{}"),
+      caseRow("POST", C + "/quote-requests/{id}/replies", MULTIPART, "id=quoteId"));
 
   /** Buyer Account endpoints: the account_session cookie, plus Account-Request: 1 on writes. */
   static final List<Endpoint> ACCOUNT_ENDPOINTS = List.of(
@@ -220,7 +224,7 @@ class CaseIsolationInventoryAcceptanceTest {
 
   @Test void everyEndpointIsClassifiedAndRefusesAnotherCasesCredentialOrObjects() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("isolation", true,
-        AgreedPriceAcceptanceTest.Configuration.class, "--case.deletion.delay=PT1H",
+        AgreedPriceAcceptanceTest.Configuration.class, "--dealer-mail.send-path=RELAY", "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef",
         "--security.rate-limit.requests=100000",

@@ -24,7 +24,7 @@ class RelayRetryAcceptanceTest {
 
   @Test void quoteRequestsAndCounteroffersSettleOrRetryWithoutReachingTheDealerTwice() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("relay-retry", true,
-        FixtureExtractionProvider.class, "--case.deletion.delay=PT1H",
+        FixtureExtractionProvider.class, "--dealer-mail.send-path=RELAY", "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();
@@ -143,7 +143,7 @@ class RelayRetryAcceptanceTest {
 
   @Test void anUnclearAcceptanceAndTestDriveMessageReachTheirFirstSendStateOnce() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("relay-retry-agreed", true,
-        AgreedPriceAcceptanceTest.Configuration.class, "--case.deletion.delay=PT1H",
+        AgreedPriceAcceptanceTest.Configuration.class, "--dealer-mail.send-path=RELAY", "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();

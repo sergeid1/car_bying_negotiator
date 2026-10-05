@@ -12,6 +12,7 @@ import com.dealanalyzer.outbound.OutboundDraftService;
 import com.dealanalyzer.outbound.OutboundGate;
 import com.dealanalyzer.quote.NegotiationStateService;
 import com.dealanalyzer.quote.WrittenQuoteEvidence;
+import com.dealanalyzer.relay.DealerMessageHandoff;
 import com.dealanalyzer.relay.RelayMessageOwner;
 import com.dealanalyzer.relay.RelayService;
 import com.dealanalyzer.time.PersistedInstant;
@@ -54,6 +55,7 @@ public class TestDriveService implements RelayMessageOwner {
   private final OutboundDraftService drafts;
   private final NegotiationStateService negotiation;
   private final RelayService relay;
+  private final DealerMessageHandoff handoffs;
   private final AccountContactRelease contacts;
   private final AccountRelayAccess accounts;
   private final JourneyAppointment journeys;
@@ -66,11 +68,11 @@ public class TestDriveService implements RelayMessageOwner {
       OutboundDraftService drafts, NegotiationStateService negotiation, RelayService relay,
       AccountContactRelease contacts, AccountRelayAccess accounts, JourneyAppointment journeys,
       BuyerNotifications notifications, DealerOfferPersistence offers, ObjectMapper json,
-      PlatformTransactionManager transactions) {
+      PlatformTransactionManager transactions, DealerMessageHandoff handoffs) {
     this.cases = cases; this.locks = locks; this.jdbc = jdbc; this.drafts = drafts; this.negotiation = negotiation;
     this.relay = relay; this.contacts = contacts; this.accounts = accounts; this.journeys = journeys;
     this.notifications = notifications; this.offers = offers; this.json = json;
-    this.transaction = new TransactionTemplate(transactions);
+    this.transaction = new TransactionTemplate(transactions); this.handoffs = handoffs;
   }
 
   public record Availability(String appointmentId, String timeZone, List<TestDriveText.Window> windows) {}
@@ -251,14 +253,20 @@ public class TestDriveService implements RelayMessageOwner {
         released.addAll(values.values());
         body = body + "\n\n" + TestDriveText.releasedBlock(values);
       }
-      String relayMessage;
+      DealerMessageHandoff.Outcome handoff;
       try {
-        relayMessage = relay.send(caseId, agreed.dealerAddress(), TestDriveText.subject(message.kind()), body, released);
+        handoff = handoffs.handOff(caseId, agreed.dealerAddress(), TestDriveText.subject(message.kind()), body, released);
       } catch (RelayService.RelayRefusedException refused) {
         // A FAILED or DELIVERY_UNKNOWN send keeps its relay message so it can be checked or retried.
         jdbc.update("update test_drive_messages set state = ?, message_id = ? where id = ?", refused.reason().name(), refused.messageId(), id);
         return new Sent(message(caseId, token, id), null, null);
       }
+      if (!handoff.sent()) {
+        // The Buyer sends it from their own mailbox; marking it sent applies the first-send change below.
+        jdbc.update("update test_drive_messages set state = 'HANDED_OFF', message_id = ? where id = ?", handoff.messageId(), id);
+        return new Sent(message(caseId, token, id), null, null);
+      }
+      String relayMessage = handoff.messageId();
       Instant now = PersistedInstant.round(Instant.now());
       jdbc.update("update test_drive_messages set state = 'SENT', message_id = ?, sent_at = ? where id = ?", relayMessage, Timestamp.from(now), id);
       String notifyKey = applySent(caseId, message, accountId, agreed, relayMessage, now);
@@ -321,12 +329,12 @@ public class TestDriveService implements RelayMessageOwner {
   }
 
   @Override public void unsent(String caseId, String relayMessageId, String state) {
-    jdbc.update("update test_drive_messages set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+    jdbc.update("update test_drive_messages set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
         state, caseId, relayMessageId);
   }
 
   private List<String> unsettled(String caseId, String relayMessageId) {
-    return jdbc.queryForList("select id from test_drive_messages where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+    return jdbc.queryForList("select id from test_drive_messages where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
         String.class, caseId, relayMessageId);
   }
 

@@ -30,7 +30,7 @@ providers, and each one adds contractual and privacy obligations this table cann
 | Database | PostgreSQL supplied by the operator | Case graph | Operator-run |
 | Postal-code location | `PostalJurisdictionResolver` over bundled Census reference data | In process | None — the dataset ships with the application and is never queried remotely |
 | Recovery email | `SmtpRecoveryEmail`, opt-in and unconfigured by default | Buyer email address | Operator's SMTP provider when enabled |
-| Dealer email relay | `FakeDealerMailRelay` (deterministic, in memory) selected by `dealer-relay.provider=fake`, the default; `none` refuses every send. `RelayProductionGuard` refuses the fake under a pilot or production deployment. No real provider is integrated until specification §18 prerequisite 10 | Relay address, dealer address and message content; never the Buyer's email, phone or surname | None — a relay provider will receive dealer mail content once selected |
+| Dealer email relay | `FakeDealerMailRelay` (deterministic, in memory) selected by `dealer-relay.provider=fake`, the default; `none` refuses every send. `RelayProductionGuard` refuses the fake under a pilot or production deployment. No real provider is integrated until specification §18 prerequisite 10. Since ticket 82 the Buyer-facing flow does not send through it: `dealer-mail.send-path=OWN_EMAIL_APP` (the default) hands approved messages to the Buyer, who sends them from their own mail app; `RELAY` is kept only for the relay's own tests until ticket 84 retires it | Relay address, dealer address and message content; never the Buyer's email, phone or surname | None — nothing leaves through a provider on the default send path |
 | Human review | Internal queue behind separate consent | Redacted fields | None |
 | Model calls | `AnthropicModelGateway` or `OpenAiModelGateway` through the [AI execution harness](ai-execution-harness.md), one per deployment (`ai.model.provider`); disabled (`ai.model.enabled=false`) | Not while disabled; would send normalized page images and recognized text | Anthropic or OpenAI, once enabled — **terms unexecuted for both** |
 
@@ -43,8 +43,9 @@ Declare every pilot or production deployment with `SPRING_PROFILES_ACTIVE=pilot`
 `checkout.deployment` and `inventory.deployment` remain legacy aliases with the same restrictive
 effect. Any production-like declaration wins over development declarations. All guards use this
 decision, including parser confinement, synthetic intake, readiness, secure cookies, test malware
-scanning and storage-key validation. `document.malware-scanner=test` and a missing or shorter than
-32-byte UTF-8 `DOCUMENT_STORAGE_ENCRYPTION_KEY` fail startup in these deployments.
+scanning and storage-key validation. `document.malware-scanner=test` and missing or passphrase-like
+document key material fail startup in these deployments. The active/retired base64 random
+key ring and legacy compatibility rules are in the [hardening runbook](hardening-runbook.md).
 
 No licensed listing or market source is integrated. These two deterministic adapters are
 development fixtures. `EvidenceProviderProductionGuard` rejects either selected adapter at startup

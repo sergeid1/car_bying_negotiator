@@ -24,6 +24,8 @@ class PersistenceHardeningTest {
   @Autowired com.dealanalyzer.document.persistence.DocumentIntakePersistence documents;
   @Autowired PlatformTransactionManager manager;
   @Autowired jakarta.persistence.EntityManagerFactory emf;
+  @Autowired AnalysisCaseRepository cases;
+  @Autowired EphemeralCasePersistence persistence;
 
   @Test void staleJpaWriteCannotOverwriteACommittedChange() throws Exception {
     var c = create();
@@ -39,6 +41,22 @@ class PersistenceHardeningTest {
           .hasCauseInstanceOf(jakarta.persistence.OptimisticLockException.class);
     }
     assertThat(store.requireCase(c[0]).buyerZip()).isEqualTo("11111");
+  }
+
+  @Test void caseLockAfterAnEarlierReadSeesAConcurrentWriteInsteadOfFailing() throws Exception {
+    var c = create();
+    var outer = new TransactionTemplate(manager);
+    var other = new TransactionTemplate(manager);
+    other.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    outer.executeWithoutResult(status -> {
+      // An ownership check reads the case before the lock, as test-drive approval does.
+      assertThat(cases.findById(c[0])).isPresent();
+      other.executeWithoutResult(inner -> cases.findById(c[0]).orElseThrow().buyerZip = "11111");
+      assertThatCode(() -> persistence.lock(c[0])).doesNotThrowAnyException();
+      assertThat(cases.findById(c[0]).orElseThrow().buyerZip).isEqualTo("11111");
+    });
+    assertThatThrownBy(() -> outer.executeWithoutResult(status -> persistence.lock(UUID.randomUUID().toString())))
+        .isInstanceOf(com.dealanalyzer.buyingcase.ResourceNotFoundException.class);
   }
 
   @Test void redeliveryCannotRewriteACompletedReportOrDowngradeItsState() throws Exception {

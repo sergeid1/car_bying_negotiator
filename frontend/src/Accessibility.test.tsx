@@ -34,7 +34,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 test.each(["ACCEPTANCE", "WRITTEN_CONFIRMATION", "AGREED", "BLOCKED", "JOURNEY_OPTIONS"])("Agreed Price %s has no automated AA violations", async state => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
     requests: [{ id: "a1", kind: state === "WRITTEN_CONFIRMATION" ? state : "ACCEPTANCE", state: state === "WRITTEN_CONFIRMATION" ? "SENT" : "DRAFT",
-      offerVersion: 3, planVersion: 2, gatedDraft: { draft: { text: "The Buyer accepts the itemized quote, subject to a test drive and matching paperwork." },
+      offerVersion: 3, planVersion: 2, gatedDraft: { draft: { text: "I accept the itemized quote, subject to a test drive and matching paperwork." },
         decision: { pass: state !== "BLOCKED", gateVersion: "outbound-gate.v2", reasons: state === "BLOCKED" ? [{ code: "NO_ACTIVE_MANDATE", text: "Approve a current mandate." }] : [] } } }],
     agreedPrice: state === "AGREED" || state === "JOURNEY_OPTIONS" ? { offerVersion: 3, baselineVersion: 2, actor: "BUYER", acceptedAt: "2026-10-04T12:00:00Z",
       journey: { journeyLinked: state === "JOURNEY_OPTIONS", otherOpenNegotiations: state === "JOURNEY_OPTIONS" ? [{ caseId: "other", label: "Another dealer" }] : [] } } : null,
@@ -516,8 +516,27 @@ test("the quote request with a gated draft, a sent request and dealer quote sour
       documents: [{ documentId: "doc1", outcome: "ACCEPTED", offerVersion: null, sourceKind: "MESSAGE_BODY", messageId: "m2" },
         { documentId: null, outcome: "MALWARE_DETECTED", offerVersion: null, sourceKind: "ATTACHMENT", messageId: "m2" }] }))));
   const { container } = render(<main><h1>Buying Case</h1><QuoteRequest caseId="case" token="token" /></main>);
-  await screen.findByRole("button", { name: "Approve this text and send" });
+  await screen.findByRole("button", { name: "Approve this text" });
   await screen.findByText(/cabcdefghijklmnopqrstuvwxyz234567@relay.invalid/);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+// Ticket 82: an approved request handed off to the Buyer's email app, and a sent one taking a pasted reply.
+test("the quote request handed off to the Buyer's email app has no automated AA violations", async () => {
+  const decision = { pass: true, gateVersion: "outbound-gate.v2", reasons: [] };
+  const text = "Could you provide an itemized out-the-door quote for VIN 1HGCM82633A004352?";
+  const draft = (id: string, state: string, messageId: string | null) => ({ id, dealerAddress: "sales@dealer.example", state, messageId,
+    approvedAt: null, gatedDraft: { draft: { text }, decision } });
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/relay")
+    ? { address: "cabcdefghijklmnopqrstuvwxyz234567@relay.invalid", dealerOptedOut: false, perCaseDailyCap: 10, sentLastDay: 0, messages: [] }
+    : url.includes("/handoffs/")
+      ? { messageId: "m2", sendPath: "OWN_EMAIL_APP", state: "HANDED_OFF", dealerAddress: "sales@dealer.example",
+        subject: "Request for an itemized vehicle quote", body: text, handedOffAt: "2026-10-05T12:00:00Z", sentAt: null }
+      : { negotiationState: "AWAITING_DEALER", dealers: [{ id: "d1", name: "Triangle Motors" }],
+        requests: [draft("q1", "SENT", "m1"), draft("q2", "HANDED_OFF", "m2")], documents: [] }))));
+  const { container } = render(<main><h1>Buying Case</h1><QuoteRequest caseId="case" token="token" /></main>);
+  await screen.findByRole("link", { name: "Open in my email app" });
+  await screen.findByRole("button", { name: "Add reply" });
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 
@@ -553,11 +572,11 @@ function testDriveFixture(state: string) {
   const pass = { pass: true, gateVersion: "outbound-gate.v2", reasons: [] };
   const slot = { option: 1, startsAt: "2026-10-10T15:00:00Z", endsAt: "2026-10-10T16:00:00Z", label: "Saturday, October 10, 2026, 10:00 to 11:00 (America/Chicago)" };
   const proposal = { id: "p1", kind: "PROPOSAL", appointmentId: null, slots: [slot], release: [], state: "SENT", createdAt: "2026-10-04T12:00:00Z",
-    sentAt: "2026-10-04T12:01:00Z", gatedDraft: { draft: { text: "The Buyer would like to arrange a test drive of the vehicle in your written quote at one of these times:\n\nOption 1: " + slot.label }, decision: pass } };
+    sentAt: "2026-10-04T12:01:00Z", gatedDraft: { draft: { text: "I'd like to arrange a test drive of the vehicle in your written quote at one of these times:\n\nOption 1: " + slot.label }, decision: pass } };
   return { agreedPrice: { id: "ap", offerVersion: 3, baselineVersion: 2, outTheDoorMinor: 2680000 }, dealerAddress: "sales@dealer.example",
     contactFields: ["FIRST_NAME", "LAST_NAME", "EMAIL", "PHONE"],
     messages: state === "PROPOSE" ? [] : [proposal, ...(state === "CONFIRM" ? [{ ...proposal, id: "b1", kind: "BOOKING", appointmentId: "a1",
-      release: ["EMAIL"], state: "DRAFT", sentAt: null, gatedDraft: { draft: { text: "Thank you for confirming. The Buyer will attend the test drive on " + slot.label + "." },
+      release: ["EMAIL"], state: "DRAFT", sentAt: null, gatedDraft: { draft: { text: "Thank you for confirming. I'll see you for the test drive on " + slot.label + "." },
         decision: { pass: false, gateVersion: "outbound-gate.v2", reasons: [{ code: "NO_ACTIVE_MANDATE", text: "Approve a current mandate." }] } } }] : [])],
     appointments: state === "BOOKED" ? [{ id: "a1", option: 1, startsAt: slot.startsAt, endsAt: slot.endsAt, label: slot.label, state: "SCHEDULED",
       replacesAppointmentId: null, release: { fields: [], state: "WITHHELD", decidedAt: "2026-10-04T13:00:00Z", releasedAt: null } }] : [],
