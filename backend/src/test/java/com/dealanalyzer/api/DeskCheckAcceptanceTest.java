@@ -56,7 +56,7 @@ class DeskCheckAcceptanceTest {
   @Test void deskPaperworkLeadsWithTheAddedServiceContractAndAnotherCarStartsASeparateCase() throws Exception {
     paperwork = "AGREED";
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("desk", true,
-        Configuration.class, "--case.deletion.delay=PT1H",
+        Configuration.class, "--dealer-mail.send-path=RELAY", "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();

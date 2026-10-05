@@ -5,6 +5,7 @@ import com.dealanalyzer.buyingcase.ResourceNotFoundException;
 import com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence;
 import com.dealanalyzer.outbound.OutboundDraftService;
 import com.dealanalyzer.outbound.OutboundGate;
+import com.dealanalyzer.relay.DealerMessageHandoff;
 import com.dealanalyzer.relay.RelayMessageOwner;
 import com.dealanalyzer.relay.RelayService;
 import java.sql.Timestamp;
@@ -23,14 +24,14 @@ public class QuoteRequestService implements RelayMessageOwner {
   private final EphemeralBuyingCaseService cases;
   private final EphemeralCasePersistence locks;
   private final OutboundDraftService drafts;
-  private final RelayService relay;
+  private final DealerMessageHandoff handoffs;
   private final NegotiationStateService negotiation;
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transaction;
   public QuoteRequestService(EphemeralBuyingCaseService cases, EphemeralCasePersistence locks,
-      OutboundDraftService drafts, RelayService relay, NegotiationStateService negotiation, JdbcTemplate jdbc,
+      OutboundDraftService drafts, DealerMessageHandoff handoffs, NegotiationStateService negotiation, JdbcTemplate jdbc,
       PlatformTransactionManager transactions) {
-    this.cases = cases; this.locks = locks; this.drafts = drafts; this.relay = relay; this.negotiation = negotiation; this.jdbc = jdbc;
+    this.cases = cases; this.locks = locks; this.drafts = drafts; this.handoffs = handoffs; this.negotiation = negotiation; this.jdbc = jdbc;
     this.transaction = new TransactionTemplate(transactions);
   }
   public record Create(String dealerId, String dealerAddress) {}
@@ -88,11 +89,11 @@ public class QuoteRequestService implements RelayMessageOwner {
         jdbc.update("update quote_requests set state = 'BLOCKED' where id = ?", id);
         return get(caseId, token, id);
       }
-      // Keep the case lock through provider handoff, serializing mandate revocation and deletion.
+      // Keep the case lock through the hand-off, serializing mandate revocation and deletion.
       try {
-        String message = relay.send(caseId, quote.dealerAddress(), SUBJECT, quote.gatedDraft().draft().text());
-        jdbc.update("update quote_requests set state = 'SENT', message_id = ? where id = ?", message, id);
-        negotiation.transition(caseId, NegotiationStateService.State.AWAITING_DEALER);
+        var handoff = handoffs.handOff(caseId, quote.dealerAddress(), SUBJECT, quote.gatedDraft().draft().text(), java.util.Set.of());
+        jdbc.update("update quote_requests set state = ?, message_id = ? where id = ?", handoff.state(), handoff.messageId(), id);
+        if (handoff.sent()) negotiation.transition(caseId, NegotiationStateService.State.AWAITING_DEALER);
       } catch (RelayService.RelayRefusedException refused) {
         // A FAILED or DELIVERY_UNKNOWN send keeps its relay message so it can be checked or retried.
         jdbc.update("update quote_requests set state = ?, message_id = ? where id = ?", refused.reason().name(), refused.messageId(), id);
@@ -129,19 +130,19 @@ public class QuoteRequestService implements RelayMessageOwner {
   }
 
   @Override public Runnable sent(String caseId, String token, String relayMessageId) {
-    if (jdbc.update("update quote_requests set state = 'SENT' where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+    if (jdbc.update("update quote_requests set state = 'SENT' where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
         caseId, relayMessageId) == 1 && NegotiationConversationService.ACTIVE.contains(negotiation.current(caseId)))
       negotiation.transition(caseId, NegotiationStateService.State.AWAITING_DEALER);
     return null;
   }
 
   @Override public void unsent(String caseId, String relayMessageId, String state) {
-    jdbc.update("update quote_requests set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+    jdbc.update("update quote_requests set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
         state, caseId, relayMessageId);
   }
 
   private List<String> unsettled(String caseId, String relayMessageId) {
-    return jdbc.queryForList("select id from quote_requests where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+    return jdbc.queryForList("select id from quote_requests where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
         String.class, caseId, relayMessageId);
   }
 

@@ -62,7 +62,7 @@ class CaseExportProjection {
     result.set("outbound_drafts", rows("outbound_drafts", "id, case_id, dealer_id, mandate_id, draft_text, gate_version, decision_json, context_json, created_at", "case_id = :caseId", caseId));
     result.set("report_explanations", rows("report_explanations", "case_id, report_version, policy_version, path, fallback_reason, model_provider, model_id, prompt_version, schema_version, threshold_set_version, evaluation_set_version, payload_json, created_at", "case_id = :caseId", caseId));
     result.set("dealer_relay_identities", rows("dealer_relay_identities", "id, case_id, address, created_at, dealer_opted_out_at, opt_out_channel", "case_id = :caseId", caseId));
-    result.set("dealer_relay_messages", rows("dealer_relay_messages", "id, case_id, identity_id, direction, trust, dealer_address, state, size_bytes, provider_message_id, created_at, completed_at, body_erased_at", "case_id = :caseId", caseId));
+    result.set("dealer_relay_messages", rows("dealer_relay_messages", "id, case_id, identity_id, direction, trust, dealer_address, state, send_path, size_bytes, provider_message_id, created_at, completed_at, body_erased_at", "case_id = :caseId", caseId));
     result.set("dealer_relay_attachments", rows("dealer_relay_attachments", "id, message_id, case_id, ordinal, document_id, outcome, created_at", "case_id = :caseId", caseId));
     result.set("dealer_relay_send_attempts", rows("dealer_relay_send_attempts", "id, case_id, message_id, outcome, created_at", "case_id = :caseId", caseId));
     result.set("recovery_contact", rows("case_recovery_contacts", "case_id, email, expires_at", "case_id = :caseId", caseId));

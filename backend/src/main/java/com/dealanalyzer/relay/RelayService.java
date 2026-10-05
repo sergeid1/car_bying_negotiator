@@ -325,6 +325,11 @@ public class RelayService {
         UUID.randomUUID().toString(), caseId, dealerHash, messageId, outcome, Timestamp.from(now));
   }
 
+  /** True when the text carries the Buyer's email, phone or surname, other than the values released to this dealer. */
+  boolean revealsBuyer(String caseId, String text, java.util.Set<String> released) {
+    return !BuyerIdentityScreen.find(text, buyerIdentity(caseId, released)).isEmpty();
+  }
+
   private BuyerIdentityScreen.Identity buyerIdentity(String caseId, java.util.Set<String> released) {
     var emails = new ArrayList<String>();
     var phones = new ArrayList<String>();
@@ -392,17 +397,66 @@ public class RelayService {
     });
     if (stored == null) return new InboundResult(InboundOutcome.REJECTED_UNKNOWN_ADDRESS, null);
     if (stored.duplicate()) return new InboundResult(InboundOutcome.DUPLICATE, stored.messageId());
-    if (bodyClean) {
-      for (int i = 0; i < mail.attachments().size(); i++) intakeAttachment(stored, i, mail.attachments().get(i));
-      // Capture bodies conservatively: figures need review even if the dealer did not label them a quote.
-      if (mail.body() != null && !mail.body().isBlank() && (mail.attachments().isEmpty()
-          || java.util.regex.Pattern.compile("[0-9]").matcher(mail.body()).find()))
-        intakeBody(stored, mail.body());
-      negotiation.dealerReply(stored.caseId());
-    }
+    if (bodyClean) ingest(stored, mail.body(), mail.attachments());
     transaction.execute(status -> accounts.accountId(stored.caseId()))
         .ifPresent(account -> notifications.notify(account, NotificationType.DEALER_REPLY, "relay-inbound:" + stored.messageId()));
     return new InboundResult(bodyClean ? InboundOutcome.RECEIVED : InboundOutcome.REJECTED_MALWARE, stored.messageId());
+  }
+
+  /**
+   * A dealer reply the Buyer pasted or uploaded into a Dealer Conversation (ticket 82). The caller has
+   * authorized the case and chosen the conversation's dealer address. The reply is stored and ingested exactly
+   * like relayed mail: it is untrusted, and attachments and quoted figures enter document intake. The key makes
+   * a repeated submission return the first message.
+   */
+  public InboundResult receivePasted(String caseId, String key, String dealerAddress, String subject, String body,
+      List<DealerMailRelay.Attachment> attachments) {
+    var files = attachments == null ? List.<DealerMailRelay.Attachment>of() : attachments;
+    if ((body == null || body.isBlank()) && files.isEmpty()) return new InboundResult(InboundOutcome.REJECTED_INVALID, null);
+    long size = bytes(subject) + bytes(body) + files.stream().mapToLong(a -> a.content() == null ? 0 : a.content().length).sum();
+    if (size > maxInboundBytes || files.size() > MAX_ATTACHMENTS || (body != null && body.length() > 1_000_000)
+        || (subject != null && subject.length() > MAX_SUBJECT))
+      return new InboundResult(InboundOutcome.REJECTED_TOO_LARGE, null);
+    boolean clean = true;
+    try {
+      scanner.requireClean(((subject == null ? "" : subject) + "\n" + (body == null ? "" : body)).getBytes(StandardCharsets.UTF_8));
+    } catch (InvalidDocumentException malware) {
+      clean = false;
+    }
+    boolean bodyClean = clean;
+    String to = normalizeAddress(dealerAddress);
+    // Namespaced by case, so one Buyer's key can never match another case's reply.
+    String pastedId = "pasted:" + secrets.protectAccountSecret("pasted-reply", caseId + ":" + key);
+    Stored stored = transaction.execute(status -> {
+      Instant now = PersistedInstant.round(Instant.now());
+      if (!lockAccepting(caseId, now)) return null;
+      var duplicate = jdbc.queryForList("select id from dealer_relay_messages where case_id = ? and direction = 'INBOUND' and provider_message_id = ?",
+          String.class, caseId, pastedId);
+      if (!duplicate.isEmpty()) return new Stored(caseId, duplicate.getFirst(), true);
+      String messageId = UUID.randomUUID().toString();
+      jdbc.update("""
+          insert into dealer_relay_messages (id, case_id, identity_id, direction, trust, dealer_address, dealer_address_hash,
+            state, subject_ciphertext, body_ciphertext, size_bytes, provider_message_id, created_at, completed_at, send_path)
+          values (?, ?, null, 'INBOUND', 'UNTRUSTED', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OWN_EMAIL_APP')
+          """, messageId, caseId, to, dealerHash(to), bodyClean ? "RECEIVED" : "REJECTED_MALWARE",
+          bodyClean ? content.encrypt(caseId, messageId, subject == null ? "" : subject) : null,
+          bodyClean ? content.encrypt(caseId, messageId, body == null ? "" : body) : null,
+          (int) Math.min(Integer.MAX_VALUE, size), pastedId, Timestamp.from(now), Timestamp.from(now));
+      return new Stored(caseId, messageId, false);
+    });
+    if (stored == null) throw new ResourceNotFoundException("Buying Case not found");
+    if (stored.duplicate()) return new InboundResult(InboundOutcome.DUPLICATE, stored.messageId());
+    if (bodyClean) ingest(stored, body, files);
+    return new InboundResult(bodyClean ? InboundOutcome.RECEIVED : InboundOutcome.REJECTED_MALWARE, stored.messageId());
+  }
+
+  /** Attachments and quoted figures of a clean inbound message enter document intake; the dealer has replied. */
+  private void ingest(Stored stored, String body, List<DealerMailRelay.Attachment> attachments) {
+    for (int i = 0; i < attachments.size(); i++) intakeAttachment(stored, i, attachments.get(i));
+    // Capture bodies conservatively: figures need review even if the dealer did not label them a quote.
+    if (body != null && !body.isBlank() && (attachments.isEmpty() || Pattern.compile("[0-9]").matcher(body).find()))
+      intakeBody(stored, body);
+    negotiation.dealerReply(stored.caseId());
   }
 
   private void intakeAttachment(Stored stored, int ordinal, DealerMailRelay.Attachment attachment) {
@@ -481,7 +535,7 @@ public class RelayService {
       var attachments = jdbc.query("select message_id, ordinal, document_id, outcome from dealer_relay_attachments where case_id = ? and ordinal >= 0 order by message_id, ordinal",
           (row, n) -> Map.entry(row.getString(1), new AttachmentView(row.getInt(2), row.getString(3), row.getString(4))), caseId);
       var messages = jdbc.query("""
-          select id, direction, trust, dealer_address, state, created_at, completed_at, size_bytes, body_ciphertext
+          select id, direction, trust, dealer_address, state, created_at, completed_at, size_bytes, body_ciphertext, send_path
           from dealer_relay_messages where case_id = ? order by created_at desc, id
           """, (row, n) -> {
             String id = row.getString(1);
@@ -492,7 +546,8 @@ public class RelayService {
                 Optional.ofNullable(row.getTimestamp(7)).map(Timestamp::toInstant).orElse(null), row.getInt(8), available,
                 attachments.stream().filter(entry -> entry.getKey().equals(id)).map(Map.Entry::getValue).toList(),
                 outbound && "DELIVERY_UNKNOWN".equals(row.getString(5)),
-                outbound && "FAILED".equals(row.getString(5)) && available && identity.optedOutAt() == null);
+                outbound && "FAILED".equals(row.getString(5)) && available && identity.optedOutAt() == null,
+                SendPath.valueOf(row.getString(10)));
           }, caseId).stream().map(message -> message.retryOffered() && owner(caseId, message.id()) == null
               ? message.withoutRetry() : message).toList();
       return new RelayView(identity.address(), identity.optedOutAt() != null, identity.optedOutAt(), identity.channel(),
@@ -604,6 +659,8 @@ public class RelayService {
 
   private String optOutUrl(String identityId) { return publicUrl + "api/v1/relay/opt-out/" + optOutToken(identityId); }
 
+  String dealerAddressHash(String address) { return dealerHash(address); }
+
   private String dealerHash(String address) { return secrets.protectAccountSecret("relay-dealer", address); }
 
   private static String normalizeAddress(String address) {
@@ -639,15 +696,15 @@ public class RelayService {
   public record Delivery(String messageId, String state) {}
   public record AttachmentView(int ordinal, String documentId, String outcome) {}
   /**
-   * {@code deliveryCheckOffered}: an unclear outbound send the provider can be asked about. {@code retryOffered}:
+   * {@code sendPath}: how an outbound message left, or for an inbound one, how it arrived. {@code deliveryCheckOffered}: an unclear outbound send the provider can be asked about. {@code retryOffered}:
    * a not-sent outbound message whose stored text can be sent again; the retry still re-checks permission.
    */
   public record MessageSummary(String id, String direction, String trust, String dealerAddress, String state,
       Instant createdAt, Instant completedAt, int sizeBytes, boolean contentAvailable, List<AttachmentView> attachments,
-      boolean deliveryCheckOffered, boolean retryOffered) {
+      boolean deliveryCheckOffered, boolean retryOffered, SendPath sendPath) {
     MessageSummary withoutRetry() {
       return new MessageSummary(id, direction, trust, dealerAddress, state, createdAt, completedAt, sizeBytes,
-          contentAvailable, attachments, deliveryCheckOffered, false);
+          contentAvailable, attachments, deliveryCheckOffered, false, sendPath);
     }
   }
   public record MessageContent(String id, String direction, String trust, String subject, String body) {

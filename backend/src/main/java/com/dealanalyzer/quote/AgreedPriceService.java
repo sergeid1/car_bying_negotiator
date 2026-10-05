@@ -6,6 +6,7 @@ import com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence;
 import com.dealanalyzer.outbound.OutboundDraftService;
 import com.dealanalyzer.outbound.OutboundGate;
 import com.dealanalyzer.plan.PricePlanService;
+import com.dealanalyzer.relay.DealerMessageHandoff;
 import com.dealanalyzer.relay.RelayMessageOwner;
 import com.dealanalyzer.relay.RelayService;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence;
@@ -30,17 +31,17 @@ public class AgreedPriceService implements RelayMessageOwner {
   private final DealerOfferPersistence offers;
   private final PricePlanService plans;
   private final NegotiationStateService negotiation;
-  private final RelayService relay;
+  private final DealerMessageHandoff handoffs;
   private final JourneyAgreement journeys;
   private final ObjectMapper json;
   private final TransactionTemplate transaction;
   private final jakarta.persistence.EntityManager manager;
   public AgreedPriceService(EphemeralBuyingCaseService cases, EphemeralCasePersistence locks, JdbcTemplate jdbc,
       OutboundDraftService drafts, WrittenQuoteEvidence evidence, DealerOfferPersistence offers,
-      PricePlanService plans, NegotiationStateService negotiation, RelayService relay, JourneyAgreement journeys,
+      PricePlanService plans, NegotiationStateService negotiation, DealerMessageHandoff handoffs, JourneyAgreement journeys,
       ObjectMapper json, PlatformTransactionManager transactions, jakarta.persistence.EntityManager manager) {
     this.cases = cases; this.locks = locks; this.jdbc = jdbc; this.drafts = drafts; this.evidence = evidence;
-    this.offers = offers; this.plans = plans; this.negotiation = negotiation; this.relay = relay;
+    this.offers = offers; this.plans = plans; this.negotiation = negotiation; this.handoffs = handoffs;
     this.journeys = journeys; this.json = json; this.transaction = new TransactionTemplate(transactions);
     this.manager = manager;
   }
@@ -122,10 +123,11 @@ public class AgreedPriceService implements RelayMessageOwner {
       if (accepting) plans.reviewApproval(caseId, token, request.planVersion());
       try {
         Dealer dealer = dealer(caseId, request.quoteRequestId());
-        String message = relay.send(caseId, dealer.address(), "ACCEPTANCE".equals(request.kind())
-            ? "Conditional acceptance of itemized quote" : "Please confirm the quote in writing", request.gatedDraft().draft().text());
-        jdbc.update("update quote_acceptance_requests set state = 'SENT', message_id = ? where id = ?", message, id);
-        applySent(caseId, token, request);
+        var handoff = handoffs.handOff(caseId, dealer.address(), "ACCEPTANCE".equals(request.kind())
+            ? "Conditional acceptance of itemized quote" : "Please confirm the quote in writing", request.gatedDraft().draft().text(),
+            java.util.Set.of());
+        jdbc.update("update quote_acceptance_requests set state = ?, message_id = ? where id = ?", handoff.state(), handoff.messageId(), id);
+        if (handoff.sent()) applySent(caseId, token, request);
       } catch (RelayService.RelayRefusedException refused) {
         // A FAILED or DELIVERY_UNKNOWN send keeps its relay message so it can be checked or retried.
         jdbc.update("update quote_acceptance_requests set state = ?, message_id = ? where id = ?",
@@ -187,12 +189,12 @@ public class AgreedPriceService implements RelayMessageOwner {
   }
 
   @Override public void unsent(String caseId, String relayMessageId, String state) {
-    jdbc.update("update quote_acceptance_requests set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+    jdbc.update("update quote_acceptance_requests set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
         state, caseId, relayMessageId);
   }
 
   private List<String> unsettled(String caseId, String relayMessageId) {
-    return jdbc.queryForList("select id from quote_acceptance_requests where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+    return jdbc.queryForList("select id from quote_acceptance_requests where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
         String.class, caseId, relayMessageId);
   }
 

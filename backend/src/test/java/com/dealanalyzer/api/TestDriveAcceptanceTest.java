@@ -21,12 +21,12 @@ import org.springframework.web.client.RestClient;
 
 class TestDriveAcceptanceTest {
   private static final String VIN = "1HGCM82633A004352";
-  private static final String EMAIL = "td-buyer@example.com";
+  static final String EMAIL = "td-buyer@example.com";
   @TempDir Path directory;
 
   @Test void scheduleConfirmReleaseRescheduleAndCancelATestDriveThroughTheRelay() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("test-drive", true,
-        AgreedPriceAcceptanceTest.Configuration.class, "--case.deletion.delay=PT1H",
+        AgreedPriceAcceptanceTest.Configuration.class, "--dealer-mail.send-path=RELAY", "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();
@@ -269,7 +269,7 @@ class TestDriveAcceptanceTest {
     return AccountSessionTestSupport.verify(client, secret);
   }
 
-  private static String signInAndAttach(RestClient client, String caseId, String token) throws Exception {
+  static String signInAndAttach(RestClient client, String caseId, String token) throws Exception {
     String session = signIn(client, EMAIL);
     client.put().uri("/api/v1/account/contact").header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1")
         .body(Map.of("firstName", "Rosalind", "lastName", "Quixote", "phone", "+1 312 555 0199")).retrieve().toBodilessEntity();
@@ -293,7 +293,7 @@ class TestDriveAcceptanceTest {
     return journey;
   }
 
-  private static JsonNode postWithSession(RestClient client, String path, Object body, String key, String token, String session) throws Exception {
+  static JsonNode postWithSession(RestClient client, String path, Object body, String key, String token, String session) throws Exception {
     return new com.fasterxml.jackson.databind.ObjectMapper().readTree(client.post().uri(path)
         .contentType(org.springframework.http.MediaType.APPLICATION_JSON).header("Idempotency-Key", key)
         .header("Case-Access-Token", token).header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1").body(body).retrieve().body(String.class));
