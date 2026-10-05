@@ -10,6 +10,14 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 @org.springframework.core.annotation.Order(0)
 @RestControllerAdvice
 class DocumentIntakeExceptionHandler {
+  @ExceptionHandler(com.dealanalyzer.document.DocumentUnavailableException.class)
+  ProblemDetail unavailableDocument(com.dealanalyzer.document.DocumentUnavailableException exception) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+    problem.setTitle("Document processing is temporarily unavailable");
+    problem.setProperty("code", exception.code());
+    problem.setProperty("retryable", true);
+    return problem;
+  }
   @ExceptionHandler(InvalidDocumentException.class)
   ProblemDetail invalidDocument(InvalidDocumentException exception) {
     boolean unavailable = exception.code().equals("PARSER_BUSY") || exception.code().equals("PARSER_UNAVAILABLE");

@@ -37,6 +37,70 @@ the measured workload, queue backlog and failed operations are understood. Never
 failed/stuck operations to make a percentile pass. Deletion completion p95 must remain within
 24 hours, accompanied by the overdue/pending counts.
 
+## Document key rotation
+
+Configure `DOCUMENT_STORAGE_ACTIVE_KEY_ID` as a stable, nonsecret ID (1–64 ASCII letters,
+digits, underscores or hyphens; `legacy` is reserved). `DOCUMENT_STORAGE_KEYS` is a comma-separated
+list `id=base64,id=base64` containing the active key and all retained generations. Each value
+must encode at least 32 cryptographically random bytes; generate it with `openssl rand -base64 32`
+and deliver it through the deployment secret manager. Never put material in command arguments,
+logs or tickets. Printable passphrases and obvious repeated material are rejected. These checks
+cannot prove randomness; a cryptographic random generator is an operator requirement.
+Never reuse an ID for different material. New originals and normalized pages carry a versioned,
+authenticated header with their key ID. The storage filesystem must support atomic replacement;
+an unsupported filesystem fails the write/rotation rather than risking a partial replacement.
+The database reference also records the ID; the blob header is authoritative for decryption.
+
+Keep `DOCUMENT_STORAGE_ENCRYPTION_KEY` unchanged for headerless legacy blobs. Its historical
+SHA-256-of-string derivation remains compatible. Development accepts existing long secrets;
+pilot/production refuses passphrases and requires the legacy string itself to be base64 of
+random bytes when it is supplied. If a development passphrase was used, migrate those objects
+in development before moving to pilot. Without an active ID, legacy development writes still
+work and now record the reserved `legacy` ID in a header. A configured key ring is validated
+at startup; the existing pilot/production missing-key startup refusal remains in force.
+
+1. Add a fresh key ID/material while keeping the old key in `DOCUMENT_STORAGE_KEYS`, then
+   switch the active ID. Restart with the complete ring. Verify retained synthetic originals,
+   pages and case exports. A missing key returns the safe document-unavailable response (503,
+   `DOCUMENT_KEY_UNAVAILABLE`), never a generic 500 or crypto diagnostics.
+2. Stop every application replica, upload/normalization worker, retention/deletion worker and
+   other writer to this database and object volume. Fence ingress. Take a consistent backup
+   and protect the full key ring independently. Rotation is an **offline** command; the explicit
+   `--service-stopped` argument acknowledges this operational requirement, it does not enforce
+   a distributed lock. Do not run it alongside the service.
+3. On the application runtime classpath (including the JDBC driver), run:
+
+   ```text
+   java -cp 'backend/target/classes:backend/target/dependency/*' com.dealanalyzer.document.DocumentKeyRotation --service-stopped 100
+   ```
+
+   Prepare a fresh dependency directory with
+   `mvn -f backend/pom.xml compile dependency:copy-dependencies -DexcludeGroupIds=commons-logging`;
+   exclude the conflicting `commons-logging` jar so Spring's logging bridge does not print a
+   discovery warning. Do not enable debug/trace logging for this command.
+   Supply `DOCUMENT_STORAGE_PATH`, the complete key variables above, and
+   `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` through
+   the environment. Preserve the deployment declaration (`SPRING_PROFILES_ACTIVE` or
+   `EVIDENCE_DEPLOYMENT`) so the same startup material rules apply; development legacy
+   passphrases can be migrated only under a development declaration. No server or scheduled
+   task starts. The command fetches at most the specified 1–1000 objects per database batch, replaces
+   each blob atomically with fresh AES-GCM encryption and the same case/document/page AAD,
+   then updates original metadata. It includes expired/quarantined objects until physical
+   erasure. Output contains only scanned/rotated counts; failures exit nonzero with a safe
+   message. A restart scans from the beginning, verifies and skips already active objects,
+   and repairs a metadata update interrupted after blob replacement. No plaintext checkpoint
+   or plaintext temporary object is written. Do not remove keys after an incomplete run.
+4. Require a complete run and a second run with zero rotated objects, then verify synthetic
+   export/read, retention and deletion before restarting all replicas with the new active ID.
+   The command covers database-registered originals/pages; inventory and erase unreferenced
+   artifacts and interrupted encrypted temporary files separately before dropping their keys.
+5. Remove a retired key only when no retained live blob needs it **and** every backup/snapshot
+   that needs it has expired, been securely erased, or been separately migrated and verified.
+   Keep legacy secrets while any headerless object, retained export snapshot or relay ciphertext
+   needs them. This command rotates document files only: export/relay encryption still uses
+   the legacy variable. Never change that variable as part of this document-file rotation.
+   Restore older backups under the quarantine procedure with their original key generations.
+
 ## Quarantined restoration
 
 1. Keep ingress closed. Disable analysis/document workers. Take a consistent database and
