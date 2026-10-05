@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CoreDealReport, type CoreReport } from "./CoreDealReport";
+import { CoreDealReport, ReportSection, type CoreReport } from "./CoreDealReport";
 import { CaseDownloads } from "./CasePortability";
 
 import { DealerFinancingForm } from "./DealerFinancing";
@@ -107,6 +107,9 @@ export function VerifiedOfferAnalysis({ caseId, token, offerVersion, pollDelayMs
       </>}
       {error && <><p role="alert">Analysis could not finish. Your accepted documents and verified offer are saved. Retry analysis; you do not need to upload them again. If access has expired, use your saved link or email recovery.</p><button onClick={() => setAttempt(value => value + 1)}>Retry analysis</button></>}
     </div>}
-    {report && <><CoreDealReport report={report} caseId={caseId} token={token} /><DealerFinancingForm caseId={caseId} token={token} /><OutsideFinancing caseId={caseId} token={token} /><button className="btn-secondary" onClick={() => { requestKey.current = crypto.randomUUID(); forceRun.current = true; setAttempt(value => value + 1); }}>Update analysis with saved terms</button><OutcomeFeedback caseId={caseId} token={token} /><CaseDownloads caseId={caseId} token={token} reportVersion={report.version} /><NegotiationLoader caseId={caseId} token={token} reportVersion={report.version} /></>}
+    {report && <><CoreDealReport report={report} caseId={caseId} token={token}>
+      <ReportSection id="core-feedback" title="Optional outcome feedback"><OutcomeFeedback caseId={caseId} token={token} headless /></ReportSection>
+      <ReportSection id="core-downloads" title="Save a copy"><CaseDownloads caseId={caseId} token={token} reportVersion={report.version} headless /></ReportSection>
+    </CoreDealReport><DealerFinancingForm caseId={caseId} token={token} /><OutsideFinancing caseId={caseId} token={token} /><button className="btn-secondary" onClick={() => { requestKey.current = crypto.randomUUID(); forceRun.current = true; setAttempt(value => value + 1); }}>Update analysis with saved terms</button><NegotiationLoader caseId={caseId} token={token} reportVersion={report.version} /></>}
   </section>;
 }

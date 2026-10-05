@@ -39,7 +39,8 @@ export function FindingFeedback(props: Credentials & { reportVersion: number; fi
   </form>;
 }
 
-export function OutcomeFeedback(props: Credentials) {
+/** `headless` drops the panel and heading so the report's collapsible list can supply them. */
+export function OutcomeFeedback(props: Credentials & { headless?: boolean }) {
   const [stage, setStage] = useState("FINAL");
   const [values, setValues] = useState<Record<string, string>>({});
   const [price, setPrice] = useState<{ priceMinor: number; variant: string }>();
@@ -60,8 +61,7 @@ export function OutcomeFeedback(props: Credentials) {
       else setPriceMessage("There is no price question for this case.");
     } catch { setPriceMessage("Price question unavailable. Try again later."); }
   }
-  return <section className="panel" aria-labelledby={`${id}-heading`}>
-    <h3 id={`${id}-heading`}>Optional outcome feedback</h3>
+  const body = <>
     <p>Share any answers you choose. Terms are Buyer reported and unverified. Feedback does not change your report or approve a deal. Do not enter names or dealer details.</p>
     <form onSubmit={async e => {
       e.preventDefault(); setBusy(true); setError("");
@@ -99,5 +99,8 @@ export function OutcomeFeedback(props: Credentials) {
       </fieldset>
       {saved && <p role="status">Outcome feedback saved.</p>}{error && <p role="alert">{error}</p>}
     </form>
+  </>;
+  return props.headless ? body : <section className="panel" aria-labelledby={`${id}-heading`}>
+    <h3 id={`${id}-heading`}>Optional outcome feedback</h3>{body}
   </section>;
 }

@@ -53,6 +53,8 @@ test("saved link opens frozen offer analysis and report in a second browser sess
   await expect(second.getByRole("heading", { name: "Deal Analysis Report", exact: true })).toBeVisible();
   await expect(second.getByRole("heading", { name: "What the findings mean" })).toBeVisible();
   await second.getByText("Recorded sources for sentence 1").click();
+  // Ticket 71: market evidence sits in the report's collapsible list, collapsed until opened.
+  await second.locator("summary", { hasText: "Market evidence" }).click();
   const market = second.getByRole("region", { name: "Market evidence", exact: true });
   await expect(market).toContainText("Market data retrieved: September 30, 2026.");
   await expect(market).toContainText("Observation window: September 1 to September 28, 2026.");

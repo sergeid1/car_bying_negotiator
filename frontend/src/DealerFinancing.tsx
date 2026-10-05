@@ -88,9 +88,10 @@ export function DealerFinancingForm({ caseId, token, outside = false, onSaved }:
   </details>;
 }
 
-export function DealerFinancingResult({ result, availability, terms }: { result: FinancingResult | null; availability: string; terms?: { aprPercent: number | null; termMonths: number | null } | null }) {
+/** `headless` drops the panel and heading so the report's collapsible list can supply them. */
+export function DealerFinancingResult({ result, availability, terms, headless }: { result: FinancingResult | null; availability: string; terms?: { aprPercent: number | null; termMonths: number | null } | null; headless?: boolean }) {
   const available = availability === "AVAILABLE";
-  return <section className="panel" id="core-financing" tabIndex={-1}><h3>Dealer financing</h3>
+  const body = <>
     <p>Financing: {availability}. <a href="#evidence-financing">Verified inputs and calculation</a></p>
     {result && <>{result.issues.map(issue => <p className="notice" key={issue}>{issue}</p>)}
       {available && <>{terms && <p>Verified APR: {terms.aprPercent ?? "Unavailable"}%. Term: {terms.termMonths ?? "Unavailable"} months.</p>}<dl className="money-list">
@@ -110,5 +111,6 @@ export function DealerFinancingResult({ result, availability, terms }: { result:
       </dl></section>)}</>}
       <p>Supported timing: monthly, first payment one month after funding. Rounding: {result.rounding}.</p>
     </>}
-  </section>;
+  </>;
+  return headless ? body : <section className="panel" id="core-financing" tabIndex={-1}><h3>Dealer financing</h3>{body}</section>;
 }

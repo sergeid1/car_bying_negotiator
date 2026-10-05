@@ -1,0 +1,148 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, Page, test } from "@playwright/test";
+
+// Ticket 71: the report's secondary sections are one collapsible list below the leading section.
+const report = { version: 1, asOf: "2026-10-05", status: "COMPLETE", analysis: {
+  marketEvidence: { status: "AVAILABLE", paragraphs: ["Market data retrieved: October 1, 2026."] },
+  reviewLabel: "Review required", dealRating: "FAIR", ratingBasis: "Recorded evidence", nextAction: "Review the fees",
+  topReasons: ["The documentation fee is above the recorded range.", "Market selling-price evidence is available; it is an estimate.",
+    "The quoted total needs reconciliation with recorded charges."],
+  marketAvailability: "AVAILABLE", cashAvailability: "AVAILABLE", financingAvailability: "UNAVAILABLE", financing: null,
+  materialAmounts: [
+    { label: "Documentation fee", minorUnits: 89900, currency: "USD", precision: "EXACT", source: "cashEconomics", pointer: "/result/lineItems/0/amount",
+      documentSource: null, sourceNote: "Read from the recorded line item." },
+    { label: "/result/outTheDoorTotal", minorUnits: 2850000, currency: "USD", precision: "ESTIMATED", source: "cashEconomics", pointer: "/result/outTheDoorTotal",
+      documentSource: null, sourceNote: "Calculated from the inputs below; no single document line holds this amount.",
+      calculation: { operands: [{ operator: null, label: "Vehicle subtotal", minorUnits: 2610000, value: null },
+        { operator: "+", label: "Taxes", minorUnits: 240000, value: null }], notes: [] } },
+  ], policyVersions: { review: "core-review.v1" }, limitations: ["Financial consistency only."],
+}, evidence: {}, reproduction: {} };
+const SECTIONS = ["Amounts and sources", "Dealer financing", "Market evidence", "Evidence and calculations", "Scope and policies",
+  "Optional outcome feedback", "Save a copy"];
+
+/** `reportGate` holds the saved report back until the test releases it, so a fragment can be set first. */
+async function api(page: Page, reportGate?: Promise<void>) {
+  await page.route("**/api/v1/**", async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/v1/cases/current") return route.fulfill({ json: { id: "current" } });
+    if (path.endsWith("reports/latest") && reportGate) await reportGate;
+    const body = path.endsWith("negotiation") ? { language: { draft: "Review the fees", items: [] } }
+      : path.endsWith("dealer-offers/latest") ? { version: 1, status: "VERIFIED" }
+      : path.endsWith("analyses") ? { operation: { id: "op", stage: "QUEUED" } }
+      : path.endsWith("operations/op") ? { stage: "COMPLETE" }
+      : path.endsWith("reports/latest") ? report
+      : path.endsWith("feedback") ? { experiment: null }
+      : path.endsWith("document-limits") ? { acceptedMediaTypes: ["application/pdf"], maxFileBytes: 20971520, maxPages: 25, maxPixels: 40000000, minWidth: 1, minHeight: 1 }
+      : path.endsWith("intake-options") ? { supported: ["US-NC"], consentPolicies: {} }
+      : {};
+    await route.fulfill({ json: body });
+  });
+}
+
+async function openReport(page: Page) {
+  await page.goto("/#case=current&access=private-secret");
+  await expect(page.getByRole("heading", { name: "Deal Analysis Report", exact: true })).toBeFocused();
+  return page.getByRole("list", { name: "Report details" });
+}
+
+const section = (page: Page, name: string) => page.locator("details.report-section", { has: page.getByRole("heading", { name, exact: true, level: 3 }) });
+
+async function expectInViewport(page: Page, id: string) {
+  const box = await page.locator(`[id="${id}"]`).boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.y).toBeLessThan(780);
+}
+
+async function expectNoHorizontalOverflow(page: Page) {
+  const widest = await page.evaluate(() => Array.from(document.querySelectorAll<HTMLElement>("body *"))
+    .filter(element => element.getBoundingClientRect().right > document.documentElement.clientWidth + 1)
+    .map(element => `${element.tagName.toLowerCase()}.${element.className}`).slice(0, 5));
+  expect(widest).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+}
+
+async function expectNoAxeViolations(page: Page) {
+  const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+  expect(results.violations.map(violation => ({ id: violation.id, nodes: violation.nodes.map(node => node.html) }))).toEqual([]);
+}
+
+test("the secondary sections start collapsed below an always-open lead, open from the keyboard and fit 360 px", async ({ page }) => {
+  await api(page);
+  const list = await openReport(page);
+  await expect(page.getByRole("region", { name: "Total, findings and next action" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Questions to ask the dealer" })).toBeVisible();
+  await expect(list.locator(":scope > li > details > summary")).toHaveText(SECTIONS);
+  for (const name of SECTIONS) await expect(section(page, name)).not.toHaveAttribute("open");
+  await expect(page.getByText("Market data retrieved: October 1, 2026.")).toBeHidden();
+  await expectNoHorizontalOverflow(page);
+  await expectNoAxeViolations(page);
+
+  const summary = section(page, "Market evidence").locator(":scope > summary");
+  await summary.focus();
+  await page.keyboard.press("Enter");
+  await expect(section(page, "Market evidence")).toHaveAttribute("open");
+  await expect(page.getByRole("region", { name: "Market evidence", exact: true })).toContainText("Market data retrieved: October 1, 2026.");
+  await page.keyboard.press("Space");
+  await expect(section(page, "Market evidence")).not.toHaveAttribute("open");
+
+  for (const name of SECTIONS) await section(page, name).locator(":scope > summary").click();
+  for (const name of SECTIONS) await expect(section(page, name)).toHaveAttribute("open");
+  await expectNoHorizontalOverflow(page);
+  await expectNoAxeViolations(page);
+});
+
+test("links from the total, a finding and the section menu open their section, focus the target and survive the back button", async ({ page }) => {
+  await api(page);
+  await openReport(page);
+  await page.getByRole("link", { name: "$28,500.00", exact: true }).click();
+  await expect(section(page, "Evidence and calculations")).toHaveAttribute("open");
+  await expect(page.locator("#amount-evidence-1")).toBeFocused();
+  await expectInViewport(page, "amount-evidence-1");
+
+  await page.getByRole("navigation", { name: "Report sections" }).getByRole("link", { name: "Amounts" }).click();
+  await expect(section(page, "Amounts and sources")).toHaveAttribute("open");
+  await expect(page.locator("#core-amounts")).toBeFocused();
+  await section(page, "Evidence and calculations").locator(":scope > summary").click();
+  await expect(section(page, "Evidence and calculations")).not.toHaveAttribute("open");
+  await page.goBack();
+  await expect(section(page, "Evidence and calculations")).toHaveAttribute("open");
+  await expect(page.locator("#amount-evidence-1")).toBeFocused();
+  await expectInViewport(page, "amount-evidence-1");
+
+  // A repeat click on the current fragment still reopens the section.
+  await section(page, "Evidence and calculations").locator(":scope > summary").click();
+  await page.getByRole("link", { name: "Frozen evidence" }).first().click();
+  await expect(section(page, "Evidence and calculations")).toHaveAttribute("open");
+  await expect(page.locator("#core-evidence")).toBeFocused();
+  await expectNoHorizontalOverflow(page);
+});
+
+test("a report that opens at a fragment opens only that section", async ({ page }) => {
+  let release!: () => void;
+  await api(page, new Promise<void>(resolve => { release = resolve; }));
+  await page.goto("/#case=current&access=private-secret");
+  await expect.poll(() => page.evaluate(() => window.location.hash)).toBe("");
+  await page.evaluate(() => window.history.replaceState(null, "", "#amount-evidence-0"));
+  release();
+  await expect(section(page, "Evidence and calculations")).toHaveAttribute("open");
+  await expect(page.locator("#amount-evidence-0")).toBeFocused();
+  await expectInViewport(page, "amount-evidence-0");
+  for (const name of SECTIONS.filter(name => name !== "Evidence and calculations")) await expect(section(page, name)).not.toHaveAttribute("open");
+});
+
+test("printing expands every section in report order and restores the Buyer's choices", async ({ page }) => {
+  await api(page);
+  await openReport(page);
+  await section(page, "Market evidence").locator(":scope > summary").click();
+  await page.emulateMedia({ media: "print" });
+  await page.evaluate(() => window.dispatchEvent(new Event("beforeprint")));
+  const ids = await page.locator("details.report-section").evaluateAll(sections => sections.map(details => [details.id, (details as HTMLDetailsElement).open]));
+  expect(ids).toEqual([["core-amounts", true], ["core-financing", true], ["core-market", true], ["core-evidence", true], ["core-scope", true],
+    ["core-feedback", true], ["core-downloads", true]]);
+  await expect(page.locator("#amount-evidence-1")).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
+  await page.emulateMedia({ media: "screen" });
+  const open = await page.locator("details.report-section[open]").evaluateAll(sections => sections.map(details => details.id));
+  expect(open).toEqual(["core-market"]);
+});

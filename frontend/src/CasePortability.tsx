@@ -123,7 +123,8 @@ export function RecoveryEmailOptIn({ caseId, token }: Credentials) {
     {message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
   </section>;
 }
-export function CaseDownloads({ caseId, token, reportVersion }: Credentials & { reportVersion?: number }) {
+/** `headless` drops the panel and heading so the report's collapsible list can supply them. */
+export function CaseDownloads({ caseId, token, reportVersion, headless }: Credentials & { reportVersion?: number; headless?: boolean }) {
   const keys = useRef<Record<string, string>>({});
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -142,8 +143,7 @@ export function CaseDownloads({ caseId, token, reportVersion }: Credentials & { 
       setMessage("Download ready. Repeat downloads use the same saved snapshot.");
     } catch (failure) { setError(String(failure)); } finally { setBusy(false); }
   }
-  return <section className="panel" aria-label="Case downloads">
-    <h2>Save a copy</h2>
+  const body = <>
     <p>Export retained case data and version history. Saved reports include their evidence and limitations.</p>
     <div className="actions">
       <button disabled={busy} onClick={() => download("ZIP")}>Export retained case data</button>
@@ -155,5 +155,6 @@ export function CaseDownloads({ caseId, token, reportVersion }: Credentials & { 
     </div>
     {reportVersion !== undefined && <p className="muted"><small>Saved report version {reportVersion}</small></p>}
     {message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
-  </section>;
+  </>;
+  return headless ? body : <section className="panel" aria-label="Case downloads"><h2>Save a copy</h2>{body}</section>;
 }
