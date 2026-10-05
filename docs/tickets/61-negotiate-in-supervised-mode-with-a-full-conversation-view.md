@@ -13,8 +13,8 @@ EXPIRED cancels queued counteroffer drafts; mandate revocation and recorded expi
 transaction, and a test shows sends refused within one second of revocation. `NegotiationConversation.tsx` shows
 drafts, gate decisions, messages, attachments and delivery status in order. Open: reaching the target cancels drafts
 and stops counteroffers without moving the case to STOPPED, so the Buyer can still accept; draft quote and acceptance
-requests are not cancelled on stop (their sends refuse); the spec's "dealer declines to move" stop is not
-implemented (ticket 72).
+requests are not cancelled on stop (their sends refuse); the spec's "dealer declines to move" stop is
+delivered by ticket 72.
 
 - [x] Drafts are generated only from verified case facts, the latest Deal Analysis Report, and mandate values, extending ticket 31's grounded reply assistance; amounts come from deterministic boundaries.
 - [x] No message leaves without Buyer approval; an edited draft is re-gated before sending.
