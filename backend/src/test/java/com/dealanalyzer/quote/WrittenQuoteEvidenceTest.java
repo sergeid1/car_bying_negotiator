@@ -28,7 +28,7 @@ class WrittenQuoteEvidenceTest {
   @Test void dealerTextUsesQuoteFactsAndUtcReceiptDateWithoutInternalIdentifiers() {
     var evidence = new WrittenQuoteEvidence.Evidence("internal-message-id", "internal-document-id", offer(terms(), "VERIFIED"),
         "1HGCM82633A004352", Instant.parse("2026-10-05T00:15:00Z"));
-    assertThat(evidence.text()).isEqualTo("The Buyer accepts your itemized quote for VIN 1HGCM82633A004352 with an out-the-door total of USD 25000.00, received on 2026-10-05 (UTC), subject to a test drive and the final paperwork matching that quote.")
+    assertThat(evidence.text()).isEqualTo("I accept your itemized quote for VIN 1HGCM82633A004352 with an out-the-door total of USD 25000.00, received on 2026-10-05 (UTC), subject to a test drive and the final paperwork matching that quote.")
         .doesNotContain(evidence.messageId(), evidence.documentId(), "verified offer version", "will buy", "deposit", "commit to");
   }
   @Test void absentChargeTotalsUnknownItemsUnverifiedValuesAndDuplicateFieldsStayPartial() {

@@ -22,7 +22,7 @@ public class WrittenQuoteEvidence {
   public record Evidence(String messageId, String documentId, DealerOfferView offer, String vin, Instant receivedAt) {
     public String text() {
       com.dealanalyzer.vehicle.Vin.validated(vin);
-      return "The Buyer accepts your itemized quote for VIN " + vin + " with an out-the-door total of USD "
+      return "I accept your itemized quote for VIN " + vin + " with an out-the-door total of USD "
           + BigDecimal.valueOf(amount(offer.terms(), "OUT_THE_DOOR_TOTAL"), 2).toPlainString()
           + ", received on " + receivedAt.atZone(ZoneOffset.UTC).toLocalDate()
           + " (UTC), subject to a test drive and the final paperwork matching that quote.";

@@ -58,7 +58,7 @@ test("shows every draft, gate decision, message, attachment and delivery state i
 test("approval sends exactly the current revision's text and nothing is sent before it", async () => {
   const fetcher = mock();
   render(<NegotiationConversation caseId="c1" token="secret" />);
-  const approve = await screen.findByRole("button", { name: "Approve revision 2 and send" });
+  const approve = await screen.findByRole("button", { name: "Approve revision 2" });
   expect(fetcher.mock.calls.every(([url]) => !String(url).includes("approval"))).toBe(true);
   fireEvent.click(approve);
   await waitFor(() => expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/negotiation-conversation/drafts/n1/approval", expect.objectContaining({
@@ -70,7 +70,7 @@ test("approval sends exactly the current revision's text and nothing is sent bef
 test("a revision that fails the check cannot be approved, and an edit is submitted for a new check", async () => {
   const fetcher = mock(conversation("AWAITING_BUYER", "PROPOSED", blocked));
   render(<NegotiationConversation caseId="c1" token="secret" />);
-  expect(await screen.findByRole("button", { name: "Approve revision 2 and send" })).toBeDisabled();
+  expect(await screen.findByRole("button", { name: "Approve revision 2" })).toBeDisabled();
   expect(screen.getByText("This wording may commit you to buying.")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Edit this draft" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Revised text" }), { target: { value: counter } });

@@ -17,7 +17,7 @@ for (const state of ["ACCEPTANCE", "WRITTEN_CONFIRMATION", "AGREED", "BLOCKED", 
     } }));
     await page.route("**/api/v1/cases/case-1/quote-acceptance", route => route.fulfill({ json: {
       requests: [{ id: "a1", kind: state === "WRITTEN_CONFIRMATION" ? state : "ACCEPTANCE", state: state === "WRITTEN_CONFIRMATION" ? "SENT" : "DRAFT",
-        offerVersion: 3, planVersion: 2, gatedDraft: { draft: { text: "The Buyer accepts your itemized quote for VIN 1HGCM82633A004352 with an out-the-door total of USD 26800.00, received on 2026-10-04 (UTC), subject to a test drive and the final paperwork matching that quote." },
+        offerVersion: 3, planVersion: 2, gatedDraft: { draft: { text: "I accept your itemized quote for VIN 1HGCM82633A004352 with an out-the-door total of USD 26800.00, received on 2026-10-04 (UTC), subject to a test drive and the final paperwork matching that quote." },
           decision: { pass: state !== "BLOCKED", gateVersion: "outbound-gate.v2", reasons: state === "BLOCKED" ? [{ code: "NO_ACTIVE_MANDATE", text: "Approve a current mandate." }] : [] } } }],
       agreedPrice: state === "AGREED" || state === "JOURNEY_OPTIONS" ? { offerVersion: 3, baselineVersion: 2, actor: "BUYER", acceptedAt: "2026-10-04T12:00:00Z",
         journey: { journeyLinked: state === "JOURNEY_OPTIONS", otherOpenNegotiations: state === "JOURNEY_OPTIONS" ? [{ caseId: "other", label: "The other dealer with a long conversation label" }] : [] } } : null,
@@ -32,7 +32,7 @@ for (const state of ["ACCEPTANCE", "WRITTEN_CONFIRMATION", "AGREED", "BLOCKED", 
     await expect(panel.getByRole("button", { name: "Refresh acceptance status" })).toBeVisible();
     if (state === "AGREED" || state === "JOURNEY_OPTIONS") await expect(panel.getByRole("button", { name: "Download one-page Agreed Price summary" })).toBeVisible();
     else if (state === "WRITTEN_CONFIRMATION") await expect(panel.getByText(/Written confirmation requested/)).toBeVisible();
-    else await expect(panel.getByRole("button", { name: "Accept this quote, approve baseline and send this text" })).toBeVisible();
+    else await expect(panel.getByRole("button", { name: "Approve this acceptance text and baseline" })).toBeVisible();
     if (state === "JOURNEY_OPTIONS") {
       await expect(panel.getByRole("button", { name: "Pause The other dealer with a long conversation label" })).toBeVisible();
       await expect(panel.getByRole("button", { name: "Stop The other dealer with a long conversation label" })).toBeVisible();

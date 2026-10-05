@@ -33,7 +33,7 @@ class AgreedPriceAcceptanceTest {
   @TempDir Path directory;
   @Test void onlyCurrentWrittenItemizationCanBecomeAnAuditedBaselineAndAgreement() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("agreed", true,
-        Configuration.class, "--case.deletion.delay=PT1H",
+        Configuration.class, "--dealer-mail.send-path=RELAY", "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();

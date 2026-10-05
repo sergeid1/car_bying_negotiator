@@ -10,7 +10,7 @@ const slots = [
   { option: 2, startsAt: "2026-10-10T16:00:00Z", endsAt: "2026-10-10T17:00:00Z", label: "Saturday, October 10, 2026, 11:00 to 12:00 (America/Chicago)" },
 ];
 const proposal: TestDriveView["messages"][number] = { id: "p1", kind: "PROPOSAL", appointmentId: null, slots, release: [], state: "SENT", createdAt: "2026-10-04T12:00:00Z",
-  sentAt: "2026-10-04T12:01:00Z", gatedDraft: { draft: { text: "The Buyer would like to arrange a test drive." }, decision: pass } };
+  sentAt: "2026-10-04T12:01:00Z", gatedDraft: { draft: { text: "I'd like to arrange a test drive." }, decision: pass } };
 const agreed: TestDriveView = { agreedPrice: { id: "ap", offerVersion: 3, baselineVersion: 2, outTheDoorMinor: 2680000 },
   dealerAddress: "sales@dealer.example", contactFields: ["FIRST_NAME", "LAST_NAME", "EMAIL", "PHONE"], messages: [], appointments: [], confirmations: [] };
 const respond = (view: TestDriveView) => vi.fn(async () => new Response(JSON.stringify(view)));
@@ -60,13 +60,13 @@ test("a dealer reply is shown for confirmation and shares nothing unless the Buy
 });
 
 test("approving a booking sends the exact text with the account session and names the released fields", async () => {
-  const text = "Thank you for confirming. The Buyer will attend the test drive on Saturday.";
+  const text = "Thank you for confirming. I'll see you for the test drive on Saturday.";
   const fetcher = respond({ ...agreed, messages: [proposal, { ...proposal, id: "b1", kind: "BOOKING", appointmentId: "a1", slots: [slots[1]],
     release: ["FIRST_NAME", "EMAIL"], state: "DRAFT", sentAt: null, gatedDraft: { draft: { text }, decision: pass } }] });
   vi.stubGlobal("fetch", fetcher);
   render(<TestDriveAppointment caseId="c1" token="secret" />);
   expect(await screen.findByText(/only these details are added below the message for this dealer: First name, Email/)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Approve this text, share the chosen details and book" }));
+  fireEvent.click(screen.getByRole("button", { name: "Approve this text with the chosen details" }));
   await waitFor(() => expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/appointment/messages/b1/approval", expect.objectContaining({
     method: "POST", body: JSON.stringify({ approved: true, text }), headers: expect.objectContaining({ "Account-Request": "1" }),
   })));
@@ -76,7 +76,7 @@ test("a blocked draft cannot be approved", async () => {
   vi.stubGlobal("fetch", respond({ ...agreed, messages: [{ ...proposal, state: "DRAFT",
     gatedDraft: { ...proposal.gatedDraft, decision: { pass: false, gateVersion: "v2", reasons: [{ code: "NO_ACTIVE_MANDATE", text: "Approve a current mandate." }] } } }] }));
   render(<TestDriveAppointment caseId="c1" token="secret" />);
-  expect(await screen.findByRole("button", { name: "Approve this text and send" })).toBeDisabled();
+  expect(await screen.findByRole("button", { name: "Approve this text" })).toBeDisabled();
 });
 
 test("account state updates after sign-in and proposal approval carries the request marker", async () => {
@@ -90,7 +90,7 @@ test("account state updates after sign-in and proposal approval carries the requ
   expect(await screen.findByText("Sign in to your Buyer Account in this browser to book and choose contact details.")).toBeVisible();
   rerender(panel(true));
   expect(screen.queryByText("Sign in to your Buyer Account in this browser to book and choose contact details.")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Approve this text and send" }));
+  fireEvent.click(screen.getByRole("button", { name: "Approve this text" }));
   await waitFor(() => expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/appointment/messages/p2/approval",
     expect.objectContaining({ method: "POST", headers: expect.objectContaining({ "Account-Request": "1", "Case-Access-Token": "secret" }) })));
   expect((fetcher.mock.calls as unknown as [string][]).some(([url]) => url === "/api/v1/account")).toBe(false);

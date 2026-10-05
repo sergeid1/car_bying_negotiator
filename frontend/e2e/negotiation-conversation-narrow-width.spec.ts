@@ -67,7 +67,7 @@ for (const state of ["AWAITING_BUYER", "PAUSED", "TARGET_REACHED"]) {
     await expect(panel.getByRole("button", { name: /^Check delivery of the message to/ })).toBeVisible();
     await expect(panel.getByRole("button", { name: /^Retry the message to/ })).toBeVisible();
     if (state === "AWAITING_BUYER") {
-      await expect(panel.getByRole("button", { name: "Approve revision 2 and send" })).toBeDisabled();
+      await expect(panel.getByRole("button", { name: "Approve revision 2" })).toBeDisabled();
       await panel.getByRole("button", { name: "Edit this draft" }).click();
       await expect(panel.getByRole("textbox", { name: "Revised text" })).toBeVisible();
     } else if (state === "PAUSED") {

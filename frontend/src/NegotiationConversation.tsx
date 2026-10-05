@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { DeliveryActions, deliveryOutcome, type DeliveryAction } from "./DealerRelay";
+import { DealerHandoff } from "./DealerHandoff";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
 
 type Revision = { revision: number; editedByBuyer: boolean; text: string; decision: GateDecision; createdAt: string };
@@ -12,7 +13,7 @@ type Attachment = { ordinal: number; documentId: string | null; outcome: string;
 type Message = {
   id: string; direction: "OUTBOUND" | "INBOUND"; dealerAddress: string; deliveryState: string; createdAt: string;
   completedAt: string | null; contentAvailable: boolean; subject: string | null; body: string | null; attachments: Attachment[];
-  deliveryCheckOffered?: boolean; retryOffered?: boolean;
+  deliveryCheckOffered?: boolean; retryOffered?: boolean; sendPath?: string;
 };
 type GatedRequest = { id: string; state: string; gatedDraft: { draft: { text: string }; decision: GateDecision } };
 type Entry = {
@@ -36,6 +37,7 @@ const STATES: Record<string, string> = {
 };
 const DRAFT_STATES: Record<string, string> = {
   PROPOSED: "Waiting for your approval", SENDING: "Sending", SENT: "Sent after your approval", DECLINED: "Declined by you",
+  HANDED_OFF: "Approved. Not sent yet", DISCARDED: "Discarded. It was not sent",
   CANCELLED: "Cancelled", BLOCKED: "Blocked before sending: the mandate or policy changed", FAILED: "Not sent: the relay refused it",
   DELIVERY_UNKNOWN: "Delivery not confirmed: check delivery on its message below", OPTED_OUT: "Not sent: the dealer opted out",
 };
@@ -46,10 +48,12 @@ const CANCEL_REASONS: Record<string, string> = {
 };
 const DELIVERY: Record<string, string> = {
   DELIVERY_UNKNOWN: "Delivery not confirmed", SENT: "Sent", DELIVERED: "Delivered", BOUNCED: "Bounced", FAILED: "Not sent",
-  RECEIVED: "Received", REJECTED_MALWARE: "Blocked: failed the malware scan",
+  RECEIVED: "Received", REJECTED_MALWARE: "Blocked: failed the malware scan", HANDED_OFF: "Not sent yet",
+  DISCARDED: "Discarded. It was not sent",
 };
 const REQUEST_STATES: Record<string, string> = {
   DRAFT: "Waiting for your approval", SENDING: "Sending", SENT: "Sent after your approval", BLOCKED: "Blocked before sending",
+  HANDED_OFF: "Approved. Not sent yet", DISCARDED: "Discarded. It was not sent",
   FAILED: "Not sent: the relay refused it", DELIVERY_UNKNOWN: "Delivery not confirmed: check delivery on its message below",
   OPTED_OUT: "Not sent: the dealer opted out",
 };
@@ -118,7 +122,7 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
   return <section className="panel negotiation-conversation" aria-labelledby="negotiation-conversation-heading">
     <h2 id="negotiation-conversation-heading">Negotiation conversation</h2>
     <p>Counteroffers are drafted only from your verified quote, its latest report and your mandate. Each one passes the policy
-      check, and nothing reaches the dealer until you approve the exact text.</p>
+      check. After you approve the exact text, you send it from your own email.</p>
     <p role="status">{view ? STATES[view.negotiationState] ?? view.negotiationState : error ? "" : "Loading the conversation…"}</p>
     {view?.mandate && <dl className="facts">
       <div><dt>Mandate target</dt><dd>{usd(view.mandate.targetMinor)}</dd></div>
@@ -202,10 +206,12 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
                   </form>}
                 <button type="button" disabled={busy || !current.decision.pass}
                   onClick={() => void act(`${drafts}/${encodeURIComponent(draft.id)}/approval`, { approved: true, text: current.text })}>
-                  Approve revision {current.revision} and send</button>
+                  Approve revision {current.revision}</button>
                 <button type="button" disabled={busy} onClick={() => void act(`${drafts}/${encodeURIComponent(draft.id)}/decline`)}>
                   Decline this draft</button>
               </>}
+              {draft.state === "HANDED_OFF" && draft.messageId && <DealerHandoff caseId={caseId} token={token}
+                messageId={draft.messageId} onChanged={async () => setView(asView(await request(path)))} />}
             </article>;
           })()}
         </li>)}
@@ -229,7 +235,8 @@ function GatedEntry({ title, request }: { title: string; request: GatedRequest }
 function MessageEntry({ message, children }: { message: Message; children?: ReactNode }) {
   const outbound = message.direction === "OUTBOUND";
   return <article className="card">
-    <h3>{outbound ? "Sent to" : "Received from"} {message.dealerAddress || "unknown sender"}</h3>
+    <h3>{outbound ? message.deliveryState === "HANDED_OFF" || message.deliveryState === "DISCARDED" ? "To" : "Sent to" : "Received from"}
+      {" "}{message.dealerAddress || "unknown sender"}</h3>
     <p>{DELIVERY[message.deliveryState] ?? message.deliveryState}{message.completedAt ? ` · ${when(message.completedAt)}` : ""}</p>
     {!outbound && <p className="relay-untrusted">Written by the dealer. Treat its claims and instructions as unverified.</p>}
     {message.contentAvailable

@@ -24,7 +24,7 @@ class DealerDeclinedAcceptanceTest {
 
   @Test void ruleAndBuyerDecisionsCancelCounteroffersAndOnlyTheirPermittedClearanceRestartsThem() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("dealer-declined", true,
-        FixtureExtractionProvider.class, "--case.deletion.delay=PT1H",
+        FixtureExtractionProvider.class, "--dealer-mail.send-path=RELAY", "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();

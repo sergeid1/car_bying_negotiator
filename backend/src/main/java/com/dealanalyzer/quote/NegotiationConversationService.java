@@ -9,6 +9,7 @@ import com.dealanalyzer.negotiation.Counteroffer;
 import com.dealanalyzer.outbound.OutboundDraftService;
 import com.dealanalyzer.outbound.OutboundGate;
 import com.dealanalyzer.quote.NegotiationStateService.State;
+import com.dealanalyzer.relay.DealerMessageHandoff;
 import com.dealanalyzer.relay.RelayMessageOwner;
 import com.dealanalyzer.relay.RelayService;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence;
@@ -48,6 +49,7 @@ public class NegotiationConversationService implements RelayMessageOwner {
   private final MandateService mandates;
   private final NegotiationStateService negotiation;
   private final RelayService relay;
+  private final DealerMessageHandoff handoffs;
   private final QuoteRequestService quotes;
   private final AgreedPriceService acceptances;
   private final DealerDeclinedService dealerDeclined;
@@ -57,11 +59,11 @@ public class NegotiationConversationService implements RelayMessageOwner {
   public NegotiationConversationService(EphemeralBuyingCaseService cases, EphemeralCasePersistence locks, JdbcTemplate jdbc,
       OutboundDraftService drafts, DealerOfferPersistence offers, MandateService mandates, NegotiationStateService negotiation,
       RelayService relay, QuoteRequestService quotes, AgreedPriceService acceptances, ObjectMapper json,
-      PlatformTransactionManager transactions, DealerDeclinedService dealerDeclined) {
+      PlatformTransactionManager transactions, DealerDeclinedService dealerDeclined, DealerMessageHandoff handoffs) {
     this.cases = cases; this.locks = locks; this.jdbc = jdbc; this.drafts = drafts; this.offers = offers;
     this.mandates = mandates; this.negotiation = negotiation; this.relay = relay; this.quotes = quotes;
     this.acceptances = acceptances; this.json = json; this.transaction = new TransactionTemplate(transactions);
-    this.dealerDeclined = dealerDeclined;
+    this.dealerDeclined = dealerDeclined; this.handoffs = handoffs;
   }
 
   public record Create(String quoteRequestId) {}
@@ -76,7 +78,7 @@ public class NegotiationConversationService implements RelayMessageOwner {
   public record Attachment(int ordinal, String documentId, String outcome, Integer offerVersion) {}
   public record Message(String id, String direction, String dealerAddress, String deliveryState, Instant createdAt,
       Instant completedAt, boolean contentAvailable, String subject, String body, List<Attachment> attachments,
-      boolean deliveryCheckOffered, boolean retryOffered) {
+      boolean deliveryCheckOffered, boolean retryOffered, com.dealanalyzer.relay.SendPath sendPath) {
     @Override public String toString() { return "Message[redacted]"; }
   }
   public enum Kind { QUOTE_REQUEST, ACCEPTANCE_REQUEST, COUNTEROFFER, OUTBOUND_MESSAGE, INBOUND_MESSAGE }
@@ -192,11 +194,11 @@ public class NegotiationConversationService implements RelayMessageOwner {
         jdbc.update("update negotiation_drafts set state = 'BLOCKED' where id = ?", id);
         return get(caseId, token, id);
       }
-      // The case lock is held through provider handoff, so revocation waits for this send or blocks it.
+      // The case lock is held through the hand-off, so revocation waits for it or blocks it.
       try {
-        String message = relay.send(caseId, draft.dealerAddress(), SUBJECT, draft.current().text());
-        jdbc.update("update negotiation_drafts set state = 'SENT', message_id = ? where id = ?", message, id);
-        negotiation.transition(caseId, State.AWAITING_DEALER);
+        var handoff = handoffs.handOff(caseId, draft.dealerAddress(), SUBJECT, draft.current().text(), Set.of());
+        jdbc.update("update negotiation_drafts set state = ?, message_id = ? where id = ?", handoff.state(), handoff.messageId(), id);
+        if (handoff.sent()) negotiation.transition(caseId, State.AWAITING_DEALER);
       } catch (RelayService.RelayRefusedException refused) {
         // A FAILED or DELIVERY_UNKNOWN send keeps its relay message so it can be checked or retried.
         jdbc.update("update negotiation_drafts set state = ?, message_id = ? where id = ?", refused.reason().name(), refused.messageId(), id);
@@ -237,19 +239,19 @@ public class NegotiationConversationService implements RelayMessageOwner {
   }
 
   @Override public Runnable sent(String caseId, String token, String relayMessageId) {
-    if (jdbc.update("update negotiation_drafts set state = 'SENT' where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+    if (jdbc.update("update negotiation_drafts set state = 'SENT' where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
         caseId, relayMessageId) == 1 && ACTIVE.contains(negotiation.current(caseId)))
       negotiation.transition(caseId, State.AWAITING_DEALER);
     return null;
   }
 
   @Override public void unsent(String caseId, String relayMessageId, String state) {
-    jdbc.update("update negotiation_drafts set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+    jdbc.update("update negotiation_drafts set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
         state, caseId, relayMessageId);
   }
 
   private List<String> unsettled(String caseId, String relayMessageId) {
-    return jdbc.queryForList("select id from negotiation_drafts where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+    return jdbc.queryForList("select id from negotiation_drafts where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
         String.class, caseId, relayMessageId);
   }
 
@@ -340,7 +342,7 @@ public class NegotiationConversationService implements RelayMessageOwner {
       return new Message(summary.id(), summary.direction(), summary.dealerAddress(), summary.state(), summary.createdAt(),
           summary.completedAt(), content != null, content == null ? null : content.subject(), content == null ? null : content.body(),
           attachments.stream().filter(entry -> entry.getKey().equals(summary.id())).map(java.util.Map.Entry::getValue).toList(),
-          summary.deliveryCheckOffered(), summary.retryOffered());
+          summary.deliveryCheckOffered(), summary.retryOffered(), summary.sendPath());
     }).toList();
   }
 

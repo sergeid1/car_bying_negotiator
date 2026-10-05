@@ -16,7 +16,7 @@ function mock(view = { negotiationState: "MANDATE_ACTIVE", requests: [quote], do
 test("reviews the gated text accessibly and sends only on explicit approval", async () => {
   const fetcher = mock();
   const { container } = render(<QuoteRequest caseId="c1" token="secret" />);
-  const approve = await screen.findByRole("button", { name: "Approve this text and send" });
+  const approve = await screen.findByRole("button", { name: "Approve this text" });
   expect(fetcher.mock.calls.every(([url]) => !url.includes("approval"))).toBe(true);
   expect((await axe.run(container, { rules: { "color-contrast": { enabled: false } } })).violations).toEqual([]);
   fireEvent.click(approve);
@@ -29,7 +29,7 @@ test("a blocked draft cannot be approved and expiry is explained", async () => {
   mock({ negotiationState: "EXPIRED", requests: [{ ...quote, gatedDraft: { ...quote.gatedDraft,
     decision: { pass: false, gateVersion: "outbound-gate.v2", reasons: [{ code: "NO_ACTIVE_MANDATE", text: "Approve a current mandate." }] } } }], documents: [], dealers: [] });
   render(<QuoteRequest caseId="c1" token="secret" />);
-  expect(await screen.findByRole("button", { name: "Approve this text and send" })).toBeDisabled();
+  expect(await screen.findByRole("button", { name: "Approve this text" })).toBeDisabled();
   expect(screen.getByText(/Your mandate expired/)).toBeInTheDocument();
 });
 

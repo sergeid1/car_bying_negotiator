@@ -26,7 +26,7 @@ class NegotiationConversationAcceptanceTest {
 
   @Test void supervisedCounteroffersAreGatedApprovedAndShownInOneConversation() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("conversation", true,
-        Configuration.class, "--case.deletion.delay=PT1H", "--document.storage.path=" + directory.resolve("objects"),
+        Configuration.class, "--dealer-mail.send-path=RELAY", "--case.deletion.delay=PT1H", "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();
       var created = post(client, "/api/v1/cases", validCase(), "case");
