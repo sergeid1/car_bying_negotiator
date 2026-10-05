@@ -27,7 +27,7 @@ without a flash on load, and every browser layout and contrast check runs in bot
       fades text, so contrast holds at every frame.
 - [ ] Group the report's secondary sections (amounts, market evidence, evidence and calculations,
       financing, feedback, downloads, retention) into one collapsible list without breaking the deep
-      links from the total and findings into the evidence. Deferred: it changes navigation, not styling.
+      links from the total and findings into the evidence. Deferred: it changes navigation, not styling. Moved to ticket 71.
 
 ## Implementation notes — 2026-10-02
 
