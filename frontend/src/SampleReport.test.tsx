@@ -47,6 +47,8 @@ test("the example report opens from the start of the flow without a case, labell
 
   expect(within(panel).getAllByText(/Document source: removed from this example/)).toHaveLength(2);
   expect(within(panel).getAllByText("Removed from this example").length).toBeGreaterThan(0);
+  // Ticket 71: the evidence sits in a collapsed section; the report's own link opens it.
+  fireEvent.click(within(panel).getByRole("link", { name: "Evidence and calculations" }));
   expect(within(panel).getByText("Diagnostic data and frozen inputs: removed from this example.")).toBeVisible();
   expect(panel).not.toHaveTextContent(/null|undefined|Unknown/);
   expect(screen.queryByRole("alert")).toBeNull();

@@ -99,3 +99,77 @@ it("resolves amounts to a document page and region or states no source, and writ
   expect(fetchMock).toHaveBeenCalledWith("/api/v1/cases/case-1/documents/document-1/pages/2/image", { headers: { "Case-Access-Token": "token-1" } });
   fetchMock.mockRestore();
 });
+
+// Ticket 71: the secondary sections are one collapsible list below the leading section.
+const listReport: CoreReport = { version: 4, status: "COMPLETE", asOf: "2026-10-05", analysis: {
+  reviewLabel: "Review required", dealRating: "FAIR", ratingBasis: "Selling price", nextAction: "Ask about the fee",
+  topReasons: ["Check fees", "Check total", "Check market"], marketAvailability: "AVAILABLE", cashAvailability: "AVAILABLE",
+  financingAvailability: "UNAVAILABLE", financing: null,
+  marketEvidence: { status: "AVAILABLE", paragraphs: ["Market data retrieved: October 1, 2026."] },
+  materialAmounts: [
+    { label: "Vehicle price", minorUnits: 2500000, currency: "USD", precision: "EXACT", source: "cashEconomics", pointer: "/result/lineItems/0/amount" },
+    { label: "/result/outTheDoorTotal", minorUnits: 2850000, currency: "USD", precision: "ESTIMATED", source: "cashEconomics", pointer: "/result/outTheDoorTotal" },
+  ], policyVersions: { review: "core-review.v1" }, limitations: ["Cash purchase only"],
+}, evidence: {}, reproduction: {} };
+const sectionOf = (name: string) => screen.getByRole("heading", { name, level: 3 }).closest("details")!;
+
+it("keeps the total, findings, questions and next action outside a collapsed list of named sections", () => {
+  window.history.replaceState(null, "", "/");
+  render(<CoreDealReport report={listReport} />);
+  const list = screen.getByRole("list", { name: "Report details" });
+  const names = ["Amounts and sources", "Dealer financing", "Market evidence", "Evidence and calculations", "Scope and policies"];
+  expect(Array.from(list.querySelectorAll(":scope > li > details > summary h3")).map(heading => heading.textContent)).toEqual(names);
+  for (const name of names) expect(sectionOf(name).open).toBe(false);
+  for (const outside of ["Total, findings and next action", "Questions to ask the dealer"]) {
+    const region = screen.getByRole("region", { name: outside });
+    expect(region.closest("details")).toBeNull();
+    expect(list.contains(region)).toBe(false);
+  }
+  expect(screen.getByText("Ask about the fee")).toBeVisible();
+  expect(screen.getByText("Market data retrieved: October 1, 2026.")).not.toBeVisible();
+  for (const id of ["core-amounts", "core-financing", "core-evidence", "core-scope", "amount-evidence-0", "amount-evidence-1", "market-evidence-heading"])
+    expect(document.getElementById(id)).not.toBeNull();
+});
+
+it("opens the section holding a link target from the total, a finding's evidence link, the back button and an opening fragment", async () => {
+  window.history.replaceState(null, "", "/");
+  const { unmount } = render(<CoreDealReport report={listReport} />);
+  const evidence = sectionOf("Evidence and calculations");
+  fireEvent.click(screen.getByRole("link", { name: "$28,500.00" }));
+  expect(evidence.open).toBe(true);
+  await new Promise(resolve => setTimeout(resolve));
+  expect(document.getElementById("amount-evidence-1")).toHaveFocus();
+
+  evidence.open = false;
+  fireEvent.click(screen.getAllByRole("link", { name: "Frozen evidence" })[0]);
+  expect(evidence.open).toBe(true);
+  await new Promise(resolve => setTimeout(resolve));
+  expect(evidence).toHaveFocus();
+
+  const amounts = sectionOf("Amounts and sources");
+  window.history.replaceState(null, "", "#core-amounts");
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
+  expect(amounts.open).toBe(true);
+  expect(amounts).toHaveFocus();
+  unmount();
+
+  window.history.replaceState(null, "", "#core-scope");
+  render(<CoreDealReport report={listReport} />);
+  expect(sectionOf("Scope and policies").open).toBe(true);
+  expect(sectionOf("Scope and policies")).toHaveFocus();
+  expect(sectionOf("Amounts and sources").open).toBe(false);
+  window.history.replaceState(null, "", "/");
+});
+
+it("expands every section for printing in the original order and restores the Buyer's choices afterwards", () => {
+  window.history.replaceState(null, "", "/");
+  render(<CoreDealReport report={listReport} />);
+  const amounts = sectionOf("Amounts and sources");
+  amounts.open = true;
+  window.dispatchEvent(new Event("beforeprint"));
+  const sections = Array.from(document.querySelectorAll<HTMLDetailsElement>("details.report-section"));
+  expect(sections.map(section => section.id)).toEqual(["core-amounts", "core-financing", "core-market", "core-evidence", "core-scope"]);
+  expect(sections.every(section => section.open)).toBe(true);
+  window.dispatchEvent(new Event("afterprint"));
+  expect(sections.filter(section => section.open)).toEqual([amounts]);
+});

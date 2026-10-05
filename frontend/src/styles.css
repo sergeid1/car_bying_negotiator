@@ -1693,3 +1693,34 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
 .desk-check button, .desk-fresh-case button { max-width: 100%; white-space: normal; min-height: 44px; }
 .desk-check input, .desk-check select { min-width: 0; max-width: 100%; }
 /* End ticket 66. */
+
+/* ==========================================================================
+   Ticket 71 — The report's secondary sections as one collapsible list
+   Owned by CoreDealReport.tsx (ReportSection). The summary's heading takes
+   the panel header row from `details.panel`; the chevron states open/closed.
+   ========================================================================== */
+
+.report-sections { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.report-sections > li { min-width: 0; }
+/* Leave room for the sticky masthead when a link scrolls a target into view. */
+.report-section, .report-section [id] { scroll-margin-top: 88px; }
+.report-section > summary h3 { margin: 0; font: inherit; color: inherit; letter-spacing: inherit; overflow-wrap: anywhere; }
+.report-section > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+.report-section-body { min-width: 0; }
+.report-section-body > * { margin: 0; }
+.report-section-body > * + * { margin-top: 14px; }
+.report-policies {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr));
+  gap: 10px;
+  color: var(--ink-muted);
+  font-size: 0.89rem;
+}
+.report-policies dd { margin: 0; font-family: var(--font-mono); font-size: 0.8rem; font-weight: 500; overflow-wrap: anywhere; }
+
+@media print {
+  /* Printing opens every section (see useSectionLinks); the chevron has nothing to say on paper. */
+  .report-section > summary::after { display: none; }
+  .report-section > summary { min-height: 0; }
+}
+/* End ticket 71. */

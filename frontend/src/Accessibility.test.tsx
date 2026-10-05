@@ -12,7 +12,8 @@ import { AgreedPrice } from "./AgreedPrice";
 import { CaseDownloads, RecoveryEmailOptIn, SaveCaseLink } from "./CasePortability";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
-import { CoreDealReport, MarketEvidenceSection } from "./CoreDealReport";
+import { CoreDealReport, MarketEvidenceSection, ReportSection } from "./CoreDealReport";
+import { OutcomeFeedback } from "./PilotFeedback";
 import { ReportTotalMeasure } from "./ReportTotalMeasure";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { DealerReplyAssistant } from "./NegotiationDraft";
@@ -360,6 +361,27 @@ test("field-to-document evidence, arithmetic and revised-offer differences have 
           { operator: "+", label: "Taxes", minorUnits: 242500, value: null }], notes: ["Rounded half up."] } },
     ], policyVersions: {}, limitations: [],
   }, evidence: {}, reproduction: {} }} caseId="case" token="token" /></main>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+test("the report's collapsible section list has no automated AA violations collapsed or expanded", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ experiment: null })));
+  window.history.replaceState(null, "", "/");
+  const { container } = render(<main><h1>Buying Case</h1><CoreDealReport report={{ version: 3, asOf: "2026-10-05", status: "COMPLETE", analysis: {
+    reviewLabel: "Review required", dealRating: "FAIR", ratingBasis: "Selling price comparison", nextAction: "Ask about the fee",
+    topReasons: ["Check fees", "Check market", "Check total"], marketAvailability: "AVAILABLE", cashAvailability: "AVAILABLE",
+    financingAvailability: "UNAVAILABLE", financing: null, marketEvidence: { status: "AVAILABLE", paragraphs: ["Market data retrieved: October 1, 2026."] },
+    materialAmounts: [{ label: "Out-the-door total", minorUnits: 2850000, currency: "USD", precision: "ESTIMATED", source: "cashEconomics", pointer: "/result/outTheDoorTotal" }],
+    policyVersions: { review: "core-review.v1" }, limitations: ["Cash purchase only"],
+  }, evidence: {}, reproduction: {} }} caseId="case" token="token">
+    <ReportSection id="core-feedback" title="Optional outcome feedback"><OutcomeFeedback caseId="case" token="token" headless /></ReportSection>
+    <ReportSection id="core-downloads" title="Save a copy"><CaseDownloads caseId="case" token="token" reportVersion={3} headless /></ReportSection>
+  </CoreDealReport></main>);
+  const list = screen.getByRole("list", { name: "Report details" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  const sections = Array.from(list.querySelectorAll<HTMLDetailsElement>(":scope > li > details"));
+  expect(sections).toHaveLength(7);
+  sections.forEach(section => { section.open = true; });
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 
