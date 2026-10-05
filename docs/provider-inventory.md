@@ -43,8 +43,9 @@ Declare every pilot or production deployment with `SPRING_PROFILES_ACTIVE=pilot`
 `checkout.deployment` and `inventory.deployment` remain legacy aliases with the same restrictive
 effect. Any production-like declaration wins over development declarations. All guards use this
 decision, including parser confinement, synthetic intake, readiness, secure cookies, test malware
-scanning and storage-key validation. `document.malware-scanner=test` and a missing or shorter than
-32-byte UTF-8 `DOCUMENT_STORAGE_ENCRYPTION_KEY` fail startup in these deployments.
+scanning and storage-key validation. `document.malware-scanner=test` and missing or passphrase-like
+document key material fail startup in these deployments. The active/retired base64 random
+key ring and legacy compatibility rules are in the [hardening runbook](hardening-runbook.md).
 
 No licensed listing or market source is integrated. These two deterministic adapters are
 development fixtures. `EvidenceProviderProductionGuard` rejects either selected adapter at startup

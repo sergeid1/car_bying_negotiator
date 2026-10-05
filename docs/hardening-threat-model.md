@@ -32,7 +32,9 @@ Declare pilot/production with `SPRING_PROFILES_ACTIVE=pilot` or `production`, or
 `pilot`, `production` and `prod` case-insensitively with surrounding whitespace trimmed.
 `checkout.deployment` and `inventory.deployment` are restrictive legacy aliases; development
 settings cannot override any production-like declaration. Every development-only guard uses
-this decision. Storage requires at least 32 UTF-8 bytes in `DOCUMENT_STORAGE_ENCRYPTION_KEY`.
+this decision. Document storage supports an active/retired base64 random key ring and authenticated
+per-object key IDs; pilot/production refuses passphrase-like material at startup. Legacy
+development derivation stays readable. See the [rotation procedure](hardening-runbook.md).
 
 Deletion uses a batch size of 100 (valid range 1–1000). Oldest last-attempt/request time wins,
 so a repeatedly failing job does not permanently monopolize the first batch. HTTP transport

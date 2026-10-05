@@ -51,7 +51,10 @@ class DeploymentStageGuardTest {
       refuses(runner.withPropertyValues("document.storage.encryption-key=" + key),
           "document.EncryptedFileDocumentStorage", "DOCUMENT_STORAGE_ENCRYPTION_KEY");
     }
-    runner.withPropertyValues("document.storage.encryption-key=" + "x".repeat(32))
+    refuses(runner.withPropertyValues("document.storage.encryption-key=" + "x".repeat(32)),
+        "document.EncryptedFileDocumentStorage", "DOCUMENT_STORAGE_ENCRYPTION_KEY");
+    byte[] randomKey = new byte[32]; new java.security.SecureRandom().nextBytes(randomKey);
+    runner.withPropertyValues("document.storage.encryption-key=" + java.util.Base64.getEncoder().encodeToString(randomKey))
         .withUserConfiguration(type("document.EncryptedFileDocumentStorage"))
         .run(context -> assertThat(context).hasNotFailed());
 
