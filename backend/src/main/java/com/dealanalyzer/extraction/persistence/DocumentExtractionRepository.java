@@ -11,4 +11,8 @@ interface DocumentExtractionRepository extends JpaRepository<DocumentExtractionE
   Optional<DocumentExtractionEntity> findByDocumentIdAndExtractionVersion(String documentId, int version);
   List<DocumentExtractionEntity> findByDocumentIdOrderByExtractionVersionDesc(
       String documentId, Pageable pageable);
+  @org.springframework.data.jpa.repository.Query(nativeQuery = true,
+      value = "select count(*) from source_documents where id = :documentId and case_id = :caseId")
+  long countCaseDocument(@org.springframework.data.repository.query.Param("caseId") String caseId,
+      @org.springframework.data.repository.query.Param("documentId") String documentId);
 }

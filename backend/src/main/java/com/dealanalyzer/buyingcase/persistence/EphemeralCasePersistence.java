@@ -39,10 +39,11 @@ public class EphemeralCasePersistence {
         && !"READY_TO_ANALYZE".equals(value.status)).orElse(true);
   }
 
+  /** An unknown case is refused like a wrong credential, so the lock taken before authorization reveals nothing. */
   @Transactional
   public void lock(String caseId) {
     cases.findLockedById(caseId)
-        .orElseThrow(() -> new IllegalArgumentException("Buying Case not found"));
+        .orElseThrow(() -> new com.dealanalyzer.buyingcase.ResourceNotFoundException("Buying Case not found"));
   }
 
   @Transactional

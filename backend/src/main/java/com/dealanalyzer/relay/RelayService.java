@@ -566,7 +566,7 @@ public class RelayService {
 
   /** Locks the case; true while it is active, unexpired, not being deleted, and its account is active. */
   private boolean lockAccepting(String caseId, Instant now) {
-    try { locks.lock(caseId); } catch (IllegalArgumentException missing) { return false; }
+    try { locks.lock(caseId); } catch (ResourceNotFoundException missing) { return false; }
     Long active = jdbc.queryForObject("""
         select count(*) from analysis_cases c where c.id = ? and c.lifecycle = 'ACTIVE' and c.access_expires_at > ?
           and not exists (select 1 from case_deletion_jobs j where j.case_id = c.id)
