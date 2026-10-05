@@ -5,6 +5,7 @@ import com.dealanalyzer.buyingcase.ResourceNotFoundException;
 import com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence;
 import com.dealanalyzer.outbound.OutboundDraftService;
 import com.dealanalyzer.outbound.OutboundGate;
+import com.dealanalyzer.relay.RelayMessageOwner;
 import com.dealanalyzer.relay.RelayService;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -17,7 +18,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
-public class QuoteRequestService {
+public class QuoteRequestService implements RelayMessageOwner {
   public static final String SUBJECT = "Request for an itemized vehicle quote";
   private final EphemeralBuyingCaseService cases;
   private final EphemeralCasePersistence locks;
@@ -93,7 +94,8 @@ public class QuoteRequestService {
         jdbc.update("update quote_requests set state = 'SENT', message_id = ? where id = ?", message, id);
         negotiation.transition(caseId, NegotiationStateService.State.AWAITING_DEALER);
       } catch (RelayService.RelayRefusedException refused) {
-        jdbc.update("update quote_requests set state = ? where id = ?", refused.reason().name(), id);
+        // A FAILED or DELIVERY_UNKNOWN send keeps its relay message so it can be checked or retried.
+        jdbc.update("update quote_requests set state = ?, message_id = ? where id = ?", refused.reason().name(), refused.messageId(), id);
       }
       return get(caseId, token, id);
     });
@@ -112,6 +114,36 @@ public class QuoteRequestService {
       throw new IllegalArgumentException("Negotiation is paused.");
   }
   private record Reservation(Quote quote, boolean reserved) {}
+
+  // ---------------------------------------------------------------- unclear sends (RelayMessageOwner)
+
+  @Override public boolean owns(String caseId, String relayMessageId) {
+    return jdbc.queryForObject("select count(*) from quote_requests where case_id = ? and message_id = ?",
+        Long.class, caseId, relayMessageId) > 0;
+  }
+
+  @Override public void requireResendPermitted(String caseId, String token, String relayMessageId) {
+    var ids = unsettled(caseId, relayMessageId);
+    if (ids.isEmpty()) throw new IllegalArgumentException("This quote request was already sent.");
+    requirePermitted(caseId, get(caseId, token, ids.getFirst()));
+  }
+
+  @Override public Runnable sent(String caseId, String token, String relayMessageId) {
+    if (jdbc.update("update quote_requests set state = 'SENT' where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+        caseId, relayMessageId) == 1 && NegotiationConversationService.ACTIVE.contains(negotiation.current(caseId)))
+      negotiation.transition(caseId, NegotiationStateService.State.AWAITING_DEALER);
+    return null;
+  }
+
+  @Override public void unsent(String caseId, String relayMessageId, String state) {
+    jdbc.update("update quote_requests set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+        state, caseId, relayMessageId);
+  }
+
+  private List<String> unsettled(String caseId, String relayMessageId) {
+    return jdbc.queryForList("select id from quote_requests where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+        String.class, caseId, relayMessageId);
+  }
 
   @Transactional
   public View view(String caseId, String token) {

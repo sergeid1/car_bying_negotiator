@@ -1,6 +1,7 @@
 package com.dealanalyzer.relay;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Replaceable email relay provider boundary (AGT-03). The real provider is chosen under specification
@@ -9,8 +10,18 @@ import java.util.List;
  * {@link RelayService#recordDelivery}.
  */
 public interface DealerMailRelay {
-  /** Hands one rendered message to the provider and returns its message id; throws when not accepted. */
-  String send(OutboundMail mail);
+  /**
+   * Hands one rendered message to the provider and returns its message id; throws when not accepted. The
+   * idempotency key is fixed when the message is first recorded: a provider that already accepted a message
+   * under the key returns the original message id and does not send it again.
+   */
+  String send(String idempotencyKey, OutboundMail mail);
+
+  /**
+   * The provider message id when the provider has a message under this idempotency key, empty when it does
+   * not. Never sends. Throws {@link RelayUnavailableException} when the provider cannot answer.
+   */
+  Optional<String> lookup(String idempotencyKey);
 
   /** The domain relay addresses are issued under. */
   String domain();

@@ -6,6 +6,7 @@ import com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence;
 import com.dealanalyzer.outbound.OutboundDraftService;
 import com.dealanalyzer.outbound.OutboundGate;
 import com.dealanalyzer.plan.PricePlanService;
+import com.dealanalyzer.relay.RelayMessageOwner;
 import com.dealanalyzer.relay.RelayService;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
-public class AgreedPriceService {
+public class AgreedPriceService implements RelayMessageOwner {
   private final EphemeralBuyingCaseService cases;
   private final EphemeralCasePersistence locks;
   private final JdbcTemplate jdbc;
@@ -124,32 +125,75 @@ public class AgreedPriceService {
         String message = relay.send(caseId, dealer.address(), "ACCEPTANCE".equals(request.kind())
             ? "Conditional acceptance of itemized quote" : "Please confirm the quote in writing", request.gatedDraft().draft().text());
         jdbc.update("update quote_acceptance_requests set state = 'SENT', message_id = ? where id = ?", message, id);
-        if (accepting) {
-          var baseline = plans.approve(caseId, token, "agreement:" + id, new PricePlanService.Approval(request.planVersion(), true));
-          manager.flush();
-          var offer = offers.requireOffer(caseId, request.offerVersion());
-          var journey = journeys.agree(caseId);
-          Instant now = com.dealanalyzer.time.PersistedInstant.round(Instant.now());
-          String agreedId = UUID.randomUUID().toString();
-          jdbc.update("""
-              insert into agreed_prices (id, case_id, acceptance_request_id, dealer_offer_id, offer_version, baseline_id,
-                baseline_version, actor, accepted_at, evidence_message_id, evidence_document_id, journey_result_json)
-              values (?, ?, ?, ?, ?, ?, ?, 'BUYER', ?, ?, ?, ?)
-              """, agreedId, caseId, id, offer.id(), offer.version(), baseline.id(), baseline.version(), Timestamp.from(now),
-              request.evidenceMessageId(), request.evidenceDocumentId(), write(journey));
-          jdbc.update("""
-              insert into audit_events (id, case_id, event_type, aggregate_type, aggregate_id, aggregate_version,
-                idempotency_key, actor, metadata_json, created_at)
-              values (?, ?, 'AGREED_PRICE_ACCEPTED', 'AGREED_PRICE', ?, ?, ?, 'BUYER', ?, ?)
-              """, UUID.randomUUID().toString(), caseId, agreedId, offer.version(), id,
-              write(java.util.Map.of("baselineId", baseline.id(), "evidenceMessageId", request.evidenceMessageId())), Timestamp.from(now));
-          negotiation.transition(caseId, NegotiationStateService.State.AGREED);
-        } else negotiation.transition(caseId, NegotiationStateService.State.AWAITING_DEALER);
+        applySent(caseId, token, request);
       } catch (RelayService.RelayRefusedException refused) {
-        jdbc.update("update quote_acceptance_requests set state = ? where id = ?", refused.reason().name(), id);
+        // A FAILED or DELIVERY_UNKNOWN send keeps its relay message so it can be checked or retried.
+        jdbc.update("update quote_acceptance_requests set state = ?, message_id = ? where id = ?",
+            refused.reason().name(), refused.messageId(), id);
       }
       return get(caseId, token, id);
     });
+  }
+
+  /** The first-send state change: an acceptance creates the Agreed Price; a confirmation request awaits the dealer. */
+  private void applySent(String caseId, String token, Request request) {
+    String id = request.id();
+    if ("ACCEPTANCE".equals(request.kind())) {
+      var baseline = plans.approve(caseId, token, "agreement:" + id, new PricePlanService.Approval(request.planVersion(), true));
+      manager.flush();
+      var offer = offers.requireOffer(caseId, request.offerVersion());
+      var journey = journeys.agree(caseId);
+      Instant now = com.dealanalyzer.time.PersistedInstant.round(Instant.now());
+      String agreedId = UUID.randomUUID().toString();
+      jdbc.update("""
+          insert into agreed_prices (id, case_id, acceptance_request_id, dealer_offer_id, offer_version, baseline_id,
+            baseline_version, actor, accepted_at, evidence_message_id, evidence_document_id, journey_result_json)
+          values (?, ?, ?, ?, ?, ?, ?, 'BUYER', ?, ?, ?, ?)
+          """, agreedId, caseId, id, offer.id(), offer.version(), baseline.id(), baseline.version(), Timestamp.from(now),
+          request.evidenceMessageId(), request.evidenceDocumentId(), write(journey));
+      jdbc.update("""
+          insert into audit_events (id, case_id, event_type, aggregate_type, aggregate_id, aggregate_version,
+            idempotency_key, actor, metadata_json, created_at)
+          values (?, ?, 'AGREED_PRICE_ACCEPTED', 'AGREED_PRICE', ?, ?, ?, 'BUYER', ?, ?)
+          """, UUID.randomUUID().toString(), caseId, agreedId, offer.version(), id,
+          write(java.util.Map.of("baselineId", baseline.id(), "evidenceMessageId", request.evidenceMessageId())), Timestamp.from(now));
+      negotiation.transition(caseId, NegotiationStateService.State.AGREED);
+    } else negotiation.transition(caseId, NegotiationStateService.State.AWAITING_DEALER);
+  }
+
+  // ---------------------------------------------------------------- unclear sends (RelayMessageOwner)
+
+  @Override public boolean owns(String caseId, String relayMessageId) {
+    return jdbc.queryForObject("select count(*) from quote_acceptance_requests where case_id = ? and message_id = ?",
+        Long.class, caseId, relayMessageId) > 0;
+  }
+
+  @Override public void requireResendPermitted(String caseId, String token, String relayMessageId) {
+    var ids = unsettled(caseId, relayMessageId);
+    if (ids.isEmpty()) throw new IllegalArgumentException("This message was already sent.");
+    Request request = get(caseId, token, ids.getFirst());
+    requirePermitted(caseId, token, request);
+  }
+
+  @Override public Runnable sent(String caseId, String token, String relayMessageId) {
+    var ids = unsettled(caseId, relayMessageId);
+    if (ids.isEmpty()) return null;
+    jdbc.update("update quote_acceptance_requests set state = 'SENT' where id = ?", ids.getFirst());
+    // The dealer has the message. Its state change applies while negotiation can still reach it.
+    var state = negotiation.current(caseId);
+    if (readAgreed(caseId) == null && NegotiationConversationService.ACTIVE.contains(state))
+      applySent(caseId, token, get(caseId, token, ids.getFirst()));
+    return null;
+  }
+
+  @Override public void unsent(String caseId, String relayMessageId, String state) {
+    jdbc.update("update quote_acceptance_requests set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+        state, caseId, relayMessageId);
+  }
+
+  private List<String> unsettled(String caseId, String relayMessageId) {
+    return jdbc.queryForList("select id from quote_acceptance_requests where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+        String.class, caseId, relayMessageId);
   }
 
   private void requirePermitted(String caseId, String token, Request request) {

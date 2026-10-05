@@ -133,3 +133,38 @@ test("records the Buyer decision and undoes it with case credentials", async () 
   expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/negotiation-conversation/dealer-declined",
     expect.objectContaining({ method: "DELETE", headers: expect.objectContaining({ "Case-Access-Token": "secret" }) }));
 });
+
+test("an unconfirmed send offers a delivery check that reports the result and reloads the conversation", async () => {
+  const view = conversation("MANDATE_ACTIVE", "DELIVERY_UNKNOWN");
+  const unclear = view.entries[1].message!;
+  view.entries[1] = { ...view.entries[1], message: { ...unclear, deliveryState: "DELIVERY_UNKNOWN", completedAt: null, deliveryCheckOffered: true } };
+  const settled = conversation("AWAITING_DEALER", "SENT");
+  const fetcher = vi.fn(async (url: string, _init?: RequestInit) => new Response(JSON.stringify(
+    url.endsWith("/delivery-check") ? { messageId: "m1", state: "SENT" } : fetcher.mock.calls.length > 2 ? settled : view)));
+  vi.stubGlobal("fetch", fetcher);
+  render(<NegotiationConversation caseId="c1" token="t1" />);
+  expect(await screen.findByText(/did not confirm that it took this message/)).toBeVisible();
+  expect(screen.getByText(/Checking never sends anything/)).toBeVisible();
+  expect(screen.getByText(/Delivery not confirmed: check delivery on its message below/)).toBeVisible();
+  expect(screen.queryByRole("button", { name: /^Retry/ })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: /^Check delivery of the message to sales@dealer.example/ }));
+  await waitFor(() => expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/relay/messages/m1/delivery-check",
+    expect.objectContaining({ method: "POST", headers: expect.objectContaining({ "Case-Access-Token": "t1" }) })));
+  expect(await screen.findByText("Waiting for the dealer to reply.")).toBeVisible();
+  expect(screen.queryByRole("button", { name: /^Check delivery/ })).toBeNull();
+});
+
+test("a retry is offered only when the server offers it, and a refusal is shown in plain words", async () => {
+  const view = conversation("AWAITING_BUYER", "FAILED");
+  const failed = view.entries[1].message!;
+  view.entries[1] = { ...view.entries[1], message: { ...failed, deliveryState: "FAILED", retryOffered: true } };
+  const fetcher = vi.fn(async (url: string, _init?: RequestInit) => url.endsWith("/retry")
+    ? new Response(JSON.stringify({ detail: "This Buying Case reached its daily dealer message limit.", reason: "CASE_CAP" }), { status: 409 })
+    : new Response(JSON.stringify(view)));
+  vi.stubGlobal("fetch", fetcher);
+  render(<NegotiationConversation caseId="c1" token="t1" />);
+  expect(await screen.findByText(/Retry sends the same stored text with the same message key/)).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: /^Retry the message to sales@dealer.example/ }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("This Buying Case reached its daily dealer message limit.");
+  expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/relay/messages/m1/retry", expect.objectContaining({ method: "POST" }));
+});
