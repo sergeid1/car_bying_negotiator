@@ -16,6 +16,7 @@ document pipeline. Spec 2.1 §1.3, §2.2, §4 principles 11–13, AGT-03, AGT-04
 - [ ] The mandate's autonomy mode is removed from the API, UI and new mandates with a forward-only migration. Stored mandates and their history stay readable, and no code can enable delegated sending.
 - [ ] Each case's inbound address remains unguessable, accepts mail only while the case accepts it, and is shown to the Buyer as "Forward a dealer's email here". Forwarded mail is recorded as an inbound dealer message, its quoted forward headers are kept as content, and attachments and figures go through the existing intake.
 - [ ] Ticket 78's inbound mail authentication prerequisite (provider webhook signature or equivalent, replay protection, binding mail to its case) applies to the reply-intake address before any real inbound provider is enabled.
+- [ ] The `dealer-mail.send-path` property and the `--dealer-mail.send-path=RELAY` pins in relay-path acceptance tests (left by ticket 82) are removed, and `dealer_relay_messages` is renamed if that reads better now that most rows are Buyer-sent.
 - [ ] Existing relay-sent messages stay visible in each conversation with their recorded send path, and export and deletion still cover them.
 - [ ] `docs/outbound-gate.md`, `docs/provider-inventory.md`, `docs/case-deletion-policy.md` and any other doc that describes platform-sent email are updated to the tool model.
 - [ ] `mvn clean verify`, `npm test`, `npm run build` and `npx playwright test` pass.
