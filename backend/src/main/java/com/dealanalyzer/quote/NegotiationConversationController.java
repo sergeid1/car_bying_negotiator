@@ -42,6 +42,16 @@ public class NegotiationConversationController {
   public NegotiationConversationService.View stop(@PathVariable String caseId, @RequestHeader("Case-Access-Token") String token) {
     return conversation.stop(caseId, token);
   }
+  @PostMapping("/dealer-declined")
+  public NegotiationConversationService.View recordDealerDeclined(@PathVariable String caseId,
+      @RequestHeader("Case-Access-Token") String token) {
+    return conversation.recordDealerDeclined(caseId, token);
+  }
+  @DeleteMapping("/dealer-declined")
+  public NegotiationConversationService.View clearDealerDeclined(@PathVariable String caseId,
+      @RequestHeader("Case-Access-Token") String token) {
+    return conversation.clearDealerDeclined(caseId, token);
+  }
   @PostMapping("/resume")
   public NegotiationConversationService.View resume(@PathVariable String caseId, @RequestHeader("Case-Access-Token") String token) {
     return conversation.resume(caseId, token);

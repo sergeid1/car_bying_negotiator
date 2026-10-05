@@ -49,16 +49,18 @@ public class NegotiationConversationService {
   private final RelayService relay;
   private final QuoteRequestService quotes;
   private final AgreedPriceService acceptances;
+  private final DealerDeclinedService dealerDeclined;
   private final ObjectMapper json;
   private final TransactionTemplate transaction;
 
   public NegotiationConversationService(EphemeralBuyingCaseService cases, EphemeralCasePersistence locks, JdbcTemplate jdbc,
       OutboundDraftService drafts, DealerOfferPersistence offers, MandateService mandates, NegotiationStateService negotiation,
       RelayService relay, QuoteRequestService quotes, AgreedPriceService acceptances, ObjectMapper json,
-      PlatformTransactionManager transactions) {
+      PlatformTransactionManager transactions, DealerDeclinedService dealerDeclined) {
     this.cases = cases; this.locks = locks; this.jdbc = jdbc; this.drafts = drafts; this.offers = offers;
     this.mandates = mandates; this.negotiation = negotiation; this.relay = relay; this.quotes = quotes;
     this.acceptances = acceptances; this.json = json; this.transaction = new TransactionTemplate(transactions);
+    this.dealerDeclined = dealerDeclined;
   }
 
   public record Create(String quoteRequestId) {}
@@ -83,7 +85,7 @@ public class NegotiationConversationService {
       long ceilingMinor, Instant expiresAt) {}
   public record Conversation(String quoteRequestId, String dealerAddress) {}
   public record View(State negotiationState, MandateSummary mandate, boolean targetReached, List<Conversation> conversations,
-      List<Entry> entries) {}
+      List<Entry> entries, DealerDeclinedService.Decision dealerDeclined) {}
 
   // ---------------------------------------------------------------- drafting
 
@@ -100,6 +102,7 @@ public class NegotiationConversationService {
       return get(caseId, token, previous.getFirst()[0]);
     }
     requireActive(caseId);
+    requireDealerMoving(caseId);
     var mandate = supervisedMandate(caseId);
     String dealerId = sentDealer(caseId, request.quoteRequestId());
     var offer = currentOffer(caseId);
@@ -200,6 +203,7 @@ public class NegotiationConversationService {
   }
 
   private void requirePermitted(String caseId, Draft draft) {
+    requireDealerMoving(caseId);
     State state = negotiation.current(caseId);
     if (state == State.PAUSED) throw new IllegalArgumentException("Negotiation is paused. Resume it before sending.");
     if (!ACTIVE.contains(state)) throw new IllegalArgumentException("Negotiation is not active. No message can be sent.");
@@ -217,6 +221,26 @@ public class NegotiationConversationService {
   }
 
   // ---------------------------------------------------------------- Buyer controls
+
+  @Transactional
+  public View recordDealerDeclined(String caseId, String token) {
+    authorize(caseId, token);
+    requireActive(caseId);
+    dealerDeclined.recordBuyer(caseId);
+    return view(caseId, token);
+  }
+
+  @Transactional
+  public View clearDealerDeclined(String caseId, String token) {
+    authorize(caseId, token);
+    dealerDeclined.clearBuyer(caseId);
+    return view(caseId, token);
+  }
+
+  private void requireDealerMoving(String caseId) {
+    if (dealerDeclined.current(caseId) != null)
+      throw new IllegalArgumentException("The dealer has declined to lower the verified selling price. Counteroffers have stopped; you can still accept the written quote or stop negotiation.");
+  }
 
   @Transactional
   public View stop(String caseId, String token) {
@@ -244,6 +268,7 @@ public class NegotiationConversationService {
     authorize(caseId, token);
     State state = negotiation.current(caseId);
     var mandate = mandates.activeMandate(caseId).orElse(null);
+    var declined = dealerDeclined.current(caseId);
     boolean reached = false;
     if (mandate != null) {
       var offer = offers.latestOffer(caseId).filter(value -> "VERIFIED".equals(value.status())).orElse(null);
@@ -266,7 +291,7 @@ public class NegotiationConversationService {
         .map(quote -> new Conversation(quote.id(), quote.dealerAddress())).toList();
     return new View(state, mandate == null ? null : new MandateSummary(mandate.version(), mandate.status().name(),
         mandate.autonomyMode().name(), mandate.currency(), mandate.targetMinor(), mandate.ceilingMinor(), mandate.expiresAt()),
-        reached, conversations, List.copyOf(entries));
+        reached, conversations, List.copyOf(entries), declined);
   }
 
   private List<Message> messages(String caseId, String token) {

@@ -96,3 +96,40 @@ test("an unexpected response is shown as unavailable rather than rendered", asyn
   render(<NegotiationConversation caseId="c1" token="secret" />);
   expect(await screen.findByRole("alert")).toHaveTextContent("The negotiation conversation is unavailable.");
 });
+
+test("shows the automatic reason and verified price while preserving the stop action", async () => {
+  const view = conversation();
+  view.dealerDeclined = { source: "RULE", rounds: 2, lastVerifiedSellingPriceMinor: 2500000, currency: "USD" };
+  mock(view);
+  render(<NegotiationConversation caseId="c1" token="secret" />);
+  expect(await screen.findByText(/After 2 counteroffers/)).toHaveTextContent("Last verified selling price: $25,000.00.");
+  expect(screen.getByText(/After 2 counteroffers/)).toHaveTextContent("You can still accept the latest written quote or stop negotiation.");
+  expect(screen.queryByRole("button", { name: "Draft a counteroffer" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Approve revision/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Stop negotiation" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Undo the dealer won't move" })).not.toBeInTheDocument();
+});
+
+test("records the Buyer decision and undoes it with case credentials", async () => {
+  let view = conversation();
+  const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
+    if (init?.method === "POST") {
+      view = conversation("AWAITING_BUYER", "CANCELLED");
+      view.dealerDeclined = { source: "BUYER", rounds: 2, lastVerifiedSellingPriceMinor: 2500000, currency: "USD" };
+      view.entries[3].counteroffer!.cancelReason = "DEALER_DECLINED";
+    } else if (init?.method === "DELETE") { view = conversation("AWAITING_BUYER", "CANCELLED"); }
+    return new Response(JSON.stringify(view));
+  });
+  vi.stubGlobal("fetch", fetcher);
+  render(<NegotiationConversation caseId="c1" token="secret" />);
+  fireEvent.click(await screen.findByRole("button", { name: "The dealer won't move" }));
+  expect(await screen.findByText(/You recorded that the dealer won't move/)).toBeInTheDocument();
+  expect(screen.getByText("Cancelled: the dealer declined to lower the selling price.")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Draft a counteroffer" })).not.toBeInTheDocument();
+  expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/negotiation-conversation/dealer-declined",
+    expect.objectContaining({ method: "POST", headers: expect.objectContaining({ "Case-Access-Token": "secret" }) }));
+  fireEvent.click(screen.getByRole("button", { name: "Undo the dealer won't move" }));
+  expect(await screen.findByRole("button", { name: "Draft a counteroffer" })).toBeInTheDocument();
+  expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/negotiation-conversation/dealer-declined",
+    expect.objectContaining({ method: "DELETE", headers: expect.objectContaining({ "Case-Access-Token": "secret" }) }));
+});

@@ -9,7 +9,7 @@ total over a soft blue light.
 
 **Status:** complete — the header's appearance menu offers System, Light and Dark, remembers the choice
 without a flash on load, and every browser layout and contrast check runs in both themes, as of
-2026-10-02. Regrouping the report's lower sections into one collapsible list remains open (below).
+2026-10-02. Regrouping the report's lower sections into one collapsible list was delivered by ticket 71.
 
 - [x] An appearance control in the header offers System, Light and Dark. System follows the device and
       updates live; a pinned choice is stored in the browser only and applied before the first paint.
@@ -25,9 +25,9 @@ without a flash on load, and every browser layout and contrast check runs in bot
       amount, and reduced-motion users see the final amount only.
 - [x] Every Playwright spec runs at 360 px in light and dark, including axe colour contrast; motion never
       fades text, so contrast holds at every frame.
-- [ ] Group the report's secondary sections (amounts, market evidence, evidence and calculations,
+- [x] Group the report's secondary sections (amounts, market evidence, evidence and calculations,
       financing, feedback, downloads, retention) into one collapsible list without breaking the deep
-      links from the total and findings into the evidence. Deferred: it changes navigation, not styling.
+      links from the total and findings into the evidence. Deferred: it changes navigation, not styling. Moved to ticket 71, delivered 2026-10-05.
 
 ## Implementation notes — 2026-10-02
 

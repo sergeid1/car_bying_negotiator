@@ -6,7 +6,7 @@ import { OutsideFinancing } from "./OutsideFinancing";
 import { DealerFinancingForm, DealerFinancingResult, type FinancingResult } from "./DealerFinancing";
 import { ReportTotalMeasure } from "./ReportTotalMeasure";
 import { Arithmetic, DocumentSourceView, type Calculation, type DocumentSource } from "./EvidenceSource";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { ReportExplanationLoader } from "./ReportExplanation";
 import { AnimatedAmount } from "./AnimatedAmount";
 
@@ -54,7 +54,14 @@ export function CoreReportLoader({ caseId, token }: { caseId: string; token: str
     } catch (caught) { setError(String(caught)); } finally { setBusy(false); }
   }
   return <section className="stack" aria-label="Core deal report">
-    {report && <CoreDealReport report={report} caseId={caseId} token={token} />}
+    {report && <CoreDealReport report={report} caseId={caseId} token={token}>
+      <ReportSection id="core-feedback" title="Optional outcome feedback">
+        <OutcomeFeedback key={`feedback-${caseId}-${token}`} caseId={caseId} token={token} headless />
+      </ReportSection>
+      <ReportSection id="core-downloads" title="Save a copy">
+        <CaseDownloads key={`download-${caseId}-${token}-${report.version}`} caseId={caseId} token={token} reportVersion={report.version} headless />
+      </ReportSection>
+    </CoreDealReport>}
     <DealerFinancingForm key={`dealer-${caseId}-${token}`} caseId={caseId} token={token} />
     <OutsideFinancing key={`outside-${caseId}-${token}`} caseId={caseId} token={token} />
     <div className="panel">
@@ -65,18 +72,19 @@ export function CoreReportLoader({ caseId, token }: { caseId: string; token: str
       {busy && <p role="status">Loading report…</p>}
       {error && <p role="alert">{error}</p>}
     </div>
-    {report && <>
-      <OutcomeFeedback key={`feedback-${caseId}-${token}`} caseId={caseId} token={token} />
-      <CaseDownloads key={`download-${caseId}-${token}-${report.version}`} caseId={caseId} token={token} reportVersion={report.version} />
-      <NegotiationLoader key={`${caseId}-${token}-${report.version}`} caseId={caseId} token={token} reportVersion={report.version} />
-    </>}
+    {report && <NegotiationLoader key={`${caseId}-${token}-${report.version}`} caseId={caseId} token={token} reportVersion={report.version} />}
   </section>;
 }
 
-/** `redacted` marks an example report, whose removed fields are null and must read as removed. */
-export function CoreDealReport({ report, caseId, token, redacted }: { report: CoreReport; caseId?: string; token?: string; redacted?: boolean }) {
+/**
+ * `redacted` marks an example report, whose removed fields are null and must read as removed.
+ * `children` are further `ReportSection`s appended to the end of the collapsible list.
+ */
+export function CoreDealReport({ report, caseId, token, redacted, children }: { report: CoreReport; caseId?: string; token?: string; redacted?: boolean; children?: ReactNode }) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const article = useRef<HTMLElement>(null);
   useEffect(() => { heading.current?.focus(); }, [report]);
+  useSectionLinks(article, report);
   const { analysis } = report;
   const removed = "Removed from this example";
   const text = (value: string | null | undefined) => value ?? (redacted ? removed : "Unknown");
@@ -89,7 +97,8 @@ export function CoreDealReport({ report, caseId, token, redacted }: { report: Co
   const totalIndex = total ? analysis.materialAmounts.indexOf(total) : -1;
   const amountLabel = (label: string | null) => label == null ? removed : label.replace("/payload/plan/", "Approved ")
     .replace("/result/", "").replaceAll("/", " · ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/Minor$/, "");
-  return <article className="report" aria-labelledby="core-report-heading">
+  const showFinancing = analysis.financingAvailability && analysis.financingAvailability !== "NOT_APPLICABLE";
+  return <article className="report" aria-labelledby="core-report-heading" ref={article}>
     <section className="outcome report-leading" aria-label="Total, findings and next action">
       <h2 id="core-report-heading" tabIndex={-1} ref={heading}>Deal Analysis Report</h2>
       <h3>Out-the-door total</h3>
@@ -114,48 +123,128 @@ export function CoreDealReport({ report, caseId, token, redacted }: { report: Co
     <section className="panel"><h3>Review and rating</h3><div className="status-row"><strong>{text(analysis.reviewLabel)}</strong><span>{text(analysis.dealRating).replaceAll("_", " ")}</span></div><p>{text(analysis.ratingBasis)}</p></section>
     <p>Version {report.version} · {report.status} · As of <time dateTime={report.asOf}>{report.asOf}</time></p>
     {report.status === "PARTIAL" && <p className="notice">Warning: this report is partial. One or more analysis areas are unavailable.</p>}
-    <nav aria-label="Report sections">{analysis.dealReview && <><a href="#revised-offer-review">Revised offer comparison</a> · </>}<a href="#core-amounts">Amounts</a> · {analysis.financingAvailability && analysis.financingAvailability !== "NOT_APPLICABLE" && <><a href="#core-financing">Financing</a> · </>} <a href="#core-evidence">Evidence and calculations</a> · <a href="#core-scope">Scope and policies</a></nav>
+    <nav aria-label="Report sections">{analysis.dealReview && <><a href="#revised-offer-review">Revised offer comparison</a> · </>}<a href="#core-amounts">Amounts</a> · {showFinancing && <><a href="#core-financing">Financing</a> · </>} <a href="#core-evidence">Evidence and calculations</a> · <a href="#core-scope">Scope and policies</a></nav>
     {analysis.dealReview && <RevisedOfferReview review={analysis.dealReview} redacted={redacted} />}
-    <section className="panel" id="core-amounts" tabIndex={-1}>
-      <h3>Amounts and sources</h3>
-      <p>Market analysis: {analysis.marketAvailability}. Cash economics: {analysis.cashAvailability}.</p>
-      <dl className="money-list">
-        {analysis.materialAmounts.map((amount, index) => <div key={index}>
-          <dt>{amountLabel(amount.label)}<small>{amount.precision.toLowerCase()} · <a href={`#amount-evidence-${index}`} title={`${amount.source}${amount.pointer}`}>Source and calculation {index + 1}</a></small></dt>
-          <dd>{money(amount)}</dd>
-        </div>)}
-      </dl>
-    </section>
-    {analysis.financingAvailability && analysis.financingAvailability !== "NOT_APPLICABLE" && <DealerFinancingResult result={analysis.financing ?? null} availability={analysis.financingAvailability} terms={analysis.financingTerms} />}
-    <MarketEvidenceSection evidence={analysis.marketEvidence} />
-    <section className="panel" id="core-evidence" tabIndex={-1}>
-      <h3>Evidence and calculations</h3>
-      <p>Each amount shows the dealer document page and region it was read from, or says that no document source exists, and each calculated amount shows its arithmetic.</p>
-      {analysis.materialAmounts.map((amount, index) => <section key={index} id={`amount-evidence-${index}`} tabIndex={-1} className="amount-evidence">
-        <h4>{amountLabel(amount.label)}: {money(amount)} <small>{amount.precision.toLowerCase()}</small></h4>
-        {redacted && (amount.documentSource?.pageNumber == null || amount.documentSource.region == null)
-          ? <p>Document source: removed from this example. Example reports keep no document pages or regions.</p>
-          : amount.documentSource
-          ? <DocumentSourceView source={amount.documentSource} caseId={caseId} token={token} what={amountLabel(amount.label)} />
-          : <p>No document source: {amount.sourceNote ?? "this saved report does not record where this amount came from."}</p>}
-        {amount.calculation && <Arithmetic calculation={amount.calculation} result={amount.precision === "UNAVAILABLE" ? null : amount.minorUnits} currency={amount.currency} label={amountLabel(amount.label)} />}
-      </section>)}
-      {redacted ? <p>Diagnostic data and frozen inputs: removed from this example.</p> : <ReproductionDiagnostics report={report} />}
-    </section>
-    <section className="limitations" id="core-scope" tabIndex={-1}>
-      <h3>Scope and policies</h3>
-      {analysis.limitations.map((limitation, index) => <p key={index}>{text(limitation)}</p>)}
-      <dl>{Object.entries(analysis.policyVersions).map(([name, version]) => <div key={name}><dt>{name}</dt><dd>{version}</dd></div>)}</dl>
-    </section>
+    <ul className="report-sections" aria-label="Report details">
+      <ReportSection id="core-amounts" title="Amounts and sources">
+        <p>Market analysis: {analysis.marketAvailability}. Cash economics: {analysis.cashAvailability}.</p>
+        <dl className="money-list">
+          {analysis.materialAmounts.map((amount, index) => <div key={index}>
+            <dt>{amountLabel(amount.label)}<small>{amount.precision.toLowerCase()} · <a href={`#amount-evidence-${index}`} title={`${amount.source}${amount.pointer}`}>Source and calculation {index + 1}</a></small></dt>
+            <dd>{money(amount)}</dd>
+          </div>)}
+        </dl>
+      </ReportSection>
+      {showFinancing && <ReportSection id="core-financing" title="Dealer financing">
+        <DealerFinancingResult result={analysis.financing ?? null} availability={analysis.financingAvailability!} terms={analysis.financingTerms} headless />
+      </ReportSection>}
+      <ReportSection id="core-market" title="Market evidence" headingId="market-evidence-heading">
+        <MarketEvidenceParagraphs evidence={analysis.marketEvidence} />
+      </ReportSection>
+      <ReportSection id="core-evidence" title="Evidence and calculations">
+        <p>Each amount shows the dealer document page and region it was read from, or says that no document source exists, and each calculated amount shows its arithmetic.</p>
+        {analysis.materialAmounts.map((amount, index) => <section key={index} id={`amount-evidence-${index}`} tabIndex={-1} className="amount-evidence">
+          <h4>{amountLabel(amount.label)}: {money(amount)} <small>{amount.precision.toLowerCase()}</small></h4>
+          {redacted && (amount.documentSource?.pageNumber == null || amount.documentSource.region == null)
+            ? <p>Document source: removed from this example. Example reports keep no document pages or regions.</p>
+            : amount.documentSource
+            ? <DocumentSourceView source={amount.documentSource} caseId={caseId} token={token} what={amountLabel(amount.label)} />
+            : <p>No document source: {amount.sourceNote ?? "this saved report does not record where this amount came from."}</p>}
+          {amount.calculation && <Arithmetic calculation={amount.calculation} result={amount.precision === "UNAVAILABLE" ? null : amount.minorUnits} currency={amount.currency} label={amountLabel(amount.label)} />}
+        </section>)}
+        {redacted ? <p>Diagnostic data and frozen inputs: removed from this example.</p> : <ReproductionDiagnostics report={report} />}
+      </ReportSection>
+      <ReportSection id="core-scope" title="Scope and policies">
+        {analysis.limitations.map((limitation, index) => <p key={index}>{text(limitation)}</p>)}
+        <dl className="report-policies">{Object.entries(analysis.policyVersions).map(([name, version]) => <div key={name}><dt>{name}</dt><dd>{version}</dd></div>)}</dl>
+      </ReportSection>
+      {children}
+    </ul>
   </article>;
 }
 
 export function MarketEvidenceSection({ evidence }: { evidence?: CoreReport["analysis"]["marketEvidence"] }) {
   return <section className="panel" aria-labelledby="market-evidence-heading">
     <h3 id="market-evidence-heading">Market evidence</h3>
-    {evidence?.paragraphs.length ? evidence.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)
-      : <p>Market evidence details are unavailable in this saved report.</p>}
+    <MarketEvidenceParagraphs evidence={evidence} />
   </section>;
+}
+
+function MarketEvidenceParagraphs({ evidence }: { evidence?: CoreReport["analysis"]["marketEvidence"] }) {
+  return evidence?.paragraphs.length ? <>{evidence.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</>
+    : <p>Market evidence details are unavailable in this saved report.</p>;
+}
+
+/**
+ * One entry of the report's collapsible list. Sections start collapsed; the open state lives only
+ * in the page. The summary's heading names the section and the native disclosure announces
+ * whether it is open. The `id` stays on the disclosure itself so existing links still resolve.
+ */
+export function ReportSection({ id, title, headingId = `${id}-heading`, children }: {
+  id: string; title: string; headingId?: string; children: ReactNode;
+}) {
+  return <li>
+    <details className="panel report-section" id={id} tabIndex={-1}>
+      <summary><h3 id={headingId}>{title}</h3></summary>
+      <section aria-labelledby={headingId} className="report-section-body">{children}</section>
+    </details>
+  </li>;
+}
+
+function sectionTarget(id: string) {
+  let target: HTMLElement | null = null;
+  try { target = document.getElementById(decodeURIComponent(id)); } catch { return null; }
+  const section = target?.closest<HTMLDetailsElement>("details.report-section");
+  return target && section ? { target, section } : null;
+}
+
+/** Opens the section holding an in-report link target, then focuses and scrolls to the target. */
+function revealSectionTarget(id: string) {
+  const found = sectionTarget(id);
+  if (!found) return;
+  found.section.open = true;
+  const focusable = found.target.hasAttribute("tabindex") || found.target.matches("a[href], button, input, select, textarea, summary");
+  (focusable ? found.target : found.section).focus({ preventScroll: true });
+  found.target.scrollIntoView?.({ block: "start" });
+}
+
+/**
+ * Links into the list open the section that holds their target: in-page clicks (including a repeat
+ * click on the current hash), the back and forward buttons, and a report opened at a fragment.
+ * Printing expands every section, then restores the Buyer's choices.
+ */
+function useSectionLinks(article: RefObject<HTMLElement | null>, report: CoreReport) {
+  useEffect(() => {
+    if (window.location.hash.length > 1) revealSectionTarget(window.location.hash.slice(1));
+  }, [report]);
+  useEffect(() => {
+    const onHashChange = () => revealSectionTarget(window.location.hash.slice(1));
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = (event.target as Element | null)?.closest?.("a[href^='#']");
+      const id = link?.getAttribute("href")?.slice(1);
+      const found = id ? sectionTarget(id) : null;
+      if (!id || !found) return;
+      found.section.open = true;
+      window.setTimeout(() => revealSectionTarget(id));
+    };
+    let reopened: HTMLDetailsElement[] = [];
+    const onBeforePrint = () => {
+      reopened = Array.from(article.current?.querySelectorAll<HTMLDetailsElement>("details.report-section:not([open])") ?? []);
+      reopened.forEach(section => { section.open = true; });
+    };
+    const onAfterPrint = () => { reopened.forEach(section => { section.open = false; }); reopened = []; };
+    window.addEventListener("hashchange", onHashChange);
+    document.addEventListener("click", onClick);
+    window.addEventListener("beforeprint", onBeforePrint);
+    window.addEventListener("afterprint", onAfterPrint);
+    return () => {
+      window.removeEventListener("hashchange", onHashChange);
+      document.removeEventListener("click", onClick);
+      window.removeEventListener("beforeprint", onBeforePrint);
+      window.removeEventListener("afterprint", onAfterPrint);
+    };
+  }, [article]);
 }
 
 /** Serialized inputs are only rendered once the Buyer opens this diagnostic disclosure. */
