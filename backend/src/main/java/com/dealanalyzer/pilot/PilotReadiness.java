@@ -1,5 +1,6 @@
 package com.dealanalyzer.pilot;
 
+import com.dealanalyzer.deployment.DeploymentStage;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -34,7 +35,7 @@ public class PilotReadiness {
 
   @org.springframework.beans.factory.annotation.Autowired
   PilotReadiness(Environment environment, ObjectMapper json) {
-    this(shipped(json).prerequisites(), environment.matchesProfiles("pilot"));
+    this(shipped(json).prerequisites(), DeploymentStage.from(environment).productionLike());
   }
 
   PilotReadiness(List<Prerequisite> prerequisites, boolean pilotProfile) {

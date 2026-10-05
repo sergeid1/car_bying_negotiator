@@ -1,11 +1,12 @@
 package com.dealanalyzer.buyingcase;
 
+import com.dealanalyzer.deployment.DeploymentStage;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 /**
  * Synthetic case intake is a development affordance. It follows the same shape as the document
- * parser mode: available by default for local work, and refused at startup under the pilot profile
+ * parser mode: available by default for local work, and refused at startup for pilot/production
  * so a release cannot expose a fixture-backed path to Buyers. When it is switched off the route is
  * never registered, so the path does not exist rather than answering differently.
  */
@@ -15,9 +16,9 @@ public class SyntheticIntakeAffordance {
 
   SyntheticIntakeAffordance(Environment environment) {
     this.enabled = environment.getProperty("intake.synthetic.enabled", Boolean.class, Boolean.TRUE);
-    if (enabled && environment.matchesProfiles("pilot")) {
+    if (enabled && DeploymentStage.from(environment).productionLike()) {
       throw new IllegalStateException(
-          "The pilot must not expose synthetic case intake; set intake.synthetic.enabled=false");
+          "Pilot/production must not expose synthetic case intake; set intake.synthetic.enabled=false");
     }
   }
 

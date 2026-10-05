@@ -36,10 +36,19 @@ providers, and each one adds contractual and privacy obligations this table cann
 
 ## Market and listing readiness
 
+Declare every pilot or production deployment with `SPRING_PROFILES_ACTIVE=pilot` or
+`SPRING_PROFILES_ACTIVE=production`, or equivalently `EVIDENCE_DEPLOYMENT=pilot` or
+`EVIDENCE_DEPLOYMENT=production`. The shared `DeploymentStage` decision treats `pilot`,
+`production` and `prod` as production-like, ignoring case and surrounding whitespace.
+`checkout.deployment` and `inventory.deployment` remain legacy aliases with the same restrictive
+effect. Any production-like declaration wins over development declarations. All guards use this
+decision, including parser confinement, synthetic intake, readiness, secure cookies, test malware
+scanning and storage-key validation. `document.malware-scanner=test` and a missing or shorter than
+32-byte UTF-8 `DOCUMENT_STORAGE_ENCRYPTION_KEY` fail startup in these deployments.
+
 No licensed listing or market source is integrated. These two deterministic adapters are
 development fixtures. `EvidenceProviderProductionGuard` rejects either selected adapter at startup
-and names it in the error when `evidence.deployment=production` (`EVIDENCE_DEPLOYMENT=production`)
-or a `production`, `prod`, or `pilot` profile is active. A development property cannot override a
+and names it in the error under the shared pilot/production declaration above. A development property cannot override a
 production profile. Future adapters must pass the reusable `EvidenceAdapterConformance` suite.
 Market snapshots older than 45 days, invalid metadata, and schema drift become explicit unavailable
 assessments without replacement prices; report generation also checks the age of stored snapshots.
@@ -60,8 +69,8 @@ comparison. Fixture zero cost is explicitly recorded, never inferred from missin
 Configure `evidence.budget.per-case-cost-usd` (non-negative USD) and
 `evidence.budget.p95-latency-millis` (positive milliseconds), or their Spring environment equivalents
 `EVIDENCE_BUDGET_PER_CASE_COST_USD` and `EVIDENCE_BUDGET_P95_LATENCY_MILLIS`, with approved ceilings.
-Neither has a default. `EvidenceBudget` rejects missing ceilings in `pilot`, `production`, `prod`
-or `evidence.deployment=production`; development reports `UNSET`. Observations are compared with
+Neither has a default. `EvidenceBudget` rejects missing ceilings under every shared pilot/production
+declaration; development reports `UNSET`. Observations are compared with
 the combined market/listing per-case cost ceiling and per-call p95 latency ceiling as `OVER`,
 `WITHIN` or `NOT_MEASURABLE`. These are measurements, not an automatic release decision.
 The existing development-adapter production guard remains independent and still blocks release.
@@ -164,8 +173,8 @@ source is integrated. `DeterministicFakeInventorySearchAdapter` is development-o
 its provider, dealer identity, listings, and result notice as synthetic. Its varied fixture includes a
 criteria match, near-miss, duplicate VIN, stale observation, missing VIN, and unknown facts/price.
 
-`InventorySearchProductionGuard` refuses synthetic adapters under `pilot`, `prod`, or `production`
-profiles and under `inventory.deployment=production` or `evidence.deployment=production`. The reusable
+`InventorySearchProductionGuard` refuses synthetic adapters under every shared pilot/production
+declaration. The reusable
 `InventorySearchAdapterConformance` suite must be extended by each future licensed adapter using
 recorded available, unavailable, timed-out, and rate-limited scenarios. Vendor payloads stay inside adapters.
 Listings use minor-unit prices, normalized VINs and explicit unknown fields. Duplicate VINs (or
