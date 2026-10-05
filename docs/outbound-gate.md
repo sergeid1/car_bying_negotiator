@@ -45,3 +45,19 @@ sending even if an older saved decision passed. Never treat a saved pass as a se
 
 The frozen adversarial resource `backend/src/test/resources/outbound/adversarial-drafts.json`
 runs in `OutboundGateTest` in the normal Maven suite. Add examples to this file as new attacks appear.
+
+Supervised counteroffers also stop when the dealer declines to lower the selling price. The
+deterministic rule compares each of the last `negotiation.dealer-declined.rounds` sent counteroffers
+(default 2) with its next verified Dealer Offer and the verified offer used to draft it. Every round
+must have a distinct verified response in the same currency with a selling price that did not fall.
+A pending response, missing price or currency cannot establish the condition. A later verified price
+reduction resets the rule's rounds and clears a rule decision. Dealer prose and unverified extraction
+play no part. The Buyer can separately record “the dealer won't move” and undo that decision; only
+the Buyer clears a Buyer decision, and undo still applies the deterministic rule if it holds.
+
+The conversation view and counteroffer checks settle this condition under the case lock. Proposed
+drafts are cancelled with `DEALER_DECLINED`; fresh counteroffers and sends are refused while it holds.
+The case remains active so written-quote acceptance and the Buyer's stop action remain available.
+Decisions record their source, configured rounds and verified price in case-scoped `audit_events`,
+including Buyer undo and rule clearance. That existing graph is exported and erased with the case
+(including account-linked case export/deletion); no new table or migration is required.

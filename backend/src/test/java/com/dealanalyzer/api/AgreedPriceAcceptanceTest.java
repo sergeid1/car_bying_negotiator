@@ -135,6 +135,10 @@ class AgreedPriceAcceptanceTest {
       assertThat(provider.sent()).hasSize(2);
       assertThat(get(client, path, token).path("agreedPrice").isNull()).isTrue();
       assertThat(jdbc.queryForObject("select count(*) from price_plan_snapshots where case_id = ? and kind = 'BASELINE'", Integer.class, caseId)).isZero();
+      // Dealer-declined stops counteroffers while both acceptance preparation and send remain available.
+      var dealerDeclined = post(client, base + "/negotiation-conversation/dealer-declined", Map.of(), "dealer-declined", token);
+      assertThat(dealerDeclined.at("/dealerDeclined/source").asText()).isEqualTo("BUYER");
+      assertThat(dealerDeclined.path("negotiationState").asText()).isNotEqualTo("STOPPED");
       var fresh = post(client, path, Map.of("quoteRequestId", quoteId, "offerVersion", version), "accept2", token);
       String freshPath = path + "/" + fresh.path("id").asText() + "/approval";
       var sent = post(client, freshPath, approval(fresh), "accept-send", token);
@@ -170,7 +174,7 @@ class AgreedPriceAcceptanceTest {
           .isInstanceOf(HttpClientErrorException.class);
       var exported = post(client, base + "/exports", Map.of("format", "ZIP", "reportVersion", 0), "export", token);
       byte[] bytes = client.get().uri(base + "/exports/" + exported.path("id").asText()).header("Case-Access-Token", token).retrieve().body(byte[].class);
-      assertThat(new String(zipBytes(bytes, "case-data.json"), java.nio.charset.StandardCharsets.UTF_8)).contains("agreed_prices", agreed.path("id").asText(), "quote_acceptance_requests");
+      assertThat(new String(zipBytes(bytes, "case-data.json"), java.nio.charset.StandardCharsets.UTF_8)).contains("agreed_prices", agreed.path("id").asText(), "quote_acceptance_requests", "DEALER_DECLINED_RECORDED");
       post(client, "/api/v1/account/sign-in-requests", Map.of("email", "agreed-buyer@example.com"), "sign-in");
       String secret = BuyerAccountAcceptanceTest.sent.getLast().link().split("#sign-in=")[1];
       String session = post(client, "/api/v1/account/sign-in/verify", Map.of("token", secret)).path("sessionToken").asText();
@@ -178,13 +182,13 @@ class AgreedPriceAcceptanceTest {
           .body(Map.of("caseId", caseId)).retrieve().toBodilessEntity();
       byte[] accountZip = client.post().uri("/api/v1/account/export").header("Account-Session-Token", session).retrieve().body(byte[].class);
       assertThat(new String(zipBytes(zipBytes(accountZip, "cases/buying-case-" + caseId + ".zip"), "case-data.json"), java.nio.charset.StandardCharsets.UTF_8))
-          .contains(agreed.path("id").asText(), "agreed_prices");
+          .contains(agreed.path("id").asText(), "agreed_prices", "DEALER_DECLINED_RECORDED");
       client.post().uri("/api/v1/account/deletion").header("Account-Session-Token", session).retrieve().toBodilessEntity();
       assertThatThrownBy(() -> get(client, path, token)).isInstanceOf(HttpClientErrorException.NotFound.class);
       app.context().getBean(com.dealanalyzer.account.AccountDeletionWorker.class).runOnce();
       app.context().getBean(CaseDeletionWorker.class).runOnce();
       app.context().getBean(com.dealanalyzer.account.AccountDeletionWorker.class).runOnce();
-      for (String table : List.of("agreed_prices", "quote_acceptance_requests", "quote_requests"))
+      for (String table : List.of("agreed_prices", "quote_acceptance_requests", "quote_requests", "audit_events"))
         assertThat(jdbc.queryForObject("select count(*) from " + table + " where case_id = ?", Integer.class, caseId)).isZero();
     }
   }
