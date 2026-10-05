@@ -1,6 +1,6 @@
 # Outbound draft policy
 
-`OutboundGate.VERSION` is `outbound-gate.v1`. The gate has no model, I/O, or clock. Its trusted
+`OutboundGate.VERSION` is `outbound-gate.v3`. The gate has no model, I/O, or clock. Its trusted
 context contains an active mandate, verified money values in that mandate's currency, verified
 disclosure facts, known personal values, values released for this specific dealer, and an optional
 finalized core report. HTTP clients supply only `dealerId` and `text`, never gate context.
@@ -117,3 +117,14 @@ V44 adds `send_path` (`RELAY`, `OWN_EMAIL_APP`, `CONNECTED_MAILBOX`; existing ro
 makes `identity_id` nullable for non-relay rows, and admits `HANDED_OFF` and `DISCARDED`. The column
 is in the case export, and the rows are erased with the case like every relay message.
 Ticket 83 adds a `CONNECTED_MAILBOX` implementation behind the same step.
+
+Because the Buyer sends from their own address, every platform-rendered dealer text is written in the
+Buyer's own voice, with no sign of an intermediary: the conditional acceptance (`I accept your itemized
+quote for VIN ...`) and the test-drive proposal, reschedule, booking and cancellation (`I'd like to
+arrange a test drive ...`, `My acceptance of your quote remains subject to this test drive ...`,
+`Please reply to this email with any changes.`). This changed the authorized case language, so the gate
+version is `outbound-gate.v3`. The no-commitment rule is unchanged: none of these texts says the Buyer
+will buy, pay, reserve or sign, any other wording still fails as unsupported language, and the
+adversarial corpus has first-person commitment attempts. Drafts prepared under v2 wording keep their
+stored decision. An unsent v2 acceptance no longer matches the current authorized text and has to be
+prepared again. Test-drive messages stay grounded on their own stored text.

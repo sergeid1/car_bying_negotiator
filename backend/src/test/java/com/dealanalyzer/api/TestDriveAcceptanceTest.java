@@ -176,12 +176,12 @@ class TestDriveAcceptanceTest {
       assertThat(moving.path("kind").asText()).isEqualTo("RESCHEDULE");
       assertThat(moving.at("/gatedDraft/decision/pass").asBoolean()).as(moving.toString()).isTrue();
       post(client, path + "/messages/" + moving.path("id").asText() + "/approval", approval(moving), "send-move", token);
-      assertThat(provider.sent().getLast().body()).contains("needs to move the test drive", "Option 1:");
+      assertThat(provider.sent().getLast().body()).contains("I need to move the test drive", "Option 1:");
       assertThat(get(client, path, token).path("appointments").get(0).path("state").asText()).isEqualTo("RESCHEDULING");
       var moved = relay.receive(new DealerMailRelay.InboundMail("td-reply-3", relayAddress, "sales@dealer.example", "Re", "Option 1 is fine.", List.of()));
       var rebook = postWithSession(client, path + "/bookings", Map.of("proposalId", moving.path("id").asText(), "messageId", moved.messageId(),
           "option", 1, "release", List.of()), "rebook", token, session);
-      assertThat(rebook.at("/gatedDraft/draft/text").asText()).contains("chose not to share contact details");
+      assertThat(rebook.at("/gatedDraft/draft/text").asText()).contains("Please reply to this email with any changes.");
       assertThat(rebook.at("/gatedDraft/decision/pass").asBoolean()).as(rebook.toString()).isTrue();
       postWithSession(client, path + "/messages/" + rebook.path("id").asText() + "/approval", approval(rebook), "approve-rebook", token, session);
       assertThat(provider.sent().getLast().body()).doesNotContain(EMAIL, "Rosalind", "Quixote", "312 555 0199");
@@ -199,7 +199,7 @@ class TestDriveAcceptanceTest {
       var cancel = post(client, path + "/appointments/" + newId + "/cancellation", Map.of(), "cancel", token);
       assertThat(cancel.at("/gatedDraft/decision/pass").asBoolean()).as(cancel.toString()).isTrue();
       post(client, path + "/messages/" + cancel.path("id").asText() + "/approval", approval(cancel), "send-cancel", token);
-      assertThat(provider.sent().getLast().body()).contains("needs to cancel the test drive");
+      assertThat(provider.sent().getLast().body()).contains("I need to cancel the test drive");
       assertThat(get(client, path, token).path("appointments").get(1).path("state").asText()).isEqualTo("CANCELLED");
       assertThat(jdbc.queryForObject("select state from buying_journeys where id = ?", String.class, journeyId)).isEqualTo("AGREED");
       assertThatThrownBy(() -> post(client, path + "/appointments/" + newId + "/cancellation", Map.of(), "cancel-again", token))

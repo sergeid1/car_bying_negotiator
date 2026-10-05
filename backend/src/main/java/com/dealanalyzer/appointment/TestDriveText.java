@@ -14,7 +14,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Fixed dealer-facing wording for test-drive messages. Every paragraph is rendered from validated
+ * Fixed dealer-facing wording for test-drive messages, in the Buyer's own voice: the Buyer sends them from
+ * their own mailbox, so nothing suggests an intermediary (spec 2.1). Every paragraph is rendered from validated
  * availability and recorded choices, never from Buyer prose, and none says the Buyer will buy (spec 5.8).
  * Released contact values are appended only at send time, after the gate checked this template.
  */
@@ -57,25 +58,25 @@ public final class TestDriveText {
   }
 
   static String proposal(List<Slot> slots) {
-    return "The Buyer would like to arrange a test drive of the vehicle in your written quote at one of these times:"
+    return "I'd like to arrange a test drive of the vehicle in your written quote at one of these times:"
         + "\n\n" + options(slots) + "\n\n" + REPLY;
   }
 
   static String reschedule(String current, List<Slot> slots) {
-    return "The Buyer needs to move the test drive arranged for " + current + ". The Buyer is available at one of these times instead:"
+    return "I need to move the test drive arranged for " + current + ". I'm available at one of these times instead:"
         + "\n\n" + options(slots) + "\n\n" + REPLY;
   }
 
   static String booking(String slot, Collection<Field> released) {
-    return "Thank you for confirming. The Buyer will attend the test drive on " + slot + "."
-        + "\n\nThe Buyer's acceptance of your quote remains subject to this test drive and to the final paperwork matching the written quote."
+    return "Thank you for confirming. I'll see you for the test drive on " + slot + "."
+        + "\n\nMy acceptance of your quote remains subject to this test drive and to the final paperwork matching the written quote."
         + "\n\n" + (released.isEmpty()
-            ? "The Buyer chose not to share contact details. Please use this conversation for any changes."
-            : "The Buyer chose to share these contact details with you for this appointment: " + names(released) + ".");
+            ? "Please reply to this email with any changes."
+            : "For this appointment, here are my " + names(released) + ".");
   }
 
   static String cancellation(String slot) {
-    return "The Buyer needs to cancel the test drive arranged for " + slot + ". Thank you for your time.";
+    return "I need to cancel the test drive arranged for " + slot + ". Thank you for your time.";
   }
 
   /** The released values, appended after the gated text. Only the fields in {@code values} appear. */

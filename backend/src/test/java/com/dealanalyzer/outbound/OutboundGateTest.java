@@ -51,7 +51,7 @@ class OutboundGateTest {
   }
 
   @Test void conditionalAcceptanceRequiresTheExactCaseBackedQuoteDetails() {
-    String text = "The Buyer accepts your itemized quote for VIN 1HGCM82633A004352 with an out-the-door total of USD 23500.00, received on 2026-10-05 (UTC), subject to a test drive and the final paperwork matching that quote.";
+    String text = "I accept your itemized quote for VIN 1HGCM82633A004352 with an out-the-door total of USD 23500.00, received on 2026-10-05 (UTC), subject to a test drive and the final paperwork matching that quote.";
     String request = "Please send a written, itemized quote for this vehicle.";
     var ctx = new OutboundGate.GateContext(mandate, Set.of(2_350_000L), Set.of(), Set.of(), Set.of(), null,
         Set.of(text, request, com.dealanalyzer.quote.WrittenQuoteEvidence.CONFIRMATION), request);

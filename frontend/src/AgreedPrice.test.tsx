@@ -3,7 +3,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { AgreedPrice } from "./AgreedPrice";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
-const text = "The Buyer accepts the itemized quote, subject to a test drive and the final paperwork matching that quote.";
+const text = "I accept the itemized quote, subject to a test drive and the final paperwork matching that quote.";
 const draft = { id: "a1", kind: "ACCEPTANCE", state: "DRAFT", offerVersion: 3, planVersion: 2,
   gatedDraft: { draft: { text }, decision: { pass: true, gateVersion: "outbound-gate.v2", reasons: [] } } };
 const props = { caseId: "c1", token: "secret", quotes: [{ id: "q1", dealerAddress: "sales@dealer.example", state: "SENT" }],

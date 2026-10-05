@@ -59,6 +59,8 @@ class TestDriveCalendarTest {
         TestDriveText.booking(slots.getFirst().label(), EnumSet.noneOf(Field.class)), TestDriveText.cancellation(slots.getFirst().label()));
     var gate = new OutboundGate();
     for (String text : texts) {
+      // Sent from the Buyer's own mailbox: first person, with no sign of an intermediary.
+      assertThat(text).doesNotContain("The Buyer", "Buyer's", "Deal X-Ray", "this conversation", "relay");
       assertThat(text).doesNotContainIgnoringCase("will buy").doesNotContainIgnoringCase("purchase").doesNotContainIgnoringCase("deposit")
           .doesNotContain("@");
       var ungrounded = gate.check(new OutboundGate.Draft("d", text), new OutboundGate.GateContext(null, java.util.Set.of(), java.util.Set.of(),
@@ -66,7 +68,8 @@ class TestDriveCalendarTest {
       assertThat(ungrounded.pass()).isFalse();
     }
     assertThat(TestDriveText.booking("x", EnumSet.of(Field.EMAIL, Field.PHONE)))
-        .contains("contact details with you for this appointment: email and telephone number.", "subject to this test drive");
+        .contains("For this appointment, here are my email and telephone number.", "My acceptance of your quote remains subject to this test drive");
+    assertThat(TestDriveText.booking("x", EnumSet.noneOf(Field.class))).endsWith("Please reply to this email with any changes.");
     assertThat(TestDriveText.releasedBlock(Map.of(Field.EMAIL, "b@example.com"))).isEqualTo("Email: b@example.com");
   }
 }
