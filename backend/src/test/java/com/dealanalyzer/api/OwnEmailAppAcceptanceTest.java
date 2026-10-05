@@ -190,10 +190,103 @@ class OwnEmailAppAcceptanceTest {
     }
   }
 
+  @Test void counteroffersAreHandedOffAndPastedAttachmentsEnterDocumentIntake() throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("own-email-counteroffer", true,
+        AgreedPriceAcceptanceTest.Configuration.class, "--case.deletion.delay=PT1H",
+        "--document.storage.path=" + directory.resolve("objects"),
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
+      var client = app.client();
+      var jdbc = app.context().getBean(JdbcTemplate.class);
+      var provider = (FakeDealerMailRelay) app.context().getBean(DealerMailRelay.class);
+      int relayed = provider.sent().size();
+      var created = post(client, "/api/v1/cases", validCase(), "case");
+      String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+      String base = "/api/v1/cases/" + caseId, path = base + "/negotiation-conversation";
+      OutboundDraftAcceptanceTest.verifyAndPlan(app, base, token);
+      jdbc.update("update vehicles set vin = ? where case_id = ?", VIN, caseId);
+      String dealer = UUID.randomUUID().toString();
+      jdbc.update("insert into dealers(id, case_id, source, provider_dealer_id, name, created_at) values (?, ?, 'TEST', 'dealer', 'Dealer', current_timestamp)", dealer, caseId);
+      jdbc.update("""
+          insert into listing_snapshots(id, case_id, dealer_id, provider_listing_id, listing_url, vin, source, retrieved_at, provider_version, license_metadata, created_at)
+          values (?, ?, ?, 'listing', 'https://dealer.example/vehicle/42', ?, 'TEST', current_timestamp, 'v1', 'test', current_timestamp)
+          """, UUID.randomUUID().toString(), caseId, dealer, VIN);
+      approveMandate(client, base, token, "mandate1");
+      var quote = post(client, base + "/quote-requests", Map.of("dealerId", dealer, "dealerAddress", "sales@dealer.example"), "quote", token);
+      String quoteId = quote.path("id").asText();
+      String quoteMessage = post(client, base + "/quote-requests/" + quoteId + "/approval", approval(quote), "send", token).path("messageId").asText();
+      post(client, base + "/handoffs/" + quoteMessage + "/sent", Map.of(), "sent", token);
+
+      // The dealer's quote arrives as a pasted reply and is verified and analysed.
+      String inbound = reply(client, base, quoteId, token, "reply-1",
+          "Selling price $25,000; OTD $26,800.\n" + "Itemized dealer source line\n".repeat(56), null).path("messageId").asText();
+      String documentId = jdbc.queryForObject("select document_id from dealer_relay_attachments where message_id = ?", String.class, inbound);
+      awaitExtraction(app, jdbc.queryForObject("select id from document_processing_operations where document_id = ?", String.class, documentId), token);
+      var extraction = get(client, base + "/documents/" + documentId + "/extractions/latest", token);
+      post(client, base + "/documents/" + documentId + "/extractions/" + extraction.path("id").asText() + "/corrections",
+          Map.of("targetType", "CANDIDATE", "targetId", find(extraction.path("candidates"), "field", "AMOUNT_FINANCED").path("id").asText(),
+              "normalizedValue", "2680000", "normalizedUnit", "USD_MINOR"), "co-correct", token);
+      var candidates = new ArrayList<String>(); var lines = new ArrayList<String>();
+      extraction.path("candidates").forEach(value -> candidates.add(value.path("id").asText()));
+      extraction.path("lineItems").forEach(value -> lines.add(value.path("id").asText()));
+      post(client, base + "/dealer-offers", Map.of("extractionId", extraction.path("id").asText(),
+          "confirmedCandidateIds", candidates, "confirmedLineItemIds", lines), "co-verify", token);
+      post(client, base + "/market-assessments", Map.of(), "co-market", token);
+      post(client, base + "/cash-economics", Map.of(), "co-cash", token);
+      post(client, base + "/price-plans", Map.of("maxSellingPriceMinor", 2_000_000), "co-plan", token);
+      post(client, base + "/analyses", Map.of(), "co-analysis", token);
+      approveMandate(client, base, token, "mandate2");
+      assertThat(get(client, path, token).path("negotiationState").asText()).isEqualTo("MANDATE_ACTIVE");
+
+      // Approving a counteroffer hands it off; only "I sent it" moves negotiation to AWAITING_DEALER.
+      var draft = post(client, path + "/drafts", Map.of("quoteRequestId", quoteId), "draft1", token);
+      String text = draft.at("/revisions/0/text").asText();
+      var approved = post(client, path + "/drafts/" + draft.path("id").asText() + "/approval", Map.of("approved", true, "text", text), "approve1", token);
+      assertThat(approved.path("state").asText()).isEqualTo("HANDED_OFF");
+      String counterMessage = approved.path("messageId").asText();
+      var handoff = get(client, base + "/handoffs/" + counterMessage, token);
+      assertThat(handoff.path("subject").asText()).isEqualTo("Revised itemized written offer");
+      assertThat(handoff.path("body").asText()).isEqualTo(text);
+      assertThat(get(client, path, token).path("negotiationState").asText()).isEqualTo("MANDATE_ACTIVE");
+      assertThat(post(client, base + "/handoffs/" + counterMessage + "/sent", Map.of(), "sent1", token).path("state").asText()).isEqualTo("SENT");
+      assertThat(get(client, path, token).path("negotiationState").asText()).isEqualTo("AWAITING_DEALER");
+      assertThat(jdbc.queryForObject("select state from negotiation_drafts where id = ?", String.class, draft.path("id").asText())).isEqualTo("SENT");
+      assertThatThrownBy(() -> post(client, base + "/handoffs/" + counterMessage + "/sent", Map.of(), "sent1-again", token))
+          .isInstanceOf(HttpClientErrorException.Conflict.class);
+
+      // After revocation a handed-off counteroffer cannot be marked sent, and negotiation does not move.
+      var second = post(client, path + "/drafts", Map.of("quoteRequestId", quoteId), "draft2", token);
+      String secondMessage = post(client, path + "/drafts/" + second.path("id").asText() + "/approval",
+          Map.of("approved", true, "text", second.at("/revisions/0/text").asText()), "approve2", token).path("messageId").asText();
+      post(client, base + "/mandates/" + latestMandate(client, base, token) + "/revocation", Map.of(), "revoke", token);
+      assertThatThrownBy(() -> post(client, base + "/handoffs/" + secondMessage + "/sent", Map.of(), "sent2", token))
+          .isInstanceOf(HttpClientErrorException.Conflict.class).hasMessageContaining("not marked sent");
+      assertThat(jdbc.queryForObject("select state from negotiation_drafts where id = ?", String.class, second.path("id").asText())).isEqualTo("HANDED_OFF");
+      assertThat(get(client, base + "/handoffs/" + secondMessage, token).path("state").asText()).isEqualTo("HANDED_OFF");
+      assertThat(get(client, path, token).path("negotiationState").asText()).isEqualTo("STOPPED");
+
+      // A pasted reply with an attachment: the file part goes through the existing document intake.
+      var attached = reply(client, base, quoteId, token, "reply-2", "", twoPagePdf());
+      assertThat(attached.path("outcome").asText()).isEqualTo("RECEIVED");
+      String attachedMessage = attached.path("messageId").asText();
+      var attachment = jdbc.queryForMap("select ordinal, outcome, document_id from dealer_relay_attachments where message_id = ?", attachedMessage);
+      assertThat(attachment.get("ordinal")).isEqualTo(0);
+      assertThat(attachment.get("outcome")).isEqualTo("ACCEPTED");
+      String attachedDocument = (String) attachment.get("document_id");
+      assertThat(jdbc.queryForObject("select count(*) from source_documents where id = ? and case_id = ?", Integer.class, attachedDocument, caseId)).isOne();
+      assertThat(jdbc.queryForObject("select count(*) from document_processing_operations where document_id = ?", Integer.class, attachedDocument)).isOne();
+      var shown = find(get(client, path, token).path("entries"), "kind", "INBOUND_MESSAGE");
+      for (var entry : get(client, path, token).path("entries"))
+        if (entry.at("/message/id").asText().equals(attachedMessage)) shown = entry;
+      assertThat(shown.at("/message/id").asText()).isEqualTo(attachedMessage);
+      assertThat(shown.at("/message/attachments/0/documentId").asText()).isEqualTo(attachedDocument);
+      assertThat(provider.sent()).hasSize(relayed);
+    }
+  }
+
   private static JsonNode reply(RestClient client, String base, String quoteId, String token, String key, String text, byte[] file)
       throws Exception {
     var parts = new LinkedMultiValueMap<String, Object>();
-    parts.add("text", text);
+    if (!text.isEmpty()) parts.add("text", text);
     if (file != null) parts.add("file", new NamedBytes("quote.pdf", file));
     return new ObjectMapper().readTree(client.post().uri(base + "/quote-requests/" + quoteId + "/replies")
         .contentType(MediaType.MULTIPART_FORM_DATA).header("Idempotency-Key", key).header("Case-Access-Token", token)
