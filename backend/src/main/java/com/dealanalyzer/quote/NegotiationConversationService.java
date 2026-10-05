@@ -9,6 +9,7 @@ import com.dealanalyzer.negotiation.Counteroffer;
 import com.dealanalyzer.outbound.OutboundDraftService;
 import com.dealanalyzer.outbound.OutboundGate;
 import com.dealanalyzer.quote.NegotiationStateService.State;
+import com.dealanalyzer.relay.RelayMessageOwner;
 import com.dealanalyzer.relay.RelayService;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence.DealerOfferView;
@@ -35,7 +36,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * conversation view lists every draft, gate decision, relay message, attachment and delivery state.
  */
 @Service
-public class NegotiationConversationService {
+public class NegotiationConversationService implements RelayMessageOwner {
   public static final String SUBJECT = "Revised itemized written offer";
   static final Set<State> ACTIVE = Set.of(State.MANDATE_ACTIVE, State.AWAITING_DEALER, State.AWAITING_BUYER);
 
@@ -74,7 +75,8 @@ public class NegotiationConversationService {
   }
   public record Attachment(int ordinal, String documentId, String outcome, Integer offerVersion) {}
   public record Message(String id, String direction, String dealerAddress, String deliveryState, Instant createdAt,
-      Instant completedAt, boolean contentAvailable, String subject, String body, List<Attachment> attachments) {
+      Instant completedAt, boolean contentAvailable, String subject, String body, List<Attachment> attachments,
+      boolean deliveryCheckOffered, boolean retryOffered) {
     @Override public String toString() { return "Message[redacted]"; }
   }
   public enum Kind { QUOTE_REQUEST, ACCEPTANCE_REQUEST, COUNTEROFFER, OUTBOUND_MESSAGE, INBOUND_MESSAGE }
@@ -196,7 +198,8 @@ public class NegotiationConversationService {
         jdbc.update("update negotiation_drafts set state = 'SENT', message_id = ? where id = ?", message, id);
         negotiation.transition(caseId, State.AWAITING_DEALER);
       } catch (RelayService.RelayRefusedException refused) {
-        jdbc.update("update negotiation_drafts set state = ? where id = ?", refused.reason().name(), id);
+        // A FAILED or DELIVERY_UNKNOWN send keeps its relay message so it can be checked or retried.
+        jdbc.update("update negotiation_drafts set state = ?, message_id = ? where id = ?", refused.reason().name(), refused.messageId(), id);
       }
       return get(caseId, token, id);
     });
@@ -218,6 +221,36 @@ public class NegotiationConversationService {
       throw new IllegalArgumentException("A newer verified quote exists. Prepare a new counteroffer.");
     if (Counteroffer.targetReached(WrittenQuoteEvidence.amount(offer.terms(), "SELLING_PRICE"), context.mandate().targetMinor()))
       throw new IllegalArgumentException("The verified quote is at or below your target. Negotiation stopped.");
+  }
+
+  // ---------------------------------------------------------------- unclear sends (RelayMessageOwner)
+
+  @Override public boolean owns(String caseId, String relayMessageId) {
+    return jdbc.queryForObject("select count(*) from negotiation_drafts where case_id = ? and message_id = ?",
+        Long.class, caseId, relayMessageId) > 0;
+  }
+
+  @Override public void requireResendPermitted(String caseId, String token, String relayMessageId) {
+    var ids = unsettled(caseId, relayMessageId);
+    if (ids.isEmpty()) throw new IllegalArgumentException("This counteroffer was already sent.");
+    requirePermitted(caseId, get(caseId, token, ids.getFirst()));
+  }
+
+  @Override public Runnable sent(String caseId, String token, String relayMessageId) {
+    if (jdbc.update("update negotiation_drafts set state = 'SENT' where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+        caseId, relayMessageId) == 1 && ACTIVE.contains(negotiation.current(caseId)))
+      negotiation.transition(caseId, State.AWAITING_DEALER);
+    return null;
+  }
+
+  @Override public void unsent(String caseId, String relayMessageId, String state) {
+    jdbc.update("update negotiation_drafts set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+        state, caseId, relayMessageId);
+  }
+
+  private List<String> unsettled(String caseId, String relayMessageId) {
+    return jdbc.queryForList("select id from negotiation_drafts where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+        String.class, caseId, relayMessageId);
   }
 
   // ---------------------------------------------------------------- Buyer controls
@@ -306,7 +339,8 @@ public class NegotiationConversationService {
       RelayService.MessageContent content = summary.contentAvailable() ? relay.message(caseId, token, summary.id()) : null;
       return new Message(summary.id(), summary.direction(), summary.dealerAddress(), summary.state(), summary.createdAt(),
           summary.completedAt(), content != null, content == null ? null : content.subject(), content == null ? null : content.body(),
-          attachments.stream().filter(entry -> entry.getKey().equals(summary.id())).map(java.util.Map.Entry::getValue).toList());
+          attachments.stream().filter(entry -> entry.getKey().equals(summary.id())).map(java.util.Map.Entry::getValue).toList(),
+          summary.deliveryCheckOffered(), summary.retryOffered());
     }).toList();
   }
 

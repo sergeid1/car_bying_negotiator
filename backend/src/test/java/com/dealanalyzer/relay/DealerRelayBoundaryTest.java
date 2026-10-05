@@ -38,7 +38,7 @@ class DealerRelayBoundaryTest {
         .isInstanceOf(IllegalStateException.class);
     new RelayProductionGuard(pilotProfile, new UnavailableDealerMailRelay()).afterSingletonsInstantiated();
     new RelayProductionGuard(new MockEnvironment(), fake).afterSingletonsInstantiated();
-    assertThatThrownBy(() -> new UnavailableDealerMailRelay().send(null))
+    assertThatThrownBy(() -> new UnavailableDealerMailRelay().send("key", null))
         .isInstanceOf(DealerMailRelay.RelayUnavailableException.class);
   }
 

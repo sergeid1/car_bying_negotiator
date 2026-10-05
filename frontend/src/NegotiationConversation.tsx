@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { DeliveryActions, deliveryOutcome, type DeliveryAction } from "./DealerRelay";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
 
 type Revision = { revision: number; editedByBuyer: boolean; text: string; decision: GateDecision; createdAt: string };
@@ -11,6 +12,7 @@ type Attachment = { ordinal: number; documentId: string | null; outcome: string;
 type Message = {
   id: string; direction: "OUTBOUND" | "INBOUND"; dealerAddress: string; deliveryState: string; createdAt: string;
   completedAt: string | null; contentAvailable: boolean; subject: string | null; body: string | null; attachments: Attachment[];
+  deliveryCheckOffered?: boolean; retryOffered?: boolean;
 };
 type GatedRequest = { id: string; state: string; gatedDraft: { draft: { text: string }; decision: GateDecision } };
 type Entry = {
@@ -35,7 +37,7 @@ const STATES: Record<string, string> = {
 const DRAFT_STATES: Record<string, string> = {
   PROPOSED: "Waiting for your approval", SENDING: "Sending", SENT: "Sent after your approval", DECLINED: "Declined by you",
   CANCELLED: "Cancelled", BLOCKED: "Blocked before sending: the mandate or policy changed", FAILED: "Not sent: the relay refused it",
-  DELIVERY_UNKNOWN: "Delivery not confirmed", OPTED_OUT: "Not sent: the dealer opted out",
+  DELIVERY_UNKNOWN: "Delivery not confirmed: check delivery on its message below", OPTED_OUT: "Not sent: the dealer opted out",
 };
 const CANCEL_REASONS: Record<string, string> = {
   SUPERSEDED: "a newer draft replaced it", STOPPED: "negotiation stopped", PAUSED: "negotiation was paused",
@@ -48,6 +50,8 @@ const DELIVERY: Record<string, string> = {
 };
 const REQUEST_STATES: Record<string, string> = {
   DRAFT: "Waiting for your approval", SENDING: "Sending", SENT: "Sent after your approval", BLOCKED: "Blocked before sending",
+  FAILED: "Not sent: the relay refused it", DELIVERY_UNKNOWN: "Delivery not confirmed: check delivery on its message below",
+  OPTED_OUT: "Not sent: the dealer opted out",
 };
 
 function asView(value: unknown): ConversationView {
@@ -64,6 +68,7 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<Record<string, string>>({});
+  const [outcome, setOutcome] = useState<{ id: string; text: string }>();
   const key = useRef(crypto.randomUUID());
   const path = `/api/v1/cases/${encodeURIComponent(caseId)}/negotiation-conversation`;
 
@@ -96,6 +101,16 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
       return true;
     } catch (failure) { setError((failure as Error).message); return false; }
     finally { setBusy(false); }
+  }
+  async function deliver(id: string, action: DeliveryAction) {
+    setBusy(true); setError(undefined); setOutcome(undefined);
+    try {
+      const result = await request(`/api/v1/cases/${encodeURIComponent(caseId)}/relay/messages/${encodeURIComponent(id)}/${action}`, {});
+      setOutcome({ id, text: deliveryOutcome(typeof result?.state === "string" ? result.state : "") });
+    } catch (failure) { setError((failure as Error).message); }
+    // A refused retry can still have settled the message, so the view is always reloaded.
+    try { setView(asView(await request(path))); } catch { /* The error above, or the last view, still applies. */ }
+    setBusy(false);
   }
   const active = view && ["MANDATE_ACTIVE", "AWAITING_DEALER", "AWAITING_BUYER"].includes(view.negotiationState);
   const drafts = `${path}/drafts`;
@@ -150,7 +165,11 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
           {entry.quoteRequest && <GatedEntry title={`Quote request to ${entry.quoteRequest.dealerAddress}`} request={entry.quoteRequest} />}
           {entry.acceptance && <GatedEntry title={entry.acceptance.kind === "ACCEPTANCE" ? "Conditional acceptance" : "Written confirmation request"}
             request={entry.acceptance} />}
-          {entry.message && <MessageEntry message={entry.message} />}
+          {entry.message && <MessageEntry message={entry.message}>
+            <DeliveryActions message={entry.message} busy={busy} onAction={action => void deliver(entry.message!.id, action)}
+              label={`the message to ${entry.message.dealerAddress}, ${when(entry.message.createdAt)}`} />
+            {outcome?.id === entry.message.id && <p role="status">{outcome.text}</p>}
+          </MessageEntry>}
           {entry.counteroffer && (() => {
             const draft = entry.counteroffer;
             const current = draft.revisions[draft.revisions.length - 1];
@@ -207,7 +226,7 @@ function GatedEntry({ title, request }: { title: string; request: GatedRequest }
   </article>;
 }
 
-function MessageEntry({ message }: { message: Message }) {
+function MessageEntry({ message, children }: { message: Message; children?: ReactNode }) {
   const outbound = message.direction === "OUTBOUND";
   return <article className="card">
     <h3>{outbound ? "Sent to" : "Received from"} {message.dealerAddress || "unknown sender"}</h3>
@@ -226,5 +245,6 @@ function MessageEntry({ message }: { message: Message }) {
           : "not added to your documents"}
       </li>)}
     </ul>}
+    {children}
   </article>;
 }

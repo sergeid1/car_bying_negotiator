@@ -44,3 +44,29 @@ test("says plainly when the relay is unavailable", async () => {
   render(<DealerRelay caseId="case" token="token" />);
   expect(await screen.findByText("The dealer email relay is not available for this case right now.")).toBeVisible();
 });
+
+test("offers a delivery check for an unconfirmed send and a retry for a not-sent one, then reloads", async () => {
+  const offered = { ...view, messages: [
+    { ...view.messages[1], id: "out-2", state: "DELIVERY_UNKNOWN", contentAvailable: true, deliveryCheckOffered: true, retryOffered: false },
+    { ...view.messages[1], contentAvailable: true, deliveryCheckOffered: false, retryOffered: true }] };
+  const after = { ...view, messages: [{ ...offered.messages[0], state: "SENT", deliveryCheckOffered: false }, offered.messages[1]] };
+  let checked = false;
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async input => {
+    const url = String(input);
+    if (url.endsWith("/delivery-check")) { checked = true; return new Response(JSON.stringify({ messageId: "out-2", state: "SENT" })); }
+    if (url.endsWith("/retry")) return new Response(JSON.stringify({ detail: "The original send is no longer permitted.", reason: "NOT_PERMITTED" }), { status: 409 });
+    return new Response(JSON.stringify(checked ? after : offered));
+  });
+  render(<DealerRelay caseId="case" token="secret" />);
+  expect(await screen.findByText(/Checking delivery asks the relay whether it has the message/)).toBeVisible();
+  expect(screen.getAllByRole("button", { name: /^Check delivery/ })).toHaveLength(1);
+  expect(screen.getAllByRole("button", { name: /^Retry/ })).toHaveLength(1);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: /^Check delivery of the message to desk@dealer.example/ }));
+  expect(await screen.findByText("The relay has this message, so it is now marked as sent.")).toBeVisible();
+  expect(fetch).toHaveBeenCalledWith("/api/v1/cases/case/relay/messages/out-2/delivery-check",
+    { method: "POST", headers: { "Case-Access-Token": "secret" } });
+  expect(screen.queryByRole("button", { name: /^Check delivery/ })).toBeNull();
+  await user.click(screen.getByRole("button", { name: /^Retry the message to desk@dealer.example/ }));
+  expect(await screen.findByText("The original send is no longer permitted.")).toBeVisible();
+});

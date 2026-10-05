@@ -18,7 +18,10 @@ const RELAY = {
       createdAt: "2026-10-03T12:30:00Z", completedAt: "2026-10-03T12:30:00Z", contentAvailable: true,
       attachments: [{ ordinal: 0, documentId: "d1", outcome: "ACCEPTED" }, { ordinal: 1, documentId: null, outcome: "MALWARE_DETECTED" }] },
     { id: "out-1", direction: "OUTBOUND", trust: "PLATFORM", dealerAddress: LONG_DEALER, state: "DELIVERED",
-      createdAt: "2026-10-03T12:00:00Z", completedAt: "2026-10-03T12:01:00Z", contentAvailable: false, attachments: [] }],
+      createdAt: "2026-10-03T12:00:00Z", completedAt: "2026-10-03T12:01:00Z", contentAvailable: false, attachments: [] },
+    { id: "out-2", direction: "OUTBOUND", trust: "PLATFORM", dealerAddress: LONG_DEALER, state: "DELIVERY_UNKNOWN",
+      createdAt: "2026-10-03T11:00:00Z", completedAt: null, contentAvailable: true, attachments: [],
+      deliveryCheckOffered: true, retryOffered: false }],
 };
 const CONTENT = { subject: "Re: Quote", body: "See https://a-very-long-dealership-domain-name.example/quotes/0123456789abcdef0123456789abcdef for the itemized quote." };
 
@@ -44,6 +47,8 @@ test("the relay address, dealer opt-out, messages and dealer text fit 360 px", a
   const panel = page.locator(".relay-panel");
   await expect(panel.getByText(RELAY.address)).toBeVisible();
   await expect(panel.getByText(/The dealer opted out/)).toBeVisible();
+  await expect(panel.getByRole("button", { name: /^Check delivery of the message to/ })).toBeVisible();
+  await expect(panel.getByText(/Checking never sends anything/)).toBeVisible();
   await panel.getByRole("button", { name: /Show message from/ }).click();
   await expect(panel.getByText(/for the itemized quote/)).toBeVisible();
   const overflow = await page.evaluate(() => ({
