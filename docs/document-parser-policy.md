@@ -52,14 +52,20 @@ fallback bypasses these limits.
 
 ## Confined execution for the pilot
 
-The `pilot` Spring profile refuses to start in local process mode. Configure a host-run
+Declare pilot/production with `SPRING_PROFILES_ACTIVE=pilot` or `production`, or equivalently
+`EVIDENCE_DEPLOYMENT=pilot` or `production`. The shared `DeploymentStage` decision also recognizes
+`prod`, ignoring case and surrounding whitespace; `checkout.deployment` and `inventory.deployment`
+remain restrictive legacy aliases. Any production-like declaration wins over development settings.
+Every such deployment refuses to start in local process mode. Configure a host-run
 application with a dedicated local container daemon and an already-built immutable parser image:
 
-The profile also enforces the [pilot readiness record](pilot-readiness-record.md): while any
-prerequisite is blocked, the application cannot start with `pilot` active. For pre-release staging
-and parser drills, use the same container settings below without activating `pilot`. Container
+The same decision enforces the [pilot readiness record](pilot-readiness-record.md): while any
+prerequisite is blocked, the application cannot start as pilot or production. It also refuses
+`document.malware-scanner=test`, synthetic intake, and a missing or shorter than 32-byte UTF-8
+`DOCUMENT_STORAGE_ENCRYPTION_KEY` at startup. For pre-release staging
+and parser drills, use the same container settings below without declaring pilot/production. Container
 mode still applies its confinement checks. That staging configuration does not authorize public
-pilot traffic; public release requires the approved record and the `pilot` profile.
+pilot traffic; public release requires the approved record and a pilot/production declaration.
 
 ```sh
 docker build -f backend/Dockerfile.parser -t deal-analyzer-parser:release backend
@@ -117,4 +123,4 @@ and parser release images. The 2×2 HEIC fixture was generated from a synthetic 
 with libheif 1.21.2/x265; it contains no Buyer data.
 
 Local `process` mode remains useful for development and unit tests. It is a failure barrier,
-not an OS security sandbox, and must not be used for pilot uploads.
+not an OS security sandbox, and must not be used for pilot or production uploads.

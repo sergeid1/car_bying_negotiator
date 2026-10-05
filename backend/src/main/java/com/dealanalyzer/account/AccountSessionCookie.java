@@ -3,8 +3,7 @@ package com.dealanalyzer.account;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.stream.Stream;
-import java.util.Locale;
+import com.dealanalyzer.deployment.DeploymentStage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
@@ -17,9 +16,7 @@ public class AccountSessionCookie {
   private final boolean secure;
 
   AccountSessionCookie(@Value("${account.session.cookie-secure:true}") boolean secure, Environment environment) {
-    if (!secure && Stream.concat(Stream.of(environment.getActiveProfiles()),
-        Stream.of(environment.getProperty("evidence.deployment", "development"))).map(p -> p.toLowerCase(Locale.ROOT))
-        .anyMatch(p -> p.equals("pilot") || p.equals("production") || p.equals("prod")))
+    if (!secure && DeploymentStage.from(environment).productionLike())
       throw new IllegalStateException("Account session cookies must be secure for pilot/production");
     this.secure = secure;
   }
