@@ -78,3 +78,42 @@ negotiation transition, while negotiation can still reach that state. Test-drive
 authorized for the gate while its message is `FAILED` or `DELIVERY_UNKNOWN`. Every check and retry
 writes a `RELAY_DELIVERY_CHECKED` or `RELAY_RETRY` row to case-scoped `audit_events` holding only
 the outcome. That graph is already exported and erased with the case; no migration was needed.
+
+## Sending from the Buyer's own email app (ticket 82)
+
+The platform does not write to a dealer in its own name (spec 2.1 §2.1). After the owner record's send
+checks pass under the case lock, `DealerMessageHandoff.handOff` is the one step every approved message
+takes: the quote request, counteroffer, acceptance or written-confirmation request, and test-drive
+proposal, booking, rescheduling and cancellation. On the `OWN_EMAIL_APP` send path (the default,
+`dealer-mail.send-path`) it stores the exact approved subject and text, encrypted, as an outbound
+`dealer_relay_messages` row in state `HANDED_OFF` with `send_path = 'OWN_EMAIL_APP'` and no relay
+identity. Nothing is added: no footer, opt-out line, relay address or platform name. The Buyer
+identity screen still refuses any Buyer email, phone or surname other than values the Buyer released
+to this dealer, and the gate's own checks are unchanged. The owner record moves to `HANDED_OFF`, not
+`SENT`, and no negotiation or appointment state changes yet.
+
+`GET /api/v1/cases/{caseId}/handoffs/{messageId}` returns the address, subject and body for the
+Buyer's mail app (a `mailto:` link, or Copy when the link would exceed about 2,000 characters).
+`POST .../sent` is "I sent it": under the case lock it re-runs the owner's
+`RelayMessageOwner.requireResendPermitted` checks (mandate, gate decision on the exact stored text,
+negotiation and appointment state, test-drive contact release), marks the message `SENT` with the
+time, and calls the owner's `sent`, which applies exactly the first-send state change a relay send
+applies, once. A second press, a discarded message, or a mandate that was revoked or expired changes
+nothing and returns 409 with the reason. `POST .../discard` moves the message and its owner record to
+`DISCARDED`. Nothing is sent or retried automatically; a handed-off message stays "Not sent yet" until
+the Buyer acts. Both actions write a `DEALER_MESSAGE_MARKED_SENT` or `DEALER_MESSAGE_DISCARDED` row to
+case-scoped `audit_events` holding only the send path. Test-drive text stays authorized for the gate
+while its message is `HANDED_OFF`.
+
+`POST /api/v1/cases/{caseId}/quote-requests/{id}/replies` (multipart `text`, optional `subject`,
+`file` parts, `Idempotency-Key`) adds a dealer reply the Buyer pasted or attached to a Dealer
+Conversation whose request is marked sent. `RelayService.receivePasted` stores it as an `INBOUND`,
+`UNTRUSTED` message from the conversation's dealer address with `send_path = 'OWN_EMAIL_APP'`, and
+the relay's inbound path ingests it: malware scan, attachments and quoted figures into document
+intake, and the dealer-reply negotiation transition. Written-quote evidence and test-drive
+confirmations read it exactly as relayed mail.
+
+V44 adds `send_path` (`RELAY`, `OWN_EMAIL_APP`, `CONNECTED_MAILBOX`; existing rows keep `RELAY`),
+makes `identity_id` nullable for non-relay rows, and admits `HANDED_OFF` and `DISCARDED`. The column
+is in the case export, and the rows are erased with the case like every relay message.
+Ticket 83 adds a `CONNECTED_MAILBOX` implementation behind the same step.
