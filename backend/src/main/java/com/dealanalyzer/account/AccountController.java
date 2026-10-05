@@ -11,16 +11,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-/** Buyer Account API. Every account endpoint is authorized by the Account-Session-Token header. */
+/** Buyer Account API. Account endpoints use the HttpOnly account session cookie. */
 @RestController @RequestMapping("/api/v1/account") @Validated
 public class AccountController {
-  private static final String SESSION = "Account-Session-Token";
   private final BuyerAccountService accounts;
+  private final AccountSessionCookie cookies;
   private final AccountExportService exports;
   private final AccountDeletionService deletion;
 
-  AccountController(BuyerAccountService accounts, AccountExportService exports, AccountDeletionService deletion) {
-    this.accounts = accounts; this.exports = exports; this.deletion = deletion;
+  AccountController(BuyerAccountService accounts, AccountExportService exports, AccountDeletionService deletion, AccountSessionCookie cookies) {
+    this.accounts = accounts; this.exports = exports; this.deletion = deletion; this.cookies = cookies;
   }
 
   public record SignInRequest(@NotBlank @Email @Size(max = 254) String email) {}
@@ -37,53 +37,66 @@ public class AccountController {
     return Map.of("status", "Check your email for a single-use sign-in link. It expires in 15 minutes.");
   }
 
+  public record SignedIn(java.time.Instant expiresAt) {}
+
   @PostMapping("/sign-in/verify")
-  public BuyerAccountService.Session verify(@Valid @RequestBody VerifyRequest request) {
-    return accounts.verify(request.token());
+  public SignedIn verify(@Valid @RequestBody VerifyRequest request, jakarta.servlet.http.HttpServletResponse response) {
+    var session = accounts.verify(request.token());
+    cookies.issue(response, session);
+    return new SignedIn(session.expiresAt());
   }
 
   @GetMapping
-  public BuyerAccountService.AccountView view(@RequestHeader(value = SESSION, required = false) String session) {
+  public BuyerAccountService.AccountView view(@com.dealanalyzer.account.AccountSession String session) {
     return accounts.view(session);
   }
 
   @PutMapping("/contact")
-  public BuyerAccountService.AccountView updateContact(@RequestHeader(value = SESSION, required = false) String session,
+  public BuyerAccountService.AccountView updateContact(@com.dealanalyzer.account.AccountSession String session,
       @Valid @RequestBody ContactRequest request) {
     return accounts.updateContact(session, request.firstName(), request.lastName(), request.phone());
   }
 
   @PostMapping("/cases")
-  public BuyerAccountService.AccountView attach(@RequestHeader(value = SESSION, required = false) String session,
+  public BuyerAccountService.AccountView attach(@com.dealanalyzer.account.AccountSession String session,
       @RequestHeader("Case-Access-Token") String caseToken, @Valid @RequestBody AttachRequest request) {
     return accounts.attach(session, request.caseId(), caseToken);
   }
 
   @PostMapping("/sign-out") @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void signOut(@RequestHeader(value = SESSION, required = false) String session,
-      @RequestParam(defaultValue = "false") boolean everywhere) {
+  public void signOut(@com.dealanalyzer.account.AccountSession String session,
+      @RequestParam(defaultValue = "false") boolean everywhere, jakarta.servlet.http.HttpServletResponse response) {
     accounts.signOut(session, everywhere);
+    cookies.clear(response);
   }
 
   @PostMapping("/export")
-  public ResponseEntity<byte[]> export(@RequestHeader(value = SESSION, required = false) String session) {
+  public ResponseEntity<byte[]> export(@com.dealanalyzer.account.AccountSession String session) {
     return ResponseEntity.ok().header("Content-Type", "application/zip")
         .header("Content-Disposition", "attachment; filename=buyer-account-export.zip").body(exports.export(session));
   }
 
   @PostMapping("/deletion") @ResponseStatus(HttpStatus.ACCEPTED)
-  public AccountDeletionService.Receipt delete(@RequestHeader(value = SESSION, required = false) String session) {
+  public AccountDeletionService.Receipt delete(@com.dealanalyzer.account.AccountSession String session) {
     return deletion.request(session);
   }
 
   @GetMapping("/deletion")
-  public AccountDeletionService.Receipt deletionReceipt(@RequestHeader(value = SESSION, required = false) String session) {
-    return deletion.receipt(session);
+  public AccountDeletionService.Receipt deletionReceipt(@com.dealanalyzer.account.AccountSession String session,
+      jakarta.servlet.http.HttpServletResponse response) {
+    AccountDeletionService.Receipt receipt;
+    try { receipt = deletion.receipt(session); }
+    catch (AccountProblem unknown) {
+      cookies.clear(response);
+      throw unknown;
+    }
+    if ("DELETED".equals(receipt.state())) cookies.clear(response);
+    return receipt;
   }
 
   /** Reviewed account outcomes keep their code and fixed detail; nothing echoes Buyer input. */
   @RestControllerAdvice(assignableTypes = {AccountController.class, com.dealanalyzer.notification.NotificationController.class,
-      com.dealanalyzer.journey.JourneyController.class})
+      com.dealanalyzer.journey.JourneyController.class, com.dealanalyzer.appointment.TestDriveController.class})
   @Order(Ordered.HIGHEST_PRECEDENCE)
   static class Problems {
     @ExceptionHandler(AccountProblem.class)

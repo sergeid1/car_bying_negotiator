@@ -2,7 +2,7 @@ import { FormEvent, useState } from "react";
 import "./styles.css";
 import { RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess, SaveCaseLink } from "./CasePortability";
 import { CaseLifecycle } from "./CaseLifecycle";
-import { BuyerAccount } from "./BuyerAccount";
+import { AccountSignedInContext, BuyerAccount } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 import { PricePlan } from "./PricePlan";
 import { NegotiationMandate } from "./NegotiationMandate";
@@ -126,7 +126,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   // A case started at the desk for another car, remembered so it is shown apart from the agreed one.
   const [deskFresh, setDeskFresh] = useState<FreshDeskCase>();
   const [deskRefresh, setDeskRefresh] = useState(0);
-  const [accountSession, setAccountSession] = useState("");
+  const [accountSignedIn, setAccountSignedIn] = useState(false);
   const [accountRecheck, setAccountRecheck] = useState(0);
   const [guide] = useState(requestedGuide);
   const [partnerKit] = useState(requestedPartnerKit);
@@ -216,8 +216,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
           <div className="column">
             {guide && <ExplainerGuide slug={guide} />}
             {!guide && partnerKit && <ReferralPartnerKit />}
-            {!standalone && accountSession && <BuyingJourneys key={accountSession} session={accountSession}
-              onSessionEnded={() => { setAccountSession(""); setAccountRecheck(value => value + 1); }}
+            {!standalone && accountSignedIn && <BuyingJourneys
+              onSessionEnded={() => { setAccountSignedIn(false); setAccountRecheck(value => value + 1); }}
               onCaseOpened={(value, disclosure) => {
                 setReferral(disclosure ? { caseId: value.caseId, text: disclosure } : undefined);
                 setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId);
@@ -294,7 +294,9 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               onOfferFrozen={offer => { setFrozenOffer({ caseId: caseCredentials.caseId, version: offer.version }); setDeskRefresh(value => value + 1); }} />}
             {caseCredentials && !caseRevoked && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <NegotiationMandate key={`mandate-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
-            {caseCredentials && !caseRevoked && <QuoteRequest key={`quote-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
+            {caseCredentials && !caseRevoked && <AccountSignedInContext.Provider value={accountSignedIn}>
+              <QuoteRequest key={`quote-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />
+            </AccountSignedInContext.Provider>}
             {caseCredentials && !caseRevoked && <VerifiedOfferAnalysis key={`analysis-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
               offerVersion={frozenOffer?.caseId === caseCredentials.caseId ? frozenOffer.version : undefined} pollDelayMs={pollDelayMs} />}
           </div>
@@ -308,8 +310,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             {caseCredentials && !caseRevoked && <SaveCaseLink {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
-            <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined}
-              onSignedIn={setAccountSession} recheck={accountRecheck} />
+            {!standalone && <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined}
+              onSignedIn={setAccountSignedIn} recheck={accountRecheck} />}
             {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
               onRevoked={() => { setCaseRevoked(true); setReport(undefined); setStage(undefined); setError(undefined); }} />}
           </aside>

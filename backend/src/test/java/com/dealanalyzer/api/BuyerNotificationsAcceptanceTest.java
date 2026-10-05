@@ -115,7 +115,7 @@ class BuyerNotificationsAcceptanceTest {
       // An uncertain adapter outcome remains deduplicated after restart too.
       jdbc.update("update buyer_notification_deliveries set state = 'DELIVERY_UNKNOWN', completed_at = null where account_id = ? and notification_type = 'DEALER_REPLY' and state = 'SENT'", id);
       request(client, "PUT", session, Map.of("type", "APPOINTMENT", "enabled", false));
-      byte[] archive = client.post().uri("/api/v1/account/export").header("Account-Session-Token", session)
+      byte[] archive = client.post().uri("/api/v1/account/export").header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1")
           .retrieve().body(byte[].class);
       try (var zip = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(archive))) {
         boolean found = false;
@@ -140,7 +140,7 @@ class BuyerNotificationsAcceptanceTest {
       assertThat(sent).hasSize(before);
       assertThat(notifications.deliveryHistory(id).stream().anyMatch(row -> "DELIVERY_UNKNOWN".equals(row.get("state")))).isTrue();
       assertThat(notifications.preferences(session).stream().filter(p -> p.type() == NotificationType.APPOINTMENT).findFirst().orElseThrow().enabled()).isFalse();
-      app.client().post().uri("/api/v1/account/deletion").header("Account-Session-Token", session).retrieve().toBodilessEntity();
+      app.client().post().uri("/api/v1/account/deletion").header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1").retrieve().toBodilessEntity();
       notifications.notify(id, NotificationType.ACCOUNT_SECURITY, "after-deletion");
       assertThat(sent).hasSize(before);
       app.context().getBean(AccountDeletionWorker.class).runOnce();
@@ -160,14 +160,16 @@ class BuyerNotificationsAcceptanceTest {
 
   private String signIn(RestClient client, String email) throws Exception {
     post(client, "/api/v1/account/sign-in-requests", Map.of("email", email));
-    return post(client, "/api/v1/account/sign-in/verify", Map.of("token", sent.getLast().link().split("#sign-in=")[1]))
-        .path("sessionToken").asText();
+    return AccountSessionTestSupport.verify(client, sent.getLast().link().split("#sign-in=")[1]);
   }
 
   record Result(int status, JsonNode body) {}
   private Result request(RestClient client, String method, String session, Object body) {
     var request = client.method(HttpMethod.valueOf(method)).uri("/api/v1/account/notifications");
-    if (session != null) request.header("Account-Session-Token", session);
+    if (session != null) {
+      request.header("Cookie", AccountSessionTestSupport.cookie(session));
+      if (!"GET".equals(method)) request.header("Account-Request", "1");
+    }
     if (body != null) request.contentType(MediaType.APPLICATION_JSON).body(body);
     return request.exchange((req, res) -> new Result(res.getStatusCode().value(), new ObjectMapper().readTree(res.getBody())));
   }

@@ -73,6 +73,12 @@ public class AccountDeletionService {
     return view(job);
   }
 
+  @Transactional(readOnly = true)
+  public boolean hasPendingReceipt(String sessionToken) {
+    var job = receiptJob(sessionToken);
+    return job != null && "DELETION_PENDING".equals(job.state);
+  }
+
   private AccountDeletionJobEntity receiptJob(String sessionToken) {
     if (sessionToken == null || sessionToken.isBlank() || sessionToken.length() > 128) return null;
     return jobs.findByReceiptHash(receiptHash(sessionToken)).orElse(null);

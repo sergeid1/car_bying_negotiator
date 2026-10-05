@@ -15,8 +15,8 @@ function total(car: ComparisonCar, order: Exclude<Order, "shortlist">) {
   return amounts.length ? amounts.reduce((sum, amount) => sum + amount.minorUnits, 0) : null;
 }
 
-export function QuoteComparison({ journeyId, session, onSessionEnded }: {
-  journeyId: string; session: string; onSessionEnded: () => void;
+export function QuoteComparison({ journeyId, onSessionEnded }: {
+  journeyId: string; onSessionEnded: () => void;
 }) {
   const id = useId();
   const [view, setView] = useState<QuoteComparisonView>();
@@ -26,7 +26,7 @@ export function QuoteComparison({ journeyId, session, onSessionEnded }: {
   useEffect(() => {
     let active = true;
     setView(undefined); setStatus("Loading quote comparison…");
-    fetch(`/api/v1/journeys/${encodeURIComponent(journeyId)}/quote-comparison`, { headers: { "Account-Session-Token": session } })
+    fetch(`/api/v1/journeys/${encodeURIComponent(journeyId)}/quote-comparison`)
       .then(async response => {
         if (!active) return;
         if (response.status === 401) { onSessionEnded(); return; }
@@ -35,7 +35,7 @@ export function QuoteComparison({ journeyId, session, onSessionEnded }: {
         if (active) { setView(saved); setStatus(""); if (!saved.otdComparable) setOrder(previous => previous === "otd" ? "shortlist" : previous); }
       }).catch(() => { if (active) setStatus("Quote comparison is unavailable. Try refreshing it."); });
     return () => { active = false; };
-  }, [journeyId, session, revision]);
+  }, [journeyId, revision]);
   const cars = [...(view?.cars ?? [])];
   if (order !== "shortlist") cars.sort((a, b) => {
     const left = total(a, order), right = total(b, order);

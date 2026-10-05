@@ -65,8 +65,10 @@ async function stubApi(page: Page) {
   await page.route("**/api/v1/**", route => route.fulfill({ status: 204, body: "" }));
   await page.route("**/api/v1/intake-options", route => route.fulfill({ json: { supported: ["US-NC"], consentPolicies: {} } }));
   await page.route("**/api/v1/account/sign-in/verify", route =>
-    route.fulfill({ json: { sessionToken: "session-1", expiresAt: "2026-10-17T00:00:00Z" } }));
-  await page.route("**/api/v1/account", route => route.fulfill({ json: ACCOUNT }));
+    route.fulfill({ headers: { "Set-Cookie": "account_session=session-1; HttpOnly; Secure; SameSite=Strict; Path=/api/v1; Max-Age=1209600" },
+      json: { expiresAt: "2026-10-17T00:00:00Z" } }));
+  await page.route("**/api/v1/account", route => route.request().headers().cookie?.includes("account_session=session-1")
+    ? route.fulfill({ json: ACCOUNT }) : route.fulfill({ status: 401, json: { code: "SESSION_ENDED" } }));
   await page.route("**/api/v1/account/notifications", route => route.fulfill({ json: [] }));
   await page.route("**/api/v1/journeys/brief-options", route => route.fulfill({ json: OPTIONS }));
   await page.route("**/api/v1/journeys", route => route.request().method() === "POST"

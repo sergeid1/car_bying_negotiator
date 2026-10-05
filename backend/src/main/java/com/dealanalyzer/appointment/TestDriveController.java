@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 @RestController @Validated
 @RequestMapping("/api/v1/cases/{caseId}/appointment")
 public class TestDriveController {
-  private static final String SESSION = "Account-Session-Token";
   private final TestDriveService testDrives;
   public TestDriveController(TestDriveService testDrives) { this.testDrives = testDrives; }
 
@@ -31,7 +30,7 @@ public class TestDriveController {
   }
   @PostMapping("/bookings") @ResponseStatus(HttpStatus.CREATED)
   public TestDriveService.Message book(@PathVariable String caseId, @RequestHeader("Case-Access-Token") String token,
-      @RequestHeader(value = SESSION, required = false) String session,
+      @com.dealanalyzer.account.AccountSession String session,
       @RequestHeader("Idempotency-Key") @NotBlank @Size(max = 200) String key, @RequestBody TestDriveService.Booking request) {
     return testDrives.book(caseId, token, session, key, request);
   }
@@ -43,7 +42,7 @@ public class TestDriveController {
   }
   @PostMapping("/messages/{id}/approval")
   public TestDriveService.Message approve(@PathVariable String caseId, @PathVariable String id,
-      @RequestHeader("Case-Access-Token") String token, @RequestHeader(value = SESSION, required = false) String session,
+      @RequestHeader("Case-Access-Token") String token, @com.dealanalyzer.account.AccountSession String session,
       @RequestBody TestDriveService.Approval approval) {
     return testDrives.approve(caseId, token, session, id, approval);
   }

@@ -66,7 +66,7 @@ function server(candidates: () => Response) {
 }
 
 async function open(user: ReturnType<typeof userEvent.setup>, onSessionEnded = () => {}) {
-  render(<BuyingJourneys session="s1" onSessionEnded={onSessionEnded} />);
+  render(<BuyingJourneys onSessionEnded={onSessionEnded} />);
   await user.click(await screen.findByRole("button", { name: "Open 2020–2024 Honda Civic" }));
   return screen.findByRole("region", { name: "Candidate Vehicles" });
 }
@@ -82,7 +82,7 @@ test("candidates are searched only on request and show reasons, snapshot source,
   const list = await within(region).findByRole("list", { name: "Candidate Vehicles, brief version 2" });
   const search = calls.find(call => call.path === "/api/v1/journeys/j1/candidates");
   expect(search?.init?.method).toBe("POST");
-  expect((search?.init?.headers as Record<string, string>)["Account-Session-Token"]).toBe("s1");
+  expect((search?.init?.headers as Record<string, string>)["Account-Request"]).toBe("1");
   expect(within(region).getByRole("heading", { name: "2 candidates for brief version 2" })).toHaveFocus();
   expect(within(region).getByText(/not for sale/, { selector: ".notice" })).toBeInTheDocument();
 

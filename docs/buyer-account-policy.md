@@ -11,7 +11,7 @@ There are no passwords. `POST /api/v1/account/sign-in-requests` with `{"email"}`
 purpose `ACCOUNT_SIGN_IN`. The acknowledgement is identical for new, existing and
 pending-deletion addresses. Links expire after `account.sign-in.link-lifetime` (default
 15 minutes) and are stored only as a scoped HMAC. `POST /api/v1/account/sign-in/verify`
-consumes a link once and returns a session token; a reused link gets 410
+consumes a link once and sets the session cookie; its JSON returns only the expiry, never the token. A reused link gets 410
 `SIGN_IN_LINK_USED`, an expired one 410 `SIGN_IN_LINK_EXPIRED`, an unknown one 404
 `SIGN_IN_LINK_UNKNOWN`, each with a fixed Buyer-facing `detail`. At most
 `account.sign-in.max-active-links` (default 3) unused, unexpired links exist per address;
@@ -23,11 +23,28 @@ link expired are removed by the account worker.
 
 ## Sessions
 
-Every account endpoint takes `Account-Session-Token`. Sessions are stored as a scoped HMAC,
-expire after `account.session.lifetime` (default 14 days), and survive a page reload because
-the browser keeps the token in `localStorage` after sign-in only. `POST
-/api/v1/account/sign-out` revokes the current session server-side; `?everywhere=true`
-revokes every session. Ended sessions get 401 `SESSION_ENDED`.
+Account, notification, journey, quote-comparison and account-authenticated test-drive
+endpoints read the `account_session` cookie. The old `Account-Session-Token` header is
+ignored. The cookie has `HttpOnly; Secure; SameSite=Strict; Path=/api/v1` and a Max-Age
+matching the session expiry. Sessions are stored server-side as a scoped HMAC and expire
+after `account.session.lifetime` (default 14 days). The browser sends the cookie on
+same-origin requests, so sign-in survives a reload; the client discovers sign-in with
+`GET /api/v1/account` and stores no account data in localStorage or sessionStorage.
+HttpOnly prevents page scripts from reading the credential. Secure confines it to HTTPS,
+and SameSite=Strict limits its use across sites.
+
+POST, PUT and DELETE requests using this cookie also require `Account-Request: 1`.
+The shared resolver refuses requests without that exact header with 403
+`ACCOUNT_REQUEST_REQUIRED`; a cross-site HTML form cannot add it. GET requests need no
+custom header. The header is a public request marker, readable and set by page scripts;
+it contains no credential. Only the cookie credential is unreadable by page scripts.
+Case-link requests and anonymous case creation are unchanged.
+
+`POST /api/v1/account/sign-out` revokes the current session server-side and clears the
+cookie; `?everywhere=true` revokes every session. Expired or revoked sessions get 401
+`SESSION_ENDED` and clear the cookie, except while its deletion receipt is pending (below).
+`account.session.cookie-secure=false` permits local HTTP development only; secure is the
+default, and pilot, prod and production profiles or deployment settings refuse the switch.
 
 ## Contact details
 
@@ -59,9 +76,13 @@ session and unused sign-in link, marks the account `DELETION_PENDING`, and queue
 case on the case deletion lifecycle (`docs/case-deletion-policy.md`), revoking those case links
 at once. `AccountDeletionWorker` deletes and count-verifies the account graph, then marks the
 job `DELETED` with verification `ACCOUNT_GRAPH_AND_CASES_ABSENT_V1` once every attached case is
-verified `DELETED`. `GET /api/v1/account/deletion` with the old session token reads the receipt,
-which holds no contact details or credentials. Backup expiry is reported as `UNKNOWN`, as for
-cases.
+verified `DELETED`. The deletion request leaves the cookie in place for
+`GET /api/v1/account/deletion`, which reads the receipt through the existing receipt hash
+even though the session is revoked. While that receipt is pending, other account endpoints
+return 401 without clearing the cookie, preserving the Buyer's Check deletion progress flow.
+A receipt response in terminal state `DELETED` clears the cookie with Max-Age=0 and the same
+attributes. The receipt holds no contact details or credentials. Backup expiry is reported
+as `UNKNOWN`, as for cases.
 
 ## Notifications
 
@@ -72,7 +93,7 @@ through the `RecoveryEmail` adapter, after the producer's own transaction commit
 dealer names, VINs, document content, case credential or sign-in token, so reading the journey
 still requires sign-in.
 
-`GET`/`PUT /api/v1/account/notifications` (`Account-Session-Token`) read and set each optional
+`GET`/`PUT /api/v1/account/notifications` (session cookie) read and set each optional
 type. Every optional type is on until turned off. `ACCOUNT_SECURITY` cannot be turned off.
 
 Each `(account, type, dedupeKey)` is attempted at most once. The key is stored only as a keyed
@@ -93,7 +114,7 @@ removes both notification tables.
 ## Buying Journeys
 
 A signed-in Buyer starts a Buying Journey under `/api/v1/journeys`, authorized only by
-`Account-Session-Token`; a case token never opens a journey. A journey starts in `SHOPPING`
+the session cookie; a case token never opens a journey. A journey starts in `SHOPPING`
 (the other spec §6 journey states arrive with later tickets) and is created with Shopping Brief
 version 1. `POST /api/v1/journeys` needs an `Idempotency-Key`; a replay returns the same journey.
 

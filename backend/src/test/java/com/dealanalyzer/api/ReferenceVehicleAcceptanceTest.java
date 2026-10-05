@@ -34,7 +34,6 @@ import org.springframework.web.client.RestClient;
 class ReferenceVehicleAcceptanceTest {
   private static final ObjectMapper JSON = new ObjectMapper();
   private static final String KEY = "--document.storage.encryption-key=0123456789abcdef0123456789abcdef";
-  private static final String SESSION = "Account-Session-Token";
   private static final String RAV4 = "2T3P1RFV5MW000001";
   private static final String CRV = "5J6RW2H52ML000002";
   private static final String SILVERADO = "1GCUYHED0KZ000003";
@@ -203,7 +202,7 @@ class ReferenceVehicleAcceptanceTest {
       String id = create(client, session);
       exchange(client, "POST", "/api/v1/journeys/" + id + "/reference-vehicles", Map.of("basedOnVersion", 1, "vin", RAV4), session);
 
-      byte[] archive = client.post().uri("/api/v1/account/export").header(SESSION, session).retrieve().body(byte[].class);
+      byte[] archive = client.post().uri("/api/v1/account/export").header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1").retrieve().body(byte[].class);
       JsonNode account = null;
       String readme = null;
       try (var zip = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(archive))) {
@@ -246,8 +245,7 @@ class ReferenceVehicleAcceptanceTest {
   private static String signIn(RestClient client, String email) throws Exception {
     HttpAcceptanceHarness.post(client, "/api/v1/account/sign-in-requests", Map.of("email", email), UUID.randomUUID().toString());
     String secret = links.getLast().split("#sign-in=")[1];
-    return HttpAcceptanceHarness.post(client, "/api/v1/account/sign-in/verify", Map.of("token", secret))
-        .path("sessionToken").asText();
+    return AccountSessionTestSupport.verify(client, secret);
   }
 
   record Result(int status, JsonNode body) {}
@@ -258,7 +256,10 @@ class ReferenceVehicleAcceptanceTest {
 
   private static Result exchange(RestClient client, String method, String path, Object body, String session, String key) {
     var request = client.method(HttpMethod.valueOf(method)).uri(path);
-    if (session != null) request.header(SESSION, session);
+    if (session != null) {
+      request.header("Cookie", AccountSessionTestSupport.cookie(session));
+      if (!"GET".equals(method)) request.header("Account-Request", "1");
+    }
     if (key != null) request.header("Idempotency-Key", key);
     if (body != null) request.contentType(MediaType.APPLICATION_JSON).body(body);
     return request.exchange((req, response) -> {

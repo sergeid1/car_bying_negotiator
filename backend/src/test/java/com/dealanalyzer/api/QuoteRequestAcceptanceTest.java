@@ -141,13 +141,13 @@ class QuoteRequestAcceptanceTest {
       assertThat(zipEntry(bytes, "case-data.json")).contains("quote_requests", "case_negotiation_states", quote.path("id").asText());
       post(client, "/api/v1/account/sign-in-requests", Map.of("email", "quote-buyer@example.com"), "sign-in");
       String secret = BuyerAccountAcceptanceTest.sent.getLast().link().split("#sign-in=")[1];
-      String session = post(client, "/api/v1/account/sign-in/verify", Map.of("token", secret)).path("sessionToken").asText();
-      client.post().uri("/api/v1/account/cases").header("Account-Session-Token", session).header("Case-Access-Token", token)
+      String session = AccountSessionTestSupport.verify(client, secret);
+      client.post().uri("/api/v1/account/cases").header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1").header("Case-Access-Token", token)
           .body(Map.of("caseId", caseId)).retrieve().toBodilessEntity();
-      byte[] accountZip = client.post().uri("/api/v1/account/export").header("Account-Session-Token", session).retrieve().body(byte[].class);
+      byte[] accountZip = client.post().uri("/api/v1/account/export").header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1").retrieve().body(byte[].class);
       assertThat(zipEntry(zipBytes(accountZip, "cases/buying-case-" + caseId + ".zip"), "case-data.json"))
           .contains("quote_requests", "case_negotiation_states", quote.path("id").asText());
-      client.post().uri("/api/v1/account/deletion").header("Account-Session-Token", session).retrieve().toBodilessEntity();
+      client.post().uri("/api/v1/account/deletion").header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1").retrieve().toBodilessEntity();
       assertThatThrownBy(() -> get(client, path, token)).isInstanceOf(HttpClientErrorException.NotFound.class);
       app.context().getBean(com.dealanalyzer.account.AccountDeletionWorker.class).runOnce();
       app.context().getBean(CaseDeletionWorker.class).runOnce();
