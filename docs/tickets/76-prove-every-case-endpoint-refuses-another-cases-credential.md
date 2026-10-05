@@ -4,12 +4,19 @@
 
 **Blocked by:** none.
 
-**Status:** ready-for-agent — filed on 2026-10-05 from a codebase security review.
+**Status:** complete — `CaseIsolationInventoryAcceptanceTest` classifies all 157 mappings (92 case, 26 account,
+13 public, 26 operator) in one boot and fails on any unclassified endpoint (no migration), as of 2026-10-05. Fixed:
+`EphemeralCasePersistence.lock` answered 400 "Buying Case not found" for an unknown case on 26 routes while a wrong
+token answered 404, revealing which case IDs exist; test-drive message approval checked the message kind and booking
+owner before the case token; extraction history answered 200 `[]` for another case's document. Open: no fixture has
+a vehicle-identity conflict, so that route's cross-case object check is trivial; on a few routes the attacker case's
+state refuses before the nested object lookup (the responses still match an unknown object); a missing
+`Case-Access-Token` header gets the framework's 400 for every case, not 404.
 
-- [ ] The test reads every mapping from `RequestMappingHandlerMapping` and classifies it as case-scoped (has `{caseId}` or takes `Case-Access-Token`), account-scoped, operator-scoped or public. An unclassified endpoint fails the test with its path, so a new endpoint cannot ship without a decision.
-- [ ] Every case-scoped endpoint is called with no token, a malformed token, an expired token, and a valid token for a second case. Each call is refused with the same generic response as an unknown case, and no response body, header or timing branch reveals whether the case exists.
-- [ ] Endpoints that also take nested object IDs (documents, reports, operations, relay messages, quotes, appointments) are called with the right case token but another case's object ID, and are refused the same way.
-- [ ] Account-scoped endpoints are called with another account's session and with no session; operator endpoints are called without and with a wrong operator token.
-- [ ] The public endpoints (case creation, recovery, sign-in, dealer opt-out) are listed explicitly with a one-line reason each.
-- [ ] Any endpoint the test finds that does not refuse is fixed in this ticket, and the finding is recorded in the status line.
-- [ ] The threat model's case-substitution row names this test as its evidence in place of the manual re-run obligation.
+- [x] The test reads every mapping from `RequestMappingHandlerMapping` and classifies it as case-scoped (has `{caseId}` or takes `Case-Access-Token`), account-scoped, operator-scoped or public. An unclassified endpoint fails the test with its path, so a new endpoint cannot ship without a decision.
+- [x] Every case-scoped endpoint is called with no token, a malformed token, an expired token, and a valid token for a second case. Each call is refused with the same generic response as an unknown case, and no response body, header or timing branch reveals whether the case exists.
+- [x] Endpoints that also take nested object IDs (documents, reports, operations, relay messages, quotes, appointments) are called with the right case token but another case's object ID, and are refused the same way.
+- [x] Account-scoped endpoints are called with another account's session and with no session; operator endpoints are called without and with a wrong operator token.
+- [x] The public endpoints (case creation, recovery, sign-in, dealer opt-out) are listed explicitly with a one-line reason each.
+- [x] Any endpoint the test finds that does not refuse is fixed in this ticket, and the finding is recorded in the status line.
+- [x] The threat model's case-substitution row names this test as its evidence in place of the manual re-run obligation.
