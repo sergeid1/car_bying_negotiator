@@ -14,7 +14,7 @@ retention, and stay out of logs. Inbound mail is size-limited, malware-scanned, 
 attachments enter the existing document intake. The dealer opt-out link is `/api/v1/relay/opt-out/{token}` so it never
 reveals the case id. Open: only a deterministic fake adapter exists — the real provider, its signed inbound webhook and
 sender authentication wait on specification §18 prerequisite 10; contact release for a dealer is ticket 65; `send` has
-no idempotency key, so a `DELIVERY_UNKNOWN` message must not be resent blindly.
+no idempotency key, so a `DELIVERY_UNKNOWN` message must not be resent blindly (resolved by ticket 73).
 
 - [x] A replaceable relay adapter sends and receives email; a deterministic fake drives the main test suite; the real provider is selected under specification §18 prerequisite 10 and is not enabled by this ticket.
 - [x] Relay addresses are unguessable per case and stop accepting mail when the case or account is deleted.

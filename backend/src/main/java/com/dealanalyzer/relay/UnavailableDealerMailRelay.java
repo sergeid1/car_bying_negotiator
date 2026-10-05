@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "dealer-relay.provider", havingValue = "none")
 class UnavailableDealerMailRelay implements DealerMailRelay {
-  @Override public String send(OutboundMail mail) { throw new RelayUnavailableException(); }
+  @Override public String send(String idempotencyKey, OutboundMail mail) { throw new RelayUnavailableException(); }
+  @Override public java.util.Optional<String> lookup(String idempotencyKey) { throw new RelayUnavailableException(); }
   @Override public String domain() { return "relay.invalid"; }
 }

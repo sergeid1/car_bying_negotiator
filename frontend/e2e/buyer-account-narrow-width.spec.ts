@@ -15,10 +15,14 @@ async function stubAccountApi(page: Page) {
   await page.route("**/api/v1/**", route => route.fulfill({ status: 204, body: "" }));
   await page.route("**/api/v1/intake-options", route => route.fulfill({ json: { supported: ["US-NC"], consentPolicies: {} } }));
   await page.route("**/api/v1/account/sign-in/verify", route =>
-    route.fulfill({ json: { sessionToken: "session-1", expiresAt: "2026-10-17T00:00:00Z" } }));
-  await page.route("**/api/v1/account", route => route.fulfill({ json: ACCOUNT }));
+    route.fulfill({ headers: { "Set-Cookie": "account_session=session-1; HttpOnly; Secure; SameSite=Strict; Path=/api/v1; Max-Age=1209600" },
+      json: { expiresAt: "2026-10-17T00:00:00Z" } }));
+  await page.route("**/api/v1/account", route => route.request().headers().cookie?.includes("account_session=session-1")
+    ? route.fulfill({ json: ACCOUNT }) : route.fulfill({ status: 401, json: { code: "SESSION_ENDED" } }));
   await page.route("**/api/v1/account/notifications", route => {
     if (route.request().method() === "PUT") {
+      expect(route.request().headers()["account-request"]).toBe("1");
+      expect(route.request().headers()["account-session-token"]).toBeUndefined();
       const change = route.request().postDataJSON();
       preferences = preferences.map(value => value.type === change.type ? { ...value, enabled: change.enabled } : value);
     }
@@ -64,6 +68,10 @@ test("signing in, the account screen and the deletion receipt fit 360 px", async
   await expect.poll(() => new URL(page.url()).hash).toBe("");
   await panel.getByRole("button", { name: "Finish signing in" }).click();
   await expect(panel.getByText(ACCOUNT.contact.email)).toBeVisible();
+  const cookie = (await page.context().cookies()).find(cookie => cookie.name === "account_session");
+  expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: "Strict", path: "/api/v1" });
+  expect(await page.evaluate(() => document.cookie)).not.toContain("account_session");
+  expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
   await expect(panel.getByRole("list", { name: "Attached Buying Cases" })).toContainText("Open");
   await expect(panel.getByLabel("Account security (required)")).toBeChecked();
   await expect(panel.getByLabel("Account security (required)")).toBeDisabled();

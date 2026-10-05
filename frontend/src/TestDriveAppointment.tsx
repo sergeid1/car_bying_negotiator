@@ -1,6 +1,6 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useContext, useEffect, useRef, useState } from "react";
+import { AccountSignedInContext } from "./BuyerAccount";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
-import { ACCOUNT_SESSION_KEY } from "./BuyerAccount";
 
 type Field = "FIRST_NAME" | "LAST_NAME" | "EMAIL" | "PHONE";
 type Slot = { option: number; startsAt: string; endsAt: string; label: string };
@@ -38,9 +38,6 @@ function asView(value: unknown): TestDriveView {
     || !Array.isArray(v.contactFields)) throw new Error("Test-drive scheduling is unavailable. Try refreshing.");
   return v as TestDriveView;
 }
-function storedSession() {
-  try { return window.localStorage.getItem(ACCOUNT_SESSION_KEY) ?? ""; } catch { return ""; }
-}
 function defaultZone() {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; }
 }
@@ -52,13 +49,24 @@ export function TestDriveAppointment({ caseId, token, version = 0 }: { caseId: s
   const [busy, setBusy] = useState(false);
   const [moving, setMoving] = useState<string>();
   const [windowCount, setWindowCount] = useState(1);
+  const sharedSignedIn = useContext(AccountSignedInContext);
+  const [discoveredSignedIn, setDiscoveredSignedIn] = useState(false);
+  const signedIn = sharedSignedIn ?? discoveredSignedIn;
   const key = useRef(crypto.randomUUID());
   const path = `/api/v1/cases/${encodeURIComponent(caseId)}/appointment`;
-  async function request(url: string, body?: unknown, session = false) {
-    const account = session ? storedSession() : "";
+  useEffect(() => {
+    if (sharedSignedIn !== undefined) return;
+    let current = true;
+    fetch("/api/v1/account").then(async response => {
+      const account = response.ok ? await response.json() : undefined;
+      if (current) setDiscoveredSignedIn(typeof account?.contact?.email === "string");
+    }).catch(() => { if (current) setDiscoveredSignedIn(false); });
+    return () => { current = false; };
+  }, [path, version, sharedSignedIn]);
+  async function request(url: string, body?: unknown) {
     const response = await fetch(url, { method: body === undefined ? "GET" : "POST", headers: {
       "Case-Access-Token": token, "Content-Type": "application/json", "Idempotency-Key": key.current,
-      ...(account ? { "Account-Session-Token": account } : {}),
+      ...(body !== undefined ? { "Account-Request": "1" } : {}),
     }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     if (!response.ok) {
       if (response.status === 401) throw new Error("Sign in to your Buyer Account in this browser to book and choose contact details.");
@@ -78,9 +86,9 @@ export function TestDriveAppointment({ caseId, token, version = 0 }: { caseId: s
     // The case, its token and relay changes define this view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, token, version]);
-  async function update(url: string, body: unknown, session = false) {
+  async function update(url: string, body: unknown) {
     setBusy(true); setError(undefined);
-    try { await request(url, body, session); key.current = crypto.randomUUID(); setMoving(undefined); await refresh(); }
+    try { await request(url, body); key.current = crypto.randomUUID(); setMoving(undefined); await refresh(); }
     catch (failure) { setError((failure as Error).message); }
     finally { setBusy(false); }
   }
@@ -94,7 +102,7 @@ export function TestDriveAppointment({ caseId, token, version = 0 }: { caseId: s
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     void update(`${path}/bookings`, { proposalId: reply.proposalId, messageId: reply.messageId, option: Number(data.get("option")),
-      release: data.getAll("release") }, true);
+      release: data.getAll("release") });
   }
   async function download(appointment: Appointment) {
     setBusy(true); setError(undefined);
@@ -111,7 +119,6 @@ export function TestDriveAppointment({ caseId, token, version = 0 }: { caseId: s
   if (view && !view.agreedPrice) return null;
   const active = view?.appointments.find(appointment => appointment.state === "SCHEDULED" || appointment.state === "RESCHEDULING");
   const proposal = view?.messages.filter(message => (message.kind === "PROPOSAL" || message.kind === "RESCHEDULE") && message.state === "SENT").at(-1);
-  const signedIn = Boolean(storedSession());
   const canPropose = view && (!active || moving);
   return <section className="panel test-drive-panel" aria-labelledby="test-drive-heading">
     <h2 id="test-drive-heading">Schedule a test drive</h2>
@@ -167,7 +174,7 @@ export function TestDriveAppointment({ caseId, token, version = 0 }: { caseId: s
         <OutboundGateDecision decision={message.gatedDraft.decision} />
         {message.state === "DRAFT" ? <button type="button" disabled={busy || !message.gatedDraft.decision.pass}
           onClick={() => void update(`${path}/messages/${encodeURIComponent(message.id)}/approval`,
-            { approved: true, text: message.gatedDraft.draft.text }, message.kind === "BOOKING")}>
+            { approved: true, text: message.gatedDraft.draft.text })}>
           {message.kind === "BOOKING" ? "Approve this text, share the chosen details and book" : "Approve this text and send"}
         </button> : <p role="status">{MESSAGE_STATES[message.state] ?? message.state}</p>}
       </article>)}

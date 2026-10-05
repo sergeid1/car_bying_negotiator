@@ -44,10 +44,10 @@ const day = (iso: string) => {
 const title = (from: number, to: number, make: string, model: string) =>
   `${from === to ? from : `${from}–${to}`} ${make} ${model}`;
 
-async function call<T>(path: string, session: string, init: RequestInit & { key?: string } = {}): Promise<T> {
+async function call<T>(path: string, init: RequestInit & { key?: string } = {}): Promise<T> {
   const { key, ...rest } = init;
   const response = await fetch(path, { ...rest, headers: {
-    "Account-Session-Token": session,
+    ...(["POST", "PUT", "DELETE"].includes(rest.method ?? "GET") ? { "Account-Request": "1" } : {}),
     ...(rest.body ? { "Content-Type": "application/json" } : {}),
     ...(key ? { "Idempotency-Key": key } : {}),
   } });
@@ -62,7 +62,7 @@ type View = { mode: "list" } | { mode: "new" } | { mode: "open"; journey: Journe
   | { mode: "edit"; journey: Journey };
 
 /** A signed-in Buyer's Buying Journeys: each starts with a Shopping Brief, and every saved edit is a new version. */
-export function BuyingJourneys({ session, onSessionEnded, onCaseOpened }: { session: string; onSessionEnded: () => void;
+export function BuyingJourneys({ onSessionEnded, onCaseOpened }: { onSessionEnded: () => void;
   onCaseOpened?: (value: JourneyCaseCredentials, disclosure?: string) => void }) {
   const [options, setOptions] = useState<BriefOptions>();
   const [journeys, setJourneys] = useState<JourneySummary[]>();
@@ -77,7 +77,7 @@ export function BuyingJourneys({ session, onSessionEnded, onCaseOpened }: { sess
 
   useEffect(() => {
     let current = true;
-    Promise.all([call<BriefOptions>("/api/v1/journeys/brief-options", session), call<JourneySummary[]>("/api/v1/journeys", session)])
+    Promise.all([call<BriefOptions>("/api/v1/journeys/brief-options"), call<JourneySummary[]>("/api/v1/journeys")])
       .then(([loadedOptions, loadedJourneys]) => {
         if (!current) return;
         if (!Array.isArray(loadedJourneys) || !loadedOptions?.reference) throw { status: 0 };
@@ -88,7 +88,7 @@ export function BuyingJourneys({ session, onSessionEnded, onCaseOpened }: { sess
         if (failure?.status === 401) onSessionEnded(); else setError("Your Buying Journeys could not be loaded. Retry safely.");
       });
     return () => { current = false; };
-  }, [session, loads]);
+  }, [loads]);
 
   async function run(action: () => Promise<void>, failure: string) {
     setBusy(true); setError(""); setMessage(""); setProblem(undefined);
@@ -104,7 +104,7 @@ export function BuyingJourneys({ session, onSessionEnded, onCaseOpened }: { sess
     setView(next); setProblem(undefined); setError(""); setMessage(notice);
     window.setTimeout(() => heading.current?.focus(), 0);
   }
-  const refreshList = async () => setJourneys(await call<JourneySummary[]>("/api/v1/journeys", session));
+  const refreshList = async () => setJourneys(await call<JourneySummary[]>("/api/v1/journeys"));
 
   let body;
   if (!options || !journeys) {
@@ -118,14 +118,14 @@ export function BuyingJourneys({ session, onSessionEnded, onCaseOpened }: { sess
       onCancel={() => show(journey ? { mode: "open", journey, shown: journey.brief } : { mode: "list" })}
       onSubmit={input => run(async () => {
         if (!journey) {
-          const created = await call<Journey>("/api/v1/journeys", session, { method: "POST", key: createKey.current, body: JSON.stringify(input) });
+          const created = await call<Journey>("/api/v1/journeys", { method: "POST", key: createKey.current, body: JSON.stringify(input) });
           createKey.current = crypto.randomUUID();
           await refreshList();
           show({ mode: "open", journey: created, shown: created.brief }, "Buying Journey started with brief version 1. No inventory has been searched yet.");
           return;
         }
         try {
-          const saved = await call<Journey>(`/api/v1/journeys/${encodeURIComponent(journey.id)}/briefs`, session, {
+          const saved = await call<Journey>(`/api/v1/journeys/${encodeURIComponent(journey.id)}/briefs`, {
             method: "POST", body: JSON.stringify({ basedOnVersion: journey.brief.version, brief: input }) });
           await refreshList();
           show({ mode: "open", journey: saved, shown: saved.brief }, saved.brief.version === journey.brief.version
@@ -133,7 +133,7 @@ export function BuyingJourneys({ session, onSessionEnded, onCaseOpened }: { sess
             : `Saved as brief version ${saved.brief.version}. Earlier versions remain readable.`);
         } catch (thrown) {
           if ((thrown as Problem)?.status !== 409) throw thrown;
-          const latest = await call<Journey>(`/api/v1/journeys/${encodeURIComponent(journey.id)}`, session);
+          const latest = await call<Journey>(`/api/v1/journeys/${encodeURIComponent(journey.id)}`);
           show({ mode: "open", journey: latest, shown: latest.brief });
           setError((thrown as Problem).detail ?? "This Shopping Brief changed since you opened it. Review the latest version and edit again.");
         }
@@ -141,7 +141,7 @@ export function BuyingJourneys({ session, onSessionEnded, onCaseOpened }: { sess
   } else if (view.mode === "open") {
     const { journey, shown } = view;
     body = <JourneyDetail journey={journey} shown={shown} busy={busy}
-      references={<ReferenceVehicles key={journey.id} session={session} journey={journey} shownVersion={shown.version}
+      references={<ReferenceVehicles key={journey.id} journey={journey} shownVersion={shown.version}
         maxVehicles={options.bounds.maxReferenceVehicles ?? 5} onSessionEnded={onSessionEnded}
         onSaved={async saved => {
           setView({ mode: "open", journey: saved, shown: saved.brief });
@@ -149,17 +149,17 @@ export function BuyingJourneys({ session, onSessionEnded, onCaseOpened }: { sess
         }} />}
       candidates={<><JourneyCandidates key={`${journey.id}-${journey.brief.version}`} journeyId={journey.id}
         briefVersion={journey.brief.version} postalCode={journey.brief.postalCode} onSessionEnded={onSessionEnded}
-        onCaseOpened={onCaseOpened} request={(path, init) => call(path, session, init)} />
-        <QuoteComparison key={journey.id} journeyId={journey.id} session={session} onSessionEnded={onSessionEnded} /></>}
+        onCaseOpened={onCaseOpened} request={(path, init) => call(path, init)} />
+        <QuoteComparison key={journey.id} journeyId={journey.id} onSessionEnded={onSessionEnded} /></>}
       onBack={() => show({ mode: "list" })}
       onEdit={() => show({ mode: "edit", journey })}
       onVersion={version => run(async () => {
         const brief = version === journey.brief.version ? journey.brief
-          : await call<ShoppingBrief>(`/api/v1/journeys/${encodeURIComponent(journey.id)}/briefs/${version}`, session);
+          : await call<ShoppingBrief>(`/api/v1/journeys/${encodeURIComponent(journey.id)}/briefs/${version}`);
         setView({ mode: "open", journey, shown: brief });
       }, "That brief version could not be loaded. Retry safely.")}
       onDelete={() => run(async () => {
-        await call(`/api/v1/journeys/${encodeURIComponent(journey.id)}`, session, { method: "DELETE" });
+        await call(`/api/v1/journeys/${encodeURIComponent(journey.id)}`, { method: "DELETE" });
         await refreshList();
         show({ mode: "list" }, "Buying Journey deleted with every version of its Shopping Brief, Reference Vehicles, captured candidates, shortlist and case links. Buying Cases opened from it remain available separately.");
       }, "The journey could not be deleted. Retry safely.")} />;
@@ -171,7 +171,7 @@ export function BuyingJourneys({ session, onSessionEnded, onCaseOpened }: { sess
         : <ul className="journey-list" aria-label="Your Buying Journeys">
           {journeys.map(j => <li key={j.id}>
             <button className="btn-secondary" disabled={busy} onClick={() => run(async () => {
-              const journey = await call<Journey>(`/api/v1/journeys/${encodeURIComponent(j.id)}`, session);
+              const journey = await call<Journey>(`/api/v1/journeys/${encodeURIComponent(j.id)}`);
               show({ mode: "open", journey, shown: journey.brief });
             }, "That journey could not be opened. Retry safely.")}>
               Open {title(j.yearFrom, j.yearTo, j.make, j.model)}
@@ -245,8 +245,8 @@ const vehicleName = (vehicle: ReferenceVehicle, position: number) => {
  * VINs of cars the Buyer likes. Each is checksum-checked and decoded by the server; the Buyer marks
  * which decoded details matter, and only those refine matching. Every change saves a new brief version.
  */
-function ReferenceVehicles({ session, journey, shownVersion, maxVehicles, onSaved, onSessionEnded }: {
-  session: string; journey: Journey; shownVersion: number; maxVehicles: number;
+function ReferenceVehicles({ journey, shownVersion, maxVehicles, onSaved, onSessionEnded }: {
+  journey: Journey; shownVersion: number; maxVehicles: number;
   onSaved: (journey: Journey) => Promise<void>; onSessionEnded: () => void;
 }) {
   const current = shownVersion === journey.brief.version;
@@ -263,7 +263,7 @@ function ReferenceVehicles({ session, journey, shownVersion, maxVehicles, onSave
     setEarlier(undefined); setError("");
     if (current) return;
     let live = true;
-    call<ReferenceVehicle[]>(`${base}/briefs/${shownVersion}/reference-vehicles`, session)
+    call<ReferenceVehicle[]>(`${base}/briefs/${shownVersion}/reference-vehicles`)
       .then(loaded => { if (live) setEarlier(Array.isArray(loaded) ? loaded : []); })
       .catch((failure: Problem) => {
         if (!live) return;
@@ -271,7 +271,7 @@ function ReferenceVehicles({ session, journey, shownVersion, maxVehicles, onSave
         else setError("The Reference Vehicles of this version could not be loaded. Choose the version again to retry.");
       });
     return () => { live = false; };
-  }, [current, shownVersion, journey.id, session]);
+  }, [current, shownVersion, journey.id]);
 
   const vehicles = current ? journey.referenceVehicles ?? [] : earlier;
   const full = (vehicles?.length ?? 0) >= maxVehicles;
@@ -291,7 +291,7 @@ function ReferenceVehicles({ session, journey, shownVersion, maxVehicles, onSave
         setVinError(vinProblem.message);
         window.setTimeout(() => vinInput.current?.focus(), 0);
       } else if (outcome?.status === 409) {
-        const latest = await call<Journey>(base, session).catch(() => undefined);
+        const latest = await call<Journey>(base).catch(() => undefined);
         if (latest) await onSaved(latest);
         setError(outcome.detail ?? "This Shopping Brief changed since you opened it. Review the latest version and try again.");
       } else setError(outcome?.detail ?? failure);
@@ -301,7 +301,7 @@ function ReferenceVehicles({ session, journey, shownVersion, maxVehicles, onSave
 
   async function add(event: FormEvent) {
     event.preventDefault();
-    const added = await save(() => call<Journey>(`${base}/reference-vehicles`, session, { method: "POST",
+    const added = await save(() => call<Journey>(`${base}/reference-vehicles`, { method: "POST",
       body: JSON.stringify({ basedOnVersion: journey.brief.version, vin: vin.trim() }) }), saved => {
       if (saved.brief.version === journey.brief.version) return "That VIN is already a Reference Vehicle in this brief, so nothing changed.";
       const last = saved.referenceVehicles?.at(-1);
@@ -324,13 +324,13 @@ function ReferenceVehicles({ session, journey, shownVersion, maxVehicles, onSave
         {vehicles.map((vehicle, index) => <li key={`${vehicle.referenceId}-${shownVersion}`}>
           <ReferenceVehicleCard vehicle={vehicle} position={index + 1} editable={current} busy={busy}
             onRelevance={relevant => save(() => call<Journey>(
-              `${base}/reference-vehicles/${encodeURIComponent(vehicle.referenceId)}/relevance`, session, { method: "PUT",
+              `${base}/reference-vehicles/${encodeURIComponent(vehicle.referenceId)}/relevance`, { method: "PUT",
                 body: JSON.stringify({ basedOnVersion: journey.brief.version, relevantAttributes: relevant }) }),
               saved => saved.brief.version === journey.brief.version ? "Nothing changed, so no new version was saved."
                 : `Saved which details matter as brief version ${saved.brief.version}.`,
               "Your choice could not be saved. Retry safely.")}
             onRemove={() => save(() => call<Journey>(`${base}/reference-vehicles/${encodeURIComponent(vehicle.referenceId)}`
-              + `?basedOnVersion=${journey.brief.version}`, session, { method: "DELETE" }),
+              + `?basedOnVersion=${journey.brief.version}`, { method: "DELETE" }),
               saved => `Removed as brief version ${saved.brief.version}. Earlier versions still list it.`,
               "The Reference Vehicle could not be removed. Retry safely.")} />
         </li>)}

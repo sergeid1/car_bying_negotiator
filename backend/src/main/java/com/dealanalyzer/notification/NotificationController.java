@@ -13,12 +13,12 @@ public class NotificationController {
   public record Change(@NotNull NotificationType type, @NotNull Boolean enabled) {}
 
   @GetMapping
-  public List<BuyerNotifications.Preference> get(@RequestHeader(value = "Account-Session-Token", required = false) String session) {
+  public List<BuyerNotifications.Preference> get(@com.dealanalyzer.account.AccountSession String session) {
     return notifications.preferences(session);
   }
 
   @PutMapping
-  public List<BuyerNotifications.Preference> update(@RequestHeader(value = "Account-Session-Token", required = false) String session,
+  public List<BuyerNotifications.Preference> update(@com.dealanalyzer.account.AccountSession String session,
       @Valid @RequestBody Change change) {
     return notifications.update(session, change.type(), change.enabled());
   }

@@ -1,15 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { TestDriveAppointment, type TestDriveView } from "./TestDriveAppointment";
-import { ACCOUNT_SESSION_KEY } from "./BuyerAccount";
-
-let values = new Map<string, string>();
-beforeEach(() => {
-  values = new Map();
-  Object.defineProperty(window, "localStorage", { configurable: true, value: {
-    getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); },
-    removeItem: (key: string) => { values.delete(key); } } });
-});
+import { AccountSignedInContext } from "./BuyerAccount";
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 const pass = { pass: true, gateVersion: "outbound-gate.v2", reasons: [] };
@@ -46,11 +38,11 @@ test("proposes availability windows with the case credential only", async () => 
   const call = (fetcher.mock.calls as unknown as [string, RequestInit][]).find(([url]) => url.endsWith("/proposals"))!;
   const headers = call[1].headers as Record<string, string>;
   expect(headers["Case-Access-Token"]).toBe("secret");
+  expect(headers["Account-Request"]).toBe("1");
   expect(headers["Account-Session-Token"]).toBeUndefined();
 });
 
 test("a dealer reply is shown for confirmation and shares nothing unless the Buyer ticks a field", async () => {
-  window.localStorage.setItem(ACCOUNT_SESSION_KEY, "session-1");
   const fetcher = respond({ ...agreed, messages: [proposal],
     confirmations: [{ proposalId: "p1", messageId: "m9", receivedAt: "2026-10-04T13:00:00Z", excerpt: "Option 2 works for us.", detectedOption: 2 }] });
   vi.stubGlobal("fetch", fetcher);
@@ -63,12 +55,11 @@ test("a dealer reply is shown for confirmation and shares nothing unless the Buy
   fireEvent.click(screen.getByRole("button", { name: "Confirm this time and review the booking message" }));
   await waitFor(() => expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/appointment/bookings", expect.objectContaining({
     method: "POST", body: JSON.stringify({ proposalId: "p1", messageId: "m9", option: 2, release: ["EMAIL"] }),
-    headers: expect.objectContaining({ "Account-Session-Token": "session-1", "Case-Access-Token": "secret" }),
+    headers: expect.objectContaining({ "Account-Request": "1", "Case-Access-Token": "secret" }),
   })));
 });
 
 test("approving a booking sends the exact text with the account session and names the released fields", async () => {
-  window.localStorage.setItem(ACCOUNT_SESSION_KEY, "session-1");
   const text = "Thank you for confirming. The Buyer will attend the test drive on Saturday.";
   const fetcher = respond({ ...agreed, messages: [proposal, { ...proposal, id: "b1", kind: "BOOKING", appointmentId: "a1", slots: [slots[1]],
     release: ["FIRST_NAME", "EMAIL"], state: "DRAFT", sentAt: null, gatedDraft: { draft: { text }, decision: pass } }] });
@@ -77,7 +68,7 @@ test("approving a booking sends the exact text with the account session and name
   expect(await screen.findByText(/only these details are added below the message for this dealer: First name, Email/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Approve this text, share the chosen details and book" }));
   await waitFor(() => expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/appointment/messages/b1/approval", expect.objectContaining({
-    method: "POST", body: JSON.stringify({ approved: true, text }), headers: expect.objectContaining({ "Account-Session-Token": "session-1" }),
+    method: "POST", body: JSON.stringify({ approved: true, text }), headers: expect.objectContaining({ "Account-Request": "1" }),
   })));
 });
 
@@ -86,6 +77,23 @@ test("a blocked draft cannot be approved", async () => {
     gatedDraft: { ...proposal.gatedDraft, decision: { pass: false, gateVersion: "v2", reasons: [{ code: "NO_ACTIVE_MANDATE", text: "Approve a current mandate." }] } } }] }));
   render(<TestDriveAppointment caseId="c1" token="secret" />);
   expect(await screen.findByRole("button", { name: "Approve this text and send" })).toBeDisabled();
+});
+
+test("account state updates after sign-in and proposal approval carries the request marker", async () => {
+  const fetcher = respond({ ...agreed, messages: [proposal, { ...proposal, id: "p2", state: "DRAFT", sentAt: null }],
+    confirmations: [{ proposalId: "p1", messageId: "m9", receivedAt: "2026-10-04T13:00:00Z", excerpt: "Option 2 works.", detectedOption: 2 }] });
+  vi.stubGlobal("fetch", fetcher);
+  const panel = (signedIn: boolean) => <AccountSignedInContext.Provider value={signedIn}>
+    <TestDriveAppointment caseId="c1" token="secret" />
+  </AccountSignedInContext.Provider>;
+  const { rerender } = render(panel(false));
+  expect(await screen.findByText("Sign in to your Buyer Account in this browser to book and choose contact details.")).toBeVisible();
+  rerender(panel(true));
+  expect(screen.queryByText("Sign in to your Buyer Account in this browser to book and choose contact details.")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Approve this text and send" }));
+  await waitFor(() => expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/appointment/messages/p2/approval",
+    expect.objectContaining({ method: "POST", headers: expect.objectContaining({ "Account-Request": "1", "Case-Access-Token": "secret" }) })));
+  expect((fetcher.mock.calls as unknown as [string][]).some(([url]) => url === "/api/v1/account")).toBe(false);
 });
 
 test("a booked test drive offers its calendar file, moving and a relayed cancellation", async () => {

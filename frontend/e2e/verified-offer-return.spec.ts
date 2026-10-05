@@ -20,6 +20,7 @@ const explanation = { policyVersion: "report-explanation.v1", path: "MODEL", fal
 async function api(page: Page, unavailable = false) {
   await page.route("**/api/v1/**", async route => {
     const path = new URL(route.request().url()).pathname;
+    if (path === "/api/v1/account") return route.fulfill({ status: 401, json: { code: "SESSION_ENDED" } });
     if (path === "/api/v1/cases/current") {
       expect(route.request().headers()["case-access-token"]).toBe("private-secret");
       return route.fulfill({ status: unavailable ? 404 : 200, json: unavailable ? { detail: "Buying Case not found" } : { id: "current" } });

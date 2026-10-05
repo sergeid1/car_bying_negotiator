@@ -61,3 +61,20 @@ The case remains active so written-quote acceptance and the Buyer's stop action 
 Decisions record their source, configured rounds and verified price in case-scoped `audit_events`,
 including Buyer undo and rule clearance. That existing graph is exported and erased with the case
 (including account-linked case export/deletion); no new table or migration is required.
+
+Relay sends are safely retryable (ticket 73). The relay message id, fixed when the outbound row is
+first inserted, is the provider idempotency key: `DealerMailRelay.send(key, mail)` returns the
+original provider id for a repeated key, and `lookup(key)` reports whether the provider has the
+message without sending. A `FAILED` or `DELIVERY_UNKNOWN` refusal carries the message id, and the
+quote request, counteroffer, acceptance or test-drive row records it. `POST
+/api/v1/cases/{caseId}/relay/messages/{messageId}/delivery-check` settles an unclear send by lookup
+only. `.../retry` accepts `FAILED` and `DELIVERY_UNKNOWN` messages, looks up first, and resends the
+stored ciphertext with the same key only when the provider lacks it; nothing is re-rendered. Each
+record type implements `RelayMessageOwner`: a retry re-runs the owner's original send checks (gate,
+mandate, negotiation state, test-drive appointment and contact release) under the case lock, after
+the case-accepting and dealer opt-out checks and before the daily caps, which count the retry. When a
+message settles as `SENT`, its owner applies the first-send state change once, including the
+negotiation transition, while negotiation can still reach that state. Test-drive text stays
+authorized for the gate while its message is `FAILED` or `DELIVERY_UNKNOWN`. Every check and retry
+writes a `RELAY_DELIVERY_CHECKED` or `RELAY_RETRY` row to case-scoped `audit_events` holding only
+the outcome. That graph is already exported and erased with the case; no migration was needed.

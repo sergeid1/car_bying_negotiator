@@ -15,11 +15,10 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * Buying Journey API. Every endpoint is authorized by the Buyer Account session in the
- * Account-Session-Token header; journeys never accept a case token.
+ * HttpOnly cookie; journeys never accept a case token.
  */
 @RestController @RequestMapping("/api/v1/journeys")
 public class JourneyController {
-  private static final String SESSION = "Account-Session-Token";
   private final JourneyService journeys;
   private final VehicleReference reference;
   private final JourneyShortlistService shortlist;
@@ -33,7 +32,7 @@ public class JourneyController {
 
   @GetMapping("/{journeyId}/quote-comparison")
   public JourneyQuoteComparisonService.Comparison comparison(
-      @RequestHeader(value = SESSION, required = false) String session, @PathVariable String journeyId) {
+      @com.dealanalyzer.account.AccountSession String session, @PathVariable String journeyId) {
     return comparison.view(session, journeyId);
   }
 
@@ -50,7 +49,7 @@ public class JourneyController {
       int minRadiusMiles, int maxRadiusMiles, int maxChoices, int maxReferenceVehicles) {}
 
   @GetMapping("/brief-options")
-  public BriefOptions options(@RequestHeader(value = SESSION, required = false) String session) {
+  public BriefOptions options(@com.dealanalyzer.account.AccountSession String session) {
     journeys.authorize(session);
     return new BriefOptions(reference.list(), new Bounds(ShoppingBriefValidator.EARLIEST_YEAR, journeys.latestYear(),
         ShoppingBriefValidator.MAX_MILEAGE, ShoppingBriefValidator.MIN_PRICE, ShoppingBriefValidator.MAX_PRICE,
@@ -59,54 +58,54 @@ public class JourneyController {
   }
 
   @GetMapping
-  public List<JourneyService.JourneySummary> list(@RequestHeader(value = SESSION, required = false) String session) {
+  public List<JourneyService.JourneySummary> list(@com.dealanalyzer.account.AccountSession String session) {
     return journeys.list(session);
   }
 
   @PostMapping @ResponseStatus(HttpStatus.CREATED)
-  public JourneyService.JourneyView create(@RequestHeader(value = SESSION, required = false) String session,
+  public JourneyService.JourneyView create(@com.dealanalyzer.account.AccountSession String session,
       @RequestHeader(value = "Idempotency-Key", required = false) String key, @RequestBody BriefInput brief) {
     return journeys.create(session, key, brief);
   }
 
   @GetMapping("/{journeyId}")
-  public JourneyService.JourneyView open(@RequestHeader(value = SESSION, required = false) String session,
+  public JourneyService.JourneyView open(@com.dealanalyzer.account.AccountSession String session,
       @PathVariable String journeyId) {
     return journeys.open(session, journeyId);
   }
 
   @GetMapping("/{journeyId}/briefs/{version}")
-  public ShoppingBrief version(@RequestHeader(value = SESSION, required = false) String session,
+  public ShoppingBrief version(@com.dealanalyzer.account.AccountSession String session,
       @PathVariable String journeyId, @PathVariable int version) {
     return journeys.version(session, journeyId, version);
   }
 
   @PostMapping("/{journeyId}/briefs")
-  public JourneyService.JourneyView revise(@RequestHeader(value = SESSION, required = false) String session,
+  public JourneyService.JourneyView revise(@com.dealanalyzer.account.AccountSession String session,
       @PathVariable String journeyId, @RequestBody Revision revision) {
     return journeys.revise(session, journeyId, revision.basedOnVersion(), revision.brief());
   }
 
   @GetMapping("/{journeyId}/briefs/{version}/reference-vehicles")
-  public List<ReferenceVehicle> referenceVehicles(@RequestHeader(value = SESSION, required = false) String session,
+  public List<ReferenceVehicle> referenceVehicles(@com.dealanalyzer.account.AccountSession String session,
       @PathVariable String journeyId, @PathVariable int version) {
     return journeys.referenceVehicles(session, journeyId, version);
   }
 
   @PostMapping("/{journeyId}/reference-vehicles")
-  public JourneyService.JourneyView addReferenceVehicle(@RequestHeader(value = SESSION, required = false) String session,
+  public JourneyService.JourneyView addReferenceVehicle(@com.dealanalyzer.account.AccountSession String session,
       @PathVariable String journeyId, @RequestBody ReferenceVehicleInput input) {
     return journeys.addReferenceVehicle(session, journeyId, input.basedOnVersion(), input.vin());
   }
 
   @PutMapping("/{journeyId}/reference-vehicles/{referenceId}/relevance")
-  public JourneyService.JourneyView markRelevant(@RequestHeader(value = SESSION, required = false) String session,
+  public JourneyService.JourneyView markRelevant(@com.dealanalyzer.account.AccountSession String session,
       @PathVariable String journeyId, @PathVariable String referenceId, @RequestBody Relevance relevance) {
     return journeys.markRelevant(session, journeyId, referenceId, relevance.basedOnVersion(), relevance.relevantAttributes());
   }
 
   @DeleteMapping("/{journeyId}/reference-vehicles/{referenceId}")
-  public JourneyService.JourneyView removeReferenceVehicle(@RequestHeader(value = SESSION, required = false) String session,
+  public JourneyService.JourneyView removeReferenceVehicle(@com.dealanalyzer.account.AccountSession String session,
       @PathVariable String journeyId, @PathVariable String referenceId,
       @RequestParam(required = false) Integer basedOnVersion) {
     return journeys.removeReferenceVehicle(session, journeyId, referenceId, basedOnVersion);
@@ -114,7 +113,7 @@ public class JourneyController {
 
   /** Captures candidates and market evidence for the current brief; the Buyer chooses the shortlist order. */
   @PostMapping("/{journeyId}/candidates")
-  public JourneyShortlistService.Results candidates(@RequestHeader(value = SESSION, required = false) String session,
+  public JourneyShortlistService.Results candidates(@com.dealanalyzer.account.AccountSession String session,
       @PathVariable String journeyId) {
     return shortlist.search(session, journeyId);
   }
@@ -122,13 +121,13 @@ public class JourneyController {
   public record ShortlistInput(List<String> candidateIds) {}
 
   @GetMapping("/{journeyId}/shortlist")
-  public List<JourneyShortlistService.Entry> shortlist(@RequestHeader(value = SESSION, required = false) String session,
+  public List<JourneyShortlistService.Entry> shortlist(@com.dealanalyzer.account.AccountSession String session,
       @PathVariable String journeyId) {
     return shortlist.shortlist(session, journeyId);
   }
 
   @PutMapping("/{journeyId}/shortlist")
-  public List<JourneyShortlistService.Entry> shortlist(@RequestHeader(value = SESSION, required = false) String session,
+  public List<JourneyShortlistService.Entry> shortlist(@com.dealanalyzer.account.AccountSession String session,
       @PathVariable String journeyId, @RequestBody ShortlistInput input) {
     return shortlist.replace(session, journeyId, input.candidateIds());
   }
@@ -136,20 +135,20 @@ public class JourneyController {
   @PostMapping("/{journeyId}/candidates/{candidateId}/case")
   @ResponseStatus(HttpStatus.CREATED)
   public EphemeralBuyingCaseService.CreatedBuyingCase openCandidateCase(
-      @RequestHeader(value = SESSION, required = false) String session, @PathVariable String journeyId,
+      @com.dealanalyzer.account.AccountSession String session, @PathVariable String journeyId,
       @PathVariable String candidateId, @Valid @RequestBody CreateBuyingCaseRequest input) {
     return shortlist.openCase(session, journeyId, candidateId, input);
   }
 
   @GetMapping("/{journeyId}/candidates/{candidateId}/case")
   public EphemeralBuyingCaseService.CreatedBuyingCase linkedCandidateCase(
-      @RequestHeader(value = SESSION, required = false) String session, @PathVariable String journeyId,
+      @com.dealanalyzer.account.AccountSession String session, @PathVariable String journeyId,
       @PathVariable String candidateId) {
     return shortlist.linkedCase(session, journeyId, candidateId);
   }
 
   @DeleteMapping("/{journeyId}")
-  public JourneyService.Deletion delete(@RequestHeader(value = SESSION, required = false) String session,
+  public JourneyService.Deletion delete(@com.dealanalyzer.account.AccountSession String session,
       @PathVariable String journeyId) {
     return journeys.delete(session, journeyId);
   }

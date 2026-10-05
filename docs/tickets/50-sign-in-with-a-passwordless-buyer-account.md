@@ -10,7 +10,7 @@ at three unused links per address; sessions are HMAC-stored, expire, and are rev
 Contact details are AES-GCM encrypted once per account and never logged. Cases attach by case link; account
 export bundles each attached case export; account deletion runs every attached case through the case deletion
 lifecycle and verifies the account graph. Open: backup-restore deletion replay covers cases, not account rows;
-the session token is held in `localStorage`. See [Buyer Account policy](../buyer-account-policy.md).
+the session token is held in `localStorage` (moved to an HttpOnly cookie by ticket 74). See [Buyer Account policy](../buyer-account-policy.md).
 
 - [x] Sign-in uses an expiring, single-use, high-entropy email link through the existing email adapter; there are no passwords, and a used or expired link is refused with a clear message.
 - [x] Sessions are revocable, expire, and survive a page reload; signing out revokes the session server-side.

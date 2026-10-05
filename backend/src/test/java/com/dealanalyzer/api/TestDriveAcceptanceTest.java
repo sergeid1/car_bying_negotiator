@@ -117,8 +117,19 @@ class TestDriveAcceptanceTest {
       assertThatThrownBy(() -> post(client, bookPath, approval(book), "approve-anonymous", token))
           .isInstanceOf(HttpClientErrorException.Unauthorized.class);
       int appointmentEmails = appointmentEmails();
-      var booked = postWithSession(client, bookPath, approval(book), "approve-book", token, session);
-      assertThat(booked.path("state").asText()).isEqualTo("SENT");
+      // A booking the relay refused stays pending and releases nothing; a retry with its stored text reaches the first-send state once.
+      provider.failing(true);
+      var refused = postWithSession(client, bookPath, approval(book), "approve-book", token, session);
+      provider.failing(false);
+      assertThat(refused.path("state").asText()).isEqualTo("FAILED");
+      var pending = get(client, path, token).path("appointments").get(0);
+      assertThat(pending.path("state").asText()).isEqualTo("PENDING_BOOKING");
+      assertThat(pending.at("/release/state").asText()).isEqualTo("PREPARED");
+      assertThat(appointmentEmails()).isEqualTo(appointmentEmails);
+      int sentBeforeRetry = provider.sent().size();
+      var retried = post(client, base + "/relay/messages/" + refused.path("messageId").asText() + "/retry", Map.of(), "retry-book", token);
+      assertThat(retried.path("state").asText()).isEqualTo("SENT");
+      assertThat(provider.sent()).hasSize(sentBeforeRetry + 1);
       String body = provider.sent().getLast().body();
       assertThat(body).contains("First name: Rosalind", "Email: " + EMAIL).doesNotContain("Quixote", "312 555 0199", "will buy");
       var scheduled = get(client, path, token).path("appointments").get(0);
@@ -199,7 +210,7 @@ class TestDriveAcceptanceTest {
       byte[] bytes = client.get().uri(base + "/exports/" + exported.path("id").asText()).header("Case-Access-Token", token).retrieve().body(byte[].class);
       assertThat(new String(zipEntry(bytes, "case-data.json"), java.nio.charset.StandardCharsets.UTF_8))
           .contains("test_drive_appointments", "test_drive_messages", "test_drive_contact_releases", appointmentId);
-      client.post().uri("/api/v1/account/deletion").header("Account-Session-Token", session).retrieve().toBodilessEntity();
+      client.post().uri("/api/v1/account/deletion").header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1").retrieve().toBodilessEntity();
       app.context().getBean(com.dealanalyzer.account.AccountDeletionWorker.class).runOnce();
       app.context().getBean(CaseDeletionWorker.class).runOnce();
       app.context().getBean(com.dealanalyzer.account.AccountDeletionWorker.class).runOnce();
@@ -255,14 +266,14 @@ class TestDriveAcceptanceTest {
   private static String signIn(RestClient client, String email) throws Exception {
     post(client, "/api/v1/account/sign-in-requests", Map.of("email", email), "sign-in-" + email);
     String secret = BuyerAccountAcceptanceTest.sent.getLast().link().split("#sign-in=")[1];
-    return post(client, "/api/v1/account/sign-in/verify", Map.of("token", secret)).path("sessionToken").asText();
+    return AccountSessionTestSupport.verify(client, secret);
   }
 
   private static String signInAndAttach(RestClient client, String caseId, String token) throws Exception {
     String session = signIn(client, EMAIL);
-    client.put().uri("/api/v1/account/contact").header("Account-Session-Token", session)
+    client.put().uri("/api/v1/account/contact").header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1")
         .body(Map.of("firstName", "Rosalind", "lastName", "Quixote", "phone", "+1 312 555 0199")).retrieve().toBodilessEntity();
-    client.post().uri("/api/v1/account/cases").header("Account-Session-Token", session).header("Case-Access-Token", token)
+    client.post().uri("/api/v1/account/cases").header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1").header("Case-Access-Token", token)
         .body(Map.of("caseId", caseId)).retrieve().toBodilessEntity();
     return session;
   }
@@ -285,7 +296,7 @@ class TestDriveAcceptanceTest {
   private static JsonNode postWithSession(RestClient client, String path, Object body, String key, String token, String session) throws Exception {
     return new com.fasterxml.jackson.databind.ObjectMapper().readTree(client.post().uri(path)
         .contentType(org.springframework.http.MediaType.APPLICATION_JSON).header("Idempotency-Key", key)
-        .header("Case-Access-Token", token).header("Account-Session-Token", session).body(body).retrieve().body(String.class));
+        .header("Case-Access-Token", token).header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1").body(body).retrieve().body(String.class));
   }
 
   private static int appointmentEmails() {

@@ -12,6 +12,7 @@ import com.dealanalyzer.outbound.OutboundDraftService;
 import com.dealanalyzer.outbound.OutboundGate;
 import com.dealanalyzer.quote.NegotiationStateService;
 import com.dealanalyzer.quote.WrittenQuoteEvidence;
+import com.dealanalyzer.relay.RelayMessageOwner;
 import com.dealanalyzer.relay.RelayService;
 import com.dealanalyzer.time.PersistedInstant;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence;
@@ -43,7 +44,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * booking message is sent, carrying only the contact details the Buyer chose for this dealer.
  */
 @Service
-public class TestDriveService {
+public class TestDriveService implements RelayMessageOwner {
   private static final Pattern OPTION = Pattern.compile("(?i)\\boption\\s*(?:#|no\\.?|number)?\\s*([1-9])\\b");
   private static final TypeReference<List<TestDriveText.Slot>> SLOTS = new TypeReference<>() {};
 
@@ -254,25 +255,79 @@ public class TestDriveService {
       try {
         relayMessage = relay.send(caseId, agreed.dealerAddress(), TestDriveText.subject(message.kind()), body, released);
       } catch (RelayService.RelayRefusedException refused) {
-        jdbc.update("update test_drive_messages set state = ? where id = ?", refused.reason().name(), id);
+        // A FAILED or DELIVERY_UNKNOWN send keeps its relay message so it can be checked or retried.
+        jdbc.update("update test_drive_messages set state = ?, message_id = ? where id = ?", refused.reason().name(), refused.messageId(), id);
         return new Sent(message(caseId, token, id), null, null);
       }
       Instant now = PersistedInstant.round(Instant.now());
       jdbc.update("update test_drive_messages set state = 'SENT', message_id = ?, sent_at = ? where id = ?", relayMessage, Timestamp.from(now), id);
-      String notifyKey = switch (message.kind()) {
-        case "RESCHEDULE" -> {
-          jdbc.update("update test_drive_appointments set state = 'RESCHEDULING' where id = ? and state = 'SCHEDULED'", message.appointmentId());
-          yield null;
-        }
-        case "BOOKING" -> { booked(caseId, message, accountId, agreed, relayMessage, now); yield "appointment-booked:" + message.appointmentId(); }
-        case "CANCELLATION" -> { cancelled(caseId, message, relayMessage, now); yield "appointment-cancelled:" + message.appointmentId(); }
-        default -> null;
-      };
+      String notifyKey = applySent(caseId, message, accountId, agreed, relayMessage, now);
       return new Sent(message(caseId, token, id), notifyKey == null ? null : accounts.accountId(caseId).orElse(null), notifyKey);
     });
     // Notifications run after the case transaction commits; they carry no appointment content.
     if (sent.notifyAccount() != null) notifications.notify(sent.notifyAccount(), NotificationType.APPOINTMENT, sent.notifyKey());
     return sent.message();
+  }
+
+  /** The first-send state change for each kind. Returns the appointment notification key, if any. */
+  private String applySent(String caseId, Message message, String accountId, Agreed agreed, String relayMessage, Instant now) {
+    return switch (message.kind()) {
+      case "RESCHEDULE" -> {
+        jdbc.update("update test_drive_appointments set state = 'RESCHEDULING' where id = ? and state = 'SCHEDULED'", message.appointmentId());
+        yield null;
+      }
+      case "BOOKING" -> { booked(caseId, message, accountId, agreed, relayMessage, now); yield "appointment-booked:" + message.appointmentId(); }
+      case "CANCELLATION" -> { cancelled(caseId, message, relayMessage, now); yield "appointment-cancelled:" + message.appointmentId(); }
+      default -> null;
+    };
+  }
+
+  // ---------------------------------------------------------------- unclear sends (RelayMessageOwner)
+
+  @Override public boolean owns(String caseId, String relayMessageId) {
+    return jdbc.queryForObject("select count(*) from test_drive_messages where case_id = ? and message_id = ?",
+        Long.class, caseId, relayMessageId) > 0;
+  }
+
+  @Override public void requireResendPermitted(String caseId, String token, String relayMessageId) {
+    var ids = unsettled(caseId, relayMessageId);
+    if (ids.isEmpty()) throw new IllegalArgumentException("This test-drive message was already sent.");
+    Message message = message(caseId, token, ids.getFirst());
+    requirePermitted(caseId, message);
+    if ("BOOKING".equals(message.kind()) && !message.release().isEmpty()) {
+      // The stored message carries the contact details the account owner released; they must still be released.
+      var account = jdbc.queryForList("select account_id from test_drive_contact_releases where appointment_id = ? and state = 'PREPARED'",
+          String.class, message.appointmentId());
+      if (account.isEmpty() || !account.getFirst().equals(accounts.accountId(caseId).orElse(null)))
+        throw new IllegalArgumentException("The contact details for this booking are no longer released. Prepare a new booking.");
+    }
+  }
+
+  @Override public Runnable sent(String caseId, String token, String relayMessageId) {
+    var ids = unsettled(caseId, relayMessageId);
+    if (ids.isEmpty()) return null;
+    Message message = message(caseId, token, ids.getFirst());
+    Instant now = PersistedInstant.round(Instant.now());
+    jdbc.update("update test_drive_messages set state = 'SENT', sent_at = ? where id = ?", Timestamp.from(now), message.id());
+    // The dealer has the message. Its state change applies while the appointment is still in the state it was sent for.
+    Agreed agreed = agreed(caseId).orElse(null);
+    if (agreed == null || !current(caseId, message)) return null;
+    String accountId = "BOOKING".equals(message.kind()) ? jdbc.queryForList(
+        "select account_id from test_drive_contact_releases where appointment_id = ?", String.class, message.appointmentId())
+        .stream().findFirst().orElse(null) : null;
+    String notifyKey = applySent(caseId, message, accountId, agreed, relayMessageId, now);
+    String notifyAccount = notifyKey == null ? null : accounts.accountId(caseId).orElse(null);
+    return notifyAccount == null ? null : () -> notifications.notify(notifyAccount, NotificationType.APPOINTMENT, notifyKey);
+  }
+
+  @Override public void unsent(String caseId, String relayMessageId, String state) {
+    jdbc.update("update test_drive_messages set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+        state, caseId, relayMessageId);
+  }
+
+  private List<String> unsettled(String caseId, String relayMessageId) {
+    return jdbc.queryForList("select id from test_drive_messages where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN')",
+        String.class, caseId, relayMessageId);
   }
 
   private void booked(String caseId, Message message, String accountId, Agreed agreed, String relayMessage, Instant now) {
@@ -307,14 +362,18 @@ public class TestDriveService {
       throw new IllegalArgumentException("The current mandate or policy no longer permits this message. Prepare a new one.");
     if (negotiation.current(caseId) != NegotiationStateService.State.AGREED || agreed(caseId).isEmpty())
       throw new IllegalArgumentException("Accept a written quote before scheduling a test drive.");
+    if (!current(caseId, message)) throw new IllegalArgumentException("The test drive changed. Prepare a new message.");
+  }
+
+  /** Whether the appointment is still in the state this message was prepared for. */
+  private boolean current(String caseId, Message message) {
     String state = message.appointmentId() == null ? null : appointment(caseId, message.appointmentId()).state();
-    boolean current = switch (message.kind()) {
+    return switch (message.kind()) {
       case "PROPOSAL" -> active(caseId).isEmpty();
       case "RESCHEDULE" -> "SCHEDULED".equals(state);
       case "BOOKING" -> "PENDING_BOOKING".equals(state);
       default -> "SCHEDULED".equals(state) || "RESCHEDULING".equals(state);
     };
-    if (!current) throw new IllegalArgumentException("The test drive changed. Prepare a new message.");
   }
 
   /** A booking releases contact details, so it requires the signed-in owner; returns the account for any kind. */

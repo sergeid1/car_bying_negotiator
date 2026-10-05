@@ -23,6 +23,14 @@ function conversation(state: string) {
         message: { id: "m2", direction: "INBOUND", dealerAddress: LONG_DEALER, deliveryState: "RECEIVED", createdAt: "2026-10-04T13:00:00Z",
           completedAt: "2026-10-04T13:00:00Z", contentAvailable: true, subject: "Quote", body: "Selling price $25,000; OTD $26,800. ".repeat(6),
           attachments: [{ ordinal: -1, documentId: "doc1", outcome: "ACCEPTED", offerVersion: 2 }, { ordinal: 0, documentId: null, outcome: "MALWARE_DETECTED", offerVersion: null }] } },
+      { kind: "OUTBOUND_MESSAGE", at: "2026-10-04T13:30:00Z", quoteRequest: null, acceptance: null, counteroffer: null,
+        message: { id: "m3", direction: "OUTBOUND", dealerAddress: LONG_DEALER, deliveryState: "DELIVERY_UNKNOWN", createdAt: "2026-10-04T13:30:00Z",
+          completedAt: null, contentAvailable: true, subject: "Revised itemized written offer", body: counter, attachments: [],
+          deliveryCheckOffered: true, retryOffered: false } },
+      { kind: "OUTBOUND_MESSAGE", at: "2026-10-04T13:40:00Z", quoteRequest: null, acceptance: null, counteroffer: null,
+        message: { id: "m4", direction: "OUTBOUND", dealerAddress: LONG_DEALER, deliveryState: "FAILED", createdAt: "2026-10-04T13:40:00Z",
+          completedAt: "2026-10-04T13:40:00Z", contentAvailable: true, subject: "Revised itemized written offer", body: counter, attachments: [],
+          deliveryCheckOffered: false, retryOffered: true } },
       { kind: "COUNTEROFFER", at: "2026-10-04T14:00:00Z", quoteRequest: null, acceptance: null, message: null,
         counteroffer: { id: "n1", quoteRequestId: "q1", dealerAddress: LONG_DEALER, state: state === "AWAITING_BUYER" ? "PROPOSED" : "CANCELLED",
           cancelReason: state === "AWAITING_BUYER" ? null : state === "TARGET_REACHED" ? "TARGET_REACHED" : "PAUSED",
@@ -56,6 +64,8 @@ for (const state of ["AWAITING_BUYER", "PAUSED", "TARGET_REACHED"]) {
     const panel = page.locator(".negotiation-conversation");
     await expect(panel.getByRole("heading", { name: "Negotiation conversation" })).toBeVisible();
     await expect(panel.getByRole("list", { name: "Conversation, oldest first" })).toBeVisible();
+    await expect(panel.getByRole("button", { name: /^Check delivery of the message to/ })).toBeVisible();
+    await expect(panel.getByRole("button", { name: /^Retry the message to/ })).toBeVisible();
     if (state === "AWAITING_BUYER") {
       await expect(panel.getByRole("button", { name: "Approve revision 2 and send" })).toBeDisabled();
       await panel.getByRole("button", { name: "Edit this draft" }).click();

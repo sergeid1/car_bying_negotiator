@@ -25,6 +25,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 function stub(sample: () => Response) {
   const fetcher = vi.fn(async (path: string) => path === "/api/v1/sample-report" ? sample()
+    : path === "/api/v1/account" ? json({}, 401)
     : path.endsWith("/intake-options") ? json({ supported: ["US-NC"], consentPolicies: { serviceProcessing: "service-processing.v1" } })
     : json({ status: "UNAVAILABLE" }));
   vi.stubGlobal("fetch", fetcher);
