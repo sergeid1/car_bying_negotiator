@@ -19,7 +19,8 @@ Reschedule and cancel go through the gate, approval and relay. `LinkedJourneyApp
 three new tables. Open: every dealer message needs an active mandate, so a mandate that expires after agreement
 blocks scheduling until the Buyer approves a new one; the gate's fail-closed personal-data match can refuse a message
 for a very short first name or a released email that contains the unreleased surname; the relay still has no
-idempotency key, so an unclear delivery is not resent automatically.
+idempotency key, so an unclear delivery is not resent automatically (ticket 73 adds the key, a delivery check and a
+Buyer retry).
 
 - [x] The Buyer enters availability windows; the proposal to the dealer passes the gate and sends after Buyer approval.
 - [x] A dealer's confirmation is captured from the conversation and shown to the Buyer to confirm before it becomes an appointment.

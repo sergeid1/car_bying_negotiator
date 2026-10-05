@@ -4,12 +4,17 @@
 
 **Blocked by:** 50 — Sign in with a passwordless Buyer Account.
 
-**Status:** ready-for-agent — filed on 2026-10-05 from ticket 50's open item.
+**Status:** complete — the Buyer Account session is an `account_session` cookie (`HttpOnly`, `Secure`,
+`SameSite=Strict`, `Path=/api/v1`) resolved once by `AccountSessionResolver`, with `Account-Request: 1` required on
+account-authenticated POST, PUT and DELETE (no migration), as of 2026-10-05. A pending account deletion keeps its
+revoked cookie as the progress receipt until the deletion completes. Open: `Account-Request` is a public marker, so
+`SameSite=Strict` is the main cross-site defence; deletion progress is lost if the browser drops the cookie; browser
+tests stub the API rather than run the backend behind the Vite proxy.
 
-- [ ] Verifying a sign-in link sets the session cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/v1`, expiring with the session). The response body no longer contains the session token.
-- [ ] Every endpoint that accepted `Account-Session-Token` (account, notifications, journeys, quote comparison, test drive) authenticates from the cookie instead. The header is no longer accepted.
-- [ ] A state-changing request (POST, PUT, DELETE) authenticated by the session cookie is refused unless it carries the agreed custom request header. A cross-site form post with only the cookie is refused, and a test proves it.
-- [ ] Signing out and completing account deletion revoke the session server-side and clear the cookie. An expired or revoked cookie is treated as signed out.
-- [ ] The client stores nothing account-related in `localStorage` or `sessionStorage`. It learns whether the Buyer is signed in from the account endpoint, and a session still survives a page reload.
-- [ ] Case-link access (`Case-Access-Token`) and creating a case without an account are unchanged and still covered by tests. The sign-in and account screens still pass the axe sweep and work at 360 px in both themes.
-- [ ] The Buyer Account policy describes the cookie, the request header, and why neither is readable by page scripts.
+- [x] Verifying a sign-in link sets the session cookie (`HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/v1`, expiring with the session). The response body no longer contains the session token.
+- [x] Every endpoint that accepted `Account-Session-Token` (account, notifications, journeys, quote comparison, test drive) authenticates from the cookie instead. The header is no longer accepted.
+- [x] A state-changing request (POST, PUT, DELETE) authenticated by the session cookie is refused unless it carries the agreed custom request header. A cross-site form post with only the cookie is refused, and a test proves it.
+- [x] Signing out and completing account deletion revoke the session server-side and clear the cookie. An expired or revoked cookie is treated as signed out.
+- [x] The client stores nothing account-related in `localStorage` or `sessionStorage`. It learns whether the Buyer is signed in from the account endpoint, and a session still survives a page reload.
+- [x] Case-link access (`Case-Access-Token`) and creating a case without an account are unchanged and still covered by tests. The sign-in and account screens still pass the axe sweep and work at 360 px in both themes.
+- [x] The Buyer Account policy describes the cookie, the request header, and why neither is readable by page scripts.

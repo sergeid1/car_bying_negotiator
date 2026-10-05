@@ -117,8 +117,19 @@ class TestDriveAcceptanceTest {
       assertThatThrownBy(() -> post(client, bookPath, approval(book), "approve-anonymous", token))
           .isInstanceOf(HttpClientErrorException.Unauthorized.class);
       int appointmentEmails = appointmentEmails();
-      var booked = postWithSession(client, bookPath, approval(book), "approve-book", token, session);
-      assertThat(booked.path("state").asText()).isEqualTo("SENT");
+      // A booking the relay refused stays pending and releases nothing; a retry with its stored text reaches the first-send state once.
+      provider.failing(true);
+      var refused = postWithSession(client, bookPath, approval(book), "approve-book", token, session);
+      provider.failing(false);
+      assertThat(refused.path("state").asText()).isEqualTo("FAILED");
+      var pending = get(client, path, token).path("appointments").get(0);
+      assertThat(pending.path("state").asText()).isEqualTo("PENDING_BOOKING");
+      assertThat(pending.at("/release/state").asText()).isEqualTo("PREPARED");
+      assertThat(appointmentEmails()).isEqualTo(appointmentEmails);
+      int sentBeforeRetry = provider.sent().size();
+      var retried = post(client, base + "/relay/messages/" + refused.path("messageId").asText() + "/retry", Map.of(), "retry-book", token);
+      assertThat(retried.path("state").asText()).isEqualTo("SENT");
+      assertThat(provider.sent()).hasSize(sentBeforeRetry + 1);
       String body = provider.sent().getLast().body();
       assertThat(body).contains("First name: Rosalind", "Email: " + EMAIL).doesNotContain("Quixote", "312 555 0199", "will buy");
       var scheduled = get(client, path, token).path("appointments").get(0);
