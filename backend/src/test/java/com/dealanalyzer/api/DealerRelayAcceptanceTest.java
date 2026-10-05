@@ -39,7 +39,6 @@ import org.springframework.web.client.RestClient;
 
 @ExtendWith(OutputCaptureExtension.class)
 class DealerRelayAcceptanceTest {
-  private static final String SESSION = "Account-Session-Token";
   private static final String BUYER_EMAIL = "avery.private@example.com";
   private static final String BODY_MARKER = "body-marker-8842 asking about the out-the-door total";
   @TempDir Path directory;
@@ -203,7 +202,7 @@ class DealerRelayAcceptanceTest {
           .isEqualTo(InboundOutcome.REJECTED_UNKNOWN_ADDRESS);
       assertRefused(() -> relay.send(b.id(), "x@dealer-two.example", "Hello", "Hello"), Reason.UNAVAILABLE);
       // Account deletion does the same for its attached cases.
-      client.post().uri("/api/v1/account/deletion").header(SESSION, session).retrieve().toBodilessEntity();
+      client.post().uri("/api/v1/account/deletion").header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1").retrieve().toBodilessEntity();
       assertThat(relay.receive(new InboundMail("provider-7", addressA, "desk@dealer-one.example", "x", "y", List.of())).outcome())
           .isEqualTo(InboundOutcome.REJECTED_UNKNOWN_ADDRESS);
       assertRefused(() -> relay.send(a.id(), "x@dealer-two.example", "Hello", "Hello"), Reason.UNAVAILABLE);
@@ -238,7 +237,7 @@ class DealerRelayAcceptanceTest {
   }
 
   private static String accountExport(RestClient client, String session, String caseId) throws Exception {
-    byte[] archive = client.post().uri("/api/v1/account/export").header(SESSION, session).retrieve().body(byte[].class);
+    byte[] archive = client.post().uri("/api/v1/account/export").header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1").retrieve().body(byte[].class);
     try (var zip = new ZipInputStream(new java.io.ByteArrayInputStream(archive))) {
       for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
         if (!entry.getName().equals("cases/buying-case-" + caseId + ".zip")) continue;
@@ -261,14 +260,16 @@ class DealerRelayAcceptanceTest {
 
   private String signIn(RestClient client, String email) throws Exception {
     post(client, "/api/v1/account/sign-in-requests", Map.of("email", email));
-    return post(client, "/api/v1/account/sign-in/verify", Map.of("token", mail.getLast().link().split("#sign-in=")[1]))
-        .path("sessionToken").asText();
+    return AccountSessionTestSupport.verify(client, mail.getLast().link().split("#sign-in=")[1]);
   }
 
   record Result(int status, JsonNode body) {}
   private static Result exchange(RestClient client, String method, String path, Object body, String session, String caseToken) {
     var request = client.method(HttpMethod.valueOf(method)).uri(path);
-    if (session != null) request.header(SESSION, session);
+    if (session != null) {
+      request.header("Cookie", AccountSessionTestSupport.cookie(session));
+      if (!"GET".equals(method)) request.header("Account-Request", "1");
+    }
     if (caseToken != null) request.header("Case-Access-Token", caseToken);
     if (body != null) request.contentType(MediaType.APPLICATION_JSON).body(body);
     return request.exchange((req, res) -> new Result(res.getStatusCode().value(), new ObjectMapper().readTree(res.getBody())));

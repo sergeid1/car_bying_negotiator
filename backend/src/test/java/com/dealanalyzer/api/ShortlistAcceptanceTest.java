@@ -30,7 +30,6 @@ import org.springframework.web.client.RestClient;
 class ShortlistAcceptanceTest {
   static final ObjectMapper JSON = new ObjectMapper();
   static final CopyOnWriteArrayList<String> links = new CopyOnWriteArrayList<>();
-  static final String SESSION = "Account-Session-Token";
   @TempDir Path directory;
 
   @TestConfiguration static class Configuration {
@@ -145,7 +144,7 @@ class ShortlistAcceptanceTest {
       String candidateId = candidate.path("candidateId").asText(); setShortlist(client, base, session, List.of(candidateId));
       var created = openCase(client, base, candidateId, session, "case");
       String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
-      byte[] archive = client.post().uri("/api/v1/account/export").header(SESSION, session).retrieve().body(byte[].class);
+      byte[] archive = client.post().uri("/api/v1/account/export").header("Cookie", AccountSessionTestSupport.cookie(session)).header("Account-Request", "1").retrieve().body(byte[].class);
       assertThat(zipEntries(archive).get("account.json")).contains(journeyId, candidateId, caseId)
           .doesNotContain(token, "credential_ciphertext");
       var job = post(client, "/api/v1/cases/" + caseId + "/exports", Map.of("format", "ZIP", "reportVersion", 0), "case-export", token);
@@ -198,8 +197,7 @@ class ShortlistAcceptanceTest {
   }
   private static String signIn(RestClient client, String email) throws Exception {
     post(client, "/api/v1/account/sign-in-requests", Map.of("email", email), UUID.randomUUID().toString());
-    return post(client, "/api/v1/account/sign-in/verify", Map.of("token", links.getLast().split("#sign-in=")[1]))
-        .path("sessionToken").asText();
+    return AccountSessionTestSupport.verify(client, links.getLast().split("#sign-in=")[1]);
   }
   private static String journey(RestClient client, String session, String key) {
     var result = exchange(client, "POST", "/api/v1/journeys", BuyingJourneyAcceptanceTest.brief(), session, key);
@@ -225,7 +223,10 @@ class ShortlistAcceptanceTest {
   record Result(int status, JsonNode body) {}
   private static Result exchange(RestClient client, String method, String path, Object body, String session, String key) {
     var request = client.method(HttpMethod.valueOf(method)).uri(path);
-    if (session != null) request.header(SESSION, session);
+    if (session != null) {
+      request.header("Cookie", AccountSessionTestSupport.cookie(session));
+      if (!"GET".equals(method)) request.header("Account-Request", "1");
+    }
     if (key != null) request.header("Idempotency-Key", key);
     if (body != null) request.contentType(MediaType.APPLICATION_JSON).body(body);
     return request.exchange((req, response) -> {

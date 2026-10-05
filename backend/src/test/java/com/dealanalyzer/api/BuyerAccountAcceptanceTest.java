@@ -29,7 +29,6 @@ import org.springframework.web.client.RestClient;
 class BuyerAccountAcceptanceTest {
   private static final ObjectMapper JSON = new ObjectMapper();
   private static final String KEY = "--document.storage.encryption-key=0123456789abcdef0123456789abcdef";
-  private static final String SESSION = "Account-Session-Token";
   static final CopyOnWriteArrayList<Sent> sent = new CopyOnWriteArrayList<>();
   record Sent(String recipient, String link, RecoveryEmail.Purpose purpose) {}
 
@@ -63,8 +62,7 @@ class BuyerAccountAcceptanceTest {
       String secret = link.split("#sign-in=")[1];
       assertThat(secret.length()).isGreaterThanOrEqualTo(43);
 
-      var session = post(client, "/api/v1/account/sign-in/verify", Map.of("token", secret));
-      String token = session.path("sessionToken").asText();
+      String token = AccountSessionTestSupport.verify(client, secret);
       assertThat(token).isNotBlank();
       var reused = exchange(client, "POST", "/api/v1/account/sign-in/verify", Map.of("token", secret), null);
       assertThat(reused.status()).isEqualTo(410);
@@ -80,11 +78,13 @@ class BuyerAccountAcceptanceTest {
 
       // A second session on another device; signing out revokes only the current one server-side.
       post(client, "/api/v1/account/sign-in-requests", Map.of("email", "buyer@example.com"), "request-3");
-      String other = post(client, "/api/v1/account/sign-in/verify",
-          Map.of("token", sent.getLast().link().split("#sign-in=")[1])).path("sessionToken").asText();
-      assertThat(exchange(client, "POST", "/api/v1/account/sign-out", Map.of(), token).status()).isEqualTo(204);
+      String other = AccountSessionTestSupport.verify(client, sent.getLast().link().split("#sign-in=")[1]);
+      var signedOut = exchange(client, "POST", "/api/v1/account/sign-out", Map.of(), token);
+      assertThat(signedOut.status()).isEqualTo(204);
+      assertCleared(signedOut.setCookie());
       var ended = exchange(client, "GET", "/api/v1/account", null, token);
       assertThat(ended.status()).isEqualTo(401);
+      assertCleared(ended.setCookie());
       assertThat(ended.body().path("code").asText()).isEqualTo("SESSION_ENDED");
       assertThat(account(client, other).at("/contact/email").asText()).isEqualTo("buyer@example.com");
       assertThat(exchange(client, "POST", "/api/v1/account/sign-out?everywhere=true", Map.of(), other).status()).isEqualTo(204);
@@ -109,7 +109,9 @@ class BuyerAccountAcceptanceTest {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("expired-session", false, EmailConfiguration.class, KEY,
         "--account.session.lifetime=PT0S")) {
       String token = signIn(app.client(), "buyer@example.com");
-      assertThat(exchange(app.client(), "GET", "/api/v1/account", null, token).status()).isEqualTo(401);
+      var expired = exchange(app.client(), "GET", "/api/v1/account", null, token);
+      assertThat(expired.status()).isEqualTo(401);
+      assertCleared(expired.setCookie());
     }
   }
 
@@ -174,7 +176,7 @@ class BuyerAccountAcceptanceTest {
         ids.add(created.at("/case/id").asText());
         attach(client, token, ids.getLast(), created.path("accessToken").asText());
       }
-      byte[] zip = client.post().uri("/api/v1/account/export").header(SESSION, token).retrieve().body(byte[].class);
+      byte[] zip = client.post().uri("/api/v1/account/export").header("Cookie", AccountSessionTestSupport.cookie(token)).header("Account-Request", "1").retrieve().body(byte[].class);
       var entries = unzip(zip);
       assertThat(entries).containsKeys("README.txt", "account.json",
           "cases/buying-case-" + ids.get(0) + ".zip", "cases/buying-case-" + ids.get(1) + ".zip");
@@ -264,11 +266,14 @@ class BuyerAccountAcceptanceTest {
 
       var receipt = exchange(client, "POST", "/api/v1/account/deletion", Map.of(), token);
       assertThat(receipt.status()).isEqualTo(202);
+      assertThat(receipt.setCookie()).isNull();
       assertThat(receipt.body().path("state").asText()).isEqualTo("DELETION_PENDING");
       assertThat(receipt.body().at("/cases/0/caseId").asText()).isEqualTo(caseId);
       assertThat(receipt.body().at("/cases/0/state").asText()).isEqualTo("DELETION_PENDING");
       // Access ends at once: every session, sign-in and the attached case's link.
-      assertThat(exchange(client, "GET", "/api/v1/account", null, token).status()).isEqualTo(401);
+      var pendingAccount = exchange(client, "GET", "/api/v1/account", null, token);
+      assertThat(pendingAccount.status()).isEqualTo(401);
+      assertThat(pendingAccount.setCookie()).isNull();
       assertThat(exchange(client, "GET", "/api/v1/account", null, other).status()).isEqualTo(401);
       assertThat(exchange(client, "GET", "/api/v1/cases/" + caseId, null, null, caseToken).status()).isEqualTo(404);
       post(client, "/api/v1/account/sign-in-requests", Map.of("email", "buyer@example.com"), "during-deletion");
@@ -278,12 +283,16 @@ class BuyerAccountAcceptanceTest {
 
       var accountWorker = app.context().getBean(com.dealanalyzer.account.AccountDeletionWorker.class);
       accountWorker.runOnce();
-      var waiting = exchange(client, "GET", "/api/v1/account/deletion", null, token).body();
+      var waitingResponse = exchange(client, "GET", "/api/v1/account/deletion", null, token);
+      assertThat(waitingResponse.setCookie()).isNull();
+      var waiting = waitingResponse.body();
       assertThat(waiting.path("state").asText()).isEqualTo("DELETION_PENDING");
       assertThat(waiting.path("accountRemovedAt").isNull()).isFalse();
       app.context().getBean(com.dealanalyzer.buyingcase.persistence.CaseDeletionWorker.class).runOnce();
       accountWorker.runOnce();
-      var completed = exchange(client, "GET", "/api/v1/account/deletion", null, token).body();
+      var completedResponse = exchange(client, "GET", "/api/v1/account/deletion", null, token);
+      assertCleared(completedResponse.setCookie());
+      var completed = completedResponse.body();
       assertThat(completed.path("state").asText()).isEqualTo("DELETED");
       assertThat(completed.path("verification").asText()).isEqualTo("ACCOUNT_GRAPH_AND_CASES_ABSENT_V1");
       assertThat(completed.path("backupStatus").asText()).isEqualTo("UNKNOWN");
@@ -302,10 +311,53 @@ class BuyerAccountAcceptanceTest {
     }
   }
 
+  @Test void cookieProtectsTheSessionAndMutationsRequireTheRequestHeader() throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("cookie-boundary", false, EmailConfiguration.class, KEY)) {
+      var client = app.client();
+      post(client, "/api/v1/account/sign-in-requests", Map.of("email", "buyer@example.com"), "cookie-sign-in");
+      var response = client.post().uri("/api/v1/account/sign-in/verify").contentType(MediaType.APPLICATION_JSON)
+          .body(Map.of("token", sent.getLast().link().split("#sign-in=")[1])).retrieve().toEntity(JsonNode.class);
+      String cookie = response.getHeaders().getFirst("Set-Cookie");
+      assertThat(cookie).contains("HttpOnly", "Secure", "SameSite=Strict", "Path=/api/v1", "Max-Age=1209600");
+      assertThat(response.getBody().has("sessionToken")).isFalse();
+      assertThat(response.getBody().path("expiresAt").asText()).isNotBlank();
+      String token = cookie.substring("account_session=".length(), cookie.indexOf(';'));
+      // GET after a reload needs only the browser cookie.
+      assertThat(account(client, token).at("/contact/email").asText()).isEqualTo("buyer@example.com");
+      int oldHeader = client.get().uri("/api/v1/account").header("Account-Session-Token", token)
+          .exchange((req, res) -> res.getStatusCode().value());
+      assertThat(oldHeader).isEqualTo(401);
+      for (String method : List.of("POST", "PUT", "DELETE")) {
+        String path = method.equals("POST") ? "/api/v1/account/sign-out"
+            : method.equals("PUT") ? "/api/v1/account/contact" : "/api/v1/journeys/unknown";
+        var blocked = client.method(org.springframework.http.HttpMethod.valueOf(method)).uri(path)
+            .header("Cookie", AccountSessionTestSupport.cookie(token))
+            .exchange((req, res) -> new Result(res.getStatusCode().value(), JSON.readTree(res.getBody()),
+                res.getHeaders().getFirst("Set-Cookie")));
+        assertThat(blocked.status()).as(method).isEqualTo(403);
+        assertThat(blocked.body().path("code").asText()).isEqualTo("ACCOUNT_REQUEST_REQUIRED");
+        assertThat(blocked.setCookie()).isNull();
+      }
+      // A cross-site form with the ambient cookie cannot sign the Buyer out.
+      int formPost = client.post().uri("/api/v1/cases/unknown/appointment/bookings")
+          .header("Cookie", AccountSessionTestSupport.cookie(token)).header("Origin", "https://other.example")
+          .contentType(MediaType.APPLICATION_FORM_URLENCODED).body("approved=true")
+          .exchange((req, res) -> res.getStatusCode().value());
+      assertThat(formPost).isEqualTo(403);
+      assertThat(account(client, token).at("/contact/email").asText()).isEqualTo("buyer@example.com");
+      assertThat(exchange(client, "PUT", "/api/v1/account/contact", Map.of("firstName", "Avery"), token).status())
+          .isEqualTo(200);
+    }
+  }
+
+  private static void assertCleared(String cookie) {
+    assertThat(cookie).startsWith("account_session=;").contains("Max-Age=0", "HttpOnly", "Secure", "SameSite=Strict", "Path=/api/v1");
+  }
+
   private static String signIn(RestClient client, String email) throws Exception {
     post(client, "/api/v1/account/sign-in-requests", Map.of("email", email), java.util.UUID.randomUUID().toString());
     String secret = sent.getLast().link().split("#sign-in=")[1];
-    return post(client, "/api/v1/account/sign-in/verify", Map.of("token", secret)).path("sessionToken").asText();
+    return AccountSessionTestSupport.verify(client, secret);
   }
 
   private static JsonNode account(RestClient client, String token) {
@@ -318,7 +370,7 @@ class BuyerAccountAcceptanceTest {
     return exchange(client, "POST", "/api/v1/account/cases", Map.of("caseId", caseId), token, caseToken);
   }
 
-  record Result(int status, JsonNode body) {}
+  record Result(int status, JsonNode body, String setCookie) {}
 
   private static Result exchange(RestClient client, String method, String path, Object body, String session) {
     return exchange(client, method, path, body, session, null);
@@ -332,12 +384,16 @@ class BuyerAccountAcceptanceTest {
       String idempotencyKey) {
     var request = client.method(org.springframework.http.HttpMethod.valueOf(method)).uri(path);
     if (idempotencyKey != null) request.header("Idempotency-Key", idempotencyKey);
-    if (session != null) request.header(SESSION, session);
+    if (session != null) {
+      request.header("Cookie", AccountSessionTestSupport.cookie(session));
+      if (!method.equals("GET")) request.header("Account-Request", "1");
+    }
     if (caseToken != null) request.header("Case-Access-Token", caseToken);
     if (body != null) request.contentType(MediaType.APPLICATION_JSON).body(body);
     return request.exchange((req, response) -> {
       byte[] bytes = response.getBody().readAllBytes();
-      return new Result(response.getStatusCode().value(), bytes.length == 0 ? JSON.nullNode() : JSON.readTree(bytes));
+      return new Result(response.getStatusCode().value(), bytes.length == 0 ? JSON.nullNode() : JSON.readTree(bytes),
+          response.getHeaders().getFirst("Set-Cookie"));
     });
   }
 

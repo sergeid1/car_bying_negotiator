@@ -65,7 +65,7 @@ async function fillBrief(user: ReturnType<typeof userEvent.setup>) {
 test("starts a journey from reference-list choices; lookup text only helps and is never sent", async () => {
   const created = journeyWith(briefVersion(1, 3_200_000));
   const calls = server((path, init) => init?.method === "POST" && path === "/api/v1/journeys" ? json(created, 201) : undefined);
-  render(<BuyingJourneys session="session-1" onSessionEnded={() => {}} />);
+  render(<BuyingJourneys onSessionEnded={() => {}} />);
   const user = userEvent.setup();
   expect(await screen.findByText("No Buying Journeys yet.")).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Start a Buying Journey" }));
@@ -86,7 +86,8 @@ test("starts a journey from reference-list choices; lookup text only helps and i
 
   expect(await screen.findByRole("status")).toHaveTextContent("brief version 1");
   const post = calls.find(c => c.init?.method === "POST")!;
-  expect((post.init?.headers as Record<string, string>)["Account-Session-Token"]).toBe("session-1");
+  expect((post.init?.headers as Record<string, string>)["Account-Request"]).toBe("1");
+  expect(post.init?.headers).not.toHaveProperty("Account-Session-Token");
   expect((post.init?.headers as Record<string, string>)["Idempotency-Key"]).toBeTruthy();
   const body = JSON.parse(String(post.init?.body));
   expect(body).toEqual({ yearFrom: 2020, yearTo: 2024, makeId: "toyota", modelId: "toyota-rav4", trimIds: ["toyota-rav4-limited"],
@@ -109,7 +110,7 @@ test("names each field with its correction and asks for the state when a ZIP cro
       errors: [{ field: "jurisdiction", message: "That ZIP code crosses a state line, so the state cannot be determined from it. Choose your state.",
         reason: "POSTAL_CODE_CROSSES_STATE_LINE", candidateJurisdictions: ["US-NC", "US-VA"] }] }, 422);
   });
-  render(<BuyingJourneys session="session-1" onSessionEnded={() => {}} />);
+  render(<BuyingJourneys onSessionEnded={() => {}} />);
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "Start a Buying Journey" }));
   await user.click(screen.getByRole("button", { name: "Save brief and start journey" }));
@@ -146,7 +147,7 @@ test("lists, opens, edits into a new version, reads an earlier version, and dele
     if (path === "/api/v1/journeys/j1/briefs/1") return json(v1);
     return undefined;
   });
-  render(<BuyingJourneys session="session-1" onSessionEnded={() => {}} />);
+  render(<BuyingJourneys onSessionEnded={() => {}} />);
   const user = userEvent.setup();
   const list = await screen.findByRole("list", { name: "Your Buying Journeys" });
   expect(list).toHaveTextContent("Shopping · Brief version 1");
@@ -186,7 +187,7 @@ test("a stale edit reloads the latest version instead of replacing it", async ()
       detail: "This Shopping Brief changed since you opened it. Reload it, review the latest version and save your edit again." }, 409);
     return undefined;
   });
-  render(<BuyingJourneys session="session-1" onSessionEnded={() => {}} />);
+  render(<BuyingJourneys onSessionEnded={() => {}} />);
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "Open 2020–2024 Toyota RAV4" }));
   await user.click(await screen.findByRole("button", { name: "Edit brief" }));
@@ -198,6 +199,6 @@ test("a stale edit reloads the latest version instead of replacing it", async ()
 test("an ended session hands control back to the account panel", async () => {
   server(() => json({ status: 401, code: "SESSION_ENDED" }, 401));
   const ended = vi.fn();
-  render(<BuyingJourneys session="session-1" onSessionEnded={ended} />);
+  render(<BuyingJourneys onSessionEnded={ended} />);
   await waitFor(() => expect(ended).toHaveBeenCalled());
 });

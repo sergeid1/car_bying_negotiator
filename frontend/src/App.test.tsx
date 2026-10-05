@@ -38,6 +38,7 @@ test("buyer can start a synthetic cash analysis and reach the rendered report", 
     },
   ];
   vi.spyOn(globalThis, "fetch").mockImplementation(async input => {
+    if (String(input) === "/api/v1/account") return new Response("{}", { status: 401 });
     // The intake form reads its options and the offer on mount; the fixture flow owns the remaining replies.
     const body = String(input).endsWith("/intake-options")
       ? { supported: ["US-NC"], consentPolicies: { serviceProcessing: "service-processing.v1" } }

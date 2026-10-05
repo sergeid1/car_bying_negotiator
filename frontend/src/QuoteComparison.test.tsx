@@ -17,9 +17,9 @@ function mock(view: QuoteComparisonView) {
 }
 test("starts in shortlist order and changes only by the Buyer's chosen column", async () => {
   const fetcher = mock({ cars: [comparisonCar("first", 2000000), comparisonCar("second", 1900000)], otdComparable: true });
-  render(<QuoteComparison journeyId="journey" session="session" onSessionEnded={() => {}} />);
+  render(<QuoteComparison journeyId="journey" onSessionEnded={() => {}} />);
   await screen.findByRole("article", { name: /first/ });
-  expect(fetcher).toHaveBeenCalledWith("/api/v1/journeys/journey/quote-comparison", { headers: { "Account-Session-Token": "session" } });
+  expect(fetcher).toHaveBeenCalledWith("/api/v1/journeys/journey/quote-comparison");
   expect(screen.getAllByRole("article")[0]).toHaveAccessibleName(/first/);
   fireEvent.change(screen.getByLabelText("Order quotes by"), { target: { value: "selling" } });
   expect(screen.getAllByRole("article")[0]).toHaveAccessibleName(/second/);
@@ -36,7 +36,7 @@ test("starts in shortlist order and changes only by the Buyer's chosen column", 
 test("partial quotes disable OTD ordering and missing cars display state without amounts", async () => {
   mock({ cars: [comparisonCar("first", 2000000), { ...comparisonCar("awaiting", 0), state: "Awaiting quote",
     offerVersion: null, amounts: [], missing: ["Taxes", "Out-the-door total"] }], otdComparable: false });
-  render(<QuoteComparison journeyId="journey" session="session" onSessionEnded={() => {}} />);
+  render(<QuoteComparison journeyId="journey" onSessionEnded={() => {}} />);
   await screen.findByText(/OTD totals cannot be compared/);
   expect(screen.getByRole("option", { name: "Out-the-door total, lowest first" })).toBeDisabled();
   const car = screen.getByRole("article", { name: /awaiting/ });
@@ -50,7 +50,7 @@ test("reconciled omitted categories show None listed without an amount or source
   second.amounts.push({ label: "Dealer fees: Document fee", minorUnits: 50000, currency: "USD",
     evidence: { documentSource: null, sourceNote: "Verified fee.", calculation: null } });
   mock({ cars: [first, second], otdComparable: true });
-  render(<QuoteComparison journeyId="journey" session="session" onSessionEnded={() => {}} />);
+  render(<QuoteComparison journeyId="journey" onSessionEnded={() => {}} />);
   await screen.findByText(/Every verified quoted OTD reconciles/);
   const card = screen.getByRole("article", { name: /first/ });
   expect(within(card).getAllByText("None listed")).toHaveLength(2);
@@ -69,7 +69,7 @@ test.each(["fees", "addons"])("%s ordering puts None listed first and missing fi
   const absent = { ...comparisonCar("absent", 2000000), noneListed: ["Dealer fees", "Add-ons"] };
   const missing = { ...comparisonCar("missing", 2000000), missing: ["Dealer fees", "Add-ons"] };
   mock({ cars: [missing, listed, absent], otdComparable: false });
-  render(<QuoteComparison journeyId="journey" session="session" onSessionEnded={() => {}} />);
+  render(<QuoteComparison journeyId="journey" onSessionEnded={() => {}} />);
   await screen.findByRole("article", { name: /absent/ });
   fireEvent.change(screen.getByLabelText("Order quotes by"), { target: { value: order } });
   expect(screen.getAllByRole("article").map(card => card.getAttribute("aria-label"))).toEqual([
@@ -78,13 +78,13 @@ test.each(["fees", "addons"])("%s ordering puts None listed first and missing fi
 });
 test("unreconciled quotes show the per-car reason", async () => {
   mock({ cars: [{ ...comparisonCar("one", 2000000), missing: ["Figures do not add up to the quoted OTD by 125.00 USD"] }], otdComparable: false });
-  render(<QuoteComparison journeyId="journey" session="session" onSessionEnded={() => {}} />);
+  render(<QuoteComparison journeyId="journey" onSessionEnded={() => {}} />);
   await screen.findByText(/Figures do not add up to the quoted OTD by 125.00 USD/);
   expect(screen.getByRole("option", { name: "Out-the-door total, lowest first" })).toBeDisabled();
 });
 test("refreshes, handles expired sessions and explains load failure", async () => {
   const fetcher = mock({ cars: [], otdComparable: false }); const ended = vi.fn();
-  render(<QuoteComparison journeyId="journey" session="session" onSessionEnded={ended} />);
+  render(<QuoteComparison journeyId="journey" onSessionEnded={ended} />);
   await screen.findByText(/Open Buying Cases from your shortlist/);
   fetcher.mockResolvedValueOnce(new Response(null, { status: 401 }));
   fireEvent.click(screen.getByRole("button", { name: "Refresh quote comparison" }));

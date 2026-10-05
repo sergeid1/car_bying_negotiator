@@ -23,7 +23,7 @@ import { OfferTerms, PurchasePoint } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 import { ReferralPartnerKit } from "./ReferralPartnerKit";
-import { ACCOUNT_SESSION_KEY, BuyerAccount } from "./BuyerAccount";
+import { BuyerAccount } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 import { NegotiationConversation } from "./NegotiationConversation";
 import { JourneyCandidates, ShortlistEntry } from "./JourneyCandidates";
@@ -60,7 +60,7 @@ test("quote comparison and its document evidence have no automated AA violations
       calculation: null, documentSource: { documentId: "doc", extractionId: "ex", offerVersion: 2, pageNumber: 1,
         wording: "Selling price", region: { x: .1, y: .2, width: .5, height: .1 } } } }],
   }] })));
-  const { container } = render(<main><h1>Buying Journey</h1><QuoteComparison journeyId="j1" session="session" onSessionEnded={() => {}} /></main>);
+  const { container } = render(<main><h1>Buying Journey</h1><QuoteComparison journeyId="j1" onSessionEnded={() => {}} /></main>);
   await screen.findByText("Selling price evidence");
   expect((await axe.run(container, AA)).violations).toEqual([]);
   await userEvent.setup().click(screen.getByText("Selling price evidence"));
@@ -118,10 +118,6 @@ test("core entry, document intake, recovery, price approval, downloads and delet
 });
 
 test("the signed-in Buyer Account, its contact form and its deletion receipt have no automated AA violations", async () => {
-  const values = new Map([[ACCOUNT_SESSION_KEY, "session"]]);
-  Object.defineProperty(window, "localStorage", { configurable: true, value: {
-    getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); },
-    removeItem: (key: string) => { values.delete(key); } } });
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => new Response(JSON.stringify(
     String(input).endsWith("/deletion") && init?.method === "POST"
       ? { state: "DELETION_PENDING", failureCode: null, cases: [{ caseId: "case-1", state: "DELETION_PENDING" }] }
@@ -165,7 +161,7 @@ test("Buying Journeys: the list, the brief form with field errors, and a journey
       : url.endsWith("/briefs/1") ? [200, brief(1)] : [200, journey];
     return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
   });
-  const { container } = render(<main><h1>Buyer Account</h1><BuyingJourneys session="session" onSessionEnded={() => {}} /></main>);
+  const { container } = render(<main><h1>Buyer Account</h1><BuyingJourneys onSessionEnded={() => {}} /></main>);
   const user = userEvent.setup();
   await screen.findByRole("list", { name: "Your Buying Journeys" });
   const violations = async () => (await axe.run(container, AA)).violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }));
@@ -216,7 +212,7 @@ test("Reference Vehicles: decoded, undecodable and read-only vehicles and a chec
       : url.endsWith("/briefs/2") ? [200, brief(2)] : [200, journey];
     return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
   });
-  const { container } = render(<main><h1>Buyer Account</h1><BuyingJourneys session="session" onSessionEnded={() => {}} /></main>);
+  const { container } = render(<main><h1>Buyer Account</h1><BuyingJourneys onSessionEnded={() => {}} /></main>);
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "Open 2020–2024 Toyota RAV4" }));
   await screen.findByRole("region", { name: "Reference Vehicles" });
@@ -272,7 +268,7 @@ test("Candidate Vehicles: current, stale and unstated listings with left-out lis
         currentVersion: 2, yearFrom: 2020, yearTo: 2024, make: "Honda", model: "Civic" }] : journey;
     return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
   });
-  const { container } = render(<main><h1>Buyer Account</h1><BuyingJourneys session="session" onSessionEnded={() => {}} /></main>);
+  const { container } = render(<main><h1>Buyer Account</h1><BuyingJourneys onSessionEnded={() => {}} /></main>);
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "Open 2020–2024 Honda Civic" }));
   await screen.findByRole("region", { name: "Candidate Vehicles" });

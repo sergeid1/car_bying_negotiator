@@ -53,7 +53,7 @@ function server(opened: Journey, handler: (path: string, init?: RequestInit) => 
 }
 
 async function open(user: ReturnType<typeof userEvent.setup>) {
-  render(<BuyingJourneys session="s1" onSessionEnded={() => {}} />);
+  render(<BuyingJourneys onSessionEnded={() => {}} />);
   await user.click(await screen.findByRole("button", { name: "Open 2020–2024 Toyota RAV4" }));
   return screen.findByRole("region", { name: "Reference Vehicles" });
 }

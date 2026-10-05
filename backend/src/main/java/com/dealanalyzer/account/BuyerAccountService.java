@@ -147,6 +147,12 @@ public class BuyerAccountService {
       if (other.revokedAt == null) other.revokedAt = now;
   }
 
+  @Transactional(readOnly = true)
+  public boolean sessionActive(String sessionToken) {
+    try { requireSession(sessionToken); return true; }
+    catch (AccountProblem ended) { return false; }
+  }
+
   AccountSessionEntity requireSession(String sessionToken) {
     if (sessionToken == null || sessionToken.isBlank() || sessionToken.length() > 128) throw sessionEnded();
     var session = sessions.findById(secrets.protectAccountSecret("session", sessionToken))

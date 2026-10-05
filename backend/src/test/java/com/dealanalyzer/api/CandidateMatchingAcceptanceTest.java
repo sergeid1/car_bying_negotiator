@@ -25,7 +25,6 @@ import org.springframework.web.client.RestClient;
 class CandidateMatchingAcceptanceTest {
   private static final ObjectMapper JSON = new ObjectMapper();
   private static final String KEY = "--document.storage.encryption-key=0123456789abcdef0123456789abcdef";
-  private static final String SESSION = "Account-Session-Token";
   private static final String CIVIC_EX_A = "2HGFE2F55NH000008";
   private static final String CIVIC_EX_B = "2HGFE2F5XNH000005";
   static final CopyOnWriteArrayList<String> links = new CopyOnWriteArrayList<>();
@@ -116,8 +115,7 @@ class CandidateMatchingAcceptanceTest {
   private static String signIn(RestClient client, String email) throws Exception {
     HttpAcceptanceHarness.post(client, "/api/v1/account/sign-in-requests", Map.of("email", email), UUID.randomUUID().toString());
     String secret = links.getLast().split("#sign-in=")[1];
-    return HttpAcceptanceHarness.post(client, "/api/v1/account/sign-in/verify", Map.of("token", secret))
-        .path("sessionToken").asText();
+    return AccountSessionTestSupport.verify(client, secret);
   }
 
   record Result(int status, JsonNode body) {}
@@ -128,7 +126,10 @@ class CandidateMatchingAcceptanceTest {
 
   private static Result exchange(RestClient client, String method, String path, Object body, String session, String key) {
     var request = client.method(HttpMethod.valueOf(method)).uri(path);
-    if (session != null) request.header(SESSION, session);
+    if (session != null) {
+      request.header("Cookie", AccountSessionTestSupport.cookie(session));
+      if (!"GET".equals(method)) request.header("Account-Request", "1");
+    }
     if (key != null) request.header("Idempotency-Key", key);
     if (body != null) request.contentType(MediaType.APPLICATION_JSON).body(body);
     return request.exchange((req, response) -> {
