@@ -25,9 +25,9 @@ test("sends the exact displayed acceptance text only after explicit baseline app
   const fetcher = vi.fn(async () => new Response(JSON.stringify({ requests: [draft], agreedPrice: null })));
   vi.stubGlobal("fetch", fetcher);
   render(<AgreedPrice {...props} />);
-  const button = await screen.findByRole("button", { name: "Accept this quote, approve baseline and send this text" });
+  const button = await screen.findByRole("button", { name: "Approve this acceptance text and baseline" });
   expect(fetcher.mock.calls).toHaveLength(1);
-  expect(screen.getByText(/Approval also creates an Approved Baseline/)).toBeInTheDocument();
+  expect(screen.getByText(/the Agreed Price is saved with an Approved Baseline/)).toBeInTheDocument();
   fireEvent.click(button);
   await waitFor(() => expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/quote-acceptance/a1/approval", expect.objectContaining({
     method: "POST", body: JSON.stringify({ approved: true, text }),
@@ -40,7 +40,7 @@ test("a stopped gate cannot be approved and a sent confirmation asks for review"
     { ...draft, id: "a2", kind: "WRITTEN_CONFIRMATION", state: "SENT" },
   ], agreedPrice: null }))));
   render(<AgreedPrice {...props} />);
-  expect(await screen.findByRole("button", { name: "Accept this quote, approve baseline and send this text" })).toBeDisabled();
+  expect(await screen.findByRole("button", { name: "Approve this acceptance text and baseline" })).toBeDisabled();
   expect(screen.getByText(/Written confirmation requested/)).toBeInTheDocument();
 });
 
@@ -56,7 +56,7 @@ test("an Agreed Price exposes a credentialed summary download and cannot be acce
   await waitFor(() => expect(click).toHaveBeenCalled());
   expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/quote-acceptance/summary", { headers: { "Case-Access-Token": "secret" } });
   expect(screen.queryByRole("combobox", { name: "Dealer conversation" })).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Accept this quote, approve baseline and send this text" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Approve this acceptance text and baseline" })).toBeDisabled();
 });
 
 test("offers explicit pause and stop choices only for other negotiations returned by the journey seam", async () => {

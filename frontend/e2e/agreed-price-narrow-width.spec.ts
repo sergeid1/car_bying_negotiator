@@ -32,7 +32,7 @@ for (const state of ["ACCEPTANCE", "WRITTEN_CONFIRMATION", "AGREED", "BLOCKED", 
     await expect(panel.getByRole("button", { name: "Refresh acceptance status" })).toBeVisible();
     if (state === "AGREED" || state === "JOURNEY_OPTIONS") await expect(panel.getByRole("button", { name: "Download one-page Agreed Price summary" })).toBeVisible();
     else if (state === "WRITTEN_CONFIRMATION") await expect(panel.getByText(/Written confirmation requested/)).toBeVisible();
-    else await expect(panel.getByRole("button", { name: "Accept this quote, approve baseline and send this text" })).toBeVisible();
+    else await expect(panel.getByRole("button", { name: "Approve this acceptance text and baseline" })).toBeVisible();
     if (state === "JOURNEY_OPTIONS") {
       await expect(panel.getByRole("button", { name: "Pause The other dealer with a long conversation label" })).toBeVisible();
       await expect(panel.getByRole("button", { name: "Stop The other dealer with a long conversation label" })).toBeVisible();

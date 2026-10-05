@@ -45,7 +45,7 @@ for (const state of ["PROPOSE", "CONFIRM", "BOOKED"]) {
       await expect(panel.getByRole("group", { name: "Window 2" })).toBeVisible();
     } else if (state === "CONFIRM") {
       await expect(panel.getByRole("checkbox", { name: "Email" })).not.toBeChecked();
-      await expect(panel.getByRole("button", { name: "Approve this text, share the chosen details and book" })).toBeVisible();
+      await expect(panel.getByRole("button", { name: "Approve this text with the chosen details" })).toBeVisible();
     } else {
       await expect(panel.getByRole("button", { name: "Prepare a cancellation message" })).toBeVisible();
       await panel.getByRole("button", { name: "Move this test drive" }).click();

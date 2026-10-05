@@ -1,11 +1,12 @@
 import { FormEvent, useContext, useEffect, useRef, useState } from "react";
 import { AccountSignedInContext } from "./BuyerAccount";
+import { DealerHandoff } from "./DealerHandoff";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
 
 type Field = "FIRST_NAME" | "LAST_NAME" | "EMAIL" | "PHONE";
 type Slot = { option: number; startsAt: string; endsAt: string; label: string };
 type Message = { id: string; kind: "PROPOSAL" | "RESCHEDULE" | "BOOKING" | "CANCELLATION"; appointmentId: string | null;
-  slots: Slot[]; release: Field[]; state: string; createdAt: string; sentAt: string | null;
+  slots: Slot[]; release: Field[]; state: string; messageId?: string | null; createdAt: string; sentAt: string | null;
   gatedDraft: { draft: { text: string }; decision: GateDecision } };
 type Release = { fields: Field[]; state: string; decidedAt: string; releasedAt: string | null };
 type Appointment = { id: string; option: number; startsAt: string; endsAt: string; label: string; state: string;
@@ -23,10 +24,11 @@ const TITLES: Record<Message["kind"], string> = {
 const MESSAGE_STATES: Record<string, string> = {
   SENDING: "Sending.", SENT: "Sent after your approval.", BLOCKED: "Stopped before sending: the mandate, policy or appointment changed.",
   WITHDRAWN: "Replaced by a newer choice. Not sent.", OPTED_OUT: "Not sent: the dealer opted out of messages.",
+  DISCARDED: "Discarded. It was not sent.",
   FAILED: "Not sent: the relay refused it.", DELIVERY_UNKNOWN: "Delivery was not confirmed. Check the conversation before sending again.",
 };
 const APPOINTMENT_STATES: Record<string, string> = {
-  PENDING_BOOKING: "Waiting for you to approve the booking message", SCHEDULED: "Booked", RESCHEDULING: "Booked; new times sent to the dealer",
+  PENDING_BOOKING: "Waiting for you to approve and send the booking message", SCHEDULED: "Booked", RESCHEDULING: "Booked; new times sent to the dealer",
   RESCHEDULED: "Replaced by a new time", CANCELLED: "Cancelled", WITHDRAWN: "Not booked",
 };
 const usd = (minor: number) => (minor / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -169,14 +171,17 @@ export function TestDriveAppointment({ caseId, token, version = 0 }: { caseId: s
         <pre>{message.gatedDraft.draft.text}</pre>
         {message.kind === "BOOKING" && <p>{message.release.length
           ? `After you approve, only these details are added below the message for this dealer: ${fieldList(message.release)}.`
-          : "No contact details are shared with this dealer."}</p>}
-        <p>The relay adds its notice that Deal X-Ray acts on behalf of a Buyer, uses AI assistance, and lets the dealer opt out.</p>
+          : "No contact details are added to this message."}</p>}
         <OutboundGateDecision decision={message.gatedDraft.decision} />
         {message.state === "DRAFT" ? <button type="button" disabled={busy || !message.gatedDraft.decision.pass}
           onClick={() => void update(`${path}/messages/${encodeURIComponent(message.id)}/approval`,
             { approved: true, text: message.gatedDraft.draft.text })}>
-          {message.kind === "BOOKING" ? "Approve this text, share the chosen details and book" : "Approve this text and send"}
-        </button> : <p role="status">{MESSAGE_STATES[message.state] ?? message.state}</p>}
+          {message.kind === "BOOKING" ? "Approve this text with the chosen details" : "Approve this text"}
+        </button> : message.state === "HANDED_OFF" && message.messageId
+          ? <DealerHandoff caseId={caseId} token={token} messageId={message.messageId} onChanged={refresh} />
+          : <p role="status">{MESSAGE_STATES[message.state] ?? message.state}</p>}
+        {message.kind === "BOOKING" && message.state === "HANDED_OFF" && <p>The test drive is booked, and the calendar file is ready,
+          once you send this message and tell us.</p>}
       </article>)}
 
       {proposal && view.confirmations.length > 0 && <>
@@ -194,7 +199,7 @@ export function TestDriveAppointment({ caseId, token, version = 0 }: { caseId: s
           </select></label>
           <fieldset disabled={busy}>
             <legend>Contact details to share with this dealer</legend>
-            <p>Nothing is shared unless you tick it. You can share none and keep using the relay.</p>
+            <p>Nothing is added to the message unless you tick it.</p>
             {view.contactFields.length ? view.contactFields.map(field => <label key={field}>
               <input type="checkbox" name="release" value={field} /> {FIELDS[field]}</label>)
               : <p>Your Buyer Account has no contact details to share.</p>}
@@ -203,7 +208,7 @@ export function TestDriveAppointment({ caseId, token, version = 0 }: { caseId: s
           <button type="submit" disabled={busy}>Confirm this time and review the booking message</button>
         </form>)}
       </>}
-      {proposal && view.confirmations.length === 0 && !active && <p role="status">Your times were sent. Waiting for the dealer to reply.</p>}
+      {proposal && view.confirmations.length === 0 && !active && <p role="status">Your times were sent. When the dealer replies, add the reply to the dealer conversation.</p>}
     </>}
     <button type="button" disabled={busy} onClick={() => { setError(undefined); void refresh().catch(failure => setError((failure as Error).message)); }}>
       Refresh test-drive status</button>

@@ -1724,3 +1724,22 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
   .report-section > summary { min-height: 0; }
 }
 /* End ticket 71. */
+
+/* Ticket 82: the Buyer sends an approved message from their own email app, then adds the dealer's reply. */
+.quote-request-panel, .quote-request-panel .card { min-width: 0; overflow-wrap: anywhere; }
+.handoff, .handoff-reply { display: grid; gap: 10px; min-width: 0; margin-top: 12px; overflow-wrap: anywhere; }
+.handoff-state { font-weight: 600; }
+.handoff-fields dd { overflow-wrap: anywhere; }
+.handoff-body { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; color: var(--ink); font: inherit; }
+.handoff-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.handoff-actions > p { margin: 0; flex-basis: 100%; }
+.handoff-actions > a.button-link {
+  display: inline-flex; align-items: center; min-height: 48px; padding: 12px 24px;
+  border-radius: var(--radius-pill); background: var(--brand); color: var(--on-brand);
+  font-size: 0.97rem; text-decoration: none;
+}
+.handoff-actions > a.button-link:hover { background: var(--brand-hover); color: var(--on-brand); }
+.handoff-actions > a.button-link:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.handoff-reply h4 { margin: 0; }
+.handoff-reply textarea, .handoff-reply input { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+/* End ticket 82. */

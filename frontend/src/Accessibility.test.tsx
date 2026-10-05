@@ -516,8 +516,27 @@ test("the quote request with a gated draft, a sent request and dealer quote sour
       documents: [{ documentId: "doc1", outcome: "ACCEPTED", offerVersion: null, sourceKind: "MESSAGE_BODY", messageId: "m2" },
         { documentId: null, outcome: "MALWARE_DETECTED", offerVersion: null, sourceKind: "ATTACHMENT", messageId: "m2" }] }))));
   const { container } = render(<main><h1>Buying Case</h1><QuoteRequest caseId="case" token="token" /></main>);
-  await screen.findByRole("button", { name: "Approve this text and send" });
+  await screen.findByRole("button", { name: "Approve this text" });
   await screen.findByText(/cabcdefghijklmnopqrstuvwxyz234567@relay.invalid/);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+// Ticket 82: an approved request handed off to the Buyer's email app, and a sent one taking a pasted reply.
+test("the quote request handed off to the Buyer's email app has no automated AA violations", async () => {
+  const decision = { pass: true, gateVersion: "outbound-gate.v2", reasons: [] };
+  const text = "Could you provide an itemized out-the-door quote for VIN 1HGCM82633A004352?";
+  const draft = (id: string, state: string, messageId: string | null) => ({ id, dealerAddress: "sales@dealer.example", state, messageId,
+    approvedAt: null, gatedDraft: { draft: { text }, decision } });
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/relay")
+    ? { address: "cabcdefghijklmnopqrstuvwxyz234567@relay.invalid", dealerOptedOut: false, perCaseDailyCap: 10, sentLastDay: 0, messages: [] }
+    : url.includes("/handoffs/")
+      ? { messageId: "m2", sendPath: "OWN_EMAIL_APP", state: "HANDED_OFF", dealerAddress: "sales@dealer.example",
+        subject: "Request for an itemized vehicle quote", body: text, handedOffAt: "2026-10-05T12:00:00Z", sentAt: null }
+      : { negotiationState: "AWAITING_DEALER", dealers: [{ id: "d1", name: "Triangle Motors" }],
+        requests: [draft("q1", "SENT", "m1"), draft("q2", "HANDED_OFF", "m2")], documents: [] }))));
+  const { container } = render(<main><h1>Buying Case</h1><QuoteRequest caseId="case" token="token" /></main>);
+  await screen.findByRole("link", { name: "Open in my email app" });
+  await screen.findByRole("button", { name: "Add reply" });
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 
