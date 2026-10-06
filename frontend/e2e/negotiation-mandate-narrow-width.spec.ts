@@ -16,7 +16,7 @@ const PROPOSAL = {
 };
 const MANDATE = {
   version: 2, status: "ACTIVE", currency: "USD", targetMinor: 2_250_000, ceilingMinor: 2_350_000, planCeilingMinor: 2_400_000,
-  disclosures: ["PAYING_CASH", "HAS_OUTSIDE_FINANCING", "FIRST_NAME", "PURCHASE_TIMELINE"], autonomyMode: "SUPERVISED",
+  disclosures: ["PAYING_CASH", "HAS_OUTSIDE_FINANCING", "FIRST_NAME", "PURCHASE_TIMELINE"],
   expiresAt: "2026-10-17T12:00:00Z", approvedAt: "2026-10-03T12:00:00Z", revokedAt: null,
 };
 

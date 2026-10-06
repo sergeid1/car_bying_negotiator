@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.dealanalyzer.mandate.MandatePolicy.AutonomyMode;
 import com.dealanalyzer.mandate.MandateService;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,6 +39,6 @@ class MandateExpiryNotifierTest {
 
   private static MandateService.Mandate mandate(String id, String caseId, Instant approvedAt, Instant expiresAt) {
     return new MandateService.Mandate(id, caseId, 1, MandateService.Status.ACTIVE, 1, "USD", 2_000_000, 2_100_000,
-        2_000_000, 2_100_000, List.of(), AutonomyMode.SUPERVISED, expiresAt, "BUYER", approvedAt, null, null);
+        2_000_000, 2_100_000, List.of(), expiresAt, "BUYER", approvedAt, null, null);
   }
 }

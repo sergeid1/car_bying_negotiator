@@ -37,6 +37,43 @@ the measured workload, queue backlog and failed operations are understood. Never
 failed/stuck operations to make a percentile pass. Deletion completion p95 must remain within
 24 hours, accompanied by the overdue/pending counts.
 
+## Buyer client response headers
+
+Serve `frontend/dist` over HTTPS and apply the single header definition in
+[`frontend/client-headers.json`](../frontend/client-headers.json) to client HTML (including
+SPA fallback routes) and static assets. Configure the deployment's static host/ingress to
+read or translate that name/value map; copying the build alone does not install headers.
+Keep `/api` routing separate and preserve the service's existing no-store, no-referrer,
+nosniff and correlation headers, including the export download's sandboxed CSP. Do not
+replace API headers with the client policy. The browser calls the API through its own origin.
+
+The client CSP restricts scripts, styles, fonts and connections to the site's origin,
+blocks inline scripts and eval, forbids objects, base changes and framing, and restricts
+forms to the site's origin. Images allow `'self' blob:` because authenticated document
+previews fetch normalized pages with a case header and create local blob image URLs.
+Only trusted page scripts create these URLs; same-origin-only connections constrain the
+fetches. The allowance does not extend to scripts, frames or workers, and `data:` images
+and external image origins remain blocked. React assigns source outlines/price markers
+through the CSSOM, which works without `unsafe-inline`. Theme initialization and fonts
+remain external same-origin assets. See [the header rationale](../frontend/client-headers.md).
+
+The map also defines one-year HSTS, nosniff, no-referrer and a restrictive Permissions-Policy.
+HSTS is honored only over HTTPS; verify HTTPS redirects and headers at the deployed edge
+before enrollment. HSTS intentionally omits `includeSubDomains` and `preload`, which require
+a separate inventory and commitment for all subdomains. Verify framing refusal and a
+synthetic case's document preview in the deployed browser as well as the local tests.
+
+`npm run build` runs `check:client-security` against emitted HTML, CSS and JavaScript, rejecting
+non-origin resource URL literals, inline HTML scripts/styles and dynamic code execution.
+React namespace identifiers and its error-documentation URL are narrowly exempted as
+non-resource identifiers; text download links are also exempted. This static guard cannot
+prove arbitrary computed URLs safe: the enforced CSP remains the runtime boundary.
+CI already runs this build and Playwright. `client-content-security-policy.spec.ts` checks
+the exact headers and requires zero violations on intake, upload, verification, saved
+reports/evidence/download controls, recovery and stored theme reloads in both themes.
+Vite preview uses the same header map; Vite development/HMR remains unrestricted by this
+production policy. Re-run these gates whenever adding a script, resource or client SDK.
+
 ## Request email quotas
 
 Sign-in requests, case recovery enrollment (`POST /cases/{id}/recovery-email`) and public
@@ -65,8 +102,15 @@ at ingress if abuse continues; do not raise the ceiling just to clear the warnin
 Limits are held in memory and reset on restart. Configure shared ingress quotas and global
 caps for replicas, distributed clients and restart resets, plus lower upload/write quotas.
 Account contact edits cannot change email, and notifications use the verified account address
-with their existing hourly quota. Dealer mail normally uses the Buyer's own email app; the
-optional authorized relay has its own daily per-case and per-dealer caps.
+with their existing hourly quota. Dealer mail is sent only by the Buyer from their own email
+app; the platform never emails a dealer (ticket 84), so there is no outbound relay cap to set.
+
+## Accepted scan exceptions
+
+`scripts/security-checks.sh` fails on any high or critical finding. A finding may be accepted only
+in `.trivyignore`, with the reason it is unreachable, the guard that keeps it unreachable and an
+`exp:` date, after which the scan fails again. The current entry is CVE-2026-47884 (Spring
+Framework `XsltView`), guarded by the Semgrep rule `no-xslt-view` and removed by ticket 85.
 
 ## Document key rotation
 

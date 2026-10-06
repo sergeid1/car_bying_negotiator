@@ -3,7 +3,6 @@ package com.dealanalyzer.negotiation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.dealanalyzer.mandate.MandatePolicy.AutonomyMode;
 import com.dealanalyzer.mandate.MandateService;
 import com.dealanalyzer.outbound.OutboundGate;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -33,7 +32,7 @@ class CounterofferTest {
 
   private static MandateService.Mandate mandate(long target, long ceiling) {
     return new MandateService.Mandate("m1", "c1", 1, MandateService.Status.ACTIVE, 1, "USD", target, ceiling, target, ceiling,
-        List.of(), AutonomyMode.SUPERVISED, Instant.now().plusSeconds(3600), "BUYER", Instant.now(), null, null);
+        List.of(), Instant.now().plusSeconds(3600), "BUYER", Instant.now(), null, null);
   }
 
   @Test void proposesOnlyTheMandateTargetAndReportQuestionsInGateLanguage() throws Exception {

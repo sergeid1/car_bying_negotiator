@@ -26,11 +26,11 @@ function conversation(state: string) {
       { kind: "OUTBOUND_MESSAGE", at: "2026-10-04T13:30:00Z", quoteRequest: null, acceptance: null, counteroffer: null,
         message: { id: "m3", direction: "OUTBOUND", dealerAddress: LONG_DEALER, deliveryState: "DELIVERY_UNKNOWN", createdAt: "2026-10-04T13:30:00Z",
           completedAt: null, contentAvailable: true, subject: "Revised itemized written offer", body: counter, attachments: [],
-          deliveryCheckOffered: true, retryOffered: false } },
+          sendPath: "RELAY" } },
       { kind: "OUTBOUND_MESSAGE", at: "2026-10-04T13:40:00Z", quoteRequest: null, acceptance: null, counteroffer: null,
         message: { id: "m4", direction: "OUTBOUND", dealerAddress: LONG_DEALER, deliveryState: "FAILED", createdAt: "2026-10-04T13:40:00Z",
           completedAt: "2026-10-04T13:40:00Z", contentAvailable: true, subject: "Revised itemized written offer", body: counter, attachments: [],
-          deliveryCheckOffered: false, retryOffered: true } },
+          sendPath: "RELAY" } },
       { kind: "COUNTEROFFER", at: "2026-10-04T14:00:00Z", quoteRequest: null, acceptance: null, message: null,
         counteroffer: { id: "n1", quoteRequestId: "q1", dealerAddress: LONG_DEALER, state: state === "AWAITING_BUYER" ? "PROPOSED" : "CANCELLED",
           cancelReason: state === "AWAITING_BUYER" ? null : state === "TARGET_REACHED" ? "TARGET_REACHED" : "PAUSED",
@@ -64,8 +64,9 @@ for (const state of ["AWAITING_BUYER", "PAUSED", "TARGET_REACHED"]) {
     const panel = page.locator(".negotiation-conversation");
     await expect(panel.getByRole("heading", { name: "Negotiation conversation" })).toBeVisible();
     await expect(panel.getByRole("list", { name: "Conversation, oldest first" })).toBeVisible();
-    await expect(panel.getByRole("button", { name: /^Check delivery of the message to/ })).toBeVisible();
-    await expect(panel.getByRole("button", { name: /^Retry the message to/ })).toBeVisible();
+    // Messages the former platform relay left unconfirmed or unsent are history: nothing offers to send them again.
+    await expect(panel.getByText("Delivery not confirmed", { exact: true })).toBeVisible();
+    await expect(panel.getByRole("button", { name: /^Check delivery|^Retry/ })).toHaveCount(0);
     if (state === "AWAITING_BUYER") {
       await expect(panel.getByRole("button", { name: "Approve revision 2" })).toBeDisabled();
       await panel.getByRole("button", { name: "Edit this draft" }).click();

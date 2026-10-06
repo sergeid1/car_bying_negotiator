@@ -1,0 +1,7 @@
+# Accepted vulnerability exceptions for scripts/security-checks.sh. Each entry states why the finding is not
+# reachable, what guards that, and when it expires; an expired entry fails the scan again.
+
+# CVE-2026-47884, spring-webmvc 6.2.19: remote code execution through XsltView. The application never uses XsltView
+# or XsltViewResolver; the Semgrep rule no-xslt-view in scripts/security-rules.yml fails the build if it ever does.
+# No 6.2.x fix is published; the only fix is Spring Framework 7.0.9 (Spring Boot 4), tracked as ticket 85.
+CVE-2026-47884 exp:2026-12-31

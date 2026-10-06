@@ -10,7 +10,7 @@ const quote = { id: "q1", dealerAddress: "sales@dealer.example", state: "DRAFT",
     decision: { pass: true, gateVersion: "outbound-gate.v2", reasons: [] } as GateDecision } };
 function mock(view = { negotiationState: "MANDATE_ACTIVE", requests: [quote], documents: [], dealers: [{ id: "d1", name: "Dealer" }] }) {
   const fetcher = vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/relay")
-    ? { address: "relay@example.test", messages: [], perCaseDailyCap: 10, sentLastDay: 0 } : view)));
+    ? { address: "relay@example.test", forwardingAvailable: false, messages: [] } : view)));
   vi.stubGlobal("fetch", fetcher); return fetcher;
 }
 test("reviews the gated text accessibly and sends only on explicit approval", async () => {

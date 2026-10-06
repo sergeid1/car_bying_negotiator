@@ -35,3 +35,8 @@ rules:
         - '**/DocumentParserWorker.java'
         - '**/LocalDocumentInspector.java'
         - '**/HardenedImageDecoder.java'
+  - id: no-xslt-view
+    languages: [java]
+    severity: ERROR
+    message: XsltView is exposed to CVE-2026-47884 on Spring Framework 6.2; see .trivyignore and ticket 85.
+    pattern-regex: \bXsltView(Resolver)?\b

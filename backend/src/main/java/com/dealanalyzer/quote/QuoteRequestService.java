@@ -80,7 +80,7 @@ public class QuoteRequestService implements RelayMessageOwner {
       return new Reservation(quote, true);
     });
     if (!reservation.reserved()) return reservation.quote();
-    // Commit the reservation before contacting the provider. A crash or unclear result cannot resend it.
+    // Commit the reservation before the hand-off, so a repeated approval cannot hand the request off twice.
     return transaction.execute(status -> {
       locks.lock(caseId); cases.reopen(caseId, token);
       Quote quote = get(caseId, token, id);
@@ -95,8 +95,8 @@ public class QuoteRequestService implements RelayMessageOwner {
         jdbc.update("update quote_requests set state = ?, message_id = ? where id = ?", handoff.state(), handoff.messageId(), id);
         if (handoff.sent()) negotiation.transition(caseId, NegotiationStateService.State.AWAITING_DEALER);
       } catch (RelayService.RelayRefusedException refused) {
-        // A FAILED or DELIVERY_UNKNOWN send keeps its relay message so it can be checked or retried.
-        jdbc.update("update quote_requests set state = ?, message_id = ? where id = ?", refused.reason().name(), refused.messageId(), id);
+        // An invalid message, or one revealing the Buyer's details, is not handed off.
+        jdbc.update("update quote_requests set state = ? where id = ?", refused.reason().name(), id);
       }
       return get(caseId, token, id);
     });
@@ -116,7 +116,7 @@ public class QuoteRequestService implements RelayMessageOwner {
   }
   private record Reservation(Quote quote, boolean reserved) {}
 
-  // ---------------------------------------------------------------- unclear sends (RelayMessageOwner)
+  // ---------------------------------------------------------------- marked sent or discarded (RelayMessageOwner)
 
   @Override public boolean owns(String caseId, String relayMessageId) {
     return jdbc.queryForObject("select count(*) from quote_requests where case_id = ? and message_id = ?",
@@ -130,19 +130,19 @@ public class QuoteRequestService implements RelayMessageOwner {
   }
 
   @Override public Runnable sent(String caseId, String token, String relayMessageId) {
-    if (jdbc.update("update quote_requests set state = 'SENT' where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
+    if (jdbc.update("update quote_requests set state = 'SENT' where case_id = ? and message_id = ? and state = 'HANDED_OFF'",
         caseId, relayMessageId) == 1 && NegotiationConversationService.ACTIVE.contains(negotiation.current(caseId)))
       negotiation.transition(caseId, NegotiationStateService.State.AWAITING_DEALER);
     return null;
   }
 
   @Override public void unsent(String caseId, String relayMessageId, String state) {
-    jdbc.update("update quote_requests set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
+    jdbc.update("update quote_requests set state = ? where case_id = ? and message_id = ? and state = 'HANDED_OFF'",
         state, caseId, relayMessageId);
   }
 
   private List<String> unsettled(String caseId, String relayMessageId) {
-    return jdbc.queryForList("select id from quote_requests where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
+    return jdbc.queryForList("select id from quote_requests where case_id = ? and message_id = ? and state = 'HANDED_OFF'",
         String.class, caseId, relayMessageId);
   }
 
