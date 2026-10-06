@@ -196,12 +196,14 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       <main>
         {!standalone && <div className="hero">
           <div className="hero-copy">
-            <p className="eyebrow">Buyer-aligned deal analysis</p>
+            <p className="eyebrow">The Buyer's side of the deal</p>
             <h1>See the whole deal <span className="hero-quiet">before you decide.</span></h1>
             <p className="lede">
-              Enter the vehicle you are negotiating for and get a transparent Deal X-Ray. Every
-              dollar stays connected to its input or calculation.
+              Deal X-Ray helps you find cars, check dealer quotes, draft your emails to dealers, and
+              check the paperwork at the desk. You send every email from your own email and make every
+              decision. Every dollar stays connected to its input or calculation.
             </p>
+            <p className="hero-credo">We don't work with dealers. We help people.</p>
             <ul className="trust-strip">
               <li>Every amount linked to its source</li>
               <li>Deterministic, versioned math</li>
@@ -324,9 +326,15 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             <strong>What this is, and what it is not</strong>
             <div className="scope-columns">
               <p>
-                This product represents you, the Buyer. No dealer, lender, or other commercial party
-                pays for placement, leads, or referrals, and no commercial relationship affects any
-                market range, rating, finding, or suggested boundary.
+                Deal X-Ray is a tool on your side, the Buyer's. We don't work with dealers. We help
+                people. It helps you find cars, check quotes, draft your emails to dealers, and check
+                desk paperwork. You send every email from your own email and make every decision, and
+                Deal X-Ray never contacts a dealer itself.
+              </p>
+              <p>
+                No dealer, lender, or other commercial party pays for placement, leads, or referrals,
+                and no commercial relationship affects any market range, rating, finding, or suggested
+                boundary.
               </p>
               <p>
                 It reviews the dealer's own paperwork for financial consistency. It is not legal, tax,

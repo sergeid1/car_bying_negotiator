@@ -19,20 +19,30 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Buyer-facing copy may not make unsupported law, advice, safety, fraud, guarantee, or savings
- * claims. Each risky phrase must be recorded as reviewed, so the claim surface cannot grow
- * silently; the standing commercial-relationship disclosure must remain present.
+ * claims, and may not say the platform negotiates, contacts dealers, or acts on the Buyer's behalf
+ * (DEVELOPMENT_SPEC.md sections 1.2 and 1.3). Each risky phrase must be recorded as reviewed, so the
+ * claim surface cannot grow silently; the standing positioning and commercial-relationship
+ * disclosures must remain present.
  */
 class PilotCopyClaimsTest {
   private static final Path REPOSITORY = Path.of("..").toAbsolutePath().normalize();
 
-  /** One pattern per prohibited claim category in the ticket. */
+  /** One pattern per prohibited claim category in the tickets. */
   private static final Map<String, Pattern> PROHIBITED = Map.of(
       "illegal", word("illegal|unlawful|violates the law"),
       "fraud", word("fraud|fraudulent|scam|deceptive"),
       "advice", word("advice|we advise|you should|we recommend that you"),
       "safe to sign", Pattern.compile("safe to sign", Pattern.CASE_INSENSITIVE),
       "guarantee", word("guarantee|guaranteed|guarantees|risk-free"),
-      "savings", Pattern.compile("(?i)\\b(you will save|savings of|save you \\$)"));
+      "savings", Pattern.compile("(?i)\\b(you will save|savings of|save you \\$)"),
+      "negotiates for you", word("(we|it) negotiates?|negotiates? (for|with dealers for)"
+          + " (you|the buyer)|negotiating for (you|the buyer)"),
+      "on your behalf", word("on (your|the buyer['’]s|a buyer['’]s|buyers['’]) behalf"),
+      "agent", word("our agent|your agent|ai agent|ai negotiator|autonomous|autonomously"
+          + "|(your|the buyer['’]s) representative|represents? (you|the buyer)"),
+      "contacts dealers", word("(we|deal x-ray|the platform|the product) (will )?(contacts?|emails?|writes? to)"
+          + " (the |a |your )?dealers?|(contacts?|emails?|writes? to) (the |a |your )?dealers?"
+          + " (for (you|the buyer)|itself|in its own name)"));
 
   private final ObjectMapper json = new ObjectMapper();
 
@@ -74,9 +84,32 @@ class PilotCopyClaimsTest {
 
   @Test void theStandingCommercialRelationshipDisclosureIsPresent() throws IOException {
     String app = normalize(Files.readString(REPOSITORY.resolve("frontend/src/App.tsx"), StandardCharsets.UTF_8));
-    assertThat(app).contains("This product represents you, the Buyer.");
+    assertThat(app).contains("Deal X-Ray is a tool on your side, the Buyer's.");
+    assertThat(app).contains("We don't work with dealers. We help people.");
+    assertThat(app).contains("You send every email from your own email and make every decision");
     assertThat(app).contains("no commercial relationship affects any");
     assertThat(app).contains("pays for placement, leads, or referrals");
+  }
+
+  @Test void thePartnerKitKeepsTheCredoAndTheNoDealerMoneyTerms() throws IOException {
+    String kit = normalize(Files.readString(REPOSITORY.resolve("frontend/src/ReferralPartnerKit.tsx"), StandardCharsets.UTF_8));
+    assertThat(kit).contains("does not contact dealers for the Buyer");
+    assertThat(kit).contains("We don't work with dealers. We help people.");
+    assertThat(kit).contains("The Buyer sends every email from their own email and makes every decision");
+    assertThat(kit).contains("pays for placement, leads, or referrals");
+  }
+
+  @Test void positioningClaimsAreProhibited() {
+    for (String claim : List.of("Our AI negotiator negotiates for you.", "We contact dealers on your behalf.",
+        "Deal X-Ray emails the dealer for you.", "Let our agent handle it.", "An autonomous buying assistant.",
+        "The platform writes to the dealer in its own name.", "It negotiates with dealers for the Buyer.",
+        "Deal X-Ray represents you at the dealership.", "This contract is safe to sign.", "Guaranteed savings.")) {
+      assertThat(PROHIBITED.values()).as(claim).anyMatch(pattern -> pattern.matcher(claim).find());
+    }
+    for (String allowed : List.of("Deal X-Ray helps you draft your emails to dealers.",
+        "You send every email from your own email.", "Enter the vehicle you are negotiating for.")) {
+      assertThat(PROHIBITED.values()).as(allowed).noneMatch(pattern -> pattern.matcher(allowed).find());
+    }
   }
 
   @Test void theCopyUnderReviewIsActuallyBeingScanned() throws IOException {
