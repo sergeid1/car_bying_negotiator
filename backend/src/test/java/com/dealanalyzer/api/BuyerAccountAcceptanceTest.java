@@ -193,7 +193,8 @@ class BuyerAccountAcceptanceTest {
   }
 
   @Test void signInEmailsToOneAddressAreCappedWithoutChangingTheAcknowledgement() throws Exception {
-    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("cap", false, EmailConfiguration.class, KEY)) {
+    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("cap", false, EmailConfiguration.class, KEY,
+        "--security.request-email.peer-requests=100")) {
       var client = app.client();
       var acknowledgements = new java.util.HashSet<JsonNode>();
       for (int i = 0; i < 6; i++) {
@@ -225,7 +226,7 @@ class BuyerAccountAcceptanceTest {
 
   @Test void concurrentFirstSignInRequestsForANewAddressAllGetTheAcknowledgement() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("race", false, EmailConfiguration.class, KEY,
-        "--account.sign-in.max-active-links=100")) {
+        "--account.sign-in.max-active-links=100", "--security.request-email.peer-requests=100")) {
       var client = app.client();
       var jdbc = new JdbcTemplate(app.context().getBean(javax.sql.DataSource.class));
       try (var executor = java.util.concurrent.Executors.newFixedThreadPool(8)) {

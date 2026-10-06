@@ -1,6 +1,7 @@
 package com.dealanalyzer.buyingcase.persistence;
 import com.dealanalyzer.buyingcase.*;
 import com.dealanalyzer.recovery.RecoveryEmail;
+import com.dealanalyzer.recovery.RequestEmailLimits;
 import java.time.Instant;
 import java.time.Duration;
 import java.util.UUID;
@@ -15,14 +16,16 @@ public class CaseRecoveryService {
   private final RecoveryTokenRepository tokens;
   private final CaseAccessService access;
   private final RecoveryEmail email;
+  private final RequestEmailLimits emailLimits;
   private final String origin;
   private final Duration lifetime;
   public CaseRecoveryService(AnalysisCaseRepository cases, RecoveryContactRepository contacts,
       DeliveryRequestRepository deliveries, RecoveryTokenRepository tokens, CaseAccessService access,
-      RecoveryEmail email, @Value("${case.recovery.public-url:http://localhost:5173/}") String origin,
+      RecoveryEmail email, RequestEmailLimits emailLimits, @Value("${case.recovery.public-url:http://localhost:5173/}") String origin,
       @Value("${case.recovery.link-lifetime:PT15M}") Duration lifetime) {
     this.cases=cases; this.contacts=contacts; this.deliveries=deliveries; this.tokens=tokens;
     this.access=access; this.email=email; this.origin=origin; this.lifetime=lifetime;
+    this.emailLimits=emailLimits;
   }
   @Transactional
   public void enroll(String id, String credential, String recipient, String key) {
@@ -47,6 +50,7 @@ public class CaseRecoveryService {
       if (!previous.email.equals(recipient)) throw new IdempotencyConflictException();
       return;
     }
+    if (!emailLimits.acquireDelivery()) return;
     var credential = access.issue(Instant.now());
     var delivery = new DeliveryRequestEntity(); delivery.id=UUID.randomUUID().toString();
     delivery.caseId=buyingCase.id; delivery.requestKey=key; delivery.email=recipient;

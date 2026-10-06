@@ -15,7 +15,7 @@ is a bearer credential. A Buying Case is the isolation unit; knowledge of a UUID
 | Worker redelivery / partial writes | Durable operation keys, database locking, terminal completion; `PersistenceHardeningTest`, synthetic restart and document concurrent retry tests | Multiple live worker instances and kill-during-work scenarios require deployment testing |
 | Provider outages / prompt injection | Safe failure categories, bounded provider concurrency and deadlines (`ProviderMeterTest`), grounded output, frozen provider contracts; market, extraction, operations and evaluation suites | Provider adapters must set transport deadlines; `ProviderMeter` cancels timed-out calls and discards late results, but cannot forcibly terminate an adapter that ignores interruption. Adapters must not persist case state themselves; an exhausted provider pool fails closed until calls finish or the service restarts |
 | Support overreach | Disabled-by-default named accounts, assigned field scope and current consent; `ServiceOperationsAcceptanceTest` | Sergei is the sole operator; exercise grant/revocation and delivery to his alert destination |
-| Abuse / resource exhaustion | API peer-address fixed-window limiter, bounded map, 429 with Retry-After, connection/header caps; `SecurityHardeningAcceptanceTest`; deletion batches | Shared ingress quotas across replicas; app limiter is per process and can reset on restart. Proxy peers share a bucket. Startup analysis/document recovery uses ID cursors and batches of at most 100, with one executor task per workflow; multi-replica ownership and normal-request executor admission still need deployment load testing |
+| Abuse / resource exhaustion | API peer-address fixed-window limiter, bounded map, 429 with Retry-After, connection/header caps; sign-in and both case recovery email routes share a stricter peer quota and an hourly delivery ceiling with unchanged acknowledgements and one address-free warning per exhausted window; `SecurityHardeningAcceptanceTest`, `RequestEmailLimitAcceptanceTest`, `RequestEmailLimitsTest`; deletion batches | Shared ingress quotas across replicas; app limiters are per process and reset on restart. Proxy peers share a bucket. Route the hourly email warning to the operator's monitored destination. Startup analysis/document recovery uses ID cursors and batches of at most 100, with one executor task per workflow; multi-replica ownership and normal-request executor admission still need deployment load testing |
 | Deletion and backup resurrection | Immediate access revocation, verified graph/artifact removal, retry receipts; restore-mode API fence and independent UUID ledger; `BackupRestoreAcceptanceTest` | Latest ledger durability/freshness, backup rotation, provider erasure, production RPO/RTO and physical backup expiry remain unverified |
 | Dependency / build compromise | Patched managed dependencies, Trivy filesystem/image gates, repository-owned Semgrep rules, npm audit | Protect CI settings, pin promoted image digest, scan each candidate and retain reviewed findings; source rules are a narrow guardrail, not a full taint audit |
 | UI exclusion or misleading status | Labels, non-color statuses, keyboard skip link, visible focus; axe AA-tagged rules and keyboard test | Real-browser contrast/reflow, complete keyboard path and VoiceOver/NVDA walkthrough remain required |
@@ -24,7 +24,19 @@ The API rate-limit defaults are 600 requests per minute per network peer, at mos
 peer buckets per process. Limits are configurable with `security.rate-limit.requests`,
 `security.rate-limit.window`, and `security.rate-limit.max-clients`; nonpositive values fail
 startup. `server.forward-headers-strategy=none` prevents client headers from changing the peer.
-The edge must apply lower write/upload/recovery quotas and a global cap before forwarding traffic.
+Sign-in requests, case recovery enrollment and public recovery requests share a default quota
+of five requests per peer per 15 minutes (`security.request-email.peer-requests`,
+`security.request-email.peer-window`), with at most 10,000 peer buckets
+(`security.request-email.max-peers`). They use the same network peer as the API limiter,
+never forwarding headers. Peer exhaustion returns the same generic 429 and `Retry-After`.
+Their combined delivery attempts are capped at 100 per hour
+(`security.request-email.hourly-limit`); exhausted requests keep the original acknowledgement
+and send no mail or link. The first suppressed delivery logs an address-free
+`REQUEST_EMAIL_HOURLY_LIMIT_REACHED` warning, once per window. All limits must be positive at
+startup. Failed delivery attempts consume capacity; idempotent replays and requests with no
+eligible delivery do not. Windows begin with the first request/attempt and use monotonic time.
+The edge must still apply shared write/upload/email quotas and global caps across replicas
+before forwarding traffic, and protect against restart resets and distributed clients.
 The service deliberately returns the same limit response for invalid and valid case IDs.
 
 Declare pilot/production with `SPRING_PROFILES_ACTIVE=pilot` or `production`, or equivalently
