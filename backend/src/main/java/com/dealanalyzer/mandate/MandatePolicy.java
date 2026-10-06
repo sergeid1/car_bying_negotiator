@@ -9,19 +9,18 @@ import java.util.Set;
 
 /**
  * Deterministic checks on a Buyer's mandate terms. The Deal Plan supplies the proposed target and the
- * walk-away ceiling; the Buyer may only lower either (AGT-02). Disclosures come from a fixed list, and
- * only supervised autonomy is accepted until delegated negotiation is enabled (AGT-06).
+ * walk-away ceiling; the Buyer may only lower either (AGT-02). Disclosures come from a fixed list. A mandate
+ * bounds what the Buyer may approve; it never lets the platform send anything (AGT-06, ticket 84), so it has no
+ * autonomy mode.
  */
 public final class MandatePolicy {
-  public static final String VERSION = "negotiation-mandate.v1";
+  public static final String VERSION = "negotiation-mandate.v2";
   public static final Duration DEFAULT_LIFETIME = Duration.ofDays(14);
   public static final Duration MINIMUM_LIFETIME = Duration.ofHours(1);
   public static final Duration MAXIMUM_LIFETIME = Duration.ofDays(30);
 
   /** Everything the platform may ever tell a dealer about the Buyer; anything else stays private. */
   public enum Disclosure { PAYING_CASH, HAS_OUTSIDE_FINANCING, FIRST_NAME, PURCHASE_TIMELINE }
-
-  public enum AutonomyMode { SUPERVISED, DELEGATED }
 
   public record DealPlanBasis(String planSnapshotId, int planVersion, String currency,
       long targetMinor, long ceilingMinor) {
@@ -33,10 +32,10 @@ public final class MandatePolicy {
   }
 
   public record Request(Integer planVersion, Long targetMinor, Long ceilingMinor, List<String> disclosures,
-      String autonomyMode, Instant expiresAt, boolean approved) {}
+      Instant expiresAt, boolean approved) {}
 
   public record Terms(String currency, long targetMinor, long ceilingMinor, long planTargetMinor,
-      long planCeilingMinor, List<Disclosure> disclosures, AutonomyMode autonomyMode, Instant expiresAt) {}
+      long planCeilingMinor, List<Disclosure> disclosures, Instant expiresAt) {}
 
   public Terms decide(DealPlanBasis plan, Request request, Instant now) {
     if (request == null || !request.approved())
@@ -58,30 +57,19 @@ public final class MandatePolicy {
     Set<Disclosure> disclosures = EnumSet.noneOf(Disclosure.class);
     for (String value : request.disclosures() == null ? List.<String>of() : request.disclosures())
       disclosures.add(disclosure(value));
-    AutonomyMode mode = autonomy(request.autonomyMode());
-    if (mode != AutonomyMode.SUPERVISED)
-      throw new IllegalArgumentException("Delegated mode is not available; every message needs your approval");
     Instant expiresAt = request.expiresAt() == null ? now.plus(DEFAULT_LIFETIME) : request.expiresAt();
     if (expiresAt.isBefore(now.plus(MINIMUM_LIFETIME)))
       throw new IllegalArgumentException("The mandate must last at least one hour");
     if (expiresAt.isAfter(now.plus(MAXIMUM_LIFETIME)))
       throw new IllegalArgumentException("The mandate can last at most 30 days");
     return new Terms(plan.currency(), target, ceiling, plan.targetMinor(), plan.ceilingMinor(),
-        List.copyOf(disclosures), mode, expiresAt);
+        List.copyOf(disclosures), expiresAt);
   }
 
   private static Disclosure disclosure(String value) {
     try { return Disclosure.valueOf(value == null ? "" : value.strip().toUpperCase(Locale.ROOT)); }
     catch (IllegalArgumentException unknown) {
       throw new IllegalArgumentException("Not a permitted disclosure: " + value);
-    }
-  }
-
-  private static AutonomyMode autonomy(String value) {
-    if (value == null || value.isBlank()) return AutonomyMode.SUPERVISED;
-    try { return AutonomyMode.valueOf(value.strip().toUpperCase(Locale.ROOT)); }
-    catch (IllegalArgumentException unknown) {
-      throw new IllegalArgumentException("Unknown autonomy mode: " + value);
     }
   }
 }

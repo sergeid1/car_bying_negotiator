@@ -177,22 +177,29 @@ external retained dataset or backup-erasure claim.
 ## Negotiation Mandates (ticket 57)
 
 V30 `negotiation_mandates` and `negotiation_mandate_revocations` belong to the case. Each row holds
-the approved target, walk-away ceiling, permitted disclosure codes, autonomy mode, expiry and
-approval or revocation time. CaseGraphDeletionPlan erases revocations, then mandates, before the
+the approved target, walk-away ceiling, permitted disclosure codes, expiry and approval or
+revocation time. Mandates approved before ticket 84 also keep the autonomy mode they were approved
+with; since V45 new mandates store none, because the platform never sends a dealer message
+itself. CaseGraphDeletionPlan erases revocations, then mandates, before the
 Deal Plan snapshots they reference. Approval, revocation and expiry audit events are erased with
 `audit_events`. Nothing about a mandate is kept in any anonymous total. Both tables are included
 in the case export.
 
-## Dealer email relay (ticket 58)
+## Dealer messages and the reply-intake address (tickets 58, 82 and 84)
 
 V32 `dealer_relay_identities`, `dealer_relay_messages`, `dealer_relay_attachments` and
-`dealer_relay_send_attempts` belong to the case. A relay address stops accepting mail and refuses
-sends as soon as the case is being deleted, has expired, or its Buyer Account is being deleted;
-mail to it is then refused unstored, exactly like mail to an address that never existed.
+`dealer_relay_send_attempts` belong to the case. Since ticket 84 the platform sends no dealer email:
+the rows are the case's private reply-intake address, messages the Buyer handed off and sent from
+their own email app (`send_path = 'OWN_EMAIL_APP'`), dealer replies the Buyer pasted or forwarded,
+and messages the former platform relay sent before ticket 84 (`send_path = 'RELAY'`), which stay
+listed, exported and erased exactly like the rest. No new send attempts are recorded. The
+reply-intake address stops accepting mail as soon as the case is being deleted, has expired, or its
+Buyer Account is being deleted; mail to it is then refused unstored, exactly like mail to an address
+that never existed.
 CaseGraphDeletionPlan erases attachments, send attempts, messages and the identity first, before the
 source documents the attachments point to. Message subjects and bodies are AES-GCM ciphertext and are
 erased at the case's document retention deadline (`dealer-relay.retention-sweep`, default `PT5M`);
-delivery metadata stays until case deletion. The relay identity's dealer opt-out is kept with the
-identity and goes with the case. Nothing is kept in any anonymous total. Metadata from all four
+delivery metadata stays until case deletion. A dealer opt-out recorded on a relay identity before
+ticket 84 is kept with the identity and goes with the case; new addresses have no opt-out. Nothing is kept in any anonymous total. Metadata from all four
 tables is in `case-data.json`, and retained message content is in `relay/messages.json` of the
 case export, and so of the account export.

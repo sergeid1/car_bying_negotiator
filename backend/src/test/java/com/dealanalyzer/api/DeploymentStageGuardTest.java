@@ -30,7 +30,7 @@ class DeploymentStageGuardTest {
         .withBean(ObjectMapper.class, () -> new ObjectMapper().findAndRegisterModules())
         .withBean(CaseWriteGuard.class, () -> mock(CaseWriteGuard.class));
     refuses(runner, "journey.vin.VinDecoderProductionGuard", "fake VIN decoder", "journey.vin.FakeVinDecoder");
-    refuses(runner, "relay.RelayProductionGuard", "fake dealer email relay", "relay.FakeDealerMailRelay");
+    refuses(runner, "relay.RelayProductionGuard", "fake reply-intake provider", "relay.FakeDealerMailRelay");
     refuses(runner, "purchase.CheckoutProductionGuard", "DevelopmentNoChargeCheckout", "purchase.DevelopmentNoChargeCheckout");
     refuses(runner, "shopping.inventory.InventorySearchProductionGuard", "Development inventory adapter",
         "shopping.inventory.DeterministicFakeInventorySearchAdapter");

@@ -22,7 +22,6 @@ final class MandateEntities {
     @Column(name = "plan_target_minor", nullable = false, updatable = false) long planTargetMinor;
     @Column(name = "plan_ceiling_minor", nullable = false, updatable = false) long planCeilingMinor;
     @Column(nullable = false, updatable = false) String disclosures;
-    @Column(name = "autonomy_mode", nullable = false, updatable = false) String autonomyMode;
     @Column(name = "expires_at", nullable = false, updatable = false) Instant expiresAt;
     @Column(name = "approved_by", nullable = false, updatable = false) String approvedBy;
     @Column(name = "approved_at", nullable = false, updatable = false) Instant approvedAt;
@@ -37,7 +36,7 @@ final class MandateEntities {
       this.ceilingMinor = terms.ceilingMinor(); this.planTargetMinor = terms.planTargetMinor();
       this.planCeilingMinor = terms.planCeilingMinor();
       this.disclosures = String.join(",", terms.disclosures().stream().map(Enum::name).toList());
-      this.autonomyMode = terms.autonomyMode().name(); this.expiresAt = terms.expiresAt();
+      this.expiresAt = terms.expiresAt();
       this.approvedBy = "BUYER"; this.approvedAt = now;
       this.idempotencyKey = key; this.requestFingerprint = fingerprint;
     }

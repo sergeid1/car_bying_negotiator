@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.*;
 import com.dealanalyzer.buyingcase.persistence.CaseDeletionWorker;
 import com.dealanalyzer.quote.DealerDeclinedService;
 import com.dealanalyzer.relay.DealerMailRelay;
-import com.dealanalyzer.relay.FakeDealerMailRelay;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
@@ -24,7 +23,7 @@ class DealerDeclinedAcceptanceTest {
 
   @Test void ruleAndBuyerDecisionsCancelCounteroffersAndOnlyTheirPermittedClearanceRestartsThem() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("dealer-declined", true,
-        FixtureExtractionProvider.class, "--dealer-mail.send-path=RELAY", "--case.deletion.delay=PT1H",
+        FixtureExtractionProvider.class, "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();
@@ -32,7 +31,6 @@ class DealerDeclinedAcceptanceTest {
       String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
       String base = "/api/v1/cases/" + caseId, path = base + "/negotiation-conversation";
       var jdbc = app.context().getBean(JdbcTemplate.class);
-      var provider = (FakeDealerMailRelay) app.context().getBean(DealerMailRelay.class);
       OutboundDraftAcceptanceTest.verifyAndPlan(app, base, token);
       jdbc.update("update vehicles set vin = '1HGCM82633A004352' where case_id = ?", caseId);
       String dealer = UUID.randomUUID().toString();
@@ -46,7 +44,8 @@ class DealerDeclinedAcceptanceTest {
           "ceilingMinor", proposal.path("ceilingMinor").asLong(), "approved", true), "mandate", token);
       var quote = post(client, base + "/quote-requests", Map.of("dealerId", dealer, "dealerAddress", "sales@dealer.example"), "quote", token);
       String quoteId = quote.path("id").asText();
-      post(client, base + "/quote-requests/" + quoteId + "/approval", Map.of("approved", true, "text", quote.at("/gatedDraft/draft/text").asText()), "quote-send", token);
+      DealerHandoffTestSupport.markSent(client, base, token, post(client, base + "/quote-requests/" + quoteId + "/approval",
+          Map.of("approved", true, "text", quote.at("/gatedDraft/draft/text").asText()), "quote-send", token));
       post(client, base + "/analyses", Map.of(), "analysis-1", token);
       String extractionId = jdbc.queryForObject("select extraction_id from dealer_offers where case_id = ?", String.class, caseId);
       String documentId = jdbc.queryForObject("select document_id from document_extractions where id = ?", String.class, extractionId);
@@ -83,7 +82,7 @@ class DealerDeclinedAcceptanceTest {
       assertThat(stoppedCounters.path("negotiationState").asText()).isEqualTo("AWAITING_DEALER");
       assertThat(jdbc.queryForObject("select cancel_reason from negotiation_drafts where id = ?", String.class, queued.path("id").asText()))
           .isEqualTo("DEALER_DECLINED");
-      assertThat(provider.sent()).hasSize(3);
+      assertThat(DealerHandoffTestSupport.sent(jdbc, caseId)).isEqualTo(3);
       // The decision retains its recorded threshold across configuration changes.
       var tx = new TransactionTemplate(app.context().getBean(PlatformTransactionManager.class));
       var changed = new DealerDeclinedService(jdbc, app.context().getBean(ObjectMapper.class), 3);
@@ -152,8 +151,10 @@ class DealerDeclinedAcceptanceTest {
   private static JsonNode draft(RestClient client, String path, String token, String quote, String key) throws Exception {
     return post(client, path + "/drafts", Map.of("quoteRequestId", quote), key, token);
   }
+  /** Approves the counteroffer and says it was sent from the Buyer's own email app. */
   private static JsonNode send(RestClient client, String path, String token, JsonNode draft) throws Exception {
-    return post(client, path + "/drafts/" + draft.path("id").asText() + "/approval",
+    var approved = post(client, path + "/drafts/" + draft.path("id").asText() + "/approval",
         Map.of("approved", true, "text", draft.at("/revisions/0/text").asText()), "send-" + draft.path("id").asText(), token);
+    return DealerHandoffTestSupport.markSent(client, path.substring(0, path.lastIndexOf('/')), token, approved);
   }
 }

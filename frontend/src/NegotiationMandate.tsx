@@ -8,7 +8,7 @@ export type MandateProposal = {
 };
 export type Mandate = {
   version: number; status: Status; currency: string; targetMinor: number; ceilingMinor: number;
-  planCeilingMinor: number; disclosures: Disclosure[]; autonomyMode: string; expiresAt: string;
+  planCeilingMinor: number; disclosures: Disclosure[]; expiresAt: string;
   approvedAt: string; revokedAt: string | null;
 };
 
@@ -63,7 +63,7 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
         headers: { "Content-Type": "application/json", "Idempotency-Key": approvalKey },
         body: JSON.stringify({
           planVersion: proposal?.planVersion, targetMinor: minor("target"), ceilingMinor: minor("ceiling"),
-          disclosures: values.getAll("disclosure"), autonomyMode: "SUPERVISED",
+          disclosures: values.getAll("disclosure"),
           expiresAt: new Date(Date.now() + days * 86_400_000).toISOString(), approved: values.get("approved") === "on",
         }),
       });
@@ -139,7 +139,7 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
           {proposal.disclosures.map(item =>
             <label key={item}><input type="checkbox" name="disclosure" value={item} />{DISCLOSURE_LABELS[item]}</label>)}
         </fieldset>
-        <p>Mode: supervised. Every message waits for your approval. Delegated mode is not available.</p>
+        <p>The mandate limits what you can approve. Deal X-Ray never sends anything: you approve each message and send it from your own email.</p>
         <label>Mandate lasts<select name="lifetime" defaultValue="14">
           {LIFETIMES.map(days => <option key={days} value={days}>{days} days</option>)}
         </select></label>

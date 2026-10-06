@@ -109,7 +109,7 @@ public class AgreedPriceService implements RelayMessageOwner {
       return true;
     }));
     if (!reserved) return transaction.execute(status -> { authorize(caseId, token); return get(caseId, token, id); });
-    // The committed reservation prevents duplicate sends after an uncertain provider handoff or a crash.
+    // The committed reservation prevents a second hand-off after a repeated approval or a crash.
     return transaction.execute(status -> {
       authorize(caseId, token);
       Request request = get(caseId, token, id);
@@ -118,7 +118,7 @@ public class AgreedPriceService implements RelayMessageOwner {
         jdbc.update("update quote_acceptance_requests set state = 'BLOCKED' where id = ?", id);
         return get(caseId, token, id);
       }
-      // Check the existing approval path before provider handoff; failed delivery creates no baseline.
+      // Check the existing approval path before the hand-off; a refused hand-off creates no baseline.
       boolean accepting = "ACCEPTANCE".equals(request.kind());
       if (accepting) plans.reviewApproval(caseId, token, request.planVersion());
       try {
@@ -129,9 +129,8 @@ public class AgreedPriceService implements RelayMessageOwner {
         jdbc.update("update quote_acceptance_requests set state = ?, message_id = ? where id = ?", handoff.state(), handoff.messageId(), id);
         if (handoff.sent()) applySent(caseId, token, request);
       } catch (RelayService.RelayRefusedException refused) {
-        // A FAILED or DELIVERY_UNKNOWN send keeps its relay message so it can be checked or retried.
-        jdbc.update("update quote_acceptance_requests set state = ?, message_id = ? where id = ?",
-            refused.reason().name(), refused.messageId(), id);
+        // An invalid message, or one revealing the Buyer's details, is not handed off.
+        jdbc.update("update quote_acceptance_requests set state = ? where id = ?", refused.reason().name(), id);
       }
       return get(caseId, token, id);
     });
@@ -163,7 +162,7 @@ public class AgreedPriceService implements RelayMessageOwner {
     } else negotiation.transition(caseId, NegotiationStateService.State.AWAITING_DEALER);
   }
 
-  // ---------------------------------------------------------------- unclear sends (RelayMessageOwner)
+  // ---------------------------------------------------------------- marked sent or discarded (RelayMessageOwner)
 
   @Override public boolean owns(String caseId, String relayMessageId) {
     return jdbc.queryForObject("select count(*) from quote_acceptance_requests where case_id = ? and message_id = ?",
@@ -189,12 +188,12 @@ public class AgreedPriceService implements RelayMessageOwner {
   }
 
   @Override public void unsent(String caseId, String relayMessageId, String state) {
-    jdbc.update("update quote_acceptance_requests set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
+    jdbc.update("update quote_acceptance_requests set state = ? where case_id = ? and message_id = ? and state = 'HANDED_OFF'",
         state, caseId, relayMessageId);
   }
 
   private List<String> unsettled(String caseId, String relayMessageId) {
-    return jdbc.queryForList("select id from quote_acceptance_requests where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
+    return jdbc.queryForList("select id from quote_acceptance_requests where case_id = ? and message_id = ? and state = 'HANDED_OFF'",
         String.class, caseId, relayMessageId);
   }
 

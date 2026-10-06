@@ -11,7 +11,7 @@ const PROPOSAL: MandateProposal = {
 };
 const ACTIVE: Mandate = {
   version: 1, status: "ACTIVE", currency: "USD", targetMinor: 2_250_000, ceilingMinor: 2_350_000, planCeilingMinor: 2_400_000,
-  disclosures: ["PAYING_CASH"], autonomyMode: "SUPERVISED", expiresAt: "2026-10-17T12:00:00Z",
+  disclosures: ["PAYING_CASH"], expiresAt: "2026-10-17T12:00:00Z",
   approvedAt: "2026-10-03T12:00:00Z", revokedAt: null,
 };
 
@@ -38,7 +38,7 @@ test("without a market assessment the Buyer is told why and no approval form is 
   expect(screen.getByText(/Approving it sends nothing to any dealer/)).toBeInTheDocument();
 });
 
-test("approval sends the lowered limits, ticked disclosures, supervised mode and explicit approval", async () => {
+test("approval sends the lowered limits, ticked disclosures and explicit approval, with no autonomy mode", async () => {
   const calls = stub({ "GET /api/v1/cases/case/mandates/proposal": PROPOSAL });
   render(<NegotiationMandate caseId="case" token="token" />);
   const user = userEvent.setup();
@@ -54,7 +54,8 @@ test("approval sends the lowered limits, ticked disclosures, supervised mode and
   expect(post.url).toBe("/api/v1/cases/case/mandates");
   const body = JSON.parse(String(post.init!.body));
   expect(body).toMatchObject({ planVersion: 2, targetMinor: 2_300_000, ceilingMinor: 2_350_000,
-    disclosures: ["PAYING_CASH"], autonomyMode: "SUPERVISED", approved: true });
+    disclosures: ["PAYING_CASH"], approved: true });
+  expect(body).not.toHaveProperty("autonomyMode");
   expect(new Date(body.expiresAt).getTime()).toBeGreaterThan(Date.now() + 13 * 86_400_000);
   expect((post.init!.headers as Record<string, string>)["Idempotency-Key"]).toBeTruthy();
 });

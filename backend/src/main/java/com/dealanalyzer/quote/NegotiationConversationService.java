@@ -3,7 +3,6 @@ package com.dealanalyzer.quote;
 import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService;
 import com.dealanalyzer.buyingcase.ResourceNotFoundException;
 import com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence;
-import com.dealanalyzer.mandate.MandatePolicy.AutonomyMode;
 import com.dealanalyzer.mandate.MandateService;
 import com.dealanalyzer.negotiation.Counteroffer;
 import com.dealanalyzer.outbound.OutboundDraftService;
@@ -34,7 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Supervised negotiation (spec 5.7, AGT-06, AGT-08, NEG-03). Counteroffers are drafted from the latest
  * finalized report for the current verified quote and the active mandate, pass the outbound gate, and
  * leave only after the Buyer approves the exact current text. Every edit is a new gated revision. The
- * conversation view lists every draft, gate decision, relay message, attachment and delivery state.
+ * conversation view lists every draft, gate decision, dealer message, attachment and send state.
  */
 @Service
 public class NegotiationConversationService implements RelayMessageOwner {
@@ -78,14 +77,14 @@ public class NegotiationConversationService implements RelayMessageOwner {
   public record Attachment(int ordinal, String documentId, String outcome, Integer offerVersion) {}
   public record Message(String id, String direction, String dealerAddress, String deliveryState, Instant createdAt,
       Instant completedAt, boolean contentAvailable, String subject, String body, List<Attachment> attachments,
-      boolean deliveryCheckOffered, boolean retryOffered, com.dealanalyzer.relay.SendPath sendPath) {
+      com.dealanalyzer.relay.SendPath sendPath) {
     @Override public String toString() { return "Message[redacted]"; }
   }
   public enum Kind { QUOTE_REQUEST, ACCEPTANCE_REQUEST, COUNTEROFFER, OUTBOUND_MESSAGE, INBOUND_MESSAGE }
   /** One timeline entry; exactly one of the payloads is set, matching {@code kind}. */
   public record Entry(Kind kind, Instant at, QuoteRequestService.Quote quoteRequest, AgreedPriceService.Request acceptance,
       Draft counteroffer, Message message) {}
-  public record MandateSummary(int version, String status, String autonomyMode, String currency, long targetMinor,
+  public record MandateSummary(int version, String status, String currency, long targetMinor,
       long ceilingMinor, Instant expiresAt) {}
   public record Conversation(String quoteRequestId, String dealerAddress) {}
   public record View(State negotiationState, MandateSummary mandate, boolean targetReached, List<Conversation> conversations,
@@ -107,7 +106,7 @@ public class NegotiationConversationService implements RelayMessageOwner {
     }
     requireActive(caseId);
     requireDealerMoving(caseId);
-    var mandate = supervisedMandate(caseId);
+    var mandate = activeMandate(caseId);
     String dealerId = sentDealer(caseId, request.quoteRequestId());
     var offer = currentOffer(caseId);
     Long selling = WrittenQuoteEvidence.amount(offer.terms(), "SELLING_PRICE");
@@ -185,7 +184,7 @@ public class NegotiationConversationService implements RelayMessageOwner {
       return true;
     });
     if (!Boolean.TRUE.equals(reserved)) return transaction.execute(status -> { authorize(caseId, token); return get(caseId, token, id); });
-    // The committed reservation prevents a resend after a crash or an unclear provider handoff.
+    // The committed reservation prevents a second hand-off after a repeated approval or a crash.
     return transaction.execute(status -> {
       authorize(caseId, token);
       Draft draft = get(caseId, token, id);
@@ -200,8 +199,8 @@ public class NegotiationConversationService implements RelayMessageOwner {
         jdbc.update("update negotiation_drafts set state = ?, message_id = ? where id = ?", handoff.state(), handoff.messageId(), id);
         if (handoff.sent()) negotiation.transition(caseId, State.AWAITING_DEALER);
       } catch (RelayService.RelayRefusedException refused) {
-        // A FAILED or DELIVERY_UNKNOWN send keeps its relay message so it can be checked or retried.
-        jdbc.update("update negotiation_drafts set state = ?, message_id = ? where id = ?", refused.reason().name(), refused.messageId(), id);
+        // An invalid message, or one revealing the Buyer's details, is not handed off.
+        jdbc.update("update negotiation_drafts set state = ? where id = ?", refused.reason().name(), id);
       }
       return get(caseId, token, id);
     });
@@ -215,8 +214,7 @@ public class NegotiationConversationService implements RelayMessageOwner {
     var revision = draftRevision(caseId, draft);
     var context = drafts.context(caseId, revision.draft().dealerId());
     if (!revision.decision().pass() || !new OutboundGate().check(revision.draft(), context).pass()
-        || context.mandate() == null || !context.mandate().id().equals(revision.mandateId())
-        || context.mandate().autonomyMode() != AutonomyMode.SUPERVISED)
+        || context.mandate() == null || !context.mandate().id().equals(revision.mandateId()))
       throw new IllegalArgumentException("The current mandate or policy no longer permits this draft. Prepare a new counteroffer.");
     var offer = currentOffer(caseId);
     if (!offer.id().equals(jdbc.queryForObject("select dealer_offer_id from negotiation_drafts where id = ?", String.class, draft.id())))
@@ -225,7 +223,7 @@ public class NegotiationConversationService implements RelayMessageOwner {
       throw new IllegalArgumentException("The verified quote is at or below your target. Negotiation stopped.");
   }
 
-  // ---------------------------------------------------------------- unclear sends (RelayMessageOwner)
+  // ---------------------------------------------------------------- marked sent or discarded (RelayMessageOwner)
 
   @Override public boolean owns(String caseId, String relayMessageId) {
     return jdbc.queryForObject("select count(*) from negotiation_drafts where case_id = ? and message_id = ?",
@@ -239,19 +237,19 @@ public class NegotiationConversationService implements RelayMessageOwner {
   }
 
   @Override public Runnable sent(String caseId, String token, String relayMessageId) {
-    if (jdbc.update("update negotiation_drafts set state = 'SENT' where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
+    if (jdbc.update("update negotiation_drafts set state = 'SENT' where case_id = ? and message_id = ? and state = 'HANDED_OFF'",
         caseId, relayMessageId) == 1 && ACTIVE.contains(negotiation.current(caseId)))
       negotiation.transition(caseId, State.AWAITING_DEALER);
     return null;
   }
 
   @Override public void unsent(String caseId, String relayMessageId, String state) {
-    jdbc.update("update negotiation_drafts set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
+    jdbc.update("update negotiation_drafts set state = ? where case_id = ? and message_id = ? and state = 'HANDED_OFF'",
         state, caseId, relayMessageId);
   }
 
   private List<String> unsettled(String caseId, String relayMessageId) {
-    return jdbc.queryForList("select id from negotiation_drafts where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
+    return jdbc.queryForList("select id from negotiation_drafts where case_id = ? and message_id = ? and state = 'HANDED_OFF'",
         String.class, caseId, relayMessageId);
   }
 
@@ -325,7 +323,7 @@ public class NegotiationConversationService implements RelayMessageOwner {
     var conversations = quoteView.requests().stream().filter(quote -> "SENT".equals(quote.state()))
         .map(quote -> new Conversation(quote.id(), quote.dealerAddress())).toList();
     return new View(state, mandate == null ? null : new MandateSummary(mandate.version(), mandate.status().name(),
-        mandate.autonomyMode().name(), mandate.currency(), mandate.targetMinor(), mandate.ceilingMinor(), mandate.expiresAt()),
+        mandate.currency(), mandate.targetMinor(), mandate.ceilingMinor(), mandate.expiresAt()),
         reached, conversations, List.copyOf(entries), declined);
   }
 
@@ -342,7 +340,7 @@ public class NegotiationConversationService implements RelayMessageOwner {
       return new Message(summary.id(), summary.direction(), summary.dealerAddress(), summary.state(), summary.createdAt(),
           summary.completedAt(), content != null, content == null ? null : content.subject(), content == null ? null : content.body(),
           attachments.stream().filter(entry -> entry.getKey().equals(summary.id())).map(java.util.Map.Entry::getValue).toList(),
-          summary.deliveryCheckOffered(), summary.retryOffered(), summary.sendPath());
+          summary.sendPath());
     }).toList();
   }
 
@@ -393,12 +391,9 @@ public class NegotiationConversationService implements RelayMessageOwner {
     if (!ACTIVE.contains(state)) throw new IllegalArgumentException("Negotiation is not active. Approve a current mandate first.");
   }
 
-  private MandateService.Mandate supervisedMandate(String caseId) {
-    var mandate = mandates.activeMandate(caseId)
+  private MandateService.Mandate activeMandate(String caseId) {
+    return mandates.activeMandate(caseId)
         .orElseThrow(() -> new IllegalArgumentException("Approve a current Negotiation Mandate before drafting."));
-    if (mandate.autonomyMode() != AutonomyMode.SUPERVISED)
-      throw new IllegalArgumentException("Only supervised negotiation is available.");
-    return mandate;
   }
 
   private DealerOfferView currentOffer(String caseId) {

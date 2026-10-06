@@ -26,12 +26,11 @@ class TestDriveAcceptanceTest {
 
   @Test void scheduleConfirmReleaseRescheduleAndCancelATestDriveThroughTheRelay() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("test-drive", true,
-        AgreedPriceAcceptanceTest.Configuration.class, "--dealer-mail.send-path=RELAY", "--case.deletion.delay=PT1H",
+        AgreedPriceAcceptanceTest.Configuration.class, "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();
       var jdbc = app.context().getBean(JdbcTemplate.class);
-      var provider = (FakeDealerMailRelay) app.context().getBean(DealerMailRelay.class);
       var relay = app.context().getBean(RelayService.class);
       var created = post(client, "/api/v1/cases", validCase(), "case");
       String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
@@ -50,7 +49,7 @@ class TestDriveAcceptanceTest {
       String session = signInAndAttach(client, caseId, token);
       String accountId = jdbc.queryForObject("select account_id from buyer_account_cases where case_id = ?", String.class, caseId);
       String journeyId = linkJourney(jdbc, caseId, accountId);
-      int sentBefore = provider.sent().size();
+      long sentBefore = DealerHandoffTestSupport.outbound(jdbc, caseId);
 
       var view = get(client, path, token);
       assertThat(view.at("/agreedPrice/outTheDoorMinor").asLong()).isEqualTo(2680000);
@@ -70,12 +69,12 @@ class TestDriveAcceptanceTest {
       assertThatThrownBy(() -> post(client, path + "/messages/" + proposal.path("id").asText() + "/approval",
           Map.of("approved", true, "text", "The Buyer will buy the car."), "tampered", token))
           .isInstanceOf(HttpClientErrorException.BadRequest.class);
-      assertThat(provider.sent()).hasSize(sentBefore);
+      assertThat(DealerHandoffTestSupport.outbound(jdbc, caseId)).isEqualTo(sentBefore);
       var sentProposal = post(client, path + "/messages/" + proposal.path("id").asText() + "/approval", approval(proposal), "send-proposal", token);
-      assertThat(sentProposal.path("state").asText()).isEqualTo("SENT");
-      assertThat(provider.sent()).hasSize(sentBefore + 1);
-      assertThat(provider.sent().getLast().body()).contains(proposalText, RelayService.FOOTER.strip().lines().findFirst().orElseThrow())
-          .doesNotContain("will buy", EMAIL);
+      assertThat(sentProposal.path("state").asText()).isEqualTo("HANDED_OFF");
+      assertThat(DealerHandoffTestSupport.markSent(client, base, token, sentProposal).path("state").asText()).isEqualTo("SENT");
+      assertThat(DealerHandoffTestSupport.outbound(jdbc, caseId)).isEqualTo(sentBefore + 1);
+      assertThat(body(client, base, token, sentProposal)).contains(proposalText).doesNotContain("will buy", EMAIL, "on behalf", "AI assistance");
       assertThat(get(client, path, token).path("appointments")).isEmpty();
 
       // A dealer reply is captured and shown; it books nothing until the Buyer confirms.
@@ -117,20 +116,18 @@ class TestDriveAcceptanceTest {
       assertThatThrownBy(() -> post(client, bookPath, approval(book), "approve-anonymous", token))
           .isInstanceOf(HttpClientErrorException.Unauthorized.class);
       int appointmentEmails = appointmentEmails();
-      // A booking the relay refused stays pending and releases nothing; a retry with its stored text reaches the first-send state once.
-      provider.failing(true);
-      var refused = postWithSession(client, bookPath, approval(book), "approve-book", token, session);
-      provider.failing(false);
-      assertThat(refused.path("state").asText()).isEqualTo("FAILED");
+      // A booking the Buyer has not sent yet stays pending and releases nothing; "I sent it" reaches the first-send state once.
+      var handedOff = postWithSession(client, bookPath, approval(book), "approve-book", token, session);
+      assertThat(handedOff.path("state").asText()).isEqualTo("HANDED_OFF");
       var pending = get(client, path, token).path("appointments").get(0);
       assertThat(pending.path("state").asText()).isEqualTo("PENDING_BOOKING");
       assertThat(pending.at("/release/state").asText()).isEqualTo("PREPARED");
       assertThat(appointmentEmails()).isEqualTo(appointmentEmails);
-      int sentBeforeRetry = provider.sent().size();
-      var retried = post(client, base + "/relay/messages/" + refused.path("messageId").asText() + "/retry", Map.of(), "retry-book", token);
-      assertThat(retried.path("state").asText()).isEqualTo("SENT");
-      assertThat(provider.sent()).hasSize(sentBeforeRetry + 1);
-      String body = provider.sent().getLast().body();
+      long sentBeforeBooking = DealerHandoffTestSupport.sent(jdbc, caseId);
+      assertThat(DealerHandoffTestSupport.markSent(client, base, token, handedOff).path("state").asText()).isEqualTo("SENT");
+      assertThatThrownBy(() -> DealerHandoffTestSupport.markSent(client, base, token, handedOff)).isInstanceOf(HttpClientErrorException.Conflict.class);
+      assertThat(DealerHandoffTestSupport.sent(jdbc, caseId)).isEqualTo(sentBeforeBooking + 1);
+      String body = body(client, base, token, handedOff);
       assertThat(body).contains("First name: Rosalind", "Email: " + EMAIL).doesNotContain("Quixote", "312 555 0199", "will buy");
       var scheduled = get(client, path, token).path("appointments").get(0);
       assertThat(scheduled.path("state").asText()).isEqualTo("SCHEDULED");
@@ -170,21 +167,23 @@ class TestDriveAcceptanceTest {
       remind.invoke(reminder, dueTime);
       assertThat(appointmentEmails()).isEqualTo(appointmentEmails + 2);
 
-      // Rescheduling goes through the relay; the new booking withholds every contact detail.
+      // Rescheduling goes through the Buyer's own email; the new booking withholds every contact detail.
       var moving = post(client, path + "/proposals", Map.of("appointmentId", appointmentId, "timeZone", "America/Chicago",
           "windows", List.of(Map.of("start", day.plusDays(2).withHour(9).toString(), "end", day.plusDays(2).withHour(10).toString()))), "move", token);
       assertThat(moving.path("kind").asText()).isEqualTo("RESCHEDULE");
       assertThat(moving.at("/gatedDraft/decision/pass").asBoolean()).as(moving.toString()).isTrue();
-      post(client, path + "/messages/" + moving.path("id").asText() + "/approval", approval(moving), "send-move", token);
-      assertThat(provider.sent().getLast().body()).contains("I need to move the test drive", "Option 1:");
+      var movingSent = post(client, path + "/messages/" + moving.path("id").asText() + "/approval", approval(moving), "send-move", token);
+      DealerHandoffTestSupport.markSent(client, base, token, movingSent);
+      assertThat(body(client, base, token, movingSent)).contains("I need to move the test drive", "Option 1:");
       assertThat(get(client, path, token).path("appointments").get(0).path("state").asText()).isEqualTo("RESCHEDULING");
       var moved = relay.receive(new DealerMailRelay.InboundMail("td-reply-3", relayAddress, "sales@dealer.example", "Re", "Option 1 is fine.", List.of()));
       var rebook = postWithSession(client, path + "/bookings", Map.of("proposalId", moving.path("id").asText(), "messageId", moved.messageId(),
           "option", 1, "release", List.of()), "rebook", token, session);
       assertThat(rebook.at("/gatedDraft/draft/text").asText()).contains("Please reply to this email with any changes.");
       assertThat(rebook.at("/gatedDraft/decision/pass").asBoolean()).as(rebook.toString()).isTrue();
-      postWithSession(client, path + "/messages/" + rebook.path("id").asText() + "/approval", approval(rebook), "approve-rebook", token, session);
-      assertThat(provider.sent().getLast().body()).doesNotContain(EMAIL, "Rosalind", "Quixote", "312 555 0199");
+      var rebookSent = postWithSession(client, path + "/messages/" + rebook.path("id").asText() + "/approval", approval(rebook), "approve-rebook", token, session);
+      DealerHandoffTestSupport.markSent(client, base, token, rebookSent);
+      assertThat(body(client, base, token, rebookSent)).doesNotContain(EMAIL, "Rosalind", "Quixote", "312 555 0199");
       var appointments = get(client, path, token).path("appointments");
       assertThat(appointments.get(0).path("state").asText()).isEqualTo("RESCHEDULED");
       assertThat(appointments.get(1).path("state").asText()).isEqualTo("SCHEDULED");
@@ -194,12 +193,13 @@ class TestDriveAcceptanceTest {
       assertThat(client.get().uri(path + "/appointments/" + appointmentId + "/calendar").header("Case-Access-Token", token)
           .retrieve().body(String.class)).contains("STATUS:CANCELLED");
 
-      // Cancelling goes through the relay and returns the journey to AGREED.
+      // Cancelling goes through the Buyer's own email and returns the journey to AGREED.
       String newId = appointments.get(1).path("id").asText();
       var cancel = post(client, path + "/appointments/" + newId + "/cancellation", Map.of(), "cancel", token);
       assertThat(cancel.at("/gatedDraft/decision/pass").asBoolean()).as(cancel.toString()).isTrue();
-      post(client, path + "/messages/" + cancel.path("id").asText() + "/approval", approval(cancel), "send-cancel", token);
-      assertThat(provider.sent().getLast().body()).contains("I need to cancel the test drive");
+      var cancelSent = post(client, path + "/messages/" + cancel.path("id").asText() + "/approval", approval(cancel), "send-cancel", token);
+      DealerHandoffTestSupport.markSent(client, base, token, cancelSent);
+      assertThat(body(client, base, token, cancelSent)).contains("I need to cancel the test drive");
       assertThat(get(client, path, token).path("appointments").get(1).path("state").asText()).isEqualTo("CANCELLED");
       assertThat(jdbc.queryForObject("select state from buying_journeys where id = ?", String.class, journeyId)).isEqualTo("AGREED");
       assertThatThrownBy(() -> post(client, path + "/appointments/" + newId + "/cancellation", Map.of(), "cancel-again", token))
@@ -220,6 +220,11 @@ class TestDriveAcceptanceTest {
   }
 
   /** The ticket 63 path to an Agreed Price for one dealer; returns the dealer id. */
+  /** The exact text handed to the Buyer's mail app for an approved test-drive message. */
+  private static String body(RestClient client, String base, String token, JsonNode approved) throws Exception {
+    return DealerHandoffTestSupport.handoff(client, base, token, approved.path("messageId").asText()).path("body").asText();
+  }
+
   static String agree(RunningApplication app, RestClient client, String base, String caseId, String token) throws Exception {
     var jdbc = app.context().getBean(JdbcTemplate.class);
     OutboundDraftAcceptanceTest.verifyAndPlan(app, base, token);
@@ -232,7 +237,8 @@ class TestDriveAcceptanceTest {
         """, UUID.randomUUID().toString(), caseId, dealer, VIN);
     approveMandate(client, base, token, "mandate1");
     var quote = post(client, base + "/quote-requests", Map.of("dealerId", dealer, "dealerAddress", "sales@dealer.example"), "quote", token);
-    post(client, base + "/quote-requests/" + quote.path("id").asText() + "/approval", approval(quote), "send", token);
+    DealerHandoffTestSupport.markSent(client, base, token,
+        post(client, base + "/quote-requests/" + quote.path("id").asText() + "/approval", approval(quote), "send", token));
     String relayAddress = get(client, base + "/relay", token).path("address").asText();
     var received = app.context().getBean(RelayService.class).receive(new DealerMailRelay.InboundMail("written-quote", relayAddress,
         "sales@dealer.example", "Itemized quote", "Selling price $25,000 and OTD $26,800.\n" + "Itemized source line\n".repeat(56), List.of()));
@@ -257,8 +263,9 @@ class TestDriveAcceptanceTest {
     String path = base + "/quote-acceptance";
     var prepared = post(client, path, Map.of("quoteRequestId", quote.path("id").asText(), "offerVersion", offer.path("version").asInt()), "accept", token);
     assertThat(prepared.path("kind").asText()).isEqualTo("ACCEPTANCE");
-    assertThat(post(client, path + "/" + prepared.path("id").asText() + "/approval", approval(prepared), "accept-send", token)
-        .path("state").asText()).isEqualTo("SENT");
+    var accepted = post(client, path + "/" + prepared.path("id").asText() + "/approval", approval(prepared), "accept-send", token);
+    assertThat(accepted.path("state").asText()).isEqualTo("HANDED_OFF");
+    DealerHandoffTestSupport.markSent(client, base, token, accepted);
     assertThat(get(client, path, token).path("agreedPrice").isNull()).isFalse();
     return dealer;
   }
