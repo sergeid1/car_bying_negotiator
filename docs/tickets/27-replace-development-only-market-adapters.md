@@ -10,6 +10,8 @@ This ticket keeps the licensed-source integration, executed terms, measured cove
 cost against the pilot budget, and still needs an executed provider contract before it can start.
 Narrowed again on 2026-10-02: ticket 41 builds the per-call cost and latency budget report and the
 jurisdiction coverage measurement from existing records; this ticket applies them to the licensed source.
+On 2026-10-06 MarketCheck was chosen as the candidate source; ticket 86 evaluates it and settles whether its
+terms permit the per-case evidence snapshots this application stores.
 
 - [ ] Executed commercial terms, permitted use, attribution requirements, and retention limits are recorded in the provider inventory before any production enablement.
 - [ ] The licensed source is integrated behind the existing replaceable adapter interface, with conformance tests that every adapter must pass.
