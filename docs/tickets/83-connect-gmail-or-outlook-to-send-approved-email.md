@@ -13,7 +13,7 @@ a Google Cloud project with a verified OAuth consent screen for `gmail.send`, an
 registration with publisher verification for `Mail.Send`. Both need the company's domain, a published
 Privacy Policy and Terms of Service, and a support address.
 
-**Status:** ready-for-agent after 82 — filed on 2026-10-05 from specification 2.1. Implementation and
+**Status:** ready-for-agent (82 and 84 complete) — filed on 2026-10-05 from specification 2.1. Implementation and
 tests run against fake adapters; production enablement waits on the operator verification above.
 
 - [ ] A `MailboxSender` adapter interface has a deterministic fake, a Gmail adapter (`users.messages.send` with an RFC 5322 message) and a Microsoft Graph adapter (`sendMail`). A production guard refuses the fake under `pilot`, `prod` or `production`, like the existing relay and evidence guards.

@@ -6,7 +6,8 @@
 removes platform-sent dealer email, so modelling the relay's outbound side before ticket 84 lands would describe a
 path that is being deleted. Tickets 75, 76 and 77 update their own rows; this ticket can merge before or after them.
 
-**Status:** ready-for-agent — filed on 2026-10-05 from a codebase security review.
+**Status:** ready-for-agent — filed on 2026-10-05 from a codebase security review; unblocked on 2026-10-06 when
+ticket 84 retired outbound relay sending.
 
 - [ ] The scope statement covers Buyer Accounts, the two send paths and Mailbox Connections (ticket 83: OAuth grants, encrypted send-only tokens, disconnect), each case's reply-intake address, negotiation, appointments, notifications and the model harness, and states the trust boundary of each: what is Buyer-controlled, dealer-controlled, operator-controlled and provider-controlled.
 - [ ] New rows cover at least: account takeover and sign-in link theft; session cookie theft and cross-site requests; dealer impersonation and spoofed inbound mail; hostile dealer content (prompt injection, oversized or malformed messages and attachments) reaching extraction, negotiation drafts or the Buyer's view; Buyer identity leaking through the relay; contact release beyond what the Buyer approved; notification misdelivery; and the outbound gate being bypassed or retried into a duplicate send.
