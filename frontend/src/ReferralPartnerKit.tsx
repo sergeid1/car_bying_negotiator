@@ -55,15 +55,21 @@ export function ReferralPartnerKit() {
     <section aria-labelledby="partner-product-heading">
       <h2 id="partner-product-heading">What Deal X-Ray does</h2>
       <p>
-        Deal X-Ray represents the Buyer and reviews the dealer's own paperwork for financial consistency.
-        When a Buyer uploads a quote, it reads each line, sorts it into the parts of the out-the-door
+        Deal X-Ray is a tool on the Buyer's side of a used-car purchase. We don't work with dealers. We
+        help people. It helps the Buyer find cars, check dealer quotes, draft their own emails to dealers,
+        and check the paperwork presented at the desk. The Buyer sends every email from their own email
+        and makes every decision; Deal X-Ray never contacts a dealer itself.
+      </p>
+      <p>
+        It reviews the dealer's own paperwork for financial consistency. When a Buyer uploads a quote, it reads each line, sorts it into the parts of the out-the-door
         total, and asks the Buyer to confirm every amount against the page it came from. It then checks
         that the parts add up to the total, compares the selling price with a market range where enough
         evidence exists, and turns its findings into questions the Buyer can edit and copy for the dealer.
       </p>
       <p>
         It is not a legal, tax, or mechanical review, and it does not promise any price or negotiating
-        outcome. Please describe it to Buyers in the same terms.
+        outcome. Please describe it to Buyers in the same terms: as help the Buyer uses, not as a
+        negotiator or a service that deals with the dealer for them.
       </p>
     </section>
 
@@ -103,6 +109,7 @@ export function ReferralPartnerKit() {
           Deal X-Ray works only for Buyers. It does not work with dealers: it has no dealer customers or
           partners, takes no money from dealers, and shares nothing about a Buyer with any dealer.
         </li>
+        <li>No dealer, lender, or other commercial party pays for placement, leads, or referrals.</li>
         <li>Partners are not paid for referrals, and partners do not pay for placement or referrals.</li>
         <li>Every Buyer who arrives through a partner's link is shown a disclosure of the referral.</li>
         <li>

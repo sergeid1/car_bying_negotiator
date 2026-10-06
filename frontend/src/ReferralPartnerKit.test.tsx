@@ -49,6 +49,11 @@ test("the page footer links to the kit, and an unknown page shows the usual star
   expect(screen.queryByRole("heading", { level: 1, name: KIT })).toBeNull();
   const footer = screen.getByRole("contentinfo");
   expect(within(footer).getByRole("link", { name: KIT }).getAttribute("href")).toBe("?page=referral-partners");
+  const terms = footer.textContent!.replace(/\s+/g, " ");
+  expect(terms).toContain("Deal X-Ray is a tool on your side, the Buyer's. We don't work with dealers. We help people.");
+  expect(terms).toContain("You send every email from your own email and make every decision");
+  expect(terms).toContain("No dealer, lender, or other commercial party pays for placement, leads, or referrals");
+  expect(terms).not.toMatch(/gmail|outlook|mailbox/i);
 });
 
 test("the kit names its audience, excludes dealers and lenders, and states the footer's terms", async () => {
@@ -60,6 +65,7 @@ test("the kit names its audience, excludes dealers and lenders, and states the f
   const terms = within(screen.getByRole("region", { name: "Terms of the arrangement" })).getAllByRole("listitem")
     .map(item => item.textContent!.replace(/\s+/g, " "));
   expect(terms).toContain("Partners are not paid for referrals, and partners do not pay for placement or referrals.");
+  expect(terms).toContain("No dealer, lender, or other commercial party pays for placement, leads, or referrals.");
   expect(terms.some(term => term.includes("shown a disclosure of the referral"))).toBe(true);
   expect(terms.some(term => term.includes("No partner relationship affects any market range, rating, finding, or suggested boundary"))).toBe(true);
 
@@ -68,6 +74,18 @@ test("the kit names its audience, excludes dealers and lenders, and states the f
   const figure = disclosure.closest("figure")!;
   expect(figure.querySelector("figcaption")!.textContent).toMatch(/^Example only/);
   expect(disclosure.textContent).toContain("This referral does not change the analysis, the report, or the price offered to you.");
+});
+
+test("the kit describes the product as help the Buyer uses and states the credo", async () => {
+  const { ReferralPartnerKit } = await import("./ReferralPartnerKit");
+  render(<ReferralPartnerKit />);
+  const text = (name: string) => screen.getByRole("region", { name }).textContent!.replace(/\s+/g, " ");
+  expect(text("Who can be a referral partner")).toContain("does not contact dealers for the Buyer.");
+  const product = text("What Deal X-Ray does");
+  expect(product).toContain("We don't work with dealers. We help people.");
+  expect(product).toContain("find cars, check dealer quotes, draft their own emails to dealers, and check the paperwork");
+  expect(product).toContain("The Buyer sends every email from their own email and makes every decision");
+  expect(product).not.toMatch(/gmail|outlook|mailbox/i);
 });
 
 test.each(["", "-inspector", "Inspector", "inspector_1", "inspector 1", "a".repeat(33)])(
@@ -130,7 +148,8 @@ test("the kit source makes no request, keeps nothing, and avoids prohibited clai
   for (const api of ["fetch(", "localStorage", "sessionStorage", "indexedDB", "document.cookie", "referrer", "<script", "<img", "<iframe", "http"]) {
     expect(source, `${api} has no place in the kit`).not.toContain(api);
   }
-  for (const phrase of [/ai negotiator/i, /safe to sign/i, /\bsav(e|es|ed|ing|ings)\b/i, /\badvice\b/i, /guarantee/i]) {
+  for (const phrase of [/ai negotiator/i, /safe to sign/i, /\bsav(e|es|ed|ing|ings)\b/i, /\badvice\b/i, /guarantee/i,
+    /negotiates? for/i, /on (your|the buyer's) behalf/i, /\bour agent\b/i, /autonomous/i, /represents (you|the buyer)/i]) {
     expect(source).not.toMatch(phrase);
   }
 });
