@@ -228,6 +228,7 @@ class CaseIsolationInventoryAcceptanceTest {
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef",
         "--security.rate-limit.requests=100000",
+        "--security.request-email.peer-requests=100000",
         "--operations.accounts.support.token=" + SUPPORT, "--operations.accounts.support.role=SUPPORT")) {
       var client = app.client();
       var jdbc = app.context().getBean(JdbcTemplate.class);

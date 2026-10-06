@@ -21,6 +21,18 @@ requests for a new address create one account in its own transaction; the losing
 reads the winner's row and gets the same acknowledgement. Unverified sign-ups whose
 link expired are removed by the account worker.
 
+Sign-in and both case recovery email routes also share a per-network-peer quota (default five
+requests per 15 minutes), keyed only by the connection peer. Forwarding headers cannot change
+it. Peer exhaustion returns 429 with `Retry-After`. A shared per-process hourly ceiling
+(default 100 delivery attempts) suppresses further mail and link creation while preserving
+the exact acknowledgement. It logs one address-free warning per exhausted window. Configure
+these through `security.request-email.peer-requests`, `peer-window`, `max-peers` (default
+10,000), and `hourly-limit`; all must be positive. Delivery failures consume hourly capacity;
+replays, per-address link caps and ineligible recovery requests do not. Accounts created while
+mail is suppressed remain unverified and are purged by the same abandoned-sign-up lifecycle.
+These limits reset on restart and are not shared across replicas; ingress still needs shared
+quotas. See the [operator procedure](hardening-runbook.md).
+
 ## Sessions
 
 Account, notification, journey, quote-comparison and account-authenticated test-drive
@@ -47,6 +59,9 @@ cookie; `?everywhere=true` revokes every session. Expired or revoked sessions ge
 default, and pilot, prod and production profiles or deployment settings refuse the switch.
 
 ## Contact details
+
+`PUT /api/v1/account/contact` accepts names and phone only; it cannot change the email address
+or send verification mail. Notification preferences likewise cannot supply a recipient.
 
 Email, optional first and last name, and optional phone are stored once, in
 `buyer_accounts.contact_ciphertext`, encrypted with AES-GCM under a key derived from

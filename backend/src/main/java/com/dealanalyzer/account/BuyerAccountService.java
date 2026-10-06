@@ -3,6 +3,7 @@ package com.dealanalyzer.account;
 import com.dealanalyzer.buyingcase.CaseAccessService;
 import com.dealanalyzer.buyingcase.persistence.AccountCaseLifecycle;
 import com.dealanalyzer.recovery.RecoveryEmail;
+import com.dealanalyzer.recovery.RequestEmailLimits;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -29,6 +30,7 @@ public class BuyerAccountService {
   private final AccountCaseLifecycle caseLifecycle;
   private final AccountEnrollment enrollment;
   private final RecoveryEmail email;
+  private final RequestEmailLimits emailLimits;
   private final String origin;
   private final Duration linkLifetime;
   private final Duration sessionLifetime;
@@ -36,7 +38,7 @@ public class BuyerAccountService {
 
   BuyerAccountService(BuyerAccountRepository accounts, SignInLinkRepository links, AccountSessionRepository sessions,
       AccountCaseRepository attachments, ContactProtection protection, CaseAccessService secrets,
-      AccountCaseLifecycle caseLifecycle, AccountEnrollment enrollment, RecoveryEmail email,
+      AccountCaseLifecycle caseLifecycle, AccountEnrollment enrollment, RecoveryEmail email, RequestEmailLimits emailLimits,
       @Value("${case.recovery.public-url:http://localhost:5173/}") String origin,
       @Value("${account.sign-in.link-lifetime:PT15M}") Duration linkLifetime,
       @Value("${account.session.lifetime:PT336H}") Duration sessionLifetime,
@@ -46,6 +48,7 @@ public class BuyerAccountService {
     this.protection = protection; this.secrets = secrets; this.caseLifecycle = caseLifecycle; this.email = email;
     this.origin = origin; this.linkLifetime = linkLifetime; this.sessionLifetime = sessionLifetime;
     this.maxActiveLinks = maxActiveLinks; this.enrollment = enrollment;
+    this.emailLimits = emailLimits;
   }
 
   public record Session(String sessionToken, Instant expiresAt) {}
@@ -71,6 +74,7 @@ public class BuyerAccountService {
     // Cap unused links per address so this unauthenticated endpoint cannot flood a mailbox. The
     // account row lock serializes the count; the acknowledgement does not reveal the cap.
     if (links.countByAccountIdAndConsumedAtIsNullAndExpiresAtAfter(account.id, now) >= maxActiveLinks) return;
+    if (!emailLimits.acquireDelivery()) return;
     String token = secrets.issue(now).token();
     var link = new SignInLinkEntity(secrets.protectAccountSecret("sign-in", token));
     link.accountId = account.id; link.requestKeyHash = keyHash; link.createdAt = now;
