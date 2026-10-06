@@ -23,7 +23,7 @@ import { OfferTerms, PurchasePoint } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 import { ReferralPartnerKit } from "./ReferralPartnerKit";
-import { BuyerAccount } from "./BuyerAccount";
+import { AccountSignedInContext, BuyerAccount } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 import { NegotiationConversation } from "./NegotiationConversation";
 import { JourneyCandidates, ShortlistEntry } from "./JourneyCandidates";
@@ -537,6 +537,43 @@ test("the quote request handed off to the Buyer's email app has no automated AA 
   await screen.findByRole("link", { name: "Open in my email app" });
   await screen.findByRole("button", { name: "Add reply" });
   expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+// Ticket 83: the connected mailbox on the account page, and Send from my email with an unclear outcome.
+test("the Buyer Account's connected mailbox has no automated AA violations", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => new Response(JSON.stringify(String(input).endsWith("/mailbox")
+    ? { available: true, providers: ["GOOGLE", "MICROSOFT"], connection: { provider: "MICROSOFT", providerLabel: "Outlook",
+      address: "a.rather.long.address.for.narrow.screens@outlook.example", connectedAt: "2026-10-06T12:00:00Z" } }
+    : String(input).endsWith("/notifications") ? []
+    : { contact: { email: "buyer@example.com", firstName: null, lastName: null, phone: null }, createdAt: "", sessionExpiresAt: "", cases: [] }),
+  { headers: { "Content-Type": "application/json" } }));
+  const { container } = render(<main><h1>Buying Case</h1><BuyerAccount /></main>);
+  await screen.findByRole("button", { name: "Disconnect Outlook" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+test("Send from my email and an unclear send have no automated AA violations", async () => {
+  const decision = { pass: true, gateVersion: "outbound-gate.v3", reasons: [] };
+  const text = "Could you provide an itemized out-the-door quote for VIN 1HGCM82633A004352?";
+  const draft = (id: string, messageId: string) => ({ id, dealerAddress: "sales@dealer.example", state: "HANDED_OFF", messageId,
+    approvedAt: null, gatedDraft: { draft: { text }, decision } });
+  const message = (id: string, state: string, sendPath: string) => ({ messageId: id, sendPath, state, dealerAddress: "sales@dealer.example",
+    subject: "Request for an itemized vehicle quote", body: text, handedOffAt: "2026-10-05T12:00:00Z", sentAt: null });
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/relay")
+    ? { address: "cabcdefghijklmnopqrstuvwxyz234567@relay.invalid", forwardingAvailable: false, messages: [] }
+    : url.endsWith("/account/mailbox")
+      ? { available: true, providers: ["GOOGLE"], connection: { provider: "GOOGLE", providerLabel: "Gmail", address: "buyer@gmail.example",
+        connectedAt: "2026-10-06T12:00:00Z" } }
+      : url.endsWith("/handoffs/m1") ? message("m1", "HANDED_OFF", "OWN_EMAIL_APP")
+      : url.endsWith("/handoffs/m2") ? message("m2", "DELIVERY_UNKNOWN", "CONNECTED_MAILBOX")
+      : { negotiationState: "MANDATE_ACTIVE", dealers: [{ id: "d1", name: "Triangle Motors" }],
+        requests: [draft("q1", "m1"), draft("q2", "m2")], documents: [] }))));
+  const { container } = render(<main><h1>Buying Case</h1><AccountSignedInContext.Provider value={true}>
+    <QuoteRequest caseId="case" token="token" /></AccountSignedInContext.Provider></main>);
+  await screen.findByRole("button", { name: "Send from my email" });
+  await screen.findByRole("button", { name: "Send again" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  vi.unstubAllGlobals();
 });
 
 // Ticket 61: the negotiation conversation with drafts, gate decisions, messages and a paused state.

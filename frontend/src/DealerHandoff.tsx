@@ -1,4 +1,6 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useContext, useEffect, useRef, useState } from "react";
+import { AccountSignedInContext } from "./BuyerAccount";
+import { asMailboxView, ConnectedMailbox } from "./MailboxConnection";
 
 type Handoff = { messageId: string; sendPath: string; state: string; dealerAddress: string; subject: string; body: string;
   handedOffAt: string; sentAt: string | null };
@@ -21,19 +23,22 @@ function asHandoff(value: unknown): Handoff {
 
 /**
  * The Buyer's own send of an approved message: open it in their email app or copy it, send it from their
- * mailbox, then say so. The text is exactly what they approved; nothing is added to it and nothing is sent for them.
+ * mailbox, then say so. A signed-in Buyer with a connected Gmail or Outlook account can instead send it from that
+ * address with one button. The text is exactly what they approved; nothing is added to it.
  */
 export function DealerHandoff({ caseId, token, messageId, onChanged }: {
   caseId: string; token: string; messageId: string; onChanged: () => Promise<void> | void;
 }) {
+  const signedIn = useContext(AccountSignedInContext);
   const [handoff, setHandoff] = useState<Handoff>();
+  const [mailbox, setMailbox] = useState<ConnectedMailbox | null>(null);
   const [error, setError] = useState<string>();
   const [copied, setCopied] = useState("");
   const [busy, setBusy] = useState(false);
   const path = `/api/v1/cases/${encodeURIComponent(caseId)}/handoffs/${encodeURIComponent(messageId)}`;
-  async function request(url: string, method = "GET") {
-    const response = await fetch(url, { method, headers: { "Case-Access-Token": token, "Content-Type": "application/json" },
-      ...(method === "POST" ? { body: "{}" } : {}) });
+  async function request(url: string, method = "GET", account = false) {
+    const response = await fetch(url, { method, headers: { "Case-Access-Token": token, "Content-Type": "application/json",
+      ...(account ? { "Account-Request": "1" } : {}) }, ...(method === "POST" ? { body: "{}" } : {}) });
     if (!response.ok) {
       const detail = await response.json().catch(() => ({}));
       throw new Error(typeof detail.detail === "string" ? detail.detail : "This message could not be updated. Try again.");
@@ -49,10 +54,22 @@ export function DealerHandoff({ caseId, token, messageId, onChanged }: {
     // The message and the case credential define this view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, token]);
-  async function act(action: "sent" | "discard") {
+  useEffect(() => {
+    let current = true;
+    setMailbox(null);
+    if (signedIn) fetch("/api/v1/account/mailbox").then(response => response.ok ? response.json() : null)
+      .then(value => { if (current) setMailbox(asMailboxView(value)?.connection ?? null); })
+      .catch(() => { /* Without the connection, the own-email-app path is still offered. */ });
+    return () => { current = false; };
+  }, [signedIn]);
+  async function act(action: "sent" | "discard" | "mailbox-send" | "own-email-app") {
     setBusy(true); setError(undefined);
-    try { setHandoff(await request(`${path}/${action}`, "POST")); await onChanged(); }
-    catch (failure) { setError((failure as Error).message); }
+    try { setHandoff(await request(`${path}/${action}`, "POST", action === "mailbox-send")); await onChanged(); }
+    catch (failure) {
+      setError((failure as Error).message);
+      // A refused send may have returned the message to the own-email-app path.
+      if (action === "mailbox-send") await request(path).then(setHandoff).catch(() => undefined);
+    }
     finally { setBusy(false); }
   }
   async function copy(label: string, text: string) {
@@ -65,15 +82,33 @@ export function DealerHandoff({ caseId, token, messageId, onChanged }: {
   if (!handoff) return <div className="handoff">{error ? <p role="alert">{error}</p> : <p>Loading the approved message…</p>}</div>;
   const link = mailtoLink(handoff.dealerAddress, handoff.subject, handoff.body);
   const waiting = handoff.state === "HANDED_OFF";
+  const unclear = handoff.state === "DELIVERY_UNKNOWN";
+  const fromMailbox = handoff.sendPath === "CONNECTED_MAILBOX";
+  const sentAt = handoff.sentAt ? ` on ${new Date(handoff.sentAt).toLocaleString()}` : "";
   return <div className="handoff" aria-label={`Send to ${handoff.dealerAddress} from your email`} role="group">
     <p className="handoff-state" role="status">{waiting ? "Not sent yet. Send it from your own email, then tell us."
-      : handoff.state === "SENT" ? `You sent this${handoff.sentAt ? ` on ${new Date(handoff.sentAt).toLocaleString()}` : ""}.`
+      : unclear ? "Not confirmed. Your email provider did not say whether this message was sent."
+      : handoff.state === "SENT" ? fromMailbox ? `Sent from your connected email${sentAt}.` : `You sent this${sentAt}.`
       : "Discarded. It was not sent."}</p>
     <dl className="facts handoff-fields">
       <div><dt>To</dt><dd>{handoff.dealerAddress}</dd></div>
       <div><dt>Subject</dt><dd>{handoff.subject}</dd></div>
     </dl>
     <pre className="handoff-body">{handoff.body}</pre>
+    {waiting && mailbox && <div className="handoff-mailbox">
+      <p>Send it from <strong className="mailbox-address">{mailbox.address}</strong> through your connected {mailbox.providerLabel}.
+        Exactly this text is sent, and it appears in your Sent folder.</p>
+      <button type="button" disabled={busy} onClick={() => void act("mailbox-send")}>Send from my email</button>
+    </div>}
+    {unclear && <div className="handoff-mailbox">
+      <p>Check the Sent folder of your email before doing anything else. Nothing is sent again unless you choose to.</p>
+      <div className="handoff-actions">
+        <button type="button" disabled={busy} onClick={() => void act("sent")}>It was sent</button>
+        <button type="button" disabled={busy} onClick={() => void act("mailbox-send")}>Send again</button>
+        <button type="button" className="btn-secondary" disabled={busy} onClick={() => void act("own-email-app")}>
+          It was not sent: use my email app</button>
+      </div>
+    </div>}
     {waiting && <>
       <p>This is your message, exactly as you approved it. It goes from your email address, and Deal X-Ray adds nothing to it.</p>
       <div className="handoff-actions">

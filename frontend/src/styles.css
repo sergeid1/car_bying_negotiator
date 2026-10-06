@@ -1742,6 +1742,10 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
 }
 .handoff-actions > a.button-link:hover { background: var(--brand-hover); color: var(--on-brand); }
 .handoff-actions > a.button-link:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.handoff-mailbox, .mailbox-connection { display: grid; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.handoff-mailbox > p, .mailbox-connection > p { margin: 0; }
+.handoff-mailbox > button, .mailbox-connection > button { justify-self: start; max-width: 100%; }
+.mailbox-address { overflow-wrap: anywhere; }
 .handoff-reply h4 { margin: 0; }
 .handoff-reply textarea, .handoff-reply input { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
 /* End ticket 82. */
