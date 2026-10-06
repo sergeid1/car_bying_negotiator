@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && vite build",
+    "build": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && vite build && npm run check:client-security",
+    "check:client-security": "node --test scripts/check-client-security.test.mjs && node scripts/check-client-security.mjs",
     "test": "vitest run",
     "preview": "vite preview",
     "test:e2e": "playwright test"
