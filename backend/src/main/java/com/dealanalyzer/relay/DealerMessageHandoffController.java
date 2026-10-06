@@ -14,7 +14,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * The Buyer sends approved dealer messages from their own email app (ticket 82): read the exact approved text,
- * say it was sent or discard it, and add the dealer's reply to the Dealer Conversation.
+ * say it was sent or discard it, and add the dealer's reply to the Dealer Conversation. Sending through a connected
+ * mailbox (ticket 83) is {@code com.dealanalyzer.mailbox.MailboxController}.
  */
 @RestController
 @Validated
@@ -39,6 +40,13 @@ public class DealerMessageHandoffController {
   public DealerMessageHandoff.Handoff discard(@PathVariable String caseId, @PathVariable String messageId,
       @RequestHeader("Case-Access-Token") String token) {
     return handoffs.discard(caseId, token, messageId);
+  }
+
+  /** After an unclear Connected-mailbox send, the Buyer sends the message from their own email app instead. */
+  @PostMapping("/handoffs/{messageId}/own-email-app")
+  public DealerMessageHandoff.Handoff ownEmailApp(@PathVariable String caseId, @PathVariable String messageId,
+      @RequestHeader("Case-Access-Token") String token) {
+    return handoffs.useOwnEmailApp(caseId, token, messageId);
   }
 
   @PostMapping(path = "/quote-requests/{id}/replies", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

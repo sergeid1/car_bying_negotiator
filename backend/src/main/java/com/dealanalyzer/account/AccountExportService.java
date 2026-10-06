@@ -24,13 +24,16 @@ public class AccountExportService {
   private final com.dealanalyzer.notification.BuyerNotifications notifications;
   private final com.dealanalyzer.journey.JourneyService journeys;
   private final com.dealanalyzer.operations.ProviderUsageStore providerUsage;
+  private final com.dealanalyzer.mailbox.MailboxConnections mailboxes;
+  private final com.dealanalyzer.mailbox.MailboxSendService mailboxSends;
 
   AccountExportService(BuyerAccountService accounts, AccountSessionRepository sessions, CaseExportService caseExports,
       ObjectMapper json, com.dealanalyzer.notification.BuyerNotifications notifications,
-      com.dealanalyzer.journey.JourneyService journeys, com.dealanalyzer.operations.ProviderUsageStore providerUsage) {
+      com.dealanalyzer.journey.JourneyService journeys, com.dealanalyzer.operations.ProviderUsageStore providerUsage,
+      com.dealanalyzer.mailbox.MailboxConnections mailboxes, com.dealanalyzer.mailbox.MailboxSendService mailboxSends) {
     this.accounts = accounts; this.sessions = sessions; this.caseExports = caseExports; this.json = json;
     this.notifications = notifications; this.journeys = journeys;
-    this.providerUsage = providerUsage;
+    this.providerUsage = providerUsage; this.mailboxes = mailboxes; this.mailboxSends = mailboxSends;
   }
 
   @Transactional(readOnly = true)
@@ -49,6 +52,9 @@ public class AccountExportService {
     data.put("buyingJourneys", journeys.exportForAccount(session.accountId));
     data.put("inventorySearchRuns", providerUsage.inventoryForAccount(session.accountId));
     data.put("journeyMarketRetrievals", providerUsage.marketForAccount(session.accountId));
+    // Provider and address only: mailbox tokens are never exported.
+    data.put("mailboxConnections", mailboxes.exportForAccount(session.accountId));
+    data.put("mailboxSends", mailboxSends.exportForAccount(session.accountId));
     var archives = new LinkedHashMap<String, byte[]>();
     List<Map<String, Object>> cases = new ArrayList<>();
     for (var attached : view.cases()) {
@@ -65,11 +71,12 @@ public class AccountExportService {
     data.put("cases", cases);
     try (var output = new ByteArrayOutputStream(); var zip = new ZipOutputStream(output)) {
       entry(zip, "README.txt", ("Buyer Account export\naccount.json holds your contact details, sign-in history "
-          + "(times only), email preferences, notification delivery states, inventory search history including search criteria, every Buying Journey with every version of its Shopping Brief, Reference Vehicles, captured candidates, market checks, shortlist positions and linked Buying Cases, and the Buying Cases attached to the account. Each attached case that can be exported is "
+          + "(times only), email preferences, notification delivery states, inventory search history including search criteria, every Buying Journey with every version of its Shopping Brief, Reference Vehicles, captured candidates, market checks, shortlist positions and linked Buying Cases, a connected Gmail or Outlook account (provider and address) "
+          + "with the times and outcomes of messages sent through it, and the Buying Cases attached to the account. Each attached case that can be exported is "
           + "included as its own case export under cases/, with the same contents as exporting that case directly. "
           + "A case marked PURCHASE_REQUIRED has saved reports that are exported once the report is purchased; "
           + "a case marked UNAVAILABLE has expired or is being deleted. Sign-in links, session credentials and "
-          + "case links are excluded.\n").getBytes(StandardCharsets.UTF_8));
+          + "case links and email connection tokens are excluded.\n").getBytes(StandardCharsets.UTF_8));
       entry(zip, "account.json", json.writerWithDefaultPrettyPrinter().writeValueAsBytes(data));
       for (var archive : archives.entrySet()) entry(zip, archive.getKey(), archive.getValue());
       zip.finish(); return output.toByteArray();

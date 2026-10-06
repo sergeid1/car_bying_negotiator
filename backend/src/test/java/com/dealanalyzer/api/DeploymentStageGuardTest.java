@@ -31,6 +31,8 @@ class DeploymentStageGuardTest {
         .withBean(CaseWriteGuard.class, () -> mock(CaseWriteGuard.class));
     refuses(runner, "journey.vin.VinDecoderProductionGuard", "fake VIN decoder", "journey.vin.FakeVinDecoder");
     refuses(runner, "relay.RelayProductionGuard", "fake reply-intake provider", "relay.FakeDealerMailRelay");
+    refuses(runner, "mailbox.MailboxProductionGuard", "fake mailbox sender", "mailbox.MailboxTokenProtection",
+        "mailbox.FakeMailboxSender$Senders");
     refuses(runner, "purchase.CheckoutProductionGuard", "DevelopmentNoChargeCheckout", "purchase.DevelopmentNoChargeCheckout");
     refuses(runner, "shopping.inventory.InventorySearchProductionGuard", "Development inventory adapter",
         "shopping.inventory.DeterministicFakeInventorySearchAdapter");

@@ -25,6 +25,7 @@ public class AccountDeletionWorker {
       "journey_candidate_cases", "journey_candidates",
       "reference_vehicles", "provider_usage", "shopping_brief_versions", "buying_journeys",
       "buyer_notification_preferences", "buyer_notification_deliveries",
+      "mailbox_sends", "mailbox_authorizations", "mailbox_connections",
       "buyer_account_sessions", "buyer_account_sign_in_links", "buyer_account_cases");
 
   private final AccountDeletionJobRepository jobs;
