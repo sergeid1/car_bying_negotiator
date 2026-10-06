@@ -468,7 +468,7 @@ test("the referral partner kit, its example disclosure, and its built links have
 
 test("the Negotiation Mandate with its limits, disclosures, current version and history has no automated AA violations", async () => {
   const mandate = { version: 2, status: "ACTIVE", currency: "USD", targetMinor: 2250000, ceilingMinor: 2350000, planCeilingMinor: 2400000,
-    disclosures: ["PAYING_CASH", "FIRST_NAME"], autonomyMode: "SUPERVISED", expiresAt: "2026-10-17T12:00:00Z",
+    disclosures: ["PAYING_CASH", "FIRST_NAME"], expiresAt: "2026-10-17T12:00:00Z",
     approvedAt: "2026-10-03T12:00:00Z", revokedAt: null };
   vi.spyOn(globalThis, "fetch").mockImplementation(async input => new Response(JSON.stringify(String(input).endsWith("/proposal")
     ? { available: true, unavailableReason: null, planVersion: 1, currency: "USD", targetMinor: 2300000, ceilingMinor: 2400000,
@@ -488,17 +488,16 @@ test("an unavailable Negotiation Mandate explains why without automated AA viola
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 
-test("the dealer email relay with its address, a dealer opt-out, messages and attachments has no automated AA violations", async () => {
+test("dealer messages with the reply-intake address, a former relay message and attachments have no automated AA violations", async () => {
   const user = userEvent.setup();
   vi.spyOn(globalThis, "fetch").mockImplementation(async input => new Response(JSON.stringify(String(input).includes("/messages/")
     ? { id: "m2", direction: "INBOUND", trust: "UNTRUSTED", subject: "Your quote", body: "Quote attached." }
-    : { address: "cabcdefghijklmnopqrstuvwxyz234567@relay.invalid", dealerOptedOut: true, dealerOptedOutAt: "2026-10-03T13:00:00Z",
-      optOutChannel: "REPLY", perCaseDailyCap: 10, sentLastDay: 1, messages: [
+    : { address: "cabcdefghijklmnopqrstuvwxyz234567@relay.invalid", forwardingAvailable: false, messages: [
         { id: "m2", direction: "INBOUND", trust: "UNTRUSTED", dealerAddress: "desk@dealer.example", state: "RECEIVED",
           createdAt: "2026-10-03T12:30:00Z", completedAt: "2026-10-03T12:30:00Z", contentAvailable: true,
           attachments: [{ ordinal: 0, documentId: "d1", outcome: "ACCEPTED" }, { ordinal: 1, documentId: null, outcome: "MALWARE_DETECTED" }] },
         { id: "m1", direction: "OUTBOUND", trust: "PLATFORM", dealerAddress: "desk@dealer.example", state: "DELIVERED",
-          createdAt: "2026-10-03T12:00:00Z", completedAt: "2026-10-03T12:01:00Z", contentAvailable: false, attachments: [] }] })));
+          createdAt: "2026-10-03T12:00:00Z", completedAt: "2026-10-03T12:01:00Z", contentAvailable: false, attachments: [], sendPath: "RELAY" }] })));
   const { container } = render(<main><h1>Buying Case</h1><DealerRelay caseId="case" token="token" /></main>);
   await user.click(await screen.findByRole("button", { name: /Show message from desk@dealer.example/ }));
   await screen.findByText("Quote attached.");
@@ -510,7 +509,7 @@ test("the quote request with a gated draft, a sent request and dealer quote sour
   const draft = (id: string, state: string) => ({ id, dealerAddress: "sales@dealer.example", state, messageId: null, approvedAt: null,
     gatedDraft: { draft: { text: "Could you provide an itemized out-the-door quote for VIN 1HGCM82633A004352?" }, decision } });
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/relay")
-    ? { address: "cabcdefghijklmnopqrstuvwxyz234567@relay.invalid", dealerOptedOut: false, perCaseDailyCap: 10, sentLastDay: 1, messages: [] }
+    ? { address: "cabcdefghijklmnopqrstuvwxyz234567@relay.invalid", forwardingAvailable: false, messages: [] }
     : { negotiationState: "AWAITING_BUYER", dealers: [{ id: "d1", name: "Triangle Motors" }],
       requests: [draft("q1", "SENT"), draft("q2", "DRAFT")],
       documents: [{ documentId: "doc1", outcome: "ACCEPTED", offerVersion: null, sourceKind: "MESSAGE_BODY", messageId: "m2" },
@@ -528,7 +527,7 @@ test("the quote request handed off to the Buyer's email app has no automated AA 
   const draft = (id: string, state: string, messageId: string | null) => ({ id, dealerAddress: "sales@dealer.example", state, messageId,
     approvedAt: null, gatedDraft: { draft: { text }, decision } });
   vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/relay")
-    ? { address: "cabcdefghijklmnopqrstuvwxyz234567@relay.invalid", dealerOptedOut: false, perCaseDailyCap: 10, sentLastDay: 0, messages: [] }
+    ? { address: "cabcdefghijklmnopqrstuvwxyz234567@relay.invalid", forwardingAvailable: false, messages: [] }
     : url.includes("/handoffs/")
       ? { messageId: "m2", sendPath: "OWN_EMAIL_APP", state: "HANDED_OFF", dealerAddress: "sales@dealer.example",
         subject: "Request for an itemized vehicle quote", body: text, handedOffAt: "2026-10-05T12:00:00Z", sentAt: null }

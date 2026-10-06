@@ -33,7 +33,7 @@ class AgreedPriceAcceptanceTest {
   @TempDir Path directory;
   @Test void onlyCurrentWrittenItemizationCanBecomeAnAuditedBaselineAndAgreement() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("agreed", true,
-        Configuration.class, "--dealer-mail.send-path=RELAY", "--case.deletion.delay=PT1H",
+        Configuration.class, "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();
@@ -51,9 +51,9 @@ class AgreedPriceAcceptanceTest {
           """, UUID.randomUUID().toString(), caseId, dealer);
       approveMandate(client, base, token, "mandate1");
       var quote = post(client, base + "/quote-requests", Map.of("dealerId", dealer, "dealerAddress", "sales@dealer.example"), "quote", token);
-      post(client, base + "/quote-requests/" + quote.path("id").asText() + "/approval", approval(quote), "send", token);
+      DealerHandoffTestSupport.markSent(client, base, token,
+          post(client, base + "/quote-requests/" + quote.path("id").asText() + "/approval", approval(quote), "send", token));
       String quoteId = quote.path("id").asText();
-      var provider = (FakeDealerMailRelay) app.context().getBean(DealerMailRelay.class);
       assertThatThrownBy(() -> get(client, path, "wrong")).isInstanceOf(HttpClientErrorException.class);
       assertThatThrownBy(() -> post(client, path, Map.of("quoteRequestId", quoteId), "wrong", "wrong"))
           .isInstanceOf(HttpClientErrorException.class);
@@ -65,9 +65,10 @@ class AgreedPriceAcceptanceTest {
       assertThat(post(client, path, Map.of("quoteRequestId", quoteId, "offerVersion", 1), "partial", token)).isEqualTo(partial);
       assertThatThrownBy(() -> post(client, path, Map.of("quoteRequestId", quoteId), "partial", token))
           .isInstanceOf(HttpClientErrorException.Conflict.class);
-      post(client, path + "/" + partial.path("id").asText() + "/approval", approval(partial), "confirm", token);
+      DealerHandoffTestSupport.markSent(client, base, token,
+          post(client, path + "/" + partial.path("id").asText() + "/approval", approval(partial), "confirm", token));
       assertThat(get(client, path, token).path("agreedPrice").isNull()).isTrue();
-      assertThat(provider.sent()).hasSize(2);
+      assertThat(DealerHandoffTestSupport.sent(jdbc, caseId)).isEqualTo(2);
       String relayAddress = get(client, base + "/relay", token).path("address").asText();
       var received = app.context().getBean(RelayService.class).receive(new DealerMailRelay.InboundMail("written-quote", relayAddress,
           "sales@dealer.example", "Itemized quote", "Selling price $25,000 and OTD $26,800.\n" + "Itemized source line\n".repeat(56), List.of()));
@@ -101,7 +102,7 @@ class AgreedPriceAcceptanceTest {
       assertThat(overLimit.at("/gatedDraft/decision/pass").asBoolean()).isFalse();
       assertThatThrownBy(() -> post(client, path + "/" + overLimit.path("id").asText() + "/approval", approval(overLimit), "over-limit-send", token))
           .isInstanceOf(HttpClientErrorException.BadRequest.class);
-      assertThat(provider.sent()).hasSize(2);
+      assertThat(DealerHandoffTestSupport.outbound(jdbc, caseId)).isEqualTo(2);
       post(client, base + "/price-plans", Map.of("maxSellingPriceMinor", 3000000), "plan-current", token);
       approveMandate(client, base, token, "mandate3");
       var prepared = post(client, path, Map.of("quoteRequestId", quoteId, "offerVersion", version), "accept1", token);
@@ -126,13 +127,7 @@ class AgreedPriceAcceptanceTest {
       approveMandate(client, base, token, "mandate4");
       assertThatThrownBy(() -> post(client, approvalPath, approval(prepared), "old-mandate", token))
           .isInstanceOf(HttpClientErrorException.BadRequest.class);
-      var failed = post(client, path, Map.of("quoteRequestId", quoteId, "offerVersion", version), "failed-acceptance", token);
-      String failedPath = path + "/" + failed.path("id").asText() + "/approval";
-      provider.failing(true);
-      assertThat(post(client, failedPath, approval(failed), "failed-send", token).path("state").asText()).isEqualTo("FAILED");
-      provider.failing(false);
-      assertThat(post(client, failedPath, approval(failed), "failed-repeat", token).path("state").asText()).isEqualTo("FAILED");
-      assertThat(provider.sent()).hasSize(2);
+      assertThat(DealerHandoffTestSupport.outbound(jdbc, caseId)).isEqualTo(2);
       assertThat(get(client, path, token).path("agreedPrice").isNull()).isTrue();
       assertThat(jdbc.queryForObject("select count(*) from price_plan_snapshots where case_id = ? and kind = 'BASELINE'", Integer.class, caseId)).isZero();
       // Dealer-declined stops counteroffers while both acceptance preparation and send remain available.
@@ -141,13 +136,19 @@ class AgreedPriceAcceptanceTest {
       assertThat(dealerDeclined.path("negotiationState").asText()).isNotEqualTo("STOPPED");
       var fresh = post(client, path, Map.of("quoteRequestId", quoteId, "offerVersion", version), "accept2", token);
       String freshPath = path + "/" + fresh.path("id").asText() + "/approval";
-      var sent = post(client, freshPath, approval(fresh), "accept-send", token);
+      var handedOff = post(client, freshPath, approval(fresh), "accept-send", token);
+      assertThat(handedOff.path("state").asText()).isEqualTo("HANDED_OFF");
+      assertThat(post(client, freshPath, approval(fresh), "repeat", token)).isEqualTo(handedOff);
+      // No Agreed Price until the Buyer says they sent the acceptance.
+      assertThat(get(client, path, token).path("agreedPrice").isNull()).isTrue();
+      DealerHandoffTestSupport.markSent(client, base, token, handedOff);
+      var sent = post(client, freshPath, approval(fresh), "repeat-after-sent", token);
       assertThat(sent.path("state").asText()).isEqualTo("SENT");
-      assertThat(post(client, freshPath, approval(fresh), "repeat", token)).isEqualTo(sent);
-      assertThat(provider.sent()).hasSize(3);
+      assertThat(DealerHandoffTestSupport.sent(jdbc, caseId)).isEqualTo(3);
+      String acceptanceBody = DealerHandoffTestSupport.handoff(client, base, token, handedOff.path("messageId").asText()).path("body").asText();
       String receivedDate = jdbc.queryForObject("select created_at from dealer_relay_messages where id = ?", java.sql.Timestamp.class, received.messageId())
           .toInstant().atZone(java.time.ZoneOffset.UTC).toLocalDate().toString();
-      assertThat(provider.sent().getLast().body()).contains("your itemized quote for VIN 1HGCM82633A004352", "out-the-door total of USD 26800.00",
+      assertThat(acceptanceBody).contains("your itemized quote for VIN 1HGCM82633A004352", "out-the-door total of USD 26800.00",
           "received on " + receivedDate + " (UTC)", "subject to a test drive", "final paperwork matching")
           .doesNotContain(received.messageId(), documentId, offer.path("id").asText(), "verified offer version", "will buy", "deposit", "commit to");
       var agreed = get(client, path, token).path("agreedPrice");

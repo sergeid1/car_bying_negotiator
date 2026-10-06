@@ -40,7 +40,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Test-drive scheduling after an Agreed Price (spec 5.8, APPT-01, APPT-02). Every dealer message is
- * platform-rendered, gated, approved by the Buyer as exact text, and sent once through the relay. A
+ * platform-rendered, gated, approved by the Buyer as exact text, and handed off once for the Buyer to send. A
  * dealer reply only suggests a confirmation; the appointment exists once the Buyer confirms it and the
  * booking message is sent, carrying only the contact details the Buyer chose for this dealer.
  */
@@ -235,7 +235,7 @@ public class TestDriveService implements RelayMessageOwner {
       return true;
     });
     if (!Boolean.TRUE.equals(reserved)) return transaction.execute(status -> { authorize(caseId, token); return message(caseId, token, id); });
-    // The committed reservation prevents a second send after an uncertain provider handoff or a crash.
+    // The committed reservation prevents a second hand-off after a repeated approval or a crash.
     Sent sent = transaction.execute(status -> {
       String accountId = ownerIfBooking(caseId, token, session, id);
       authorize(caseId, token);
@@ -257,8 +257,8 @@ public class TestDriveService implements RelayMessageOwner {
       try {
         handoff = handoffs.handOff(caseId, agreed.dealerAddress(), TestDriveText.subject(message.kind()), body, released);
       } catch (RelayService.RelayRefusedException refused) {
-        // A FAILED or DELIVERY_UNKNOWN send keeps its relay message so it can be checked or retried.
-        jdbc.update("update test_drive_messages set state = ?, message_id = ? where id = ?", refused.reason().name(), refused.messageId(), id);
+        // An invalid message, or one revealing the Buyer's details, is not handed off.
+        jdbc.update("update test_drive_messages set state = ? where id = ?", refused.reason().name(), id);
         return new Sent(message(caseId, token, id), null, null);
       }
       if (!handoff.sent()) {
@@ -290,7 +290,7 @@ public class TestDriveService implements RelayMessageOwner {
     };
   }
 
-  // ---------------------------------------------------------------- unclear sends (RelayMessageOwner)
+  // ---------------------------------------------------------------- marked sent or discarded (RelayMessageOwner)
 
   @Override public boolean owns(String caseId, String relayMessageId) {
     return jdbc.queryForObject("select count(*) from test_drive_messages where case_id = ? and message_id = ?",
@@ -329,12 +329,12 @@ public class TestDriveService implements RelayMessageOwner {
   }
 
   @Override public void unsent(String caseId, String relayMessageId, String state) {
-    jdbc.update("update test_drive_messages set state = ? where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
+    jdbc.update("update test_drive_messages set state = ? where case_id = ? and message_id = ? and state = 'HANDED_OFF'",
         state, caseId, relayMessageId);
   }
 
   private List<String> unsettled(String caseId, String relayMessageId) {
-    return jdbc.queryForList("select id from test_drive_messages where case_id = ? and message_id = ? and state in ('FAILED', 'DELIVERY_UNKNOWN', 'HANDED_OFF')",
+    return jdbc.queryForList("select id from test_drive_messages where case_id = ? and message_id = ? and state = 'HANDED_OFF'",
         String.class, caseId, relayMessageId);
   }
 

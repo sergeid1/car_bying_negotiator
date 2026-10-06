@@ -154,8 +154,6 @@ class CaseIsolationInventoryAcceptanceTest {
       caseRow("GET", C + "/outbound-drafts/{draftId}", null),
       caseRow("GET", C + "/relay", null),
       caseRow("GET", C + "/relay/messages/{messageId}", null),
-      caseRow("POST", C + "/relay/messages/{messageId}/delivery-check", "{}"),
-      caseRow("POST", C + "/relay/messages/{messageId}/retry", "{}"),
       caseRow("GET", C + "/handoffs/{messageId}", null),
       caseRow("POST", C + "/handoffs/{messageId}/sent", "{}"),
       caseRow("POST", C + "/handoffs/{messageId}/discard", "{}"),
@@ -201,8 +199,6 @@ class CaseIsolationInventoryAcceptanceTest {
       publicRow("POST", V + "/recovery/verify", "Redeems a single-use emailed recovery secret, which is the credential."),
       publicRow("POST", V + "/account/sign-in-requests", "Buyer Account sign-in by email; the acknowledgement is identical for every address."),
       publicRow("POST", V + "/account/sign-in/verify", "Redeems a single-use emailed sign-in secret, which is the credential."),
-      publicRow("GET", V + "/relay/opt-out/{token}", "Dealer opt-out confirmation page; it reads nothing and changes nothing."),
-      publicRow("POST", V + "/relay/opt-out/{token}", "Dealer opt-out; the unguessable relay link token is the credential."),
       publicRow("GET", V + "/offer", "The current one-time purchase offer, the same for everyone."),
       publicRow("GET", V + "/sample-report", "A redacted report built from a synthetic fixture case."),
       publicRow("GET", V + "/document-limits", "Upload limits the intake form shows before a case exists."),
@@ -224,7 +220,7 @@ class CaseIsolationInventoryAcceptanceTest {
 
   @Test void everyEndpointIsClassifiedAndRefusesAnotherCasesCredentialOrObjects() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("isolation", true,
-        AgreedPriceAcceptanceTest.Configuration.class, "--dealer-mail.send-path=RELAY", "--case.deletion.delay=PT1H",
+        AgreedPriceAcceptanceTest.Configuration.class, "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef",
         "--security.rate-limit.requests=100000",
@@ -461,7 +457,8 @@ class CaseIsolationInventoryAcceptanceTest {
         """, UUID.randomUUID().toString(), caseId, dealer);
     approveMandate(client, base, token, "mandate1");
     var quote = post(client, base + "/quote-requests", Map.of("dealerId", dealer, "dealerAddress", "sales@dealer.example"), "quote", token);
-    post(client, base + "/quote-requests/" + quote.path("id").asText() + "/approval", approval(quote), "send", token);
+    DealerHandoffTestSupport.markSent(client, base, token,
+        post(client, base + "/quote-requests/" + quote.path("id").asText() + "/approval", approval(quote), "send", token));
     String relayAddress = get(client, base + "/relay", token).path("address").asText();
     var received = app.context().getBean(com.dealanalyzer.relay.RelayService.class).receive(new com.dealanalyzer.relay.DealerMailRelay.InboundMail(
         label + "-written-quote", relayAddress, "sales@dealer.example", "Itemized quote",
@@ -493,7 +490,8 @@ class CaseIsolationInventoryAcceptanceTest {
     objects.put("dealerId", dealer);
     var prepared = post(client, base + "/quote-acceptance", Map.of("quoteRequestId", quote.path("id").asText(),
         "offerVersion", offer.path("version").asInt()), "accept", token);
-    post(client, base + "/quote-acceptance/" + prepared.path("id").asText() + "/approval", approval(prepared), "accept-send", token);
+    DealerHandoffTestSupport.markSent(client, base, token,
+        post(client, base + "/quote-acceptance/" + prepared.path("id").asText() + "/approval", approval(prepared), "accept-send", token));
   }
 
   private static Map<String, Object> approval(JsonNode request) {

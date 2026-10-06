@@ -14,7 +14,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -22,9 +21,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The one step every approved dealer message takes after its owner (quote request, counteroffer, acceptance or
- * test-drive message) re-checked it under the case lock (spec 2.1 section 2.1, ticket 82). On the
- * {@code OWN_EMAIL_APP} path the exact approved text is stored as {@code HANDED_OFF}: no footer, no relay
- * address, no platform identity. The Buyer sends it from their own mailbox and then marks it sent, which
+ * test-drive message) re-checked it under the case lock (spec 2.1 section 2.1, ticket 82). The platform never
+ * sends to a dealer itself (ticket 84). On the {@code OWN_EMAIL_APP} path the exact approved text is stored as
+ * {@code HANDED_OFF}: no footer, no reply-intake address, no platform identity. The Buyer sends it from their own mailbox and then marks it sent, which
  * applies the owner's first-send state change once, through {@link RelayMessageOwner}. Nothing is sent or
  * retried automatically. Ticket 83 adds the connected-mailbox path behind this same step. Subjects, bodies and
  * addresses never enter logs or exception messages.
@@ -42,17 +41,20 @@ public class DealerMessageHandoff {
   private final ObjectProvider<RelayMessageOwner> owners;
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transaction;
-  private final SendPath path;
+  /** The only send path until ticket 83 adds {@code CONNECTED_MAILBOX} behind this same step. */
+  private final SendPath path = SendPath.OWN_EMAIL_APP;
 
   DealerMessageHandoff(EphemeralBuyingCaseService cases, EphemeralCasePersistence locks, RelayService relay,
       RelayContentProtection content, ObjectProvider<RelayMessageOwner> owners, JdbcTemplate jdbc,
-      PlatformTransactionManager transactions, @Value("${dealer-mail.send-path:OWN_EMAIL_APP}") SendPath path) {
-    if (path == SendPath.CONNECTED_MAILBOX) throw new IllegalStateException("The connected mailbox send path is not available");
+      PlatformTransactionManager transactions) {
     this.cases = cases; this.locks = locks; this.relay = relay; this.content = content; this.owners = owners;
-    this.jdbc = jdbc; this.transaction = new TransactionTemplate(transactions); this.path = path;
+    this.jdbc = jdbc; this.transaction = new TransactionTemplate(transactions);
   }
 
-  /** The stored message, and whether it already reached the dealer ({@code RELAY}) or awaits the Buyer. */
+  /**
+   * The stored message, and whether it already left ({@code sent}, for a path that sends it, such as ticket 83's
+   * connected mailbox) or awaits the Buyer.
+   */
   public record Outcome(String messageId, boolean sent) {
     /** The owner record's state: {@code SENT}, or {@code HANDED_OFF} until the Buyer marks it sent. */
     public String state() { return sent ? "SENT" : "HANDED_OFF"; }
@@ -71,7 +73,6 @@ public class DealerMessageHandoff {
    * {@link RelayService.RelayRefusedException} ({@code BUYER_DATA}), as is an invalid address or message.
    */
   public Outcome handOff(String caseId, String dealerAddress, String subject, String body, Set<String> released) {
-    if (path == SendPath.RELAY) return new Outcome(relay.send(caseId, dealerAddress, subject, body, released), true);
     String to = dealerAddress == null ? "" : dealerAddress.trim().toLowerCase(Locale.ROOT);
     if (to.length() > 254 || !ADDRESS.matcher(to).matches())
       throw new RelayService.RelayRefusedException(RelayService.Reason.INVALID, "A valid dealer email address is required.");
@@ -144,7 +145,7 @@ public class DealerMessageHandoff {
   /**
    * A dealer reply the Buyer pasted or uploaded into the Dealer Conversation that began with this quote request.
    * It is recorded as an untrusted inbound message from the conversation's dealer address and goes through the
-   * relay's inbound intake: attachments and quoted figures become Document Artifacts for review.
+   * reply-intake pipeline: attachments and quoted figures become Document Artifacts for review.
    */
   public RelayService.InboundResult addReply(String caseId, String token, String quoteRequestId, String key, String subject,
       String body, List<DealerMailRelay.Attachment> attachments) {

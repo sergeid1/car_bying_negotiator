@@ -62,18 +62,17 @@ class NegotiationMandateAcceptanceTest {
       long target = proposal.path("targetMinor").asLong();
       assertThat(target).isPositive().isLessThanOrEqualTo(planCeiling)
           .isLessThanOrEqualTo(plan.at("/payload/plan/sellingPrice/targetMinor").asLong());
-      assertThat(proposal.path("autonomyModes").toString()).isEqualTo("[\"SUPERVISED\"]");
+      assertThat(proposal.has("autonomyModes")).isFalse();
       assertThat(proposal.path("disclosures").toString())
           .isEqualTo("[\"PAYING_CASH\",\"HAS_OUTSIDE_FINANCING\",\"FIRST_NAME\",\"PURCHASE_TIMELINE\"]");
 
       Map<String, Object> request = new HashMap<>(Map.of("planVersion", 1, "targetMinor", target - 20_000,
           "ceilingMinor", planCeiling - 10_000, "disclosures", List.of("PAYING_CASH", "FIRST_NAME"),
-          "autonomyMode", "SUPERVISED", "approved", true));
+          "approved", true));
       for (var refused : List.of(
           Map.<String, Object>of("ceilingMinor", planCeiling + 1),
           Map.<String, Object>of("targetMinor", target + 1),
           Map.<String, Object>of("disclosures", List.of("PAYING_CASH", "HOME_ADDRESS")),
-          Map.<String, Object>of("autonomyMode", "DELEGATED"),
           Map.<String, Object>of("approved", false),
           Map.<String, Object>of("planVersion", 2),
           Map.<String, Object>of("expiresAt", Instant.now().plus(31, ChronoUnit.DAYS).toString()))) {
@@ -91,7 +90,8 @@ class NegotiationMandateAcceptanceTest {
       assertThat(first.path("ceilingMinor").asLong()).isEqualTo(planCeiling - 10_000);
       assertThat(first.path("planCeilingMinor").asLong()).isEqualTo(planCeiling);
       assertThat(first.path("disclosures").toString()).isEqualTo("[\"PAYING_CASH\",\"FIRST_NAME\"]");
-      assertThat(first.path("autonomyMode").asText()).isEqualTo("SUPERVISED");
+      // Ticket 84: there is no autonomy mode; a request naming one cannot enable delegated sending.
+      assertThat(first.has("autonomyMode")).isFalse();
       assertThat(HttpAcceptanceHarness.post(client, mandates, request, "approve-one", token)).isEqualTo(first);
       var changed = new HashMap<>(request);
       changed.put("targetMinor", target - 30_000);
@@ -107,6 +107,15 @@ class NegotiationMandateAcceptanceTest {
 
       var service = application.context().getBean(MandateService.class);
       var jdbc = new JdbcTemplate(application.context().getBean(javax.sql.DataSource.class));
+      assertThat(jdbc.queryForObject("select autonomy_mode from negotiation_mandates where id = ?", String.class, first.path("id").asText())).isNull();
+      var delegated = new HashMap<>(changed);
+      delegated.put("autonomyMode", "DELEGATED");
+      // The field is not part of the request, so this replays the same approval and changes nothing.
+      assertThat(HttpAcceptanceHarness.post(client, mandates, delegated, "approve-two", token)).isEqualTo(second);
+      assertThat(jdbc.queryForObject("select count(*) from negotiation_mandates where case_id = ? and autonomy_mode is not null", Long.class, caseId)).isZero();
+      // A mandate approved before ticket 84 keeps its stored mode and stays readable.
+      jdbc.update("update negotiation_mandates set autonomy_mode = 'SUPERVISED' where id = ?", first.path("id").asText());
+      assertThat(HttpAcceptanceHarness.get(client, mandates + "/1", token).path("targetMinor").asLong()).isEqualTo(target - 20_000);
       assertThat(service.activeMandate(caseId)).get().extracting(MandateService.Mandate::version).isEqualTo(2);
       Instant expiresAt = Instant.parse(second.path("expiresAt").asText());
       assertThat(service.expiringBefore(expiresAt.plusSeconds(1))).extracting(MandateService.Mandate::id)

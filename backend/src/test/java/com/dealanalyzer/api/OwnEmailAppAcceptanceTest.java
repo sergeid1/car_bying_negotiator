@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.dealanalyzer.buyingcase.persistence.CaseDeletionWorker;
 import com.dealanalyzer.relay.DealerMailRelay;
-import com.dealanalyzer.relay.FakeDealerMailRelay;
+import com.dealanalyzer.relay.RelayService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
@@ -38,8 +38,6 @@ class OwnEmailAppAcceptanceTest {
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();
       var jdbc = app.context().getBean(JdbcTemplate.class);
-      var provider = (FakeDealerMailRelay) app.context().getBean(DealerMailRelay.class);
-      int relayed = provider.sent().size();
       var created = post(client, "/api/v1/cases", validCase(), "case");
       String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
       String base = "/api/v1/cases/" + caseId;
@@ -68,7 +66,7 @@ class OwnEmailAppAcceptanceTest {
       String relayDomain = app.context().getBean(DealerMailRelay.class).domain();
       assertThat(handoff.toString()).doesNotContain("Deal X-Ray", "on behalf", "AI assistance", "STOP", "opt-out", relayDomain);
       assertThat(handoff.path("sentAt").isNull()).isTrue();
-      assertThat(provider.sent()).hasSize(relayed);
+      assertThat(jdbc.queryForObject("select count(*) from dealer_relay_messages where send_path = 'RELAY'", Long.class)).isZero();
       assertThat(get(client, base + "/quote-requests", token).path("negotiationState").asText()).isEqualTo("MANDATE_ACTIVE");
       assertThat(find(get(client, base + "/negotiation-conversation", token).path("entries"), "kind", "OUTBOUND_MESSAGE")
           .at("/message/deliveryState").asText()).isEqualTo("HANDED_OFF");
@@ -177,7 +175,42 @@ class OwnEmailAppAcceptanceTest {
       assertThat(appointment.at("/release/state").asText()).isEqualTo("RELEASED");
       assertThat(client.get().uri(path + "/appointments/" + appointment.path("id").asText() + "/calendar")
           .header("Case-Access-Token", token).retrieve().body(String.class)).contains("BEGIN:VCALENDAR");
-      assertThat(provider.sent()).hasSize(relayed);
+      assertThat(jdbc.queryForObject("select count(*) from dealer_relay_messages where send_path = 'RELAY'", Long.class)).isZero();
+
+      // Ticket 84: a dealer email the Buyer forwards to the case's reply-intake address joins the Dealer Conversation
+      // named on its quoted From line. The forward headers stay as content, and its figures and attachments enter intake.
+      var intake = get(client, base + "/relay", token);
+      String intakeAddress = intake.path("address").asText();
+      int documentsBefore = jdbc.queryForObject("select count(*) from source_documents where case_id = ?", Integer.class, caseId);
+      String forwardedBody = """
+          Please see below.
+
+          ---------- Forwarded message ---------
+          From: North Branch Sales <Sales@Dealer.example>
+          Date: Tue, Oct 6, 2026 at 9:14 AM
+          Subject: Your quote
+          To: <buyer.private@example.com>
+
+          Updated: selling price $24,900 and OTD $26,700. Reply to accept today.
+          """;
+      var forwarded = app.context().getBean(RelayService.class).receive(new DealerMailRelay.InboundMail("forward-1", intakeAddress,
+          "buyer.private@example.com", "Fwd: Your quote", forwardedBody,
+          List.of(new DealerMailRelay.Attachment("quote.txt", "Selling price 24900".getBytes(java.nio.charset.StandardCharsets.UTF_8)))));
+      assertThat(forwarded.outcome()).isEqualTo(RelayService.InboundOutcome.RECEIVED);
+      assertThat(jdbc.queryForObject("select direction || ':' || trust || ':' || send_path || ':' || dealer_address from dealer_relay_messages where id = ?",
+          String.class, forwarded.messageId())).isEqualTo("INBOUND:UNTRUSTED:OWN_EMAIL_APP:sales@dealer.example");
+      var forwardEntry = java.util.stream.StreamSupport.stream(get(client, base + "/negotiation-conversation", token).path("entries").spliterator(), false)
+          .filter(entry -> entry.at("/message/id").asText().equals(forwarded.messageId())).findFirst().orElseThrow();
+      assertThat(forwardEntry.path("kind").asText()).isEqualTo("INBOUND_MESSAGE");
+      assertThat(forwardEntry.at("/message/body").asText()).contains("---------- Forwarded message ---------", "From: North Branch Sales");
+      assertThat(jdbc.queryForObject("select count(*) from dealer_relay_attachments where message_id = ?", Integer.class, forwarded.messageId()))
+          .isEqualTo(2);
+      assertThat(jdbc.queryForObject("select count(*) from source_documents where case_id = ?", Integer.class, caseId)).isGreaterThan(documentsBefore);
+      // Mail naming no conversation dealer is still kept, but joins no conversation.
+      var unrelated = app.context().getBean(RelayService.class).receive(new DealerMailRelay.InboundMail("forward-2", intakeAddress,
+          "buyer.private@example.com", "Fwd: other", "From: someone@elsewhere.example\nHello", List.of()));
+      assertThat(jdbc.queryForObject("select dealer_address from dealer_relay_messages where id = ?", String.class, unrelated.messageId()))
+          .isEqualTo("buyer.private@example.com");
 
       // Hand-off messages and pasted replies are exported and erased with the case.
       var exported = post(client, base + "/exports", Map.of("format", "ZIP", "reportVersion", 0), "export", token);
@@ -197,8 +230,6 @@ class OwnEmailAppAcceptanceTest {
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();
       var jdbc = app.context().getBean(JdbcTemplate.class);
-      var provider = (FakeDealerMailRelay) app.context().getBean(DealerMailRelay.class);
-      int relayed = provider.sent().size();
       var created = post(client, "/api/v1/cases", validCase(), "case");
       String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
       String base = "/api/v1/cases/" + caseId, path = base + "/negotiation-conversation";
@@ -279,7 +310,7 @@ class OwnEmailAppAcceptanceTest {
         if (entry.at("/message/id").asText().equals(attachedMessage)) shown = entry;
       assertThat(shown.at("/message/id").asText()).isEqualTo(attachedMessage);
       assertThat(shown.at("/message/attachments/0/documentId").asText()).isEqualTo(attachedDocument);
-      assertThat(provider.sent()).hasSize(relayed);
+      assertThat(jdbc.queryForObject("select count(*) from dealer_relay_messages where send_path = 'RELAY'", Long.class)).isZero();
     }
   }
 

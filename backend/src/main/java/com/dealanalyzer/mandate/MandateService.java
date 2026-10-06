@@ -5,7 +5,6 @@ import com.dealanalyzer.buyingcase.ResourceNotFoundException;
 import com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence;
 import com.dealanalyzer.mandate.MandateEntities.MandateEntity;
 import com.dealanalyzer.mandate.MandateEntities.RevocationEntity;
-import com.dealanalyzer.mandate.MandatePolicy.AutonomyMode;
 import com.dealanalyzer.mandate.MandatePolicy.DealPlanBasis;
 import com.dealanalyzer.mandate.MandatePolicy.Disclosure;
 import com.dealanalyzer.market.persistence.MarketAssessmentPersistence;
@@ -68,11 +67,11 @@ public class MandateService {
     try {
       DealPlanBasis plan = basis(caseId);
       return new Proposal(true, null, plan.planVersion(), plan.currency(), plan.targetMinor(), plan.ceilingMinor(),
-          disclosures, List.of(AutonomyMode.SUPERVISED), now.plus(MandatePolicy.DEFAULT_LIFETIME),
+          disclosures, now.plus(MandatePolicy.DEFAULT_LIFETIME),
           now.plus(MandatePolicy.MAXIMUM_LIFETIME), MandatePolicy.VERSION);
     } catch (MandateUnavailableException unavailable) {
       return new Proposal(false, unavailable.getMessage(), null, null, null, null, disclosures,
-          List.of(AutonomyMode.SUPERVISED), null, null, MandatePolicy.VERSION);
+          null, null, MandatePolicy.VERSION);
     }
   }
 
@@ -100,7 +99,6 @@ public class MandateService {
     metadata.put("targetMinor", terms.targetMinor());
     metadata.put("ceilingMinor", terms.ceilingMinor());
     metadata.put("disclosures", terms.disclosures());
-    metadata.put("autonomyMode", terms.autonomyMode());
     metadata.put("expiresAt", terms.expiresAt().toString());
     previous.ifPresent(value -> metadata.put("supersedesVersion", value.version));
     auditEvents.save(new AuditEventEntity(UUID.randomUUID().toString(), caseId, "MANDATE_APPROVED",
@@ -245,7 +243,7 @@ public class MandateService {
         : Arrays.stream(entity.disclosures.split(",")).map(Disclosure::valueOf).collect(Collectors.toList());
     return new Mandate(entity.id, entity.caseId, entity.version, status, entity.planVersion, entity.currency,
         entity.targetMinor, entity.ceilingMinor, entity.planTargetMinor, entity.planCeilingMinor,
-        List.copyOf(disclosures), AutonomyMode.valueOf(entity.autonomyMode), entity.expiresAt,
+        List.copyOf(disclosures), entity.expiresAt,
         entity.approvedBy, entity.approvedAt,
         revocation.map(value -> value.revokedBy).orElse(null), revocation.map(value -> value.revokedAt).orElse(null));
   }
@@ -265,12 +263,12 @@ public class MandateService {
   public enum Status { ACTIVE, SUPERSEDED, REVOKED, PLAN_CHANGED, EXPIRED }
 
   public record Proposal(boolean available, String unavailableReason, Integer planVersion, String currency,
-      Long targetMinor, Long ceilingMinor, List<Disclosure> disclosures, List<AutonomyMode> autonomyModes,
+      Long targetMinor, Long ceilingMinor, List<Disclosure> disclosures,
       Instant defaultExpiresAt, Instant latestExpiresAt, String policyVersion) {}
 
   public record Mandate(String id, String caseId, int version, Status status, int planVersion, String currency,
       long targetMinor, long ceilingMinor, long planTargetMinor, long planCeilingMinor,
-      List<Disclosure> disclosures, AutonomyMode autonomyMode, Instant expiresAt,
+      List<Disclosure> disclosures, Instant expiresAt,
       String approvedBy, Instant approvedAt, String revokedBy, Instant revokedAt) {}
 
   @ResponseStatus(HttpStatus.CONFLICT)

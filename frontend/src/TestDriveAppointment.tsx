@@ -25,7 +25,7 @@ const MESSAGE_STATES: Record<string, string> = {
   SENDING: "Sending.", SENT: "Sent after your approval.", BLOCKED: "Stopped before sending: the mandate, policy or appointment changed.",
   WITHDRAWN: "Replaced by a newer choice. Not sent.", OPTED_OUT: "Not sent: the dealer opted out of messages.",
   DISCARDED: "Discarded. It was not sent.",
-  FAILED: "Not sent: the relay refused it.", DELIVERY_UNKNOWN: "Delivery was not confirmed. Check the conversation before sending again.",
+  FAILED: "Not sent: the relay refused it.", DELIVERY_UNKNOWN: "Delivery was never confirmed by the former platform relay.",
 };
 const APPOINTMENT_STATES: Record<string, string> = {
   PENDING_BOOKING: "Waiting for you to approve and send the booking message", SCHEDULED: "Booked", RESCHEDULING: "Booked; new times sent to the dealer",

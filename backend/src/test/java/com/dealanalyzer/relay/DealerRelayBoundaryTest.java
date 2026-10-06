@@ -38,13 +38,26 @@ class DealerRelayBoundaryTest {
         .isInstanceOf(IllegalStateException.class);
     new RelayProductionGuard(pilotProfile, new UnavailableDealerMailRelay()).afterSingletonsInstantiated();
     new RelayProductionGuard(new MockEnvironment(), fake).afterSingletonsInstantiated();
-    assertThatThrownBy(() -> new UnavailableDealerMailRelay().send("key", null))
-        .isInstanceOf(DealerMailRelay.RelayUnavailableException.class);
+  }
+
+  /** Ticket 84: no code path can send email to a dealer from a platform address. */
+  @Test void noOutboundRelayCallRemains() {
+    assertThat(java.util.Arrays.stream(DealerMailRelay.class.getDeclaredMethods()).map(java.lang.reflect.Method::getName))
+        .containsExactlyInAnyOrder("domain", "receivesMail");
+    assertThat(java.util.Arrays.stream(DealerMailRelay.class.getDeclaredClasses()).map(Class::getSimpleName))
+        .containsExactlyInAnyOrder("InboundMail", "Attachment");
+    var forbidden = java.util.Set.of("send", "retry", "checkDelivery", "recordDelivery", "optOutByLink", "lookup");
+    for (Class<?> type : List.of(RelayService.class, DealerMessageHandoff.class, FakeDealerMailRelay.class, UnavailableDealerMailRelay.class))
+      assertThat(java.util.Arrays.stream(type.getDeclaredMethods()).map(java.lang.reflect.Method::getName))
+          .as(type.getSimpleName()).doesNotContainAnyElementsOf(forbidden);
+    assertThat(java.util.Arrays.stream(RelayService.class.getDeclaredFields()).map(java.lang.reflect.Field::getName))
+        .doesNotContain("FOOTER");
+    assertThatThrownBy(() -> Class.forName("com.dealanalyzer.relay.DealerOptOutController")).isInstanceOf(ClassNotFoundException.class);
+    assertThat(java.util.Arrays.stream(RelayController.class.getDeclaredMethods()).map(java.lang.reflect.Method::getName))
+        .doesNotContain("retry", "checkDelivery");
   }
 
   @Test void mailRecordsNeverPrintTheirContent() {
-    var mail = new DealerMailRelay.OutboundMail("c@relay.invalid", "d@x.example", "secret subject", "secret body", "u");
-    assertThat(mail.toString()).doesNotContain("secret");
     assertThat(new DealerMailRelay.InboundMail("p", "t", "f", "secret", "secret", null).toString()).doesNotContain("secret");
   }
 }

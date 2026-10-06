@@ -12,7 +12,7 @@ class OutboundGateTest {
   private final OutboundGate gate = new OutboundGate();
   private final Mandate mandate = new Mandate("mandate", "case", 1, Status.ACTIVE, 1, "USD",
       2_300_000, 2_400_000, 2_300_000, 2_400_000, List.of(Disclosure.PAYING_CASH),
-      AutonomyMode.SUPERVISED, Instant.parse("2030-01-01T00:00:00Z"), "BUYER", Instant.EPOCH, null, null);
+      Instant.parse("2030-01-01T00:00:00Z"), "BUYER", Instant.EPOCH, null, null);
   private OutboundGate.GateContext context(Set<String> released) {
     return new OutboundGate.GateContext(mandate, Set.of(2_350_000L), Set.of(Disclosure.PAYING_CASH),
         Set.of("Alice", "alice@example.com", "2125551234"), released, null);
