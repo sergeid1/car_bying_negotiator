@@ -375,6 +375,7 @@ main > * + * { margin-top: 22px; }
 }
 .hero-copy { flex: 1 1 26rem; min-width: 0; }
 .hero h1 .hero-quiet { color: var(--ink-muted); }
+.hero-credo { margin: 14px 0 0; color: var(--ink-strong); font-weight: 600; }
 
 /* Wide screens split the workflow from the case-administration rail. */
 .workspace {
@@ -1435,6 +1436,7 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
 .hero-copy > :nth-child(2) { animation-delay: 80ms; }
 .hero-copy > :nth-child(3) { animation-delay: 160ms; }
 .hero-copy > :nth-child(4) { animation-delay: 240ms; }
+.hero-copy > :nth-child(5) { animation-delay: 320ms; }
 .hero-visual { animation-delay: 200ms; }
 @keyframes rise { from { transform: translateY(16px); } to { transform: none; } }
 

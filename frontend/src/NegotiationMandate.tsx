@@ -106,7 +106,7 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
           <li>Send any message without your approval. Every message waits for you.</li>
           <li>Offer more than your walk-away ceiling.</li>
           <li>Share your email address, phone number, surname, or anything you did not tick.</li>
-          <li>Agree to buy, sign anything, or pay a deposit on your behalf.</li>
+          <li>Agree to buy, sign anything, or pay a deposit. Only you can do those things.</li>
         </ul>
       </section>
     </div>

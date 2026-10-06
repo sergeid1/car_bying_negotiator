@@ -86,6 +86,11 @@ export function ExplainerGuide({ slug }: { slug: GuideSlug }) {
         Start a Buying Case and upload the dealer's quote. You confirm each amount against the page it
         came from before any analysis runs.
       </p>
+      <p>
+        Deal X-Ray is a tool on your side: it helps you find cars, check quotes, draft your emails to
+        dealers, and check desk paperwork. You send every email from your own email and make every
+        decision. We don't work with dealers. We help people.
+      </p>
       <div className="actions">
         <a className="button-link" href={startLink(referral ?? guide.channel)}>Start a case with your quote</a>
       </div>

@@ -118,16 +118,21 @@ the commercially correct pilot settings. Changing one requires a new parameter v
 
 `PilotCopyClaimsTest` scans frontend TypeScript recursively and the listed policy, negotiation,
 report-generator, and renderer sources for law, advice, safety, fraud, guarantee, and savings
-patterns. The backend source list must be extended when new copy-producing modules are added.
+patterns, and, since ticket 69, for claims that the platform negotiates for the Buyer, acts on the
+Buyer's behalf, is the Buyer's agent or representative, is autonomous, or contacts dealers
+(specification §1.2). The backend source list must be extended when new copy-producing modules are added.
 Every risky phrase must be recorded in `backend/src/test/resources/pilot/reviewed-claim-phrases.json`
 with a justification. Whitespace is normalized, and an exception covers only matches inside its
-reviewed phrase, not other claims on the same line. All seven recorded phrases are
+reviewed phrase, not other claims on the same line. All ten recorded phrases are
 negated disclaimers that withdraw a claim rather than make one.
 
 The standing commercial-relationship disclosure in `frontend/src/App.tsx` states that the product
-represents the Buyer, that no dealer, lender, or other commercial party pays for placement, leads,
-or referrals, and that no commercial relationship affects any market range, rating, finding, or
-suggested boundary. The test fails if that disclosure is removed.
+is a tool on the Buyer's side, the credo ("We don't work with dealers. We help people."), that the
+Buyer sends every email from their own email and makes every decision, that no dealer, lender, or
+other commercial party pays for placement, leads, or referrals, and that no commercial relationship
+affects any market range, rating, finding, or suggested boundary. The referral partner kit keeps the
+credo, the same no-dealer-money term, and its statement that the product does not contact dealers
+for the Buyer. The test fails if either is removed.
 
 This is a mechanical property, not counsel approval of the copy, which remains inside
 prerequisite 1.

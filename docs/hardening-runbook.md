@@ -37,6 +37,37 @@ the measured workload, queue backlog and failed operations are understood. Never
 failed/stuck operations to make a percentile pass. Deletion completion p95 must remain within
 24 hours, accompanied by the overdue/pending counts.
 
+## Request email quotas
+
+Sign-in requests, case recovery enrollment (`POST /cases/{id}/recovery-email`) and public
+case recovery requests share these per-process limits:
+
+| Property | Default | Meaning |
+| --- | --- | --- |
+| `security.request-email.peer-requests` | `5` | Requests per connection peer, shared across the three routes |
+| `security.request-email.peer-window` | `PT15M` | Fixed peer window beginning with its first request |
+| `security.request-email.max-peers` | `10000` | Maximum peer buckets; new peers are refused when full |
+| `security.request-email.hourly-limit` | `100` | Combined sign-in/recovery delivery attempts per one-hour window |
+
+All values must be positive at startup. Only the connection peer is used; forwarding headers
+are ignored. A reverse proxy therefore shares a bucket for its clients. Peer exhaustion returns
+429 with `Retry-After`; hourly exhaustion preserves each route's acknowledgement but sends no
+mail and creates no link. SMTP failures consume capacity, while idempotent replays and requests
+without an eligible delivery do not. The hourly window begins with the first delivery attempt.
+
+Route the WARN event `REQUEST_EMAIL_HOURLY_LIMIT_REACHED` from
+`com.dealanalyzer.recovery.RequestEmailLimits` to Sergei's monitored alert destination. It
+contains no address, credential, peer or request content and occurs only once per exhausted
+window, on the first suppressed attempt. Verify alert delivery and acknowledgment before
+enrollment. Investigate aggregate traffic and adapter failures, then pause affected enrollment
+at ingress if abuse continues; do not raise the ceiling just to clear the warning.
+
+Limits are held in memory and reset on restart. Configure shared ingress quotas and global
+caps for replicas, distributed clients and restart resets, plus lower upload/write quotas.
+Account contact edits cannot change email, and notifications use the verified account address
+with their existing hourly quota. Dealer mail normally uses the Buyer's own email app; the
+optional authorized relay has its own daily per-case and per-dealer caps.
+
 ## Document key rotation
 
 Configure `DOCUMENT_STORAGE_ACTIVE_KEY_ID` as a stable, nonsecret ID (1–64 ASCII letters,

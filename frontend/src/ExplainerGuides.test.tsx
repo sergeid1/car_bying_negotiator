@@ -80,6 +80,28 @@ test.each(GUIDES)("$slug opens without a case and its start action begins intake
   expect(calls.find(call => call.url.endsWith("/api/v1/cases"))!.body!.channel).toBe(guide.channel);
 });
 
+test.each(GUIDES)("$slug describes the journey as help the Buyer uses and states the credo", async guide => {
+  stubApi();
+  const App = await freshApp(`/?guide=${guide.slug}`);
+  render(<App />);
+  const start = screen.getByRole("region", { name: "Check your own quote" }).textContent!.replace(/\s+/g, " ");
+  expect(start).toContain("find cars, check quotes, draft your emails to dealers, and check desk paperwork");
+  expect(start).toContain("You send every email from your own email and make every decision");
+  expect(start).toContain("We don't work with dealers. We help people.");
+});
+
+test("the start screen states the Buyer's side of the deal and the credo", async () => {
+  stubApi();
+  const App = await freshApp("/");
+  render(<App />);
+  const hero = screen.getByRole("heading", { level: 1 }).parentElement!.textContent!.replace(/\s+/g, " ");
+  expect(hero).toContain("The Buyer's side of the deal");
+  expect(hero).toContain("helps you find cars, check dealer quotes, draft your emails to dealers, and check the paperwork at the desk");
+  expect(hero).toContain("You send every email from your own email and make every decision");
+  expect(hero).toContain("We don't work with dealers. We help people.");
+  expect(hero).not.toMatch(/gmail|outlook|mailbox/i);
+});
+
 test("an unknown guide name shows the usual start screen", async () => {
   stubApi();
   const App = await freshApp("/?guide=unknown");
@@ -111,7 +133,7 @@ test("the guides fetch nothing, store nothing, and label every amount as an exam
   for (const api of ["fetch(", "localStorage", "sessionStorage", "indexedDB", "document.cookie", "referrer", "navigator.", "<script", "<img", "<iframe", "http"]) {
     expect(source, `${api} has no place in the guides`).not.toContain(api);
   }
-  for (const phrase of [/ai negotiator/i, /safe to sign/i, /\bsav(e|es|ed|ing|ings)\b/i]) {
+  for (const phrase of [/ai negotiator/i, /safe to sign/i, /\bsav(e|es|ed|ing|ings)\b/i, /negotiates? for/i, /on (your|the buyer's) behalf/i, /\bour agent\b/i, /autonomous/i, /represents (you|the buyer)/i]) {
     expect(source).not.toMatch(phrase);
   }
 });
