@@ -105,6 +105,13 @@ Account contact edits cannot change email, and notifications use the verified ac
 with their existing hourly quota. Dealer mail is sent only by the Buyer from their own email
 app; the platform never emails a dealer (ticket 84), so there is no outbound relay cap to set.
 
+## Accepted scan exceptions
+
+`scripts/security-checks.sh` fails on any high or critical finding. A finding may be accepted only
+in `.trivyignore`, with the reason it is unreachable, the guard that keeps it unreachable and an
+`exp:` date, after which the scan fails again. The current entry is CVE-2026-47884 (Spring
+Framework `XsltView`), guarded by the Semgrep rule `no-xslt-view` and removed by ticket 85.
+
 ## Document key rotation
 
 Configure `DOCUMENT_STORAGE_ACTIVE_KEY_ID` as a stable, nonsecret ID (1–64 ASCII letters,
