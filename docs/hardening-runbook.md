@@ -102,8 +102,8 @@ at ingress if abuse continues; do not raise the ceiling just to clear the warnin
 Limits are held in memory and reset on restart. Configure shared ingress quotas and global
 caps for replicas, distributed clients and restart resets, plus lower upload/write quotas.
 Account contact edits cannot change email, and notifications use the verified account address
-with their existing hourly quota. Dealer mail normally uses the Buyer's own email app; the
-optional authorized relay has its own daily per-case and per-dealer caps.
+with their existing hourly quota. Dealer mail is sent only by the Buyer from their own email
+app; the platform never emails a dealer (ticket 84), so there is no outbound relay cap to set.
 
 ## Document key rotation
 
