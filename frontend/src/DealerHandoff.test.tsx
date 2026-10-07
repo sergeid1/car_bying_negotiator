@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, expect, test, vi } from "vitest";
+import { AccountSignedInContext } from "./BuyerAccount";
 import { DealerHandoff, DealerReplyPaste, MAILTO_LIMIT, mailtoLink } from "./DealerHandoff";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
@@ -103,4 +104,80 @@ test("a pasted dealer reply is posted as multipart with the conversation's crede
   expect(init!.headers).toEqual(expect.objectContaining({ "Case-Access-Token": "secret", "Idempotency-Key": expect.any(String) }));
   expect(screen.getByText(/Reply added/)).toBeInTheDocument();
   expect((await axe.run(container, { rules: { "color-contrast": { enabled: false } } })).violations).toEqual([]);
+});
+
+// Ticket 83: a signed-in Buyer with a connected mailbox sends from it; unclear outcomes wait for the Buyer.
+const mailbox = { available: true, providers: ["GOOGLE"],
+  connection: { provider: "GOOGLE", providerLabel: "Gmail", address: "buyer@gmail.example", connectedAt: "2026-10-06T12:00:00Z" } };
+const viaMailbox = (state: string) => ({ ...handoff(state), sendPath: "CONNECTED_MAILBOX" });
+function route(routes: Record<string, unknown[]>) {
+  const fetcher = vi.fn(async (url: string, init?: RequestInit) => {
+    const key = `${init?.method ?? "GET"} ${url}`;
+    const queue = routes[key];
+    if (!queue) throw new Error(`Unexpected ${key}`);
+    const next = queue.length > 1 ? queue.shift() : queue[0];
+    return next instanceof Response ? next : new Response(JSON.stringify(next));
+  });
+  vi.stubGlobal("fetch", fetcher); return fetcher;
+}
+const signedIn = (node: React.ReactNode) => <AccountSignedInContext.Provider value={true}>{node}</AccountSignedInContext.Provider>;
+
+test("Send from my email sends the approved text through the connected account, next to the own-email-app path", async () => {
+  const user = userEvent.setup();
+  const onChanged = vi.fn();
+  const fetcher = route({ "GET /api/v1/account/mailbox": [mailbox], "GET /api/v1/cases/c1/handoffs/m1": [handoff()],
+    "POST /api/v1/cases/c1/handoffs/m1/mailbox-send": [viaMailbox("SENT")] });
+  const { container } = render(signedIn(<main><h1>Case</h1><DealerHandoff caseId="c1" token="secret" messageId="m1" onChanged={onChanged} /></main>));
+  expect(await screen.findByText("buyer@gmail.example")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Open in my email app" })).toBeInTheDocument();
+  expect((await axe.run(container, { rules: { "color-contrast": { enabled: false } } })).violations).toEqual([]);
+  await user.click(screen.getByRole("button", { name: "Send from my email" }));
+  expect(await screen.findByText(/Sent from your connected email/)).toBeInTheDocument();
+  const [, init] = fetcher.mock.calls.find(([url]) => url.endsWith("/mailbox-send"))!;
+  expect(init?.headers).toEqual(expect.objectContaining({ "Case-Access-Token": "secret", "Account-Request": "1" }));
+  expect(onChanged).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole("button", { name: "Send from my email" })).toBeNull();
+});
+
+test("an unclear send asks the Buyer to check their Sent folder; It was sent, Send again and the email app are their choice", async () => {
+  const user = userEvent.setup();
+  const fetcher = route({ "GET /api/v1/account/mailbox": [mailbox], "GET /api/v1/cases/c1/handoffs/m1": [viaMailbox("DELIVERY_UNKNOWN")],
+    "POST /api/v1/cases/c1/handoffs/m1/sent": [viaMailbox("SENT")] });
+  const { container } = render(signedIn(<main><h1>Case</h1><DealerHandoff caseId="c1" token="secret" messageId="m1" onChanged={vi.fn()} /></main>));
+  expect(await screen.findByText(/did not say whether this message was sent/)).toBeInTheDocument();
+  expect(screen.getByText(/Check the Sent folder/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Send again" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "It was not sent: use my email app" })).toBeEnabled();
+  expect(screen.queryByRole("button", { name: "Discard this message" })).toBeNull();
+  expect((await axe.run(container, { rules: { "color-contrast": { enabled: false } } })).violations).toEqual([]);
+  await user.click(screen.getByRole("button", { name: "It was sent" }));
+  expect(await screen.findByText(/Sent from your connected email/)).toBeInTheDocument();
+  expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/mailbox-send"))).toHaveLength(0);
+
+  cleanup();
+  route({ "GET /api/v1/account/mailbox": [mailbox], "GET /api/v1/cases/c1/handoffs/m1": [viaMailbox("DELIVERY_UNKNOWN")],
+    "POST /api/v1/cases/c1/handoffs/m1/own-email-app": [handoff()] });
+  render(signedIn(<DealerHandoff caseId="c1" token="secret" messageId="m1" onChanged={vi.fn()} />));
+  await user.click(await screen.findByRole("button", { name: "It was not sent: use my email app" }));
+  expect(await screen.findByRole("link", { name: "Open in my email app" })).toBeInTheDocument();
+});
+
+test("a refused mailbox send says why, sends nothing, and leaves the own-email-app path open", async () => {
+  const user = userEvent.setup();
+  route({ "GET /api/v1/account/mailbox": [mailbox], "GET /api/v1/cases/c1/handoffs/m1": [handoff()],
+    "POST /api/v1/cases/c1/handoffs/m1/mailbox-send": [new Response(JSON.stringify({ code: "MAILBOX_NOT_CONNECTED", ownEmailApp: true,
+      detail: "Your email is not connected, so nothing was sent. Send it from your own email app, or connect Gmail or Outlook on your account page." }), { status: 409 })] });
+  render(signedIn(<DealerHandoff caseId="c1" token="secret" messageId="m1" onChanged={vi.fn()} />));
+  await user.click(await screen.findByRole("button", { name: "Send from my email" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("nothing was sent");
+  expect(screen.getByRole("link", { name: "Open in my email app" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "I sent it" })).toBeEnabled();
+});
+
+test("without a connection or a sign-in, only the own-email-app path is offered", async () => {
+  route({ "GET /api/v1/account/mailbox": [{ available: true, providers: ["GOOGLE"], connection: null }],
+    "GET /api/v1/cases/c1/handoffs/m1": [handoff()] });
+  render(signedIn(<DealerHandoff caseId="c1" token="secret" messageId="m1" onChanged={vi.fn()} />));
+  expect(await screen.findByRole("link", { name: "Open in my email app" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Send from my email" })).toBeNull();
 });

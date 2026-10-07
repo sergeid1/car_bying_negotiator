@@ -103,7 +103,16 @@ Limits are held in memory and reset on restart. Configure shared ingress quotas 
 caps for replicas, distributed clients and restart resets, plus lower upload/write quotas.
 Account contact edits cannot change email, and notifications use the verified account address
 with their existing hourly quota. Dealer mail is sent only by the Buyer from their own email
-app; the platform never emails a dealer (ticket 84), so there is no outbound relay cap to set.
+app, or through the Gmail or Outlook account the Buyer connected (ticket 83); the platform never
+emails a dealer from an address of its own (ticket 84). Connected-mailbox sends are capped per
+dealer, per Buying Case and per account in a rolling window (`MAILBOX_CAPS_PER_DEALER`,
+`MAILBOX_CAPS_PER_CASE`, `MAILBOX_CAPS_PER_ACCOUNT`, `MAILBOX_CAPS_WINDOW`; 10, 20 and 40 per
+24 hours by default) and never retried automatically. Keep `MAILBOX_SENDER=none` until the
+Google OAuth verification for `gmail.send` and the Microsoft publisher verification for
+`Mail.Send` are complete; `live` then needs `MAILBOX_GOOGLE_CLIENT_ID`/`_SECRET`,
+`MAILBOX_MICROSOFT_CLIENT_ID`/`_SECRET`, `MAILBOX_REDIRECT_URI` registered with both providers,
+and a random `MAILBOX_TOKEN_ENCRYPTION_KEY` of at least 32 bytes, separate from the document and
+case keys. The fake sender fails startup under a pilot or production declaration.
 
 ## Accepted scan exceptions
 

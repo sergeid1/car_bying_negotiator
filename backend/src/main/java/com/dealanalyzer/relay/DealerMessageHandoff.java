@@ -12,6 +12,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -24,15 +25,17 @@ import org.springframework.transaction.support.TransactionTemplate;
  * test-drive message) re-checked it under the case lock (spec 2.1 section 2.1, ticket 82). The platform never
  * sends to a dealer itself (ticket 84). On the {@code OWN_EMAIL_APP} path the exact approved text is stored as
  * {@code HANDED_OFF}: no footer, no reply-intake address, no platform identity. The Buyer sends it from their own mailbox and then marks it sent, which
- * applies the owner's first-send state change once, through {@link RelayMessageOwner}. Nothing is sent or
- * retried automatically. Ticket 83 adds the connected-mailbox path behind this same step. Subjects, bodies and
- * addresses never enter logs or exception messages.
+ * applies the owner's first-send state change once, through {@link RelayMessageOwner}. On the
+ * {@code CONNECTED_MAILBOX} path (ticket 83) the same stored message is sent through the Buyer's connected Gmail or
+ * Outlook account instead, and reaches the same state change once. Nothing is sent or retried automatically.
+ * Subjects, bodies and addresses never enter logs or exception messages.
  */
 @Service
 public class DealerMessageHandoff {
   private static final Pattern ADDRESS = Pattern.compile("^[a-z0-9._%+\\-]{1,64}@[a-z0-9.\\-]{1,189}\\.[a-z]{2,24}$");
   private static final int MAX_SUBJECT = 300;
   private static final int MAX_BODY = 20_000;
+  private static final String DELIVERY_UNKNOWN = "DELIVERY_UNKNOWN";
 
   private final EphemeralBuyingCaseService cases;
   private final EphemeralCasePersistence locks;
@@ -41,7 +44,10 @@ public class DealerMessageHandoff {
   private final ObjectProvider<RelayMessageOwner> owners;
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transaction;
-  /** The only send path until ticket 83 adds {@code CONNECTED_MAILBOX} behind this same step. */
+  /**
+   * A message waits for the Buyer on the own-email-app path; a Connected-mailbox send records
+   * {@code CONNECTED_MAILBOX} when it starts.
+   */
   private final SendPath path = SendPath.OWN_EMAIL_APP;
 
   DealerMessageHandoff(EphemeralBuyingCaseService cases, EphemeralCasePersistence locks, RelayService relay,
@@ -102,23 +108,26 @@ public class DealerMessageHandoff {
    * The Buyer sent the message from their own mailbox. Re-runs the owner's send checks (mandate, gate decision,
    * negotiation and appointment state) under the case lock, records the message as {@code SENT} with the time,
    * and applies the owner's first-send state change once. A message already marked sent or discarded, or one
-   * the current mandate no longer permits, changes nothing and is refused with the reason.
+   * the current mandate no longer permits, changes nothing and is refused with the reason. For a
+   * Connected-mailbox send whose outcome was unclear ({@code DELIVERY_UNKNOWN}), this is the Buyer's "It was
+   * sent" after checking their Sent folder: the send was permitted when it was attempted, so it is recorded as sent.
    */
   public Handoff markSent(String caseId, String token, String messageId) {
     Runnable after = transaction.execute(status -> {
       authorize(caseId, token);
       Handoff handoff = read(caseId, messageId);
-      requireWaiting(handoff, "You already marked this message sent.");
+      boolean unclear = DELIVERY_UNKNOWN.equals(handoff.state());
+      if (!unclear) requireWaiting(handoff, "You already marked this message sent.");
       RelayMessageOwner owner = owner(caseId, messageId);
-      try {
+      if (!unclear) try {
         owner.requireResendPermitted(caseId, token, messageId);
       } catch (IllegalArgumentException stopped) {
         throw new HandoffRefusedException(stopped.getMessage() + " It was not marked sent.");
       }
       Instant now = PersistedInstant.round(Instant.now());
-      jdbc.update("update dealer_relay_messages set state = 'SENT', completed_at = ? where id = ? and state = 'HANDED_OFF'",
+      jdbc.update("update dealer_relay_messages set state = 'SENT', completed_at = ? where id = ? and state in ('HANDED_OFF', 'DELIVERY_UNKNOWN')",
           Timestamp.from(now), messageId);
-      audit(caseId, "DEALER_MESSAGE_MARKED_SENT", handoff, now);
+      audit(caseId, unclear ? "DEALER_MESSAGE_CONFIRMED_SENT" : "DEALER_MESSAGE_MARKED_SENT", handoff, now);
       return owner.sent(caseId, token, messageId);
     });
     // Notifications and other follow-up work run only after the case transaction committed.
@@ -167,9 +176,110 @@ public class DealerMessageHandoff {
     };
   }
 
+  /** The exact approved message a Connected-mailbox send carries, read under the case lock. */
+  public record MailboxClaim(String caseId, String messageId, String priorState, String dealerAddress,
+      String dealerAddressHash, String subject, String body) {
+    /** True when the Buyer is sending again a message whose earlier send had an unclear outcome. */
+    public boolean again() { return DELIVERY_UNKNOWN.equals(priorState); }
+    @Override public String toString() { return "MailboxClaim[redacted]"; }
+  }
+
+  /** How a Connected-mailbox send ended, as far as the provider's answer shows. */
+  public enum MailboxOutcome { SENT, NOT_SENT, UNKNOWN }
+
+  /**
+   * Starts a Connected-mailbox send (ticket 83) of a handed-off message, or sends again one whose earlier send had
+   * an unclear outcome. Under the case lock it re-runs the owner's send checks (mandate, gate decision, negotiation
+   * and appointment state), runs {@code inLock} with the exact stored text (the caller's connection, cap and
+   * metering checks), and records the message as {@code CONNECTED_MAILBOX} with state {@code DELIVERY_UNKNOWN}
+   * before anything leaves, so a send interrupted at any point is shown as unclear and never retried. The
+   * transaction commits before the caller contacts the provider.
+   */
+  public <T> T claimForMailbox(String caseId, String token, String messageId, Function<MailboxClaim, T> inLock) {
+    return transaction.execute(status -> {
+      authorize(caseId, token);
+      Handoff handoff = read(caseId, messageId);
+      if (!DELIVERY_UNKNOWN.equals(handoff.state())) requireWaiting(handoff, "This message was already sent.");
+      try {
+        owner(caseId, messageId).requireResendPermitted(caseId, token, messageId);
+      } catch (IllegalArgumentException stopped) {
+        throw new HandoffRefusedException(stopped.getMessage() + " It was not sent.");
+      }
+      var claim = new MailboxClaim(caseId, messageId, handoff.state(), handoff.dealerAddress(),
+          relay.dealerAddressHash(handoff.dealerAddress()), handoff.subject(), handoff.body());
+      T result = inLock.apply(claim);
+      Instant now = PersistedInstant.round(Instant.now());
+      jdbc.update("update dealer_relay_messages set state = 'DELIVERY_UNKNOWN', send_path = 'CONNECTED_MAILBOX' where id = ?",
+          messageId);
+      audit(caseId, claim.again() ? "DEALER_MESSAGE_SEND_AGAIN" : "DEALER_MESSAGE_MAILBOX_SEND_STARTED",
+          SendPath.CONNECTED_MAILBOX, messageId, now);
+      return result;
+    });
+  }
+
+  /**
+   * Records how a Connected-mailbox send ended. {@code SENT} records the message as sent and applies the owner's
+   * first-send state change once, exactly as marking it sent does; the send was permitted when it started.
+   * {@code NOT_SENT} (the provider refused it) returns the message to where it was before the send, and
+   * {@code UNKNOWN} leaves it {@code DELIVERY_UNKNOWN} for the Buyer to check their Sent folder.
+   */
+  public Handoff completeMailboxSend(String caseId, String token, MailboxClaim claim, MailboxOutcome outcome) {
+    String messageId = claim.messageId();
+    Runnable after = transaction.execute(status -> {
+      locks.lock(caseId);
+      Handoff current = read(caseId, messageId);
+      Instant now = PersistedInstant.round(Instant.now());
+      switch (outcome) {
+        case SENT -> {
+          // The Buyer may have used another path meanwhile; a message already recorded as sent stays as it is.
+          if (jdbc.update("""
+              update dealer_relay_messages set state = 'SENT', send_path = 'CONNECTED_MAILBOX', completed_at = ?
+              where id = ? and state in ('HANDED_OFF', 'DELIVERY_UNKNOWN')
+              """, Timestamp.from(now), messageId) != 1) return null;
+          audit(caseId, "DEALER_MESSAGE_SENT", SendPath.CONNECTED_MAILBOX, messageId, now);
+          return owner(caseId, messageId).sent(caseId, token, messageId);
+        }
+        case NOT_SENT -> {
+          // A refused send-again leaves the earlier, unclear send for the Buyer to check.
+          if (DELIVERY_UNKNOWN.equals(current.state()) && !claim.again())
+            jdbc.update("update dealer_relay_messages set state = 'HANDED_OFF', send_path = ? where id = ? and state = 'DELIVERY_UNKNOWN'",
+                path.name(), messageId);
+          audit(caseId, "DEALER_MESSAGE_MAILBOX_NOT_SENT", SendPath.CONNECTED_MAILBOX, messageId, now);
+          return null;
+        }
+        default -> {
+          audit(caseId, "DEALER_MESSAGE_DELIVERY_UNKNOWN", SendPath.CONNECTED_MAILBOX, messageId, now);
+          return null;
+        }
+      }
+    });
+    if (after != null) after.run();
+    return transaction.execute(status -> read(caseId, messageId));
+  }
+
+  /**
+   * The Buyer checked their Sent folder after an unclear Connected-mailbox send and will send the message from
+   * their own email app instead. The message waits as {@code HANDED_OFF} on the own-email-app path again.
+   */
+  public Handoff useOwnEmailApp(String caseId, String token, String messageId) {
+    return transaction.execute(status -> {
+      authorize(caseId, token);
+      Handoff handoff = read(caseId, messageId);
+      if ("HANDED_OFF".equals(handoff.state())) return handoff;
+      if (!DELIVERY_UNKNOWN.equals(handoff.state())) requireWaiting(handoff, "This message was already sent.");
+      Instant now = PersistedInstant.round(Instant.now());
+      jdbc.update("update dealer_relay_messages set state = 'HANDED_OFF', send_path = ? where id = ? and state = 'DELIVERY_UNKNOWN'",
+          path.name(), messageId);
+      audit(caseId, "DEALER_MESSAGE_RETURNED_TO_OWN_EMAIL_APP", path, messageId, now);
+      return read(caseId, messageId);
+    });
+  }
+
   private void requireWaiting(Handoff handoff, String sentReason) {
     if ("SENT".equals(handoff.state())) throw new HandoffRefusedException(sentReason);
     if ("DISCARDED".equals(handoff.state())) throw new HandoffRefusedException("This message was discarded. Prepare a new one.");
+    if (DELIVERY_UNKNOWN.equals(handoff.state())) throw new HandoffRefusedException(
+        "This message may already have been sent from your email. Check your Sent folder, then choose It was sent or Send again.");
     if (!"HANDED_OFF".equals(handoff.state())) throw new HandoffRefusedException("This message is not waiting to be sent.");
   }
 
@@ -193,12 +303,16 @@ public class DealerMessageHandoff {
 
   /** The audit names the message and the event only, never addresses or content. */
   private void audit(String caseId, String event, Handoff handoff, Instant now) {
+    audit(caseId, event, handoff.sendPath(), handoff.messageId(), now);
+  }
+
+  private void audit(String caseId, String event, SendPath sendPath, String messageId, Instant now) {
     jdbc.update("""
         insert into audit_events (id, case_id, event_type, aggregate_type, aggregate_id, aggregate_version,
           idempotency_key, actor, metadata_json, created_at)
         values (?, ?, ?, 'DEALER_MESSAGE', ?, 1, ?, 'BUYER', ?, ?)
-        """, UUID.randomUUID().toString(), caseId, event, handoff.messageId(), UUID.randomUUID().toString(),
-        "{\"sendPath\":\"" + handoff.sendPath().name() + "\"}", Timestamp.from(now));
+        """, UUID.randomUUID().toString(), caseId, event, messageId, UUID.randomUUID().toString(),
+        "{\"sendPath\":\"" + sendPath.name() + "\"}", Timestamp.from(now));
   }
 
   private void authorize(String caseId, String token) { locks.lock(caseId); cases.reopen(caseId, token); }

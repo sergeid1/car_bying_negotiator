@@ -157,6 +157,8 @@ class CaseIsolationInventoryAcceptanceTest {
       caseRow("GET", C + "/handoffs/{messageId}", null),
       caseRow("POST", C + "/handoffs/{messageId}/sent", "{}"),
       caseRow("POST", C + "/handoffs/{messageId}/discard", "{}"),
+      caseRow("POST", C + "/handoffs/{messageId}/own-email-app", "{}"),
+      caseRow("POST", C + "/handoffs/{messageId}/mailbox-send", "{}"),
       caseRow("POST", C + "/quote-requests/{id}/replies", MULTIPART, "id=quoteId"));
 
   /** Buyer Account endpoints: the account_session cookie, plus Account-Request: 1 on writes. */
@@ -169,6 +171,10 @@ class CaseIsolationInventoryAcceptanceTest {
       accountRow("POST", V + "/account/deletion", "{}"),
       accountRow("GET", V + "/account/deletion", null),
       accountRow("GET", V + "/account/notifications", null),
+      accountRow("GET", V + "/account/mailbox", null),
+      accountRow("POST", V + "/account/mailbox/authorizations", "{\"provider\":\"GOOGLE\"}"),
+      accountRow("POST", V + "/account/mailbox/connection", "{\"state\":\"unknown\",\"code\":\"unknown\"}"),
+      accountRow("DELETE", V + "/account/mailbox/connection", null),
       accountRow("PUT", V + "/account/notifications", "{\"type\":\"APPOINTMENT\",\"enabled\":false}"),
       accountRow("GET", V + "/journeys", null),
       accountRow("POST", V + "/journeys", "{\"yearFrom\":2020,\"yearTo\":2024,\"makeId\":\"toyota\",\"modelId\":\"toyota-rav4\","
@@ -223,6 +229,7 @@ class CaseIsolationInventoryAcceptanceTest {
         AgreedPriceAcceptanceTest.Configuration.class, "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef",
+        "--mailbox.token-encryption-key=mailbox-isolation-key-0123456789abcdef",
         "--security.rate-limit.requests=100000",
         "--security.request-email.peer-requests=100000",
         "--operations.accounts.support.token=" + SUPPORT, "--operations.accounts.support.role=SUPPORT")) {
