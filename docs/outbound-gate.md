@@ -140,6 +140,21 @@ the conversation view and the case's dealer messages, and in case and account ex
 Nothing offers to check, retry or resend them; owner records left in `FAILED` or `DELIVERY_UNKNOWN`
 can be prepared again as a new message.
 
+### Connected-mailbox dispatch
+
+Connected-mailbox dispatch (ticket 90) rechecks the mandate, gate, negotiation/appointment
+state and prepared contact release after token preparation, immediately before the provider call.
+The active account, case and exact connection are locked, in that order, through the call.
+A disconnect, replacement, account deletion, mandate revocation or release withdrawal that
+wins before dispatch prevents the call, records a non-delivery attempt and leaves the own-email-app
+handoff available where the case still exists. The audit records no credentials or contact values.
+Once dispatch enters the provider, those changes wait for the call to return and cannot recall it.
+A provider-confirmed send records `SENT`; an uncertain or unexpected failure after dispatch
+records `DELIVERY_UNKNOWN` and is never automatically retried. A process interruption can also
+leave the earlier claimed attempt unknown. Latch-controlled fake-provider tests in
+`ConnectedMailboxAcceptanceTest` cover the fence and the already-dispatched boundary; live
+provider validation and slow/crashed-send behavior remain ticket 92's scope.
+
 ### The private reply-intake address
 
 Each case keeps its unguessable relay identity (160 random bits, issued on first use) as its private

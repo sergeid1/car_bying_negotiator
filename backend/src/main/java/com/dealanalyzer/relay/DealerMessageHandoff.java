@@ -217,9 +217,25 @@ public class DealerMessageHandoff {
     });
   }
 
+  /** Rechecks current owner permission under the case lock at the provider dispatch boundary. */
+  public <T> T dispatchMailbox(String caseId, String token, MailboxClaim claim, java.util.function.Supplier<T> dispatch) {
+    return transaction.execute(status -> {
+      authorize(caseId, token);
+      Handoff current = read(caseId, claim.messageId());
+      if (!DELIVERY_UNKNOWN.equals(current.state()))
+        throw new HandoffRefusedException("This message is no longer waiting for dispatch. It was not sent.");
+      try {
+        owner(caseId, claim.messageId()).requireResendPermitted(caseId, token, claim.messageId());
+      } catch (IllegalArgumentException stopped) {
+        throw new HandoffRefusedException(stopped.getMessage() + " It was not sent.");
+      }
+      return dispatch.get();
+    });
+  }
+
   /**
    * Records how a Connected-mailbox send ended. {@code SENT} records the message as sent and applies the owner's
-   * first-send state change once, exactly as marking it sent does; the send was permitted when it started.
+   * first-send state change once, exactly as marking it sent does; the send was permitted at dispatch.
    * {@code NOT_SENT} (the provider refused it) returns the message to where it was before the send, and
    * {@code UNKNOWN} leaves it {@code DELIVERY_UNKNOWN} for the Buyer to check their Sent folder.
    */

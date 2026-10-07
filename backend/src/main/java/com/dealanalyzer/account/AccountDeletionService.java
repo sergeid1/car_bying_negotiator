@@ -62,7 +62,8 @@ public class AccountDeletionService {
           .setParameter("job", job.id).setParameter("caseId", attachment.caseId).executeUpdate();
       caseLifecycle.requestDeletion(attachment.caseId, now);
     }
-    // Mailbox tokens go at once, after the cases, so the lock order matches a send (case, then connection).
+    // Dispatch locks account, then case, then connection through the provider call. Deletion uses the same
+    // order; prepared sends lose access here, while an already-dispatched call finishes before this fence.
     for (String table : List.of("mailbox_connections", "mailbox_authorizations"))
       manager.createNativeQuery("delete from " + table + " where account_id = :id").setParameter("id", account.id).executeUpdate();
     return view(job);
