@@ -117,14 +117,18 @@ test("core entry, document intake, recovery, price approval, downloads and delet
   expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
 });
 
-test("the signed-in Buyer Account, its contact form and its deletion receipt have no automated AA violations", async () => {
+test("the signed-in Buyer Account, its case list, its contact form and its deletion receipt have no automated AA violations", async () => {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => new Response(JSON.stringify(
     String(input).endsWith("/deletion") && init?.method === "POST"
       ? { state: "DELETION_PENDING", failureCode: null, cases: [{ caseId: "case-1", state: "DELETION_PENDING" }] }
       : { contact: { email: "buyer@example.com", firstName: null, lastName: null, phone: null }, createdAt: "", sessionExpiresAt: "",
-        cases: [{ caseId: "case-1", attachedAt: "", state: "ACTIVE" }] }), { headers: { "Content-Type": "application/json" } }));
+        cases: [{ caseId: "case-1", attachedAt: "", state: "ACTIVE", startedAt: "2026-10-04T15:00:00Z", vehicle: "2021 Honda Accord EX-L",
+          dealer: "Triangle Honda" }, { caseId: "case-3", attachedAt: "", state: "EXPIRED", vehicle: null, dealer: "Dealer ZIP 27604" }] }),
+    { headers: { "Content-Type": "application/json" } }));
   const { container } = render(<main><h1>Buying Case</h1><BuyerAccount caseCredentials={{ caseId: "case-2", token: "token" }} /></main>);
   await screen.findByRole("form", { name: "Contact details" });
+  // Ticket 88: the account's case list, with an openable and an unavailable case.
+  await screen.findByRole("list", { name: "Your Buying Cases" });
   let result = await axe.run(container, AA);
   expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
   const user = userEvent.setup();

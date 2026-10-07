@@ -1749,3 +1749,13 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
 .handoff-reply h4 { margin: 0; }
 .handoff-reply textarea, .handoff-reply input { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
 /* End ticket 82. */
+
+/* Ticket 88: Buying Cases listed and opened from the Buyer Account. */
+.account-cases { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
+.account-cases li { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); min-width: 0; }
+.account-cases li:first-child { border-top: 0; }
+.account-case-name { font-weight: 600; }
+.account-case-meta, .account-case-state { color: var(--ink-muted); font-size: 0.9rem; }
+.account-cases li > button { justify-self: start; max-width: 100%; }
+.account-save-note { overflow-wrap: anywhere; }
+/* End ticket 88. */

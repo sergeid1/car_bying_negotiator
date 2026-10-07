@@ -63,6 +63,13 @@ public class AccountController {
     return accounts.attach(session, request.caseId(), caseToken);
   }
 
+  /** Opens an attached case for this session; the pass returned is not a case link and ends with the session. */
+  @PostMapping("/cases/{caseId}/open")
+  public BuyerAccountService.OpenedCase open(@com.dealanalyzer.account.AccountSession String session,
+      @PathVariable @Size(max = 36) String caseId) {
+    return accounts.open(session, caseId);
+  }
+
   @PostMapping("/sign-out") @ResponseStatus(HttpStatus.NO_CONTENT)
   public void signOut(@com.dealanalyzer.account.AccountSession String session,
       @RequestParam(defaultValue = "false") boolean everywhere, jakarta.servlet.http.HttpServletResponse response) {

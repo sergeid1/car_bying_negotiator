@@ -21,7 +21,8 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-const account = (cases: { caseId: string; attachedAt: string; state: string }[] = []) => ({
+type Listed = { caseId: string; attachedAt: string; state: string; startedAt?: string; vehicle?: string | null; dealer?: string | null };
+const account = (cases: Listed[] = []) => ({
   contact: { email: "buyer@example.com", firstName: null, lastName: null, phone: null },
   createdAt: "2026-10-03T00:00:00Z", sessionExpiresAt: "2026-10-17T00:00:00Z", cases,
 });
@@ -102,7 +103,7 @@ test("attaches the open case with its case link and signs out server-side", asyn
   render(<BuyerAccount caseCredentials={{ caseId: "case-123456789", token: "case-token" }} />);
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "Attach this Buying Case" }));
-  expect(await screen.findByRole("list", { name: "Attached Buying Cases" })).toHaveTextContent("Open");
+  expect(await screen.findByRole("list", { name: "Your Buying Cases" })).toHaveTextContent("Open case");
   const attach = fetcher.mock.calls.find(([path]) => path === "/api/v1/account/cases")!;
   expect((attach[1]?.headers as Record<string, string>)["Case-Access-Token"]).toBe("case-token");
   expect(screen.queryByRole("button", { name: "Attach this Buying Case" })).toBeNull();
@@ -110,6 +111,55 @@ test("attaches the open case with its case link and signs out server-side", asyn
   expect(await screen.findByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
   expect(fetcher.mock.calls.some(([path, init]) => path === "/api/v1/account/sign-out" && init?.method === "POST")).toBe(true);
   expect(storage.size).toBe(0);
+});
+
+test("names each case, opens an open one with the sign-in, and shows expired or deleted cases as unavailable", async () => {
+  const listed = [
+    { caseId: "case-open-1", attachedAt: "", state: "ACTIVE", startedAt: "2026-10-04T15:00:00Z", vehicle: "2021 Honda Accord EX-L", dealer: "Triangle Honda" },
+    { caseId: "case-new-22", attachedAt: "", state: "ACTIVE", startedAt: "2026-10-05T15:00:00Z", vehicle: null, dealer: "Dealer ZIP 27604" },
+    { caseId: "case-expired", attachedAt: "", state: "EXPIRED", startedAt: "2026-09-01T15:00:00Z", vehicle: "2019 Mazda CX-5", dealer: null },
+    { caseId: "case-deleted", attachedAt: "", state: "DELETED", vehicle: null, dealer: null },
+  ];
+  const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+    const path = String(input);
+    if (path === "/api/v1/account/cases/case-open-1/open")
+      return json({ caseId: "case-open-1", accessToken: "acct.case-open-1.1.sig", accessExpiresAt: "2026-10-07T08:00:00Z" });
+    return json(account(listed));
+  });
+  vi.stubGlobal("fetch", fetcher);
+  const opened = vi.fn();
+  render(<BuyerAccount onCaseOpened={opened} />);
+  const list = await screen.findByRole("list", { name: "Your Buying Cases" });
+  expect(list).toHaveTextContent("2021 Honda Accord EX-L");
+  expect(list).toHaveTextContent("Triangle Honda · Started Oct 4, 2026");
+  expect(list).toHaveTextContent("Vehicle not entered yet");
+  expect(list).toHaveTextContent("Unavailable: Expired");
+  expect(list).toHaveTextContent("Unavailable: Deleted");
+  expect(screen.getAllByRole("button", { name: /^Open / })).toHaveLength(2);
+  expect(screen.queryByRole("button", { name: /Mazda/ })).toBeNull();
+  await userEvent.setup().click(screen.getByRole("button", { name: "Open 2021 Honda Accord EX-L, started Oct 4, 2026" }));
+  await waitFor(() => expect(opened).toHaveBeenCalledWith({ caseId: "case-open-1", token: "acct.case-open-1.1.sig" }));
+  const call = fetcher.mock.calls.find(([path]) => String(path).endsWith("/open"))!;
+  expect(call[1]?.method).toBe("POST");
+  expect((call[1]?.headers as Record<string, string>)["Account-Request"]).toBe("1");
+  expect((call[1]?.headers as Record<string, string>)["Case-Access-Token"]).toBeUndefined();
+  expect(storage.size).toBe(0);
+});
+
+test("a case that became unavailable is not opened and the list is re-read", async () => {
+  let reads = 0;
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    if (String(input).endsWith("/open")) return json({ code: "CASE_UNAVAILABLE" }, 404);
+    if (String(input) !== "/api/v1/account") return json([]);
+    reads += 1;
+    return json(account([{ caseId: "case-1", attachedAt: "", state: reads > 1 ? "EXPIRED" : "ACTIVE", vehicle: "2020 Toyota Camry" }]));
+  }));
+  const opened = vi.fn();
+  render(<BuyerAccount onCaseOpened={opened} />);
+  await userEvent.setup().click(await screen.findByRole("button", { name: "Open 2020 Toyota Camry" }));
+  expect(await screen.findByText(/can no longer be opened from your account/)).toBeVisible();
+  expect(await screen.findByText("Unavailable: Expired")).toBeVisible();
+  expect(opened).not.toHaveBeenCalled();
 });
 
 test("saves optional contact details and deletes the account only after confirmation", async () => {

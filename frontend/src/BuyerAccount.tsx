@@ -3,7 +3,9 @@ import type { Credentials } from "./CasePortability";
 import { MailboxConnection } from "./MailboxConnection";
 
 type Contact = { email: string; firstName: string | null; lastName: string | null; phone: string | null };
-type AttachedCase = { caseId: string; attachedAt: string; state: string };
+type AttachedCase = {
+  caseId: string; attachedAt: string; state: string; startedAt?: string | null; vehicle?: string | null; dealer?: string | null;
+};
 type Account = { contact: Contact; createdAt: string; sessionExpiresAt: string; cases: AttachedCase[] };
 type Receipt = { state: "DELETION_PENDING" | "DELETED"; failureCode?: string | null; cases: { caseId: string; state: string }[] };
 type Problem = { status: number; code?: string; detail?: string };
@@ -35,13 +37,27 @@ const LINK_MESSAGES: Record<string, string> = {
   SIGN_IN_LINK_UNKNOWN: "This sign-in link is not recognized. Check that you opened the whole link, or request a new one below.",
 };
 const ENDED = "Your sign-in has ended. Request a new sign-in link to continue.";
+const UNAVAILABLE = "This case can no longer be opened from your account. It may have expired or be being deleted.";
+
+/** Access to a case opened from the account. It works only while this sign-in lasts and is not a case link. */
+export const ACCOUNT_PASS_PREFIX = "acct.";
+export function isAccountPass(token: string) { return token.startsWith(ACCOUNT_PASS_PREFIX); }
+
+function startedOn(value?: string | null) {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined
+    : date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
 
 /**
  * `onSignedIn` reports whether the account has loaded successfully.
  * Changing `recheck` re-reads the account, so a panel that saw the session end can sign it out here.
  */
-export function BuyerAccount({ caseCredentials, onSignedIn, recheck = 0 }: {
+export function BuyerAccount({ caseCredentials, onSignedIn, onCaseOpened, recheck = 0 }: {
   caseCredentials?: Credentials; onSignedIn?: (signedIn: boolean) => void; recheck?: number;
+  /** Opens an attached case with access that ends when this sign-in ends. */
+  onCaseOpened?: (value: Credentials) => void;
 }) {
   const [loading, setLoading] = useState(true);
   const [linkSecret, setLinkSecret] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get("sign-in") ?? "");
@@ -85,7 +101,7 @@ export function BuyerAccount({ caseCredentials, onSignedIn, recheck = 0 }: {
     } finally { setBusy(false); }
   }
 
-  if (receipt) return <section className="panel" aria-label="Buyer Account">
+  if (receipt) return <section id="buyer-account" tabIndex={-1} className="panel" aria-label="Buyer Account">
     <h2>Buyer Account</h2>
     <p role="status">{receipt.state === "DELETED" ? "Active-system removal of your account and its cases is verified."
       : "Your account and attached cases are no longer accessible. Removal is pending."}</p>
@@ -100,7 +116,7 @@ export function BuyerAccount({ caseCredentials, onSignedIn, recheck = 0 }: {
     {error && <p role="alert">{error}</p>}
   </section>;
 
-  if (!account) return <section className="panel" aria-label="Buyer Account">
+  if (!account) return <section id="buyer-account" tabIndex={-1} className="panel" aria-label="Buyer Account">
     <h2>Buyer Account</h2>
     <p>Optional. Analysis works without an account. An account keeps your Buying Cases in one place for decisions that
       take more than a day. There is no password: each sign-in uses a single-use email link that expires in 15 minutes.</p>
@@ -121,7 +137,7 @@ export function BuyerAccount({ caseCredentials, onSignedIn, recheck = 0 }: {
   </section>;
 
   const attached = caseCredentials && account.cases.some(c => c.caseId === caseCredentials.caseId);
-  return <section className="panel" aria-label="Buyer Account">
+  return <section id="buyer-account" tabIndex={-1} className="panel" aria-label="Buyer Account">
     <h2>Buyer Account</h2>
     <p>Signed in as <strong className="account-email">{account.contact.email}</strong>. Your contact details are stored
       once, encrypted, and are never handed to a dealer.</p>
@@ -131,10 +147,32 @@ export function BuyerAccount({ caseCredentials, onSignedIn, recheck = 0 }: {
     }, "Contact details could not be saved. Check the phone number format and retry.")} />
     <NotificationPreferences onSessionEnded={() => signedOut(ENDED)} />
     <MailboxConnection onSessionEnded={() => signedOut(ENDED)} />
-    <h3>Attached Buying Cases</h3>
-    {account.cases.length === 0 ? <p className="muted">No cases attached yet. Open a case by its private link, then attach it here.</p>
-      : <ul className="account-cases" aria-label="Attached Buying Cases">
-        {account.cases.map(c => <li key={c.caseId}>Case {c.caseId.slice(0, 8)}: {STATE_LABELS[c.state] ?? c.state}</li>)}
+    <h3>Your Buying Cases</h3>
+    {account.cases.length === 0 ? <p className="muted">No cases saved yet. A case you start while signed in is saved here, and
+      a case opened by its private link can be attached.</p>
+      : <ul className="account-cases" aria-label="Your Buying Cases">
+        {account.cases.map(c => {
+          const name = c.vehicle ?? "Vehicle not entered yet";
+          const started = startedOn(c.startedAt);
+          const open = c.state === "ACTIVE";
+          return <li key={c.caseId}>
+            <span className="account-case-name">{name}</span>
+            <span className="account-case-meta">{[c.dealer, started && `Started ${started}`].filter(Boolean).join(" · ")
+              || `Case ${c.caseId.slice(0, 8)}`}</span>
+            {open ? <button className="btn-secondary" disabled={busy} aria-label={`Open ${name}${started ? `, started ${started}` : ""}`}
+              onClick={() => run(async () => {
+                try {
+                  const opened = await (await call(`/api/v1/account/cases/${encodeURIComponent(c.caseId)}/open`, { method: "POST" })).json();
+                  onCaseOpened?.({ caseId: opened.caseId, token: opened.accessToken });
+                  setMessage("Case opened from your account.");
+                } catch (problem) {
+                  if ((problem as Problem)?.status === 404) { setLoads(value => value + 1); throw { status: 0, detail: UNAVAILABLE }; }
+                  throw problem;
+                }
+              }, "This case could not be opened. Retry safely.")}>Open case</button>
+              : <span className="account-case-state">Unavailable: {STATE_LABELS[c.state] ?? c.state}</span>}
+          </li>;
+        })}
       </ul>}
     {caseCredentials && !attached && <button className="btn-secondary" disabled={busy} onClick={() => run(async () => {
       setAccount(await (await call("/api/v1/account/cases", { method: "POST", caseToken: caseCredentials.token,

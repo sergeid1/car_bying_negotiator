@@ -166,6 +166,7 @@ class CaseIsolationInventoryAcceptanceTest {
       accountRow("GET", V + "/account", null),
       accountRow("PUT", V + "/account/contact", "{\"firstName\":\"Pat\"}"),
       accountRow("POST", V + "/account/cases", "{\"caseId\":\"{caseId}\"}"),
+      accountRow("POST", V + "/account/cases/{caseId}/open", "{}"),
       accountRow("POST", V + "/account/sign-out", "{}"),
       accountRow("POST", V + "/account/export", "{}"),
       accountRow("POST", V + "/account/deletion", "{}"),
@@ -252,7 +253,8 @@ class CaseIsolationInventoryAcceptanceTest {
         if (scoped && Set.of(Scope.PUBLIC, Scope.ACCOUNT).contains(declared.get(key))) caseScopedElsewhere.add(key);
       });
       assertThat(caseScopedElsewhere).as("Only these take a case credential outside the case table, and each is tested below")
-          .containsExactly("POST /api/v1/account/cases", "POST /api/v1/cases", "POST /api/v1/cases/synthetic");
+          .containsExactly("POST /api/v1/account/cases", "POST /api/v1/account/cases/{caseId}/open", "POST /api/v1/cases",
+              "POST /api/v1/cases/synthetic");
       CASE_ENDPOINTS.forEach(row -> assertThat(inventory.get(row.key())).as("case row without a case credential: " + row.key()).isTrue());
 
       // Two cases with the full object graph, each owned by its own Buyer Account, and a fixture-backed case.
@@ -329,11 +331,13 @@ class CaseIsolationInventoryAcceptanceTest {
 
       // Account endpoints refuse a missing session; journeys refuse another account's session like an unknown journey.
       for (var row : ACCOUNT_ENDPOINTS) {
-        var none = call(client, row.method(), resolve(row.path(), row.ids(), victim.objects(), null), resolve(row.body(), row.ids(), victim.objects(), null),
+        String requested = resolve(row.path(), row.ids(), victim.objects(), null);
+        var none = call(client, row.method(), requested, resolve(row.body(), row.ids(), victim.objects(), null),
             UUID.randomUUID().toString(), new Credentials(victim.token(), null, null));
         // The deletion receipt outlives the account, so without a session it answers that no receipt is known.
         int refusal = row.key().equals("GET /api/v1/account/deletion") ? 404 : 401;
-        if (none.status() != refusal || none.body().contains(victim.id())) failures.add(row.key() + " without a session: " + none);
+        // The problem body echoes the requested path as its instance; nothing else may name the case.
+        if (none.status() != refusal || none.body().replace(requested, "").contains(victim.id())) failures.add(row.key() + " without a session: " + none);
         if (row.path().contains("{journeyId}")) {
           refusedLikeUnknown(client, row, victim.objects(), "journeyId", "another account's session",
               new Credentials(null, attackerSession, null), failures);
@@ -348,6 +352,26 @@ class CaseIsolationInventoryAcceptanceTest {
       var attach = ACCOUNT_ENDPOINTS.stream().filter(row -> row.key().equals("POST /api/v1/account/cases")).findFirst().orElseThrow();
       for (var token : Arrays.asList(null, MALFORMED, attacker.token()))
         refusedLikeUnknown(client, attach, victim.objects(), "caseId", "attach with " + token, new Credentials(token, attackerSession, null), failures);
+      // Opening through the account refuses another account's case exactly like an unknown case, and the pass it
+      // issues opens nothing without the session it was issued to.
+      var open = ACCOUNT_ENDPOINTS.stream().filter(row -> row.key().equals("POST /api/v1/account/cases/{caseId}/open")).findFirst().orElseThrow();
+      refusedLikeUnknown(client, open, victim.objects(), "caseId", "another account's case", new Credentials(null, attackerSession, null), failures);
+      String victimSession = victim.objects().get("session");
+      var opened = call(client, "POST", V + "/account/cases/" + victim.id() + "/open", "{}", null, new Credentials(null, victimSession, null));
+      assertThat(opened.status()).as(opened.toString()).isEqualTo(200);
+      String pass = JSON.readTree(opened.body()).path("accessToken").asText();
+      assertThat(pass).startsWith("acct.").isNotEqualTo(victim.token());
+      assertThat(call(client, "GET", V + "/cases/" + victim.id(), null, null, new Credentials(pass, victimSession, null)).status()).isEqualTo(200);
+      for (var row : CASE_ENDPOINTS) {
+        String session = row.path().contains("/appointment/") ? attackerSession : null;
+        generic(row, "account pass without its session", refusedLikeUnknown(client, row, victim.objects(), primary(row),
+            "account pass without its session", new Credentials(pass, session, null), failures), failures);
+        generic(row, "account pass with another session", refusedLikeUnknown(client, row, victim.objects(), primary(row),
+            "account pass with another session", new Credentials(pass, attackerSession, null), failures), failures);
+      }
+      for (var row : CASE_ENDPOINTS.stream().filter(row -> row.path().equals(C)).toList())
+        refusedLikeUnknown(client, row, attacker.objects(), "caseId", "another case with this account pass",
+            new Credentials(pass, victimSession, null), failures);
       for (var row : ACCOUNT_ENDPOINTS.stream().filter(row -> !row.path().contains("{") && !row.key().equals("POST /api/v1/account/sign-out")
           && !row.key().equals("POST /api/v1/account/deletion") && !row.key().equals("POST /api/v1/account/cases")).toList()) {
         var own = call(client, row.method(), row.path(), resolve(row.body(), row.ids(), attacker.objects(), null), UUID.randomUUID().toString(),
@@ -368,7 +392,7 @@ class CaseIsolationInventoryAcceptanceTest {
       }
       assertThat(ServiceOperationsAcceptanceTest.opGet(client, V + "/operator/cases/" + victim.id(), SUPPORT).path("operations")).isNotEmpty();
 
-      assertThat(comparisons).as("refusals compared with an unknown case or object").hasValueGreaterThanOrEqualTo(8 * CASE_ENDPOINTS.size());
+      assertThat(comparisons).as("refusals compared with an unknown case or object").hasValueGreaterThanOrEqualTo(10 * CASE_ENDPOINTS.size());
       assertThat(failures).as("Endpoints that do not refuse like an unknown case or object").isEmpty();
     }
   }
