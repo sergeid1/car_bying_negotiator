@@ -70,12 +70,21 @@ public class MailboxSendService {
     MailboxConnections.Connection connection = attempt.connection();
     String label = connection.provider().label();
     MailboxSender.Delivery delivery;
+    var dispatched = new java.util.concurrent.atomic.AtomicBoolean();
     try {
       var sendable = connections.sendable(connection);
-      if (sendable.isEmpty()) return notSent(attempt, "UNAVAILABLE", notConnected());
-      delivery = connections.sender(connection.provider()).send(sendable.get().accessToken(), sendable.get().address(),
-          new MailboxSender.OutgoingMessage(attempt.claim().dealerAddress(), attempt.claim().subject(), attempt.claim().body()));
+      if (sendable.isEmpty()) throw notConnected();
+      delivery = transaction.execute(status -> {
+        accounts.lockActiveAccount(connection.accountId());
+        return handoffs.dispatchMailbox(caseId, caseToken, attempt.claim(), () -> {
+          if (!connections.stillConnected(connection)) throw notConnected();
+          dispatched.set(true);
+          return connections.sender(connection.provider()).send(sendable.get().accessToken(), sendable.get().address(),
+              new MailboxSender.OutgoingMessage(attempt.claim().dealerAddress(), attempt.claim().subject(), attempt.claim().body()));
+        });
+      });
     } catch (MailboxSender.MailboxFailure failure) {
+      if (dispatched.get()) return finish(attempt, "DELIVERY_UNKNOWN", MailboxOutcome.UNKNOWN);
       return switch (failure.kind()) {
         case REVOKED -> notSent(attempt, "REVOKED", new MailboxProblem(HttpStatus.CONFLICT, "MAILBOX_REVOKED", label
             + " no longer allows Deal X-Ray to send from your account, so nothing was sent and the connection was removed. "
@@ -83,6 +92,13 @@ public class MailboxSendService {
         default -> notSent(attempt, "UNAVAILABLE", new MailboxProblem(HttpStatus.SERVICE_UNAVAILABLE, "PROVIDER_UNAVAILABLE",
             label + " could not be reached, so nothing was sent. Try again, or send it from your own email app.", true));
       };
+    } catch (RuntimeException stopped) {
+      if (dispatched.get()) return finish(attempt, "DELIVERY_UNKNOWN", MailboxOutcome.UNKNOWN);
+      record(attempt, "UNAVAILABLE");
+      try {
+        handoffs.completeMailboxSend(caseId, caseToken, attempt.claim(), MailboxOutcome.NOT_SENT);
+      } catch (RuntimeException removed) { /* Account/case deletion may have removed the handoff. */ }
+      throw stopped;
     }
     return switch (delivery) {
       case SENT -> finish(attempt, "SENT", MailboxOutcome.SENT);

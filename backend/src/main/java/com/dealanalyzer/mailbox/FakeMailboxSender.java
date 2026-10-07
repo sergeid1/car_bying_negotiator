@@ -27,6 +27,12 @@ public class FakeMailboxSender implements MailboxSender {
   private final Deque<Delivery> outcomes = new ArrayDeque<>();
   private final List<Sent> sent = new CopyOnWriteArrayList<>();
   private volatile boolean revoked;
+  private final Set<String> revokedRefreshTokens = java.util.concurrent.ConcurrentHashMap.newKeySet();
+  private volatile Runnable afterExchange = () -> {};
+  private volatile Runnable afterRefresh = () -> {};
+  private volatile Runnable atSend = () -> {};
+  private volatile boolean withdrawalFails;
+  private final java.util.concurrent.atomic.AtomicInteger withdrawals = new java.util.concurrent.atomic.AtomicInteger();
 
   public record Sent(String from, OutgoingMessage message) {}
 
@@ -48,23 +54,39 @@ public class FakeMailboxSender implements MailboxSender {
     revoked = false;
     var scopes = new java.util.HashSet<>(Set.of(provider.requestedScope().split(" ")));
     if (read) scopes.add(provider == MailboxProvider.GOOGLE ? "https://www.googleapis.com/auth/gmail.readonly" : "Mail.Read");
-    return new Grant("fake-access-" + UUID.randomUUID(), "fake-refresh-" + UUID.randomUUID(),
+    var grant = new Grant("fake-access-" + UUID.randomUUID(), "fake-refresh-" + UUID.randomUUID(),
         Instant.now().plus(Duration.ofHours(1)), Set.copyOf(scopes), ADDRESS);
+    afterExchange.run();
+    return grant;
   }
 
   @Override public AccessToken refresh(String refreshToken) {
-    if (revoked) throw new MailboxFailure(MailboxFailure.Kind.REVOKED);
-    return new AccessToken("fake-access-" + UUID.randomUUID(), Instant.now().plus(Duration.ofHours(1)));
+    if (revoked || revokedRefreshTokens.contains(refreshToken)) throw new MailboxFailure(MailboxFailure.Kind.REVOKED);
+    var token = new AccessToken("fake-access-" + UUID.randomUUID(), Instant.now().plus(Duration.ofHours(1)));
+    afterRefresh.run();
+    return token;
   }
 
   @Override public Delivery send(String accessToken, String from, OutgoingMessage message) {
+    atSend.run();
     Delivery outcome;
     synchronized (outcomes) { outcome = outcomes.isEmpty() ? Delivery.SENT : outcomes.removeFirst(); }
     if (outcome == Delivery.SENT || outcome == Delivery.UNKNOWN) sent.add(new Sent(from, message));
     return outcome;
   }
 
-  @Override public void revoke(String refreshToken) { revoked = true; }
+  @Override public void revoke(String refreshToken) {
+    withdrawals.incrementAndGet();
+    if (withdrawalFails) throw new MailboxFailure(MailboxFailure.Kind.UNAVAILABLE);
+    revokedRefreshTokens.add(refreshToken);
+  }
+
+  /** Controlled boundaries for deterministic lifecycle tests; no tokens are exposed. */
+  public void afterExchange(Runnable action) { afterExchange = action; }
+  public void afterRefresh(Runnable action) { afterRefresh = action; }
+  public void atSend(Runnable action) { atSend = action; }
+  public void withdrawalFails(boolean value) { withdrawalFails = value; }
+  public int withdrawals() { return withdrawals.get(); }
 
   /** The next sends end with these outcomes, in order; afterwards sends succeed. */
   public void nextOutcomes(Delivery... next) { synchronized (outcomes) { outcomes.addAll(List.of(next)); } }
@@ -75,7 +97,11 @@ public class FakeMailboxSender implements MailboxSender {
   /** Messages the provider accepted, or may have accepted for an unclear outcome. */
   public List<Sent> sent() { return List.copyOf(sent); }
 
-  public void reset() { synchronized (outcomes) { outcomes.clear(); } sent.clear(); revoked = false; }
+  public void reset() {
+    synchronized (outcomes) { outcomes.clear(); }
+    sent.clear(); revoked = false; revokedRefreshTokens.clear(); withdrawals.set(0); withdrawalFails = false;
+    afterExchange = () -> {}; afterRefresh = () -> {}; atSend = () -> {};
+  }
 
   private static String encode(String value) { return URLEncoder.encode(value, StandardCharsets.UTF_8); }
 
