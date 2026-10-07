@@ -120,8 +120,8 @@
             <id>default-test</id>
             <configuration>
               <excludedGroups>serial</excludedGroups>
-              <!-- Isolate static state and shutdown hooks as well as files between classes. -->
-              <reuseForks>false</reuseForks>
+              <!-- Reuse warm JVMs; each slot retains its own files and runs methods sequentially. -->
+              <reuseForks>true</reuseForks>
             </configuration>
           </execution>
           <execution>
