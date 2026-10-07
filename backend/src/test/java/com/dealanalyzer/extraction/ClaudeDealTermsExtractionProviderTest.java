@@ -43,7 +43,7 @@ class ClaudeDealTermsExtractionProviderTest {
       new NormalizedDocumentPage(2, PAGE_TWO, "", false, false, false, false)));
 
   private final RecordingUsageStore store = new RecordingUsageStore();
-  private final ProviderMeter meter = new ProviderMeter(store, Duration.ofSeconds(2), 2);
+  private final ProviderMeter meter = new ProviderMeter(store, Duration.ofSeconds(10), 2);
   private final List<ModelRequest> requests = new ArrayList<>();
 
   @AfterEach void close() { meter.close(); }
