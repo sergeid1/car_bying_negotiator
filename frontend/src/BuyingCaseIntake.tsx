@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useContext, useEffect, useState } from "react";
 import { arrivalChannel, forgetArrivalChannel } from "./AcquisitionChannel";
+import { AccountSignedInContext } from "./BuyerAccount";
 
 type CaseCredentials = { caseId: string; token: string };
 
@@ -71,8 +72,10 @@ async function send<T>(path: string, options: RequestInit): Promise<T> {
   throw new IntakeProblem(problem);
 }
 
-export function BuyingCaseIntake({ onCaseOpened, initial, title }: {
+export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, title }: {
   onCaseOpened: (value: CaseCredentials, referralDisclosure?: string) => void;
+  /** Called when the new case was saved to the signed-in Buyer Account. */
+  onSavedToAccount?: () => void;
   /** Starting values the Buyer can still change, such as the VIN read from desk paperwork. */
   initial?: { vin?: string; dealerPostalCode?: string; purchaseMethod?: string };
   title?: string;
@@ -89,6 +92,8 @@ export function BuyingCaseIntake({ onCaseOpened, initial, title }: {
   const [referralDisclosure, setReferralDisclosure] = useState<string>();
   // Read when the case starts, so the link parameter leaves the address bar straight away.
   const [channel] = useState(arrivalChannel);
+  // Undefined outside the app shell, where there is no account panel to point to.
+  const signedIn = useContext(AccountSignedInContext);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,9 +128,15 @@ export function BuyingCaseIntake({ onCaseOpened, initial, title }: {
         const created = await send<{
           case: { id: string; referralDisclosure?: string | null };
           accessToken: string;
+          savedToAccount?: boolean;
         }>("/api/v1/cases", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": crypto.randomUUID(),
+            // Only a signed-in Buyer who was told below asks for the case to be saved to the account.
+            ...(signedIn ? { "Account-Request": "1" } : {}),
+          },
           body: JSON.stringify({
             buyerPostalCode: String(values.get("buyerPostalCode") ?? "").trim(),
             dealerPostalCode: String(values.get("dealerPostalCode") ?? "").trim(),
@@ -153,6 +164,7 @@ export function BuyingCaseIntake({ onCaseOpened, initial, title }: {
           }),
         });
         forgetArrivalChannel();
+        if (created.savedToAccount) onSavedToAccount?.();
         credentials = { caseId: created.case.id, token: created.accessToken };
         disclosure = created.case.referralDisclosure ?? undefined;
         setReferralDisclosure(disclosure);
@@ -248,6 +260,20 @@ export function BuyingCaseIntake({ onCaseOpened, initial, title }: {
           ? `Supported during the pilot: ${supported.map(stateName).join(", ")}.`
           : "Enter the vehicle you are negotiating for."}
       </p>
+
+      {!openCase && signedIn === true && (
+        <p className="account-save-note" role="note">
+          You are signed in, so this case will be saved to your Buyer Account. Its private case link works too.
+        </p>
+      )}
+      {!openCase && signedIn === false && (
+        <p className="account-save-note" role="note">
+          No account is required. To keep your cases in one place, you can{" "}
+          <a href="#buyer-account" onClick={event => {
+            event.preventDefault(); document.getElementById("buyer-account")?.focus();
+          }}>sign in with a Buyer Account</a> first.
+        </p>
+      )}
 
       {problem && !problem.field && (
         <p className="error" role="alert">

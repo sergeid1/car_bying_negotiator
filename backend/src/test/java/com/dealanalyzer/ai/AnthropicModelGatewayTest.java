@@ -15,26 +15,27 @@ class AnthropicModelGatewayTest {
 
   private static ModelRequest request(UntrustedInput... inputs) {
     var task = TestTasks.total();
-    return new ModelRequest("claude-opus-5", task.instructions(), task.outputSchema(), task.maxOutputTokens(), List.of(inputs));
+    return new ModelRequest("claude-opus-5-5", task.instructions(), task.outputSchema(), task.maxOutputTokens(), List.of(inputs));
   }
 
   @Test void sendsTheConfiguredModelFixedInstructionsAndStructuredOutputSchema() throws Exception {
     try (var stub = new StubModelServer()) {
-      stub.reply(200, message("claude-opus-5", "end_turn", "{\"total_minor\":3150000,\"currency\":\"USD\"}", 1200, 40));
+      stub.reply(200, message("claude-opus-5-5", "end_turn", "{\"total_minor\":3150000,\"currency\":\"USD\"}", 1200, 40));
       var exchange = stub.gateway(TIMEOUT).send(request(
           new UntrustedInput.Text("page 1 recognized text", "Total: $31,500.00"),
           new UntrustedInput.PngImage("page 1 image", new byte[] {1, 2, 3})));
 
       assertThat(exchange.outcome()).isEqualTo(Outcome.COMPLETED);
-      assertThat(exchange.servedModel()).isEqualTo("claude-opus-5");
+      assertThat(exchange.servedModel()).isEqualTo("claude-opus-5-5");
       assertThat(exchange.output()).isEqualTo("{\"total_minor\":3150000,\"currency\":\"USD\"}");
       assertThat(exchange.inputTokens()).isEqualTo(1200);
       assertThat(exchange.outputTokens()).isEqualTo(40);
 
       var sent = stub.requests().getFirst();
-      assertThat(sent.path("model").asText()).isEqualTo("claude-opus-5");
+      assertThat(sent.path("model").asText()).isEqualTo("claude-opus-5-5");
       assertThat(sent.path("system").asText()).startsWith(TestTasks.INSTRUCTIONS).contains("untrusted data");
       assertThat(sent.at("/output_config/format/type").asText()).isEqualTo("json_schema");
+      assertThat(sent.at("/output_config/effort").asText()).isEqualTo("high");
       assertThat(sent.at("/output_config/format/schema/additionalProperties").asBoolean(true)).isFalse();
       assertThat(sent.has("fallbacks")).as("no silent fallback to an unevaluated model").isFalse();
       var content = sent.at("/messages/0/content");
@@ -48,9 +49,9 @@ class AnthropicModelGatewayTest {
 
   @Test void refusalAndTruncationAreReportedWithTheirTokenSpend() throws Exception {
     try (var stub = new StubModelServer()) {
-      stub.reply(200, message("claude-opus-5", "refusal", null, 900, 5));
-      stub.reply(200, message("claude-opus-5", "max_tokens", "{\"total_minor\":31", 900, 1024));
-      stub.reply(200, message("claude-opus-5", "tool_use", null, 900, 10));
+      stub.reply(200, message("claude-opus-5-5", "refusal", null, 900, 5));
+      stub.reply(200, message("claude-opus-5-5", "max_tokens", "{\"total_minor\":31", 900, 1024));
+      stub.reply(200, message("claude-opus-5-5", "tool_use", null, 900, 10));
       var gateway = stub.gateway(TIMEOUT);
       var refused = gateway.send(request(new UntrustedInput.Text("page 1 recognized text", "x")));
       var truncated = gateway.send(request(new UntrustedInput.Text("page 1 recognized text", "x")));
@@ -87,7 +88,7 @@ class AnthropicModelGatewayTest {
 
   @Test void aSlowVendorTimesOut() throws Exception {
     try (var stub = new StubModelServer()) {
-      stub.reply(200, message("claude-opus-5", "end_turn", "{}", 1, 1), 3_000);
+      stub.reply(200, message("claude-opus-5-5", "end_turn", "{}", 1, 1), 3_000);
       var exchange = stub.gateway(Duration.ofMillis(300))
           .send(request(new UntrustedInput.Text("page 1 recognized text", "x")));
       assertThat(exchange.outcome()).isEqualTo(Outcome.TIMED_OUT);

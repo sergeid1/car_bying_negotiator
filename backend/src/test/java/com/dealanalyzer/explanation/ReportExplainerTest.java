@@ -28,9 +28,9 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 class ReportExplainerTest {
   private static final ModelSettings ENABLED =
-      new ModelSettings(true, ModelProvider.ANTHROPIC, "claude-opus-5", "pilot-parameters.v1", "corpus.v1");
+      new ModelSettings(true, ModelProvider.ANTHROPIC, "claude-opus-5-5", "pilot-parameters.v1", "corpus.v1");
   private static final ModelSettings SHIPPED =
-      new ModelSettings(false, ModelProvider.ANTHROPIC, "claude-opus-5", "pilot-parameters.v1", ModelSettings.NO_EVALUATION_SET);
+      new ModelSettings(false, ModelProvider.ANTHROPIC, "claude-opus-5-5", "pilot-parameters.v1", ModelSettings.NO_EVALUATION_SET);
 
   private final ObjectMapper json = new ObjectMapper();
   private final RecordingUsageStore store = new RecordingUsageStore();
@@ -76,7 +76,7 @@ class ReportExplainerTest {
   }
 
   private static ModelGateway replying(String output) {
-    return request -> new ModelExchange(Outcome.COMPLETED, "claude-opus-5", output, 900, 120);
+    return request -> new ModelExchange(Outcome.COMPLETED, "claude-opus-5-5", output, 900, 120);
   }
 
   private static String sentence(String text, String... findings) {
@@ -142,7 +142,7 @@ class ReportExplainerTest {
     AtomicReference<ModelRequest> sent = new AtomicReference<>();
     model(request -> {
       sent.set(request);
-      return new ModelExchange(Outcome.COMPLETED, "claude-opus-5",
+      return new ModelExchange(Outcome.COMPLETED, "claude-opus-5-5",
           sentence("The written offer needs review.", "review-status"), 900, 120);
     }).explain("case-1", report());
 

@@ -42,7 +42,7 @@ class ModelReleaseCheckTest {
   @Test void theShippedConfigurationDoesNotEnableAModelPathWithUnmetObligations() throws Exception {
     var settings = ModelSettings.from(shippedEnvironment());
     assertThat(settings.provider()).isEqualTo(ModelProvider.ANTHROPIC);
-    assertThat(settings.modelId()).isEqualTo("claude-opus-5");
+    assertThat(settings.modelId()).isEqualTo("claude-opus-5-5");
     var shipped = ModelObligations.shipped(JSON);
     if (settings.enabled()) {
       assertThat(ModelRolloutGate.unmet(settings, shipped, List.of(), System::getenv)).isEmpty();

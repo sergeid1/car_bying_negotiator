@@ -11,7 +11,7 @@ import java.util.Locale;
  * @param endpointOverrides settings that would redirect the SDK away from the vendor's own endpoint
  */
 public enum ModelProvider {
-  ANTHROPIC("anthropic-messages-api", "claude-opus-5",
+  ANTHROPIC("anthropic-messages-api", "claude-opus-5-5",
       List.of("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "anthropic.apiKey", "anthropic.authToken"),
       List.of("ANTHROPIC_BASE_URL", "anthropic.baseUrl")),
   OPENAI("openai-responses-api", "gpt-6-astra",

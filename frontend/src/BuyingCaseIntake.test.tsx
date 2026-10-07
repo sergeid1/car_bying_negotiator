@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import { BuyingCaseIntake } from "./BuyingCaseIntake";
+import { AccountSignedInContext } from "./BuyerAccount";
 
 const OPTIONS = {
   supported: ["US-NC"],
@@ -21,11 +22,11 @@ function stubApi(replies: { cases?: Reply[]; evidence?: Reply[]; resolution?: Re
     evidence: [...(replies.evidence ?? [])],
     resolution: [...(replies.resolution ?? [])],
   };
-  const calls: { url: string; body?: unknown }[] = [];
+  const calls: { url: string; body?: unknown; headers?: Record<string, string> }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
-    calls.push({ url, body });
+    calls.push({ url, body, headers: init?.headers as Record<string, string> | undefined });
     let reply: Reply | undefined;
     if (url.endsWith("/intake-options")) reply = { body: OPTIONS };
     else if (url.includes("/resolution")) reply = queues.resolution.shift();
@@ -78,6 +79,38 @@ test("a case is created from entered location and vehicle, with service processi
   const evidence = calls.find(call => call.url.includes("/vehicle-evidence"))?.body as Record<string, any>;
   expect(evidence.vin).toBe("1HGCM82633A004352");
   expect(evidence.confirmed).toBe(true);
+});
+
+test("a signed-in Buyer is told the case will be saved to the account before it is created", async () => {
+  const calls = stubApi({ cases: [{ body: { ...CREATED, savedToAccount: true } }], evidence: [{ body: CLEAN_EVIDENCE }] });
+  const saved = vi.fn();
+  render(<AccountSignedInContext.Provider value={true}>
+    <BuyingCaseIntake onCaseOpened={vi.fn()} onSavedToAccount={saved} />
+  </AccountSignedInContext.Provider>);
+  expect(screen.getByRole("note")).toHaveTextContent("this case will be saved to your Buyer Account");
+  const user = userEvent.setup();
+  await waitFor(() => expect(screen.getByText(/north carolina/i)).toBeInTheDocument());
+  await fillRequiredFields(user);
+  await user.click(screen.getByRole("button", { name: /start my case/i }));
+  await waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
+  expect(calls.find(call => call.url.endsWith("/api/v1/cases"))?.headers?.["Account-Request"]).toBe("1");
+});
+
+test("a signed-out Buyer is told no account is required and the case is not saved to one", async () => {
+  const calls = stubApi({ cases: [{ body: CREATED }], evidence: [{ body: CLEAN_EVIDENCE }] });
+  const saved = vi.fn();
+  render(<AccountSignedInContext.Provider value={false}>
+    <BuyingCaseIntake onCaseOpened={vi.fn()} onSavedToAccount={saved} />
+  </AccountSignedInContext.Provider>);
+  expect(screen.getByRole("note")).toHaveTextContent("No account is required");
+  expect(screen.getByRole("link", { name: "sign in with a Buyer Account" })).toHaveAttribute("href", "#buyer-account");
+  const user = userEvent.setup();
+  await waitFor(() => expect(screen.getByText(/north carolina/i)).toBeInTheDocument());
+  await fillRequiredFields(user);
+  await user.click(screen.getByRole("button", { name: /start my case/i }));
+  await waitFor(() => expect(calls.some(call => call.url.includes("/vehicle-evidence"))).toBe(true));
+  expect(calls.find(call => call.url.endsWith("/api/v1/cases"))?.headers?.["Account-Request"]).toBeUndefined();
+  expect(saved).not.toHaveBeenCalled();
 });
 
 test("manual vehicle details are sent when the Buyer has no VIN", async () => {

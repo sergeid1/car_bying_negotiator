@@ -79,6 +79,26 @@ case opened by its link. The case link keeps working. A case belongs to at most 
 (409 `CASE_ATTACHED_ELSEWHERE`). Case expiry or deletion removes the attachment first
 (`CaseGraphDeletionPlan`).
 
+`POST /api/v1/cases` saves the new case to the account at creation when the request carries the
+session cookie and `Account-Request: 1`; the response's `savedToAccount` says whether it did. The
+intake sends the header only when the Buyer is signed in, and says so before the case is created.
+Without the header, or with an ended session, the case is created unattached exactly as before.
+
+`GET /api/v1/account` lists each attached case with its state, the date it started and, when known,
+the vehicle (year, make, model and trim, or the last six VIN characters) and the dealer (the
+listing's dealer name, or the dealer ZIP). `POST /api/v1/account/cases/{caseId}/open` opens an
+attached case for the current session. A case attached to another account, an unknown case, and a
+revoked, expired, deleted or deletion-pending case all get the same 404 `CASE_UNAVAILABLE`.
+
+Opening never returns the case link. It returns an account case pass, `acct.<caseId>.<expiry>.<mac>`,
+which the client sends as `Case-Access-Token` and keeps only in memory. The MAC binds the pass to
+the case, its current case-link hash and the session, so a pass is accepted only on a request
+that also carries that session's cookie, while the session is active, the account is active and
+the case is still attached to it. It expires after `account.case-pass.lifetime` (default eight
+hours), or earlier with the session or the case. Signing out, session expiry and account deletion
+therefore end access through the account at once, and the case link keeps working for a case that
+is not being deleted. Nothing about a pass is stored server-side.
+
 ## Export and deletion
 
 `POST /api/v1/account/export` returns a ZIP built on request and never stored: `account.json`

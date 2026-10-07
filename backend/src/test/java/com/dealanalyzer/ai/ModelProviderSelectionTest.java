@@ -23,7 +23,7 @@ class ModelProviderSelectionTest {
     var defaults = ModelSettings.from(new MockEnvironment());
     assertThat(defaults.enabled()).isFalse();
     assertThat(defaults.provider()).isEqualTo(ModelProvider.ANTHROPIC);
-    assertThat(defaults.modelId()).isEqualTo("claude-opus-5");
+    assertThat(defaults.modelId()).isEqualTo("claude-opus-5-5");
 
     var openAi = ModelSettings.from(new MockEnvironment().withProperty("ai.model.provider", "openai"));
     assertThat(openAi.provider()).isEqualTo(ModelProvider.OPENAI);
@@ -36,6 +36,21 @@ class ModelProviderSelectionTest {
     var explicit = ModelSettings.from(new MockEnvironment()
         .withProperty("ai.model.provider", "openai").withProperty("ai.model.id", "gpt-6.1-sol"));
     assertThat(explicit.modelId()).isEqualTo("gpt-6.1-sol");
+  }
+
+  @Test void anthropicPricesTheNewDefaultAndAnExplicitlyPinnedPreviousModel() {
+    var defaults = ModelSettings.from(new MockEnvironment());
+    assertThat(ModelPricing.costUsd(defaults.provider(), defaults.modelId(), 1_000_000, 0))
+        .hasValueSatisfying(cost -> assertThat(cost).isEqualByComparingTo("4.00"));
+    assertThat(ModelPricing.costUsd(defaults.provider(), defaults.modelId(), 0, 1_000_000))
+        .hasValueSatisfying(cost -> assertThat(cost).isEqualByComparingTo("20.00"));
+
+    var pinned = ModelSettings.from(new MockEnvironment().withProperty("ai.model.id", "claude-opus-5"));
+    assertThat(pinned.modelId()).isEqualTo("claude-opus-5");
+    assertThat(ModelPricing.costUsd(pinned.provider(), pinned.modelId(), 1_000_000, 0))
+        .hasValueSatisfying(cost -> assertThat(cost).isEqualByComparingTo("5.00"));
+    assertThat(ModelPricing.costUsd(pinned.provider(), pinned.modelId(), 0, 1_000_000))
+        .hasValueSatisfying(cost -> assertThat(cost).isEqualByComparingTo("25.00"));
   }
 
   @Test void anUnknownProviderFailsStartup() {

@@ -35,6 +35,7 @@ public class BuyerAccountService {
   private final Duration linkLifetime;
   private final Duration sessionLifetime;
   private final int maxActiveLinks;
+  private final Duration casePassLifetime;
 
   BuyerAccountService(BuyerAccountRepository accounts, SignInLinkRepository links, AccountSessionRepository sessions,
       AccountCaseRepository attachments, ContactProtection protection, CaseAccessService secrets,
@@ -42,17 +43,23 @@ public class BuyerAccountService {
       @Value("${case.recovery.public-url:http://localhost:5173/}") String origin,
       @Value("${account.sign-in.link-lifetime:PT15M}") Duration linkLifetime,
       @Value("${account.session.lifetime:PT336H}") Duration sessionLifetime,
-      @Value("${account.sign-in.max-active-links:3}") int maxActiveLinks) {
+      @Value("${account.sign-in.max-active-links:3}") int maxActiveLinks,
+      @Value("${account.case-pass.lifetime:PT8H}") Duration casePassLifetime) {
     if (maxActiveLinks < 1) throw new IllegalArgumentException("account.sign-in.max-active-links must be positive");
     this.accounts = accounts; this.links = links; this.sessions = sessions; this.attachments = attachments;
     this.protection = protection; this.secrets = secrets; this.caseLifecycle = caseLifecycle; this.email = email;
     this.origin = origin; this.linkLifetime = linkLifetime; this.sessionLifetime = sessionLifetime;
     this.maxActiveLinks = maxActiveLinks; this.enrollment = enrollment;
     this.emailLimits = emailLimits;
+    this.casePassLifetime = casePassLifetime;
   }
 
   public record Session(String sessionToken, Instant expiresAt) {}
-  public record AttachedCase(String caseId, Instant attachedAt, String state) {}
+  /** {@code vehicle} and {@code dealer} are null until the case knows them. */
+  public record AttachedCase(String caseId, Instant attachedAt, String state, Instant startedAt, String vehicle,
+      String dealer) {}
+  /** A session-bound pass for one attached case; it is not a case link and ends with the session. */
+  public record OpenedCase(String caseId, String accessToken, Instant accessExpiresAt) {}
   public record AccountView(Contact contact, Instant createdAt, Instant sessionExpiresAt, List<AttachedCase> cases) {}
 
   /** Creates the account on first request; either way, emails a single-use sign-in link. */
@@ -142,6 +149,58 @@ public class BuyerAccountService {
     return view(sessionToken);
   }
 
+  /**
+   * Attaches a case the signed-in Buyer just created. Returns false, leaving the case unattached
+   * and its case link working, when the session has ended or the account is not active.
+   */
+  @Transactional
+  public boolean attachCreated(String sessionToken, String caseId, String caseToken) {
+    AccountSessionEntity session;
+    try { session = requireSession(sessionToken); } catch (AccountProblem ended) { return false; }
+    var account = accounts.findLockedById(session.accountId).orElse(null);
+    if (account == null || !"ACTIVE".equals(account.lifecycle)) return false;
+    caseLifecycle.requireCaseLink(caseId, caseToken);
+    var existing = attachments.findById(caseId).orElse(null);
+    if (existing != null) return existing.accountId.equals(session.accountId);
+    var attachment = new AccountCaseEntity(caseId);
+    attachment.accountId = session.accountId; attachment.attachedAt = Instant.now();
+    attachments.saveAndFlush(attachment);
+    return true;
+  }
+
+  /**
+   * Opens an attached case for this session without its case link. A case attached to another
+   * account, or one that is revoked, expired or being deleted, is the same 404 outcome.
+   */
+  @Transactional(readOnly = true)
+  public OpenedCase open(String sessionToken, String caseId) {
+    var session = requireSession(sessionToken);
+    var account = accounts.findById(session.accountId).orElseThrow(BuyerAccountService::sessionEnded);
+    if (!"ACTIVE".equals(account.lifecycle)) throw sessionEnded();
+    var attachment = attachments.findById(caseId).orElse(null);
+    if (attachment == null || !attachment.accountId.equals(session.accountId)) throw caseUnavailable();
+    Instant notAfter = Instant.now().plus(casePassLifetime);
+    if (session.expiresAt.isBefore(notAfter)) notAfter = session.expiresAt;
+    try {
+      var pass = caseLifecycle.issueAccountPass(caseId, session.tokenHash, notAfter);
+      return new OpenedCase(caseId, pass.token(), pass.expiresAt());
+    } catch (com.dealanalyzer.buyingcase.ResourceNotFoundException unavailable) { throw caseUnavailable(); }
+  }
+
+  /**
+   * The protected hash of {@code sessionToken} when it is an active session of an active account
+   * that {@code caseId} is attached to; otherwise null.
+   */
+  @Transactional(readOnly = true)
+  public String admittedSessionHash(String sessionToken, String caseId) {
+    AccountSessionEntity session;
+    try { session = requireSession(sessionToken); } catch (AccountProblem ended) { return null; }
+    var account = accounts.findById(session.accountId).orElse(null);
+    if (account == null || !"ACTIVE".equals(account.lifecycle)) return null;
+    var attachment = attachments.findById(caseId).orElse(null);
+    return attachment != null && attachment.accountId.equals(session.accountId) ? session.tokenHash : null;
+  }
+
   @Transactional
   public void signOut(String sessionToken, boolean everywhere) {
     var session = requireSession(sessionToken);
@@ -166,11 +225,36 @@ public class BuyerAccountService {
   }
 
   List<AttachedCase> attachedCases(String accountId) {
-    return attachments.findByAccountIdOrderByAttachedAt(accountId).stream()
-        .map(a -> new AttachedCase(a.caseId, a.attachedAt, caseLifecycle.state(a.caseId))).toList();
+    var rows = attachments.findByAccountIdOrderByAttachedAt(accountId);
+    var summaries = caseLifecycle.summaries(rows.stream().map(a -> a.caseId).toList());
+    return rows.stream().map(a -> {
+      var summary = summaries.get(a.caseId);
+      return new AttachedCase(a.caseId, a.attachedAt, caseLifecycle.state(a.caseId),
+          summary == null ? null : summary.startedAt(), vehicle(summary), dealer(summary));
+    }).toList();
+  }
+
+  private static String vehicle(AccountCaseLifecycle.CaseSummary summary) {
+    if (summary == null) return null;
+    var words = new java.util.ArrayList<String>();
+    if (summary.vehicleYear() != null) words.add(summary.vehicleYear().toString());
+    for (var word : new String[] {summary.vehicleMake(), summary.vehicleModel(), summary.vehicleTrim()})
+      if (word != null && !word.isBlank()) words.add(word.strip());
+    if (!words.isEmpty()) return String.join(" ", words);
+    return summary.vinLastSix() == null ? null : "VIN ending " + summary.vinLastSix();
+  }
+
+  private static String dealer(AccountCaseLifecycle.CaseSummary summary) {
+    if (summary == null) return null;
+    if (summary.dealerName() != null && !summary.dealerName().isBlank()) return summary.dealerName().strip();
+    return summary.dealerLocation() == null ? null : "Dealer ZIP " + summary.dealerLocation();
   }
 
   private static String blankToNull(String value) { return value == null || value.isBlank() ? null : value.strip(); }
+  private static AccountProblem caseUnavailable() {
+    return new AccountProblem(HttpStatus.NOT_FOUND, "CASE_UNAVAILABLE",
+        "This Buying Case cannot be opened from your account. It may have expired or be being deleted.");
+  }
   static AccountProblem sessionEnded() { return new AccountProblem(HttpStatus.UNAUTHORIZED, "SESSION_ENDED", SESSION_ENDED); }
   private static AccountProblem unknownLink() {
     return new AccountProblem(HttpStatus.NOT_FOUND, "SIGN_IN_LINK_UNKNOWN",

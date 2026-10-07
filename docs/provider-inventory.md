@@ -35,6 +35,11 @@ providers, and each one adds contractual and privacy obligations this table cann
 | Human review | Internal queue behind separate consent | Redacted fields | None |
 | Model calls | `AnthropicModelGateway` or `OpenAiModelGateway` through the [AI execution harness](ai-execution-harness.md), one per deployment (`ai.model.provider`); disabled (`ai.model.enabled=false`) | Not while disabled; would send normalized page images and recognized text | Anthropic or OpenAI, once enabled — **terms unexecuted for both** |
 
+The Anthropic default model is `claude-opus-5-5`, priced at $4 input / $20 output per million
+tokens, with `output_config.effort=high`. Explicitly pinned `claude-opus-5` remains priced at
+$5 / $25. Both remain disabled unless the provider's terms are executed and the configured model
+has its own passing shadow comparison under the AI execution harness's rollout gate.
+
 ## Market and listing readiness
 
 Declare every pilot or production deployment with `SPRING_PROFILES_ACTIVE=pilot` or

@@ -83,6 +83,8 @@ public final class AnthropicModelGateway implements ModelGateway {
         .maxTokens(request.maxOutputTokens())
         .system(UntrustedFraming.instructions(request.instructions()))
         .outputConfig(OutputConfig.builder()
+            // Preserve Opus 5's default depth when using Opus 5.5, whose default effort is medium.
+            .effort(OutputConfig.Effort.HIGH)
             .format(JsonOutputFormat.builder().schema(schema.build()).build())
             .build())
         .addUserMessageOfBlockParams(blocks(request.inputs()))
