@@ -12,6 +12,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+// CI supplies one shared PostgreSQL database to this and SchemaAndOrmEvidenceTest.
+@org.junit.jupiter.api.Tag("serial")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = {
     "spring.datasource.url=${HARDENING_DATABASE_URL:jdbc:h2:mem:hardening;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE}",
     "case.access.pepper=hardening-test-pepper-at-least-thirty-two-bytes",

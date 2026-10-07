@@ -36,6 +36,8 @@ import org.springframework.core.env.Environment;
  * runs ddl-auto=validate; the assertions then record migrations, constraints, ownership and fetch
  * rules, and prove no configuration lets Hibernate generate a schema instead.
  */
+// CI supplies one shared PostgreSQL database to this and PersistenceHardeningTest.
+@org.junit.jupiter.api.Tag("serial")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = {
     "spring.datasource.url=${HARDENING_DATABASE_URL:jdbc:h2:mem:readiness;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE}",
     "case.access.pepper=readiness-test-pepper-at-least-thirty-two-bytes",

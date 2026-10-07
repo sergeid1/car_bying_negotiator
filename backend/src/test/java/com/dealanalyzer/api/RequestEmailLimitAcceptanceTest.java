@@ -43,6 +43,7 @@ class RequestEmailLimitAcceptanceTest {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("peer", false, EmailConfiguration.class, KEY)) {
       var gate = new CountDownLatch(1);
       var results = new ArrayList<Reply>();
+      long retryCeiling;
       try (var executor = Executors.newFixedThreadPool(12)) {
         var attempts = new ArrayList<java.util.concurrent.Future<Reply>>();
         for (int i = 0; i < 12; i++) {
@@ -53,14 +54,19 @@ class RequestEmailLimitAcceptanceTest {
                 null, "192.0.2." + n);
           }));
         }
+        long burstStarted = System.nanoTime();
         gate.countDown();
         for (var attempt : attempts) results.add(attempt.get());
+        // Requests sample time before the quota lock, so timestamp order can differ from lock
+        // order. A conservative Retry-After may include that measured skew, rounded up to seconds.
+        long burstNanos = System.nanoTime() - burstStarted;
+        retryCeiling = 900L + (burstNanos + 999_999_999L) / 1_000_000_000L;
       }
       assertThat(results.stream().filter(r -> r.status == 202)).hasSize(5);
       assertThat(results.stream().filter(r -> r.status == 429)).hasSize(7);
       assertThat(results.stream().filter(r -> r.status == 202).map(Reply::body).distinct()).hasSize(1);
       for (var result : results.stream().filter(r -> r.status == 429).toList()) {
-        assertThat(Long.parseLong(result.retryAfter)).isBetween(1L, 900L);
+        assertThat(Long.parseLong(result.retryAfter)).isBetween(1L, retryCeiling);
         assertThat(result.body).doesNotContain("private-", "192.0.2", "@");
       }
       assertThat(sent).hasSize(5);
