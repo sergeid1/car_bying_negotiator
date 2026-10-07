@@ -75,7 +75,7 @@ public class MailboxConnections {
   /** A connection locked for one send. */
   record Connection(String id, String accountId, MailboxProvider provider) {}
 
-  /** What a send needs from the connection, read outside the case lock. */
+  /** Prepared outside the case lock; dispatch must still verify the connection under its locks. */
   record Sendable(String accessToken, String address) {
     @Override public String toString() { return "Sendable[redacted]"; }
   }
@@ -91,7 +91,8 @@ public class MailboxConnections {
     return transaction.execute(status -> {
       accounts.lockActiveAccount(accountId);
       Instant now = PersistedInstant.round(Instant.now());
-      jdbc.update("delete from mailbox_authorizations where account_id = ? and expires_at <= ?", accountId, Timestamp.from(now));
+      jdbc.update("update buyer_accounts set mailbox_generation = mailbox_generation + 1 where id = ?", accountId);
+      jdbc.update("delete from mailbox_authorizations where account_id = ?", accountId);
       String state = secret(), verifier = secret(), stateHash = stateHash(state);
       jdbc.update("""
           insert into mailbox_authorizations (state_hash, account_id, provider, verifier_ciphertext, created_at, expires_at)
@@ -105,12 +106,13 @@ public class MailboxConnections {
   /**
    * Completes connecting with the provider's code. The state must be this account's, unexpired and unused; it is
    * consumed either way. A grant without the send permission, or with any scope beyond send and the sending
-   * address (such as reading mail), is withdrawn and refused. A new connection replaces an earlier one.
+   * address (such as reading mail), is withdrawn and refused. Only the latest authorization generation may
+   * persist; disconnect invalidates even an exchange already in progress. A new connection replaces an earlier one.
    */
   public MailboxView complete(String session, String state, String code) {
     if (state == null || state.isBlank() || state.length() > 200 || code == null || code.isBlank() || code.length() > 4096)
       throw authorizationUnknown();
-    record Pending(String accountId, MailboxProvider provider, String verifier) {}
+    record Pending(String accountId, MailboxProvider provider, String verifier, long generation) {}
     Pending pending = transaction.execute(status -> {
       String accountId = accounts.accountId(session);
       accounts.lockActiveAccount(accountId);
@@ -120,7 +122,7 @@ public class MailboxConnections {
       jdbc.update("delete from mailbox_authorizations where state_hash = ? and account_id = ?", hash, accountId);
       if (rows.isEmpty() || !((Instant) rows.getFirst()[2]).isAfter(Instant.now())) return null;
       return new Pending(accountId, MailboxProvider.valueOf((String) rows.getFirst()[0]),
-          protection.decrypt(hash, VERIFIER, (String) rows.getFirst()[1]));
+          protection.decrypt(hash, VERIFIER, (String) rows.getFirst()[1]), generation(accountId));
     });
     if (pending == null) throw authorizationUnknown();
     MailboxSender sender = sender(pending.provider());
@@ -135,43 +137,54 @@ public class MailboxConnections {
               pending.provider().label() + " did not confirm the connection, so nothing was connected. Try again.");
     }
     if (!pending.provider().sendOnly(grant.scopes())) {
-      sender.revoke(grant.refreshToken());
+      revokeQuietly(pending.provider(), grant.refreshToken());
       throw new MailboxProblem(HttpStatus.BAD_REQUEST, "READ_SCOPE_REFUSED", "The permission you granted would let Deal X-Ray "
           + "read your email. It never needs that, so nothing was connected. Connect again and allow sending only.");
     }
     if (!pending.provider().grantsSend(grant.scopes())) {
-      sender.revoke(grant.refreshToken());
+      revokeQuietly(pending.provider(), grant.refreshToken());
       throw new MailboxProblem(HttpStatus.BAD_REQUEST, "SEND_SCOPE_MISSING", "Sending email was not allowed, so nothing "
           + "was connected. Connect again and allow Deal X-Ray to send email.");
     }
-    String previousRefresh = transaction.execute(status -> {
-      accounts.lockActiveAccount(pending.accountId());
-      String previous = current(pending.accountId())
-          .map(row -> protection.decrypt(row.id(), REFRESH, row.refreshCiphertext())).orElse(null);
-      jdbc.update("delete from mailbox_connections where account_id = ?", pending.accountId());
-      String id = UUID.randomUUID().toString();
-      jdbc.update("""
-          insert into mailbox_connections (id, account_id, provider, address_ciphertext, granted_scope, refresh_token_ciphertext,
-            access_token_ciphertext, access_expires_at, connected_at)
-          values (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          """, id, pending.accountId(), pending.provider().name(), protection.encrypt(id, ADDRESS, grant.address()),
-          String.join(" ", new TreeSet<>(grant.scopes())), protection.encrypt(id, REFRESH, grant.refreshToken()),
-          grant.accessToken() == null || grant.accessToken().isBlank() ? null : protection.encrypt(id, ACCESS, grant.accessToken()),
-          grant.accessExpiresAt() == null ? null : Timestamp.from(grant.accessExpiresAt()),
-          Timestamp.from(PersistedInstant.round(Instant.now())));
-      return previous;
-    });
-    if (previousRefresh != null) revokeQuietly(pending.provider(), previousRefresh);
+    record Previous(MailboxProvider provider, String refresh) {}
+    Previous previousRefresh;
+    try {
+      previousRefresh = transaction.execute(status -> {
+        accounts.lockActiveAccount(pending.accountId());
+        if (generation(pending.accountId()) != pending.generation()) throw authorizationUnknown();
+        Previous previous = current(pending.accountId())
+            .map(row -> new Previous(row.provider(), protection.decrypt(row.id(), REFRESH, row.refreshCiphertext()))).orElse(null);
+        jdbc.update("delete from mailbox_connections where account_id = ?", pending.accountId());
+        String id = UUID.randomUUID().toString();
+        jdbc.update("""
+            insert into mailbox_connections (id, account_id, provider, address_ciphertext, granted_scope, refresh_token_ciphertext,
+              access_token_ciphertext, access_expires_at, connected_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, id, pending.accountId(), pending.provider().name(), protection.encrypt(id, ADDRESS, grant.address()),
+            String.join(" ", new TreeSet<>(grant.scopes())), protection.encrypt(id, REFRESH, grant.refreshToken()),
+            grant.accessToken() == null || grant.accessToken().isBlank() ? null : protection.encrypt(id, ACCESS, grant.accessToken()),
+            grant.accessExpiresAt() == null ? null : Timestamp.from(grant.accessExpiresAt()),
+            Timestamp.from(PersistedInstant.round(Instant.now())));
+        return previous;
+      });
+    } catch (RuntimeException failure) {
+      revokeQuietly(pending.provider(), grant.refreshToken());
+      throw failure;
+    }
+    if (previousRefresh != null) revokeQuietly(previousRefresh.provider(), previousRefresh.refresh());
     return transaction.execute(status -> view(pending.accountId(), true));
   }
 
-  /** Disconnects: the tokens are deleted at once, so no later send can use them, then the grant is withdrawn. */
+  /** Disconnect commits a fence against prepared sends and pending callbacks, then withdraws the grant.
+   * An already-dispatched provider call holds the account lock until it returns and cannot be recalled. */
   public MailboxView disconnect(String session) {
     record Removed(String accountId, MailboxProvider provider, String refresh) {}
     Removed removed = transaction.execute(status -> {
       String accountId = accounts.accountId(session);
       accounts.lockActiveAccount(accountId);
       var row = lockedRow(accountId);
+      jdbc.update("update buyer_accounts set mailbox_generation = mailbox_generation + 1 where id = ?", accountId);
+      jdbc.update("delete from mailbox_authorizations where account_id = ?", accountId);
       jdbc.update("delete from mailbox_connections where account_id = ?", accountId);
       return new Removed(accountId, row.map(StoredConnection::provider).orElse(null),
           row.map(r -> protection.decrypt(r.id(), REFRESH, r.refreshCiphertext())).orElse(null));
@@ -205,6 +218,15 @@ public class MailboxConnections {
     var sender = senders.get(provider);
     if (sender == null) throw unavailable();
     return sender;
+  }
+
+  /** Called with the account and case locks held, immediately before provider dispatch. */
+  boolean stillConnected(Connection connection) {
+    return lockedRow(connection.accountId()).map(row -> row.id().equals(connection.id())).orElse(false);
+  }
+
+  private long generation(String accountId) {
+    return jdbc.queryForObject("select mailbox_generation from buyer_accounts where id = ?", Long.class, accountId);
   }
 
   /**

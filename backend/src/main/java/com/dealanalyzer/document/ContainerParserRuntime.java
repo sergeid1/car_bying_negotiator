@@ -10,6 +10,8 @@ import org.springframework.core.env.Environment;
 
 /** Trusted launcher configuration; documents cannot supply an image, mount or runtime option. */
 final class ContainerParserRuntime {
+  private static final Duration REMOVAL_DEADLINE = Duration.ofSeconds(10);
+  private static final Duration REMOVAL_POLL = Duration.ofMillis(100);
   private final String executable;
   private final String endpoint;
   private final String image;
@@ -53,13 +55,13 @@ final class ContainerParserRuntime {
     boolean interrupted = Thread.interrupted();
     try {
       if (!cleanup.waitFor(5, TimeUnit.SECONDS)) throw new IOException("Parser runtime cleanup timed out");
-      // Auto-removal can win this race. Verify absence instead of trusting rm's exit code.
-      Process check = DocumentParserProcess.start(List.of(executable, "--host", endpoint,
-          "ps", "--all", "--quiet", "--filter", "name=^/" + name + "$"), directory);
-      try {
-        if (!check.waitFor(5, TimeUnit.SECONDS) || check.exitValue() != 0
-            || check.getInputStream().read() != -1) throw new IOException("Parser removal could not be verified");
-      } finally { check.destroyForcibly(); }
+      // Auto-removal can win this race and still be in progress, so neither rm's exit code nor a single listing
+      // is reliable. Poll until the container is gone; one still listed at the deadline keeps the slot closed.
+      long deadline = System.nanoTime() + REMOVAL_DEADLINE.toNanos();
+      while (listed(name, directory)) {
+        if (System.nanoTime() - deadline >= 0) throw new IOException("Parser removal could not be verified");
+        Thread.sleep(REMOVAL_POLL.toMillis());
+      }
     } catch (InterruptedException stopped) {
       interrupted = true;
       throw new IOException("Parser runtime cleanup interrupted");
@@ -67,5 +69,16 @@ final class ContainerParserRuntime {
       cleanup.destroyForcibly();
       if (interrupted) Thread.currentThread().interrupt();
     }
+  }
+
+  private boolean listed(String name, Path directory) throws IOException, InterruptedException {
+    Process check = DocumentParserProcess.start(List.of(executable, "--host", endpoint,
+        "ps", "--all", "--quiet", "--filter", "name=^/" + name + "$"), directory);
+    try {
+      if (!check.waitFor(5, TimeUnit.SECONDS) || check.exitValue() != 0) {
+        throw new IOException("Parser removal could not be verified");
+      }
+      return check.getInputStream().read() != -1;
+    } finally { check.destroyForcibly(); }
   }
 }

@@ -10,15 +10,20 @@ that the intended invalidation currently fails.
 
 **Blocked by:** None; use the existing account/case acceptance harness.
 
-**Status:** ready-for-agent — missing executable evidence for existing admission logic.
+**Status:** complete — no migration, as of 2026-10-07. `AccountCaseOpeningAcceptanceTest` proves an account case pass
+stops working after the case's attachment is removed, after verified recovery rotates the case link and at its own
+expiry (zero lifetime), while the session and case stay active; a fresh pass and the rotated link work. Another
+session, account or case, and altered or malformed fields, fail on reads and writes with the unknown-case 404. One
+defect found and fixed: an out-of-range expiry made `CaseAccessService` throw instead of refusing; it now returns the
+same 404. Detachment is tested at the persistence seam; there is still no public detach feature.
 
-- [ ] Issue a pass, remove the attachment through the available lifecycle seam, and verify replay
+- [x] Issue a pass, remove the attachment through the available lifecycle seam, and verify replay
   fails with the same unavailable response as an unknown case; do not add a new public detach feature.
-- [ ] Issue a pass, rotate the case link through verified case recovery, and prove the old pass fails
+- [x] Issue a pass, rotate the case link through verified case recovery, and prove the old pass fails
   with the original active cookie; a newly opened pass and new case link work.
-- [ ] Exercise the pass's own expiry while the case/session remain active, including altered expiry
+- [x] Exercise the pass's own expiry while the case/session remain active, including altered expiry
   and malformed pass fields, without sleeping for the default lifetime.
-- [ ] Cover account/session substitution and case-isolation behavior on reads and writes using passes;
+- [x] Cover account/session substitution and case-isolation behavior on reads and writes using passes;
   preserve the existing case-link route and sign-out semantics.
-- [ ] Update the threat model with executable class names; fix any discovered admission defect within
+- [x] Update the threat model with executable class names; fix any discovered admission defect within
   this ticket and report the behavior change.

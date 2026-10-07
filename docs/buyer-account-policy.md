@@ -98,6 +98,8 @@ the case is still attached to it. It expires after `account.case-pass.lifetime` 
 hours), or earlier with the session or the case. Signing out, session expiry and account deletion
 therefore end access through the account at once, and the case link keeps working for a case that
 is not being deleted. Nothing about a pass is stored server-side.
+Malformed pass fields, including expiry values outside the supported timestamp range, receive
+the same unavailable 404 response as an unknown case on case reads and writes.
 
 ## Export and deletion
 
@@ -145,6 +147,22 @@ every `account.notifications.mandate-expiring-sweep` (default `PT5M`). A mandate
 lifetime fits inside the notice window gets no warning. The other producers arrive with tickets
 60, 61 and 65. Account export includes preferences and delivery states, and account deletion
 removes both notification tables.
+
+## Mailbox lifecycle
+
+Mailbox lifecycle (ticket 90): starting a new OAuth attempt supersedes every earlier attempt.
+Disconnect removes pending authorization rows and increments the account's mailbox generation,
+even when no connection exists. A callback exchanging outside the transaction must recheck that
+generation and the active account before storing a grant. A superseded, disconnected or deleted
+account's newly exchanged grant is withdrawn through its provider; withdrawal failure never
+restores local tokens. Replacement withdraws the previous grant through the previous provider.
+
+At send dispatch, the service locks the active account, case and exact connection in that order,
+rechecks current sending permission, and holds those locks through the provider call. Disconnect
+and account deletion that commit first prevent a prepared token from being dispatched. If dispatch
+wins, disconnect/deletion waits for the provider call to return: that call cannot be recalled.
+Provider withdrawal remains best effort, and email already delivered remains with its recipients.
+`ConnectedMailboxAcceptanceTest` exercises these boundaries with latches and fake providers.
 
 ## Buying Journeys
 

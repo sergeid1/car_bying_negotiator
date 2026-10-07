@@ -36,6 +36,206 @@ class ConnectedMailboxAcceptanceTest {
 
   record Result(int status, JsonNode body) {}
 
+  @org.springframework.boot.test.context.TestConfiguration
+  @org.springframework.context.annotation.Import({AgreedPriceAcceptanceTest.Configuration.class,
+      com.dealanalyzer.mailbox.MailboxLifecycleTestProbe.class})
+  static class LifecycleConfiguration {}
+
+  /** No timing guesses: the adapter stops at a boundary until the competing write has committed. */
+  private static final class Boundary implements Runnable {
+    final java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);
+    final java.util.concurrent.CountDownLatch resume = new java.util.concurrent.CountDownLatch(1);
+    @Override public void run() {
+      entered.countDown();
+      await(resume);
+    }
+    void reached() { await(entered); }
+    void release() { resume.countDown(); }
+    private static void await(java.util.concurrent.CountDownLatch latch) {
+      try { assertThat(latch.await(30, java.util.concurrent.TimeUnit.SECONDS)).isTrue(); }
+      catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new AssertionError(interrupted); }
+    }
+  }
+
+  @Test void lifecycleFencesExchangeRefreshAndDispatch() throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("mailbox-fences", true,
+        LifecycleConfiguration.class, "--case.deletion.delay=PT1H",
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef",
+        "--mailbox.token-encryption-key=" + MAILBOX_KEY);
+        var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+      var client = app.client();
+      var jdbc = app.context().getBean(JdbcTemplate.class);
+      var gmail = app.context().getBean("fakeGmail", FakeMailboxSender.class);
+      var outlook = app.context().getBean("fakeOutlook", FakeMailboxSender.class);
+      String session = signIn(client, "fences@example.com");
+
+      // Disconnect clears unused state, even with no connection.
+      var unused = start(client, session, "GOOGLE");
+      assertThat(call(client, "DELETE", "/api/v1/account/mailbox/connection", null, null, session).status()).isEqualTo(200);
+      assertThat(complete(client, session, unused.get("state"), unused.get("code")).status()).isEqualTo(400);
+      assertThat(count(jdbc, "mailbox_authorizations")).isZero();
+
+      // Exchange has obtained a grant, but disconnect / a newer start / deletion wins persistence.
+      for (String fence : List.of("disconnect", "supersede", "delete")) {
+        var pending = start(client, session, "GOOGLE");
+        var exchange = new Boundary();
+        gmail.afterExchange(exchange);
+        int withdrawals = gmail.withdrawals();
+        String activeSession = session;
+        var callback = executor.submit(() -> complete(client, activeSession, pending.get("state"), pending.get("code")));
+        exchange.reached();
+        Map<String, String> newer = null;
+        if (fence.equals("supersede")) newer = start(client, session, "MICROSOFT");
+        else if (fence.equals("delete"))
+          assertThat(call(client, "POST", "/api/v1/account/deletion", Map.of(), null, session).status()).isEqualTo(202);
+        else assertThat(call(client, "DELETE", "/api/v1/account/mailbox/connection", null, null, session).status()).isEqualTo(200);
+        gmail.withdrawalFails(true);
+        exchange.release();
+        assertThat(callback.get(30, java.util.concurrent.TimeUnit.SECONDS).status()).isIn(400, 401);
+        gmail.afterExchange(() -> {});
+        gmail.withdrawalFails(false);
+        assertThat(gmail.withdrawals()).isEqualTo(withdrawals + 1);
+        assertThat(count(jdbc, "mailbox_connections")).isZero();
+        assertThat(count(jdbc, "mailbox_authorizations")).isEqualTo(newer == null ? 0 : 1);
+        if (newer != null) {
+          assertThat(complete(client, session, newer.get("state"), newer.get("code")).status()).isEqualTo(200);
+          call(client, "DELETE", "/api/v1/account/mailbox/connection", null, null, session);
+        }
+      }
+
+      var created = post(client, "/api/v1/cases", validCase(), "fenced-case");
+      String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+      String base = "/api/v1/cases/" + caseId;
+      String dealer = negotiableCase(app, base, caseId, token);
+      session = TestDriveAcceptanceTest.signInAndAttach(client, caseId, token);
+      // Replacements withdraw through the previous provider in both directions.
+      String previousProvider = null;
+      for (String provider : List.of("GOOGLE", "MICROSOFT", "GOOGLE")) {
+        int g = gmail.withdrawals(), m = outlook.withdrawals();
+        var auth = start(client, session, provider);
+        assertThat(complete(client, session, auth.get("state"), auth.get("code")).status()).isEqualTo(200);
+        assertThat(gmail.withdrawals()).isEqualTo(g + ("GOOGLE".equals(previousProvider) ? 1 : 0));
+        assertThat(outlook.withdrawals()).isEqualTo(m + ("MICROSOFT".equals(previousProvider) ? 1 : 0));
+        previousProvider = provider;
+      }
+
+      for (String fence : List.of("disconnect", "prepared", "replacement", "mandate", "delete")) {
+        if (fence.equals("delete")) approveMandate(client, base, token, "after-revocation");
+        if (!fence.equals("disconnect")) {
+          var auth = start(client, session, "GOOGLE");
+          assertThat(complete(client, session, auth.get("state"), auth.get("code")).status()).isEqualTo(200);
+        }
+        String message = handOff(client, base, token, dealer, "sales@dealer.example", "race-" + fence);
+        jdbc.update("update mailbox_connections set access_expires_at = current_timestamp");
+        var refresh = new Boundary();
+        var probe = app.context().getBean(com.dealanalyzer.mailbox.MailboxLifecycleTestProbe.class);
+        if (List.of("prepared", "replacement", "delete").contains(fence)) probe.afterPreparation(refresh);
+        else gmail.afterRefresh(refresh);
+        String activeSession = session;
+        var sending = executor.submit(() -> send(client, base, token, activeSession, message));
+        refresh.reached();
+        switch (fence) {
+          case "mandate" -> post(client, base + "/mandates/" + latestMandate(client, base, token) + "/revocation", Map.of(), "race-revoke", token);
+          case "replacement" -> {
+            var auth = start(client, session, "MICROSOFT");
+            assertThat(complete(client, session, auth.get("state"), auth.get("code")).status()).isEqualTo(200);
+          }
+          case "delete" -> call(client, "POST", "/api/v1/account/deletion", Map.of(), null, session);
+          default -> {
+            gmail.withdrawalFails(true);
+            assertThat(call(client, "DELETE", "/api/v1/account/mailbox/connection", null, null, session).status()).isEqualTo(200);
+            gmail.withdrawalFails(false);
+          }
+        }
+        refresh.release();
+        assertThat(sending.get(30, java.util.concurrent.TimeUnit.SECONDS).status()).isEqualTo(fence.equals("delete") ? 401 : 409);
+        gmail.afterRefresh(() -> {});
+        probe.afterPreparation(() -> {});
+        assertThat(gmail.sent()).isEmpty();
+        assertThat(jdbc.queryForObject("select state from dealer_relay_messages where id = ?", String.class, message)).isEqualTo("HANDED_OFF");
+        assertThat(jdbc.queryForObject("select outcome from mailbox_sends where message_id = ?", String.class, message)).isEqualTo("UNAVAILABLE");
+        assertThat(jdbc.queryForObject("select count(*) from audit_events where case_id = ? and event_type = 'DEALER_MESSAGE_MAILBOX_NOT_SENT'", Long.class, caseId)).isPositive();
+      }
+    }
+  }
+
+  @Test void appointmentReleaseIsRecheckedAndDispatchedSendCannotBeRecalled() throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("mailbox-release", true,
+        LifecycleConfiguration.class, "--case.deletion.delay=PT1H",
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef",
+        "--mailbox.token-encryption-key=" + MAILBOX_KEY);
+        var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+      var client = app.client();
+      var jdbc = app.context().getBean(JdbcTemplate.class);
+      var gmail = app.context().getBean("fakeGmail", FakeMailboxSender.class);
+      var created = post(client, "/api/v1/cases", validCase(), "appointment-case");
+      String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+      String base = "/api/v1/cases/" + caseId, path = base + "/appointment";
+      TestDriveAcceptanceTest.agree(app, client, base, caseId, token);
+      String session = TestDriveAcceptanceTest.signInAndAttach(client, caseId, token);
+      var auth = start(client, session, "GOOGLE");
+      assertThat(complete(client, session, auth.get("state"), auth.get("code")).status()).isEqualTo(200);
+      var day = java.time.LocalDate.now().plusDays(3);
+      var proposal = post(client, path + "/proposals", Map.of("timeZone", "America/Chicago", "windows",
+          List.of(Map.of("start", day + "T10:00:00", "end", day + "T13:00:00"))), "proposal", token);
+      var handed = post(client, path + "/messages/" + proposal.path("id").asText() + "/approval",
+          Map.of("approved", true, "text", proposal.at("/gatedDraft/draft/text").asText()), "proposal-approve", token);
+      DealerHandoffTestSupport.markSent(client, base, token, handed);
+      var relay = app.context().getBean(com.dealanalyzer.relay.RelayService.class);
+      var reply = relay.receive(new com.dealanalyzer.relay.DealerMailRelay.InboundMail("release-reply",
+          get(client, base + "/relay", token).path("address").asText(), "sales@dealer.example", "Test drive", "Option 1 works.", List.of()));
+      var booking = TestDriveAcceptanceTest.postWithSession(client, path + "/bookings",
+          Map.of("proposalId", proposal.path("id").asText(), "messageId", reply.messageId(), "option", 1,
+              "release", List.of("FIRST_NAME", "EMAIL")), "booking", token, session);
+      var book = TestDriveAcceptanceTest.postWithSession(client, path + "/messages/" + booking.path("id").asText() + "/approval",
+          Map.of("approved", true, "text", booking.at("/gatedDraft/draft/text").asText()), "booking-approve", token, session);
+      String message = book.path("messageId").asText();
+      var prepared = new Boundary();
+      var probe = app.context().getBean(com.dealanalyzer.mailbox.MailboxLifecycleTestProbe.class);
+      probe.afterPreparation(prepared);
+      var sending = executor.submit(() -> send(client, base, token, session, message));
+      prepared.reached();
+      // Controlled release withdrawal fixture; no production endpoint permits editing frozen message text.
+      jdbc.update("update test_drive_contact_releases set state = 'WITHHELD' where case_id = ?", caseId);
+      prepared.release();
+      var refused = sending.get(30, java.util.concurrent.TimeUnit.SECONDS);
+      assertThat(refused.status()).isEqualTo(409);
+      assertThat(refused.body().path("detail").asText()).contains("no longer released").doesNotContain("Rosalind", TestDriveAcceptanceTest.EMAIL);
+      assertThat(gmail.sent()).isEmpty();
+      assertThat(handoff(client, base, token, message).path("state").asText()).isEqualTo("HANDED_OFF");
+      probe.afterPreparation(() -> {});
+
+      // Once the provider is entered, disconnect queues behind dispatch and cannot recall this call.
+      jdbc.update("update test_drive_contact_releases set state = 'PREPARED' where case_id = ?", caseId);
+      gmail.atSend(() -> { throw new IllegalStateException("private-provider-detail"); });
+      var uncertain = send(client, base, token, session, message);
+      assertThat(uncertain.status()).isEqualTo(200);
+      assertThat(uncertain.body().path("state").asText()).isEqualTo("DELIVERY_UNKNOWN");
+      assertThat(uncertain.body().toString()).doesNotContain("private-provider-detail", "fake-access", "fake-refresh");
+      assertThat(jdbc.queryForObject("select outcome from mailbox_sends where message_id = ? order by started_at desc limit 1", String.class, message))
+          .isEqualTo("DELIVERY_UNKNOWN");
+      assertThat(gmail.sent()).isEmpty();
+      var dispatch = new Boundary();
+      gmail.atSend(dispatch);
+      sending = executor.submit(() -> send(client, base, token, session, message));
+      dispatch.reached();
+      var disconnectStarted = new java.util.concurrent.CountDownLatch(1);
+      var disconnect = executor.submit(() -> {
+        disconnectStarted.countDown();
+        return call(client, "DELETE", "/api/v1/account/mailbox/connection", null, null, session);
+      });
+      Boundary.await(disconnectStarted);
+      dispatch.release();
+      assertThat(sending.get(30, java.util.concurrent.TimeUnit.SECONDS).body().path("state").asText()).isEqualTo("SENT");
+      assertThat(disconnect.get(30, java.util.concurrent.TimeUnit.SECONDS).status()).isEqualTo(200);
+      assertThat(gmail.sent()).hasSize(1);
+      assertThat(count(jdbc, "mailbox_connections")).isZero();
+      assertThat(count(jdbc, "mailbox_authorizations")).isZero();
+      assertThat(send(client, base, token, session, message).status()).isEqualTo(409);
+      assertThat(gmail.sent()).hasSize(1);
+    }
+  }
+
   @Test void connectSendCheckUnclearOutcomesAndDisconnect(CapturedOutput output) throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("connected-mailbox", true,
         AgreedPriceAcceptanceTest.Configuration.class, "--case.deletion.delay=PT1H",
@@ -74,6 +274,7 @@ class ConnectedMailboxAcceptanceTest {
       assertThat(refused.status()).isEqualTo(400);
       assertThat(refused.body().path("code").asText()).isEqualTo("READ_SCOPE_REFUSED");
       assertThat(count(jdbc, "mailbox_connections")).isZero();
+      authorization = start(client, session, "GOOGLE");
       String someoneElse = signIn(client, "someone-else@example.com");
       assertThat(complete(client, someoneElse, authorization.get("state"), authorization.get("code")).body().path("code").asText())
           .isEqualTo("AUTHORIZATION_UNKNOWN");
