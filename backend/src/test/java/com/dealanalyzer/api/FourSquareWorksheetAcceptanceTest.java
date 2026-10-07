@@ -47,7 +47,7 @@ class FourSquareWorksheetAcceptanceTest {
         if ("EXTRACTION_COMPLETE".equals(operation.path("stage").asText())) break;
         assertThat(operation.path("stage").asText()).isNotEqualTo("FAILED");
         assertThat(System.nanoTime()).isLessThan(deadline);
-        Thread.sleep(25);
+        Thread.sleep(200);
       }
       var extraction = HttpAcceptanceHarness.get(app.client(), path + "/documents/" + upload.at("/document/id").asText() + "/extractions/latest", token);
       assertThat(extraction.path("candidates")).hasSize(2);

@@ -122,7 +122,7 @@ final class HttpAcceptanceHarness {
       if (operation.get("stage").asText().equals("COMPLETE")) {
         return operation;
       }
-      Thread.sleep(25);
+      Thread.sleep(200);
     } while (System.nanoTime() < deadline);
     throw new AssertionError("Operation did not complete: " + operation);
   }

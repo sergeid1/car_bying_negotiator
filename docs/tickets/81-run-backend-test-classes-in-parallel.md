@@ -11,7 +11,9 @@
 `DocumentPerformanceAcceptanceTest` are tagged `serial` and run afterwards in one fork (shared PostgreSQL; latency
 measurement); Failsafe stays single-fork. Each test JVM writes a GC log to `target/surefire-reports/gc-<pid>.log`. Acceptance applications bind and are called on
 `127.0.0.1`, as is the ClamAV stub, because with a wildcard bind another local process that binds 127.0.0.1 on the
-same port number receives the connection (seen once as a foreign 401 in `PilotFeedbackAcceptanceTest`).
+same port number receives the connection (seen once as a foreign 401 in `PilotFeedbackAcceptanceTest`). Acceptance tests poll every 200 ms instead of 25 ms,
+because on a slower CI runner the polling in one test exceeded the real 600-per-minute API limit
+(`DeskCheckAcceptanceTest`, 429).
 Baseline `mvn clean verify` on 0a0effd: 8:49 locally on a quiet machine, 9:31 in CI; slowest classes
 DocumentPerformance 52 s, DealerDocument 46 s, DocumentExtraction 32 s, BuyerAccount 32 s, VehicleEvidence 24 s,
 CaseDeletion 21 s, BuyingCaseIntake 21 s, PilotFeedback 20 s, EphemeralBuyingCase 18 s, SyntheticCashDeal 18 s.

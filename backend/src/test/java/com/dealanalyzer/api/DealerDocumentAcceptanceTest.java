@@ -533,7 +533,7 @@ class DealerDocumentAcceptanceTest {
           || operation.get("stage").asText().equals("FAILED")) {
         return operation;
       }
-      Thread.sleep(25);
+      Thread.sleep(200);
     } while (System.nanoTime() < deadline);
     throw new AssertionError("Document operation did not finish: " + operation);
   }

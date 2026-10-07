@@ -126,7 +126,7 @@ class ContributionMarginAcceptanceTest {
       do {
         operation = get(app.client(), "/api/v1/operations/" + upload.at("/operation/id").asText(), token);
         if (Set.of("EXTRACTION_COMPLETE", "FAILED").contains(operation.path("stage").asText())) break;
-        Thread.sleep(25);
+        Thread.sleep(200);
       } while (System.nanoTime() < deadline);
       assertThat(operation.path("stage").asText()).isEqualTo("EXTRACTION_COMPLETE");
       JsonNode extraction = get(app.client(), base + "/documents/" + documentId + "/extractions/latest", token);

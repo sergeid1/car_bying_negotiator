@@ -114,9 +114,9 @@ class ServiceOperationsAcceptanceTest {
           .body(parts).retrieve().body(String.class));
       String document = upload.at("/document/id").asText();
       JsonNode extraction = null;
-      for (int i = 0; i < 200; i++) {
+      for (int i = 0; i < 50; i++) {
         try { extraction = get(app.client(), base + "/documents/" + document + "/extractions/latest", token); break; }
-        catch (HttpClientErrorException.NotFound waiting) { Thread.sleep(25); }
+        catch (HttpClientErrorException.NotFound waiting) { Thread.sleep(200); }
       }
       assertThat(extraction).isNotNull();
       var localUsage = opGet(app.client(), "/api/v1/operator/cases/" + id + "/usage", SUPPORT);
@@ -201,10 +201,10 @@ class ServiceOperationsAcceptanceTest {
           .header("Case-Access-Token", token).header("Idempotency-Key", "contract-upload")
           .body(parts).retrieve().body(String.class));
       JsonNode operation = null;
-      for (int i = 0; i < 200; i++) {
+      for (int i = 0; i < 50; i++) {
         operation = get(app.client(), "/api/v1/operations/" + upload.at("/operation/id").asText(), token);
         if (operation.path("stage").asText().equals("FAILED")) break;
-        Thread.sleep(25);
+        Thread.sleep(200);
       }
       assertThat(operation.path("stage").asText()).isEqualTo("FAILED");
       var diagnostics = opGet(app.client(), "/api/v1/operator/cases/" + id, SUPPORT);
