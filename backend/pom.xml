@@ -24,6 +24,7 @@
     <postgresql.version>42.7.13</postgresql.version>
     <!-- Bound concurrency independently of host CPU count; use 1 for serial troubleshooting. -->
     <test.forkCount>2</test.forkCount>
+    <test.heapSize>2048m</test.heapSize>
   </properties>
 
   <dependencies>
@@ -109,7 +110,7 @@
         <configuration>
           <forkCount>${test.forkCount}</forkCount>
           <reuseForks>true</reuseForks>
-          <argLine>-Xmx512m -Djava.io.tmpdir="${project.build.directory}/test-forks/${surefire.forkNumber}/tmp"</argLine>
+          <argLine>-Xmx${test.heapSize} -Xlog:gc:file="${project.build.directory}/surefire-reports/gc-%p.log":uptime,level,tags -Djava.io.tmpdir="${project.build.directory}/test-forks/${surefire.forkNumber}/tmp"</argLine>
           <systemPropertyVariables>
             <junit.jupiter.execution.parallel.enabled>false</junit.jupiter.execution.parallel.enabled>
             <document.storage.path>${project.build.directory}/test-forks/${surefire.forkNumber}/objects</document.storage.path>
