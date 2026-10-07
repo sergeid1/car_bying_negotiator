@@ -1,109 +1,149 @@
-# AI Deal Analyzer walking skeleton
+# Deal X-Ray
 
-This slice accepts a synthetic cash Vehicle and Dealer Offer, queues deterministic analysis,
-and persists a versioned Deal Analysis Report. Spring Boot owns the API and worker boundary,
-PostgreSQL owns durable state, Flyway owns schema history, and React renders the Buyer workflow.
+**The Buyer's side of a used-car purchase.**
 
-Analysis POST requests require an `Idempotency-Key` header. Reusing a key with the original
-`Case-Access-Token` returns the original Buying Case and operation without returning the token
-again, so client retries cannot create extra report versions or disclose case access. The worker
-also recovers queued or interrupted operations from durable state when the application starts.
+Deal X-Ray helps a person buying a used car from a dealership know what they are really paying, what
+a fair price looks like, and what to push back on, so they don't get taken advantage of. It finds,
+checks, explains and drafts. The Buyer makes every decision and is the only one who talks to the
+dealer.
+
+## How it helps
+
+1. **Shop.** Describe the car you want and add VINs of cars you like. Deal X-Ray matches cars for sale
+   and explains why each one fits.
+2. **Ask for a quote.** Pick a car and get a drafted email asking the dealer for an itemized
+   out-the-door quote.
+3. **Negotiate.** Each dealer reply is checked against market evidence and the limits you set, and a
+   counteroffer is drafted for you to edit or decline.
+4. **Agree.** Compare quotes across cars. When you accept a written quote, it becomes your Agreed
+   Price.
+5. **Test drive.** A drafted email books the test drive, so you arrive already knowing the number.
+6. **At the desk.** Upload the buyer's order or four-square worksheet the dealer hands you, and Deal
+   X-Ray checks it against the Agreed Price. If you never negotiated first, you get the
+   same market, fee and add-on check on the spot.
+
+At the core is the **Deal Analysis Report**: a versioned, evidence-backed answer to *what am I really
+paying, how does this offer compare with the market, what should I challenge, and what price limits
+should guide the next conversation?*
+
+## What we stand for
+
+- **Buyers only.** Dealer payments, affiliate deals or lead value never influence a search result,
+  rating, finding or draft. Deal X-Ray is never a lead source for dealers.
+- **A tool, not an agent.** Nothing reaches a dealer unless the Buyer approved it word for word, and it
+  goes from the Buyer's own email address, either from the Buyer's email app or through their
+  connected Gmail or Outlook account. Deal X-Ray never writes to a dealer in its own name.
+- **Code does the math.** AI reads documents and explains findings. Deterministic, versioned code owns
+  every money calculation, classification, threshold and price limit, so the same inputs always give
+  the same report.
+- **Private by default.** No account is needed. Buying Cases open by a private link, documents are
+  encrypted at rest, and a Buyer can export or delete their case at any time.
+
+## Status
+
+The journey above is built and tested end to end against synthetic data and test adapters. Florida is
+the first pilot state. A public pilot stays blocked until its prerequisites are met: executed
+market-data and inventory provider terms, a permissioned set of real dealer documents, expert review
+of the price-limit policy, and a reviewed Florida jurisdiction pack. The application refuses to start
+under the `pilot` profile while any prerequisite is unmet; see the
+[pilot readiness record](docs/pilot-readiness-record.md).
+
+AI model calls are off by default (`AI_MODEL_ENABLED=false`) and stay behind a rollout gate that
+requires executed vendor terms and a passing shadow comparison for the exact model.
+
+The full product and engineering contract is [DEVELOPMENT_SPEC.md](DEVELOPMENT_SPEC.md). Work is
+tracked as numbered tickets in [docs/tickets](docs/tickets).
+
+## Tech stack
+
+- **Backend:** Java 21, Spring Boot, PostgreSQL 17, Flyway (`backend/`)
+- **Frontend:** React, TypeScript, Vite (`frontend/`)
+- **Document parsing:** confined, disposable worker JVMs for untrusted uploads
+- **CI:** GitHub Actions running tests, PostgreSQL persistence tests, dependency, source, secret and
+  container scans
 
 ## Run locally
 
-Requirements: Java 21, Maven, Node.js, npm, and Docker.
+Requirements: Java 21, Maven, Node.js 22 and Docker.
+
+Start the database:
 
 ```bash
 docker compose up -d database
+```
+
+Start the backend on port 8080:
+
+```bash
 cd backend
-CASE_ACCESS_PEPPER="replace-with-a-long-random-production-secret" \
+CASE_ACCESS_PEPPER="replace-with-a-long-random-secret" \
 DOCUMENT_STORAGE_ENCRYPTION_KEY="replace-with-an-independent-32-byte-secret" \
 mvn spring-boot:run
 ```
 
-In another terminal:
+Start the frontend in another terminal:
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
-Open <http://localhost:5173>. Vite proxies `/api` requests to Spring Boot on port 8080.
+Open <http://localhost:5173>. Vite proxies `/api` to the backend.
 
-The default development database credentials are intentionally local-only and match
-`compose.yaml`. PostgreSQL is published on host port `55432` to avoid common local database
-collisions; override it with `DATABASE_PORT`. Override the application connection with
-`DATABASE_URL`, `DATABASE_USERNAME`, and `DATABASE_PASSWORD`. Flyway applies migrations from
-`backend/src/main/resources/db/migration` when the application starts. `CASE_ACCESS_PEPPER` and
-`DOCUMENT_STORAGE_ENCRYPTION_KEY` must be independent secret values containing at least 32 bytes.
-Encrypted Dealer document originals are stored outside PostgreSQL under
-`DOCUMENT_STORAGE_PATH` (default `backend/var/document-objects`).
+Configuration notes:
 
-## Verify
+- `CASE_ACCESS_PEPPER` and `DOCUMENT_STORAGE_ENCRYPTION_KEY` must be independent secrets of at least
+  32 bytes.
+- PostgreSQL is published on host port `55432` to avoid local collisions; change it with
+  `DATABASE_PORT`. Point the backend elsewhere with `DATABASE_URL`, `DATABASE_USERNAME` and
+  `DATABASE_PASSWORD`. The default credentials in `compose.yaml` are for local use only.
+- Flyway applies the migrations in `backend/src/main/resources/db/migration` at startup.
+- Encrypted dealer documents are stored outside the database under `DOCUMENT_STORAGE_PATH` (default
+  `backend/var/document-objects`).
+- Everything else in `backend/src/main/resources/application.properties` defaults to a safe local
+  setting, with email, inventory, market data, mailbox and model providers using fakes or turned off.
+
+## Test
 
 ```bash
-cd backend
-mvn test
-cd ..
+mvn -f backend/pom.xml clean verify   # unit, acceptance and packaging tests (about five minutes)
+
 cd frontend
-npm test
-npm run build
+npm test                              # component and accessibility tests
+npm run build                         # type check and production build
+npx playwright test                   # browser tests, including the 360 px layout gate
 ```
 
-The backend acceptance suite exercises the public HTTP workflow, immutable regeneration, and
-a full application restart against a file-backed test database using the production Flyway
-migration.
+Backend acceptance tests drive the public HTTP API against the production Flyway schema. Frozen
+fixtures in `backend/src/test/resources/fixtures` hold the quality contracts for reports, financing,
+providers, extraction and review safety. Later slices reuse their evaluators (`ReportReplayEvaluator`,
+`ExtractionEvaluator`, `ProviderContractEvaluator`, `ReviewSafetyEvaluator`) as release gates.
+`PilotCopyClaimsTest` keeps Buyer-facing language within the approved claims.
 
-The [CI workflow](.github/workflows/ci.yml) runs backend and frontend checks, PostgreSQL
-persistence tests, dependency/source/secret scans, and a built-container scan. Performance
-fixtures emit percentile evidence under `backend/target/hardening`. See the
-[threat model](docs/hardening-threat-model.md) and [incident and restore runbook](docs/hardening-runbook.md)
-for tested controls and the remaining pilot release gates. Untrusted document parsing uses
-[disposable worker JVMs](docs/document-parser-policy.md); `mvn verify` also tests worker launch
-from the packaged application JAR. CI configuration alone is not
-an executed release approval.
+## Documentation
 
-## Contract evaluation fixtures
+**Product and analysis**
 
-Frozen JSON fixtures under `backend/src/test/resources/fixtures` establish reusable quality contracts:
+- [Core report](docs/core-report-policy.md), [price limits](docs/price-boundary-policy.md),
+  [financing](docs/financing-policy.md) and [revised offers](docs/revised-offer-policy.md)
+- [Desk check](docs/desk-check.md) and [offer and purchase](docs/offer-and-purchase-policy.md)
+- [Grounded explanations and drafts](docs/grounded-language-policy.md) and the
+  [outbound message gate](docs/outbound-gate.md)
+- [AI execution harness](docs/ai-execution-harness.md) and the
+  [extraction evaluation contract](docs/extraction-evaluation-contract.md)
 
-- `golden` drives cash-deal reports through the public API and asserts monetary results,
-  calculation steps, declared rounding, and policy/schema versions.
-- `financing` covers fixed-rate loans, zero APR, payment reconciliation, full-term add-on
-  effects, and seeded loan properties. See [the financing policy](docs/financing-policy.md)
-  for the verification API, timing, rounding and supported scope.
-- `providers` exercises success, timeout, rate limits, missing VINs, stale and partial data,
-  duplicate filtering, and schema drift with recorded synthetic responses; it never calls a paid
-  endpoint.
-- `extraction` reports per-field and weighted presence/exact-match scores, false-positive precision,
-  numeric exact-match rate, and a configurable weighted material-field presence gate.
-- `review` is a fail-closed release corpus: any unsafe `MATCHES_APPROVED_BASELINE` result fails,
-  including unresolved questions, limit violations, and missing check scope or time metadata.
+**Buyer data**
 
-`ReportReplayEvaluator` compares regenerated reports after removing only differences explicitly
-declared in the report payload. `ExtractionEvaluator`, `ProviderContractEvaluator`, and
-`ReviewSafetyEvaluator` are public harness APIs so later product slices can reuse the same gates.
+- [Buyer Accounts](docs/buyer-account-policy.md), [case recovery and downloads](docs/case-portability-policy.md)
+  and [retention and deletion](docs/case-deletion-policy.md)
+- [Feedback and pilot metrics](docs/pilot-metrics-policy.md) and [case studies](docs/case-study-policy.md)
 
-Core reports also provide [grounded explanations and editable negotiation drafts](docs/grounded-language-policy.md), with versioned source findings and local copy/download controls.
+**Security and operations**
 
-Buying Cases also support [optional email recovery and retained-data downloads](docs/case-portability-policy.md).
-Configure SMTP and the public recovery URL to enable email delivery. ZIP, HTML and PDF downloads
-use saved snapshots and require `DOCUMENT_STORAGE_ENCRYPTION_KEY` for encrypted export storage.
-
-Buying Cases support [shorter retention and verified deletion](docs/case-deletion-policy.md).
-Deletion revokes case and recovery access immediately; a retryable worker removes the complete
-case graph and stored artifacts. Backup expiry remains unverified.
-
-Operators have [restricted diagnostics, provider usage and separately consented field review](docs/service-operations-policy.md). Operator accounts are disabled until individually configured.
-
-Buyers can provide [optional feedback, with privacy-minimized pilot measurements](docs/pilot-metrics-policy.md).
-Pilot operators must freeze thresholds and price variants before enrollment or metric review.
-
-The [public-pilot readiness record](docs/pilot-readiness-record.md) states whether each pilot
-prerequisite is approved or blocks release, and is enforced rather than advisory: the application
-refuses to start under the `pilot` profile while any prerequisite is blocked. Six of nine are
-currently blocked, so **the public pilot is blocked**. Frozen pilot parameters, Buyer-facing claim
-limits, and Flyway/Hibernate schema evidence are verified by tests in `mvn verify`, which writes
-schema evidence to `backend/target/readiness`. See also the
-[provider and subprocessor inventory](docs/provider-inventory.md).
+- [Threat model](docs/hardening-threat-model.md) and [incident and restore runbook](docs/hardening-runbook.md)
+- [Document parser confinement](docs/document-parser-policy.md)
+- [Service operations](docs/service-operations-policy.md) and
+  [provider and subprocessor inventory](docs/provider-inventory.md)
+- [Pilot readiness record](docs/pilot-readiness-record.md) and the
+  [expert review packet](docs/expert-review-packet.md)
