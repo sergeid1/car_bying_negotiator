@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Validator;
 import jakarta.validation.constraints.NotBlank;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
@@ -47,13 +49,20 @@ class BootMigrationCompatibilityTest {
   }
 
   @Test void startupActuallyAppliesMigrationsWithoutHibernateGeneratingTables() throws Exception {
+    int expected;
+    try (var files = Files.list(Path.of("src/main/resources/db/migration"))) {
+      expected = Math.toIntExact(files.filter(Files::isRegularFile)
+          .filter(file -> file.getFileName().toString().matches("V[0-9]+__.+\\.sql"))
+          .count());
+    }
+    assertThat(expected).isPositive();
     assertThat(flyway.info().pending()).isEmpty();
-    assertThat(flyway.info().applied()).hasSize(46);
+    assertThat(flyway.info().applied()).isNotEmpty().hasSize(expected);
     try (var connection = dataSource.getConnection(); var query = connection.createStatement();
         var rows = query.executeQuery(
             "select count(*) from flyway_schema_history where success = true and version is not null")) {
       assertThat(rows.next()).isTrue();
-      assertThat(rows.getInt(1)).isEqualTo(46);
+      assertThat(rows.getInt(1)).isEqualTo(expected);
     }
   }
 
