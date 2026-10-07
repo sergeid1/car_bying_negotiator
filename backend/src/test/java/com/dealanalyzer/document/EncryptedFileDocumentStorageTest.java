@@ -133,9 +133,7 @@ class EncryptedFileDocumentStorageTest {
       statement.execute("insert into document_pages values('doc',1,'" + page.objectKey() + "',null)");
     }
     for (int attempt = -1; attempt < 2; attempt++) {
-      String classpath = Arrays.stream(System.getProperty("java.class.path").split(java.io.File.pathSeparator))
-          .filter(entry -> !Path.of(entry).getFileName().toString().startsWith("commons-logging-"))
-          .collect(java.util.stream.Collectors.joining(java.io.File.pathSeparator));
+      String classpath = System.getProperty("java.class.path");
       var command = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
           "-cp", classpath, DocumentKeyRotation.class.getName(), "--service-stopped", "1");
       command.environment().put("DOCUMENT_STORAGE_PATH", objects.toString());
