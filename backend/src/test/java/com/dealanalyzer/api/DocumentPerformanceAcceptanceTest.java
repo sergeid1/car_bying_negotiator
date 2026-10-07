@@ -10,6 +10,8 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 
+// Measure parser latency without concurrent acceptance classes competing for CPU or Docker.
+@org.junit.jupiter.api.Tag("serial")
 class DocumentPerformanceAcceptanceTest {
   @TempDir Path directory;
 

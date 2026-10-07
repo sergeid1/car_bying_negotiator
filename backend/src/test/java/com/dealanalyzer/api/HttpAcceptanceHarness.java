@@ -58,6 +58,12 @@ final class HttpAcceptanceHarness {
         "--analysis.worker.enabled=" + workerEnabled,
         "--document.worker.enabled=" + workerEnabled,
         "--spring.task.execution.pool.core-size=1"));
+    // Spring combines duplicate command-line values instead of replacing them. Preserve explicit
+    // storage paths used by backup, deletion and key-rotation fixtures without adding a second value.
+    if (Arrays.stream(additionalProperties).noneMatch(value -> value.startsWith("--document.storage.path="))) {
+      properties.add("--document.storage.path="
+          + temporaryDirectory.resolve(databaseName + "-objects").toAbsolutePath());
+    }
     properties.addAll(Arrays.asList(additionalProperties));
     ConfigurableApplicationContext context =
         new SpringApplicationBuilder(DealAnalyzerApplication.class, additionalConfiguration)
