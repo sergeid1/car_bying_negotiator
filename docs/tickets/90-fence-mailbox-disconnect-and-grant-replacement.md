@@ -11,19 +11,28 @@ prove revocation fences at these boundaries. Found in ticket 78's 2026-10-07 doc
 
 **Blocked by:** None; use deterministic fake providers and controlled concurrency first.
 
-**Status:** ready-for-agent — lifecycle gap, including incorrect cross-provider grant revocation.
+**Status:** complete — migration V47, as of 2026-10-07. V47 adds `buyer_accounts.mailbox_generation`, which starting
+a connection and disconnecting both increment while clearing pending authorizations; `MailboxConnections.complete`
+refuses a stale generation at persistence and withdraws the newly exchanged grant if persistence fails. Replacing a
+connection withdraws the previous grant through the previous connection's provider. A send rechecks, under the account
+and case locks immediately before the provider call, that the same connection still exists and that the owner still
+permits it (mandate, appointment contact release); disconnect, replacement and account deletion take the same locks,
+so they win before dispatch and a dispatched call finishes first and cannot be recalled. `ConnectedMailboxAcceptanceTest`
+covers these races with latches. Open: the provider call runs inside that transaction, so a slow provider holds a
+database connection and the account lock for up to its 25-second deadline; revisit before high send volume. Grant
+withdrawal stays best effort; live provider behaviour is ticket 92.
 
-- [ ] Disconnect invalidates outstanding authorizations; a callback begun before disconnect cannot
+- [x] Disconnect invalidates outstanding authorizations; a callback begun before disconnect cannot
   silently recreate a connection, including when the token exchange is already in progress.
-- [ ] Preserve the previous provider with its refresh token when replacing a connection; test both
+- [x] Preserve the previous provider with its refresh token when replacing a connection; test both
   Gmail-to-Outlook and Outlook-to-Gmail withdrawal through the correct adapter.
-- [ ] Withdraw newly exchanged grants if the account was deleted/disconnected or the authorization
+- [x] Withdraw newly exchanged grants if the account was deleted/disconnected or the authorization
   was superseded before persistence; keep local token deletion authoritative when withdrawal fails.
-- [ ] Define the send/disconnect/deletion ordering and point after which a provider call cannot be
+- [x] Define the send/disconnect/deletion ordering and point after which a provider call cannot be
   recalled. Test disconnect while refreshing and after an access token has been obtained, and ensure
   sends initiated after the fence cannot use it.
-- [ ] Exercise mandate revocation and appointment contact-release changes during a claimed send;
+- [x] Exercise mandate revocation and appointment contact-release changes during a claimed send;
   recheck at the defined dispatch boundary and document already-dispatched behavior precisely.
-- [ ] Use barriers/latches to cover these races; verify connection/authorization rows, grant withdrawal,
+- [x] Use barriers/latches to cover these races; verify connection/authorization rows, grant withdrawal,
   actual provider calls, audit and Buyer-visible outcomes without leaking credentials or contact values.
-- [ ] Update the threat model and account/outbound policies to match the tested lifecycle semantics.
+- [x] Update the threat model and account/outbound policies to match the tested lifecycle semantics.
