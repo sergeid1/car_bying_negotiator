@@ -1,5 +1,6 @@
 import { createContext, FormEvent, useEffect, useRef, useState } from "react";
 import type { Credentials } from "./CasePortability";
+import { MailboxConnection } from "./MailboxConnection";
 
 type Contact = { email: string; firstName: string | null; lastName: string | null; phone: string | null };
 type AttachedCase = { caseId: string; attachedAt: string; state: string };
@@ -129,6 +130,7 @@ export function BuyerAccount({ caseCredentials, onSignedIn, recheck = 0 }: {
       setMessage("Contact details saved.");
     }, "Contact details could not be saved. Check the phone number format and retry.")} />
     <NotificationPreferences onSessionEnded={() => signedOut(ENDED)} />
+    <MailboxConnection onSessionEnded={() => signedOut(ENDED)} />
     <h3>Attached Buying Cases</h3>
     {account.cases.length === 0 ? <p className="muted">No cases attached yet. Open a case by its private link, then attach it here.</p>
       : <ul className="account-cases" aria-label="Attached Buying Cases">

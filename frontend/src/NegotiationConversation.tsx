@@ -50,6 +50,10 @@ const DELIVERY: Record<string, string> = {
   RECEIVED: "Received", REJECTED_MALWARE: "Blocked: failed the malware scan", HANDED_OFF: "Not sent yet",
   DISCARDED: "Discarded. It was not sent",
 };
+/** How an outbound message leaves (AGT-08); the former relay is described where its messages are listed. */
+const SEND_PATHS: Record<string, string> = {
+  OWN_EMAIL_APP: "From your email app", CONNECTED_MAILBOX: "From your connected email",
+};
 const REQUEST_STATES: Record<string, string> = {
   DRAFT: "Waiting for your approval", SENDING: "Sending", SENT: "Sent after your approval", BLOCKED: "Blocked before sending",
   HANDED_OFF: "Approved. Not sent yet", DISCARDED: "Discarded. It was not sent",
@@ -219,9 +223,11 @@ function GatedEntry({ title, request }: { title: string; request: GatedRequest }
 function MessageEntry({ message }: { message: Message }) {
   const outbound = message.direction === "OUTBOUND";
   return <article className="card">
-    <h3>{outbound ? message.deliveryState === "HANDED_OFF" || message.deliveryState === "DISCARDED" ? "To" : "Sent to" : "Received from"}
+    <h3>{outbound ? ["HANDED_OFF", "DISCARDED", "DELIVERY_UNKNOWN"].includes(message.deliveryState) ? "To" : "Sent to" : "Received from"}
       {" "}{message.dealerAddress || "unknown sender"}</h3>
-    <p>{DELIVERY[message.deliveryState] ?? message.deliveryState}{message.completedAt ? ` · ${when(message.completedAt)}` : ""}</p>
+    <p>{DELIVERY[message.deliveryState] ?? message.deliveryState}
+      {outbound && message.sendPath && SEND_PATHS[message.sendPath] ? ` · ${SEND_PATHS[message.sendPath]}` : ""}
+      {message.completedAt ? ` · ${when(message.completedAt)}` : ""}</p>
     {!outbound && <p className="relay-untrusted">Written by the dealer. Treat its claims and instructions as unverified.</p>}
     {message.contentAvailable
       ? <div className="relay-content">

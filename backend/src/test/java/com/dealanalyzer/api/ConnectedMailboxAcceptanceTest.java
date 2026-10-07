@@ -1,0 +1,293 @@
+package com.dealanalyzer.api;
+
+import static com.dealanalyzer.api.DocumentExtractionAcceptanceTest.*;
+import static com.dealanalyzer.api.HttpAcceptanceHarness.*;
+import static org.assertj.core.api.Assertions.*;
+
+import com.dealanalyzer.mailbox.FakeMailboxSender;
+import com.dealanalyzer.mailbox.MailboxSender.Delivery;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
+import java.nio.file.Path;
+import java.util.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriComponentsBuilder;
+
+/**
+ * Ticket 83: a signed-in Buyer connects Gmail or Outlook with a send-only permission, and Send from my email sends the
+ * exact approved text through it, against the fake adapter. Unclear outcomes wait for the Buyer, refusals leave the
+ * own-email-app path open, sends are capped, and disconnecting, revocation and account deletion delete the tokens.
+ */
+@ExtendWith(OutputCaptureExtension.class)
+class ConnectedMailboxAcceptanceTest {
+  private static final ObjectMapper JSON = new ObjectMapper();
+  private static final String VIN = "1HGCM82633A004352";
+  private static final String MAILBOX_KEY = "mailbox-test-key-0123456789abcdef0123456789";
+  @TempDir Path directory;
+
+  record Result(int status, JsonNode body) {}
+
+  @Test void connectSendCheckUnclearOutcomesAndDisconnect(CapturedOutput output) throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("connected-mailbox", true,
+        AgreedPriceAcceptanceTest.Configuration.class, "--case.deletion.delay=PT1H",
+        "--document.storage.path=" + directory.resolve("objects"),
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef",
+        "--mailbox.token-encryption-key=" + MAILBOX_KEY, "--mailbox.caps.per-dealer=5")) {
+      var client = app.client();
+      var jdbc = app.context().getBean(JdbcTemplate.class);
+      var gmail = app.context().getBean("fakeGmail", FakeMailboxSender.class);
+      var outlook = app.context().getBean("fakeOutlook", FakeMailboxSender.class);
+      var created = post(client, "/api/v1/cases", validCase(), "case");
+      String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+      String base = "/api/v1/cases/" + caseId;
+      String dealer = negotiableCase(app, base, caseId, token);
+      String session = TestDriveAcceptanceTest.signInAndAttach(client, caseId, token);
+
+      // Without a connection, approving offers only the own-email-app path, and a mailbox send is refused with that offer.
+      var mailbox = call(client, "GET", "/api/v1/account/mailbox", null, null, session).body();
+      assertThat(mailbox.path("available").asBoolean()).isTrue();
+      assertThat(mailbox.path("providers").toString()).contains("GOOGLE", "MICROSOFT");
+      assertThat(mailbox.path("connection").isNull()).isTrue();
+      String first = handOff(client, base, token, dealer, "sales@dealer.example", "q1");
+      var unconnected = send(client, base, token, session, first);
+      assertThat(unconnected.status()).isEqualTo(409);
+      assertThat(unconnected.body().path("code").asText()).isEqualTo("MAILBOX_NOT_CONNECTED");
+      assertThat(unconnected.body().path("ownEmailApp").asBoolean()).isTrue();
+      assertThat(handoff(client, base, token, first).path("state").asText()).isEqualTo("HANDED_OFF");
+
+      // Connecting checks the single-use state, the PKCE verifier and the granted scopes; a read scope is refused.
+      var authorization = start(client, session, "GOOGLE");
+      assertThat(call(client, "POST", "/api/v1/account/mailbox/connection",
+          Map.of("state", "forged-state", "code", authorization.get("code")), null, session).body().path("code").asText())
+          .isEqualTo("AUTHORIZATION_UNKNOWN");
+      var readScope = start(client, session, "GOOGLE");
+      var refused = complete(client, session, readScope.get("state"), readScope.get("code") + ".read");
+      assertThat(refused.status()).isEqualTo(400);
+      assertThat(refused.body().path("code").asText()).isEqualTo("READ_SCOPE_REFUSED");
+      assertThat(count(jdbc, "mailbox_connections")).isZero();
+      String someoneElse = signIn(client, "someone-else@example.com");
+      assertThat(complete(client, someoneElse, authorization.get("state"), authorization.get("code")).body().path("code").asText())
+          .isEqualTo("AUTHORIZATION_UNKNOWN");
+      var connected = complete(client, session, authorization.get("state"), authorization.get("code"));
+      assertThat(connected.status()).isEqualTo(200);
+      assertThat(connected.body().at("/connection/provider").asText()).isEqualTo("GOOGLE");
+      assertThat(connected.body().at("/connection/address").asText()).isEqualTo(FakeMailboxSender.ADDRESS);
+      assertThat(connected.body().toString()).doesNotContain("fake-access", "fake-refresh", "Token");
+      assertThat(complete(client, session, authorization.get("state"), authorization.get("code")).body().path("code").asText())
+          .isEqualTo("AUTHORIZATION_UNKNOWN");
+      String stored = jdbc.queryForList("select * from mailbox_connections").toString();
+      assertThat(stored).doesNotContain("fake-access", "fake-refresh", FakeMailboxSender.ADDRESS).contains("gmail.send");
+      assertThat(stored).doesNotContain("readonly");
+
+      // Send from my email: the exact approved text from the Buyer's address, recorded once as CONNECTED_MAILBOX.
+      String text = handoff(client, base, token, first).path("body").asText();
+      var sent = send(client, base, token, session, first);
+      assertThat(sent.status()).isEqualTo(200);
+      assertThat(sent.body().path("state").asText()).isEqualTo("SENT");
+      assertThat(sent.body().path("sendPath").asText()).isEqualTo("CONNECTED_MAILBOX");
+      assertThat(gmail.sent()).singleElement().satisfies(message -> {
+        assertThat(message.from()).isEqualTo(FakeMailboxSender.ADDRESS);
+        assertThat(message.message().to()).isEqualTo("sales@dealer.example");
+        assertThat(message.message().subject()).isEqualTo("Request for an itemized vehicle quote");
+        assertThat(message.message().body()).isEqualTo(text);
+      });
+      assertThat(get(client, base + "/quote-requests", token).path("negotiationState").asText()).isEqualTo("AWAITING_DEALER");
+      assertThat(jdbc.queryForObject("select state from quote_requests where message_id = ?", String.class, first)).isEqualTo("SENT");
+      assertThat(send(client, base, token, session, first).status()).isEqualTo(409);
+      assertThat(call(client, "POST", base + "/handoffs/" + first + "/sent", Map.of(), token, null).status()).isEqualTo(409);
+      assertThat(gmail.sent()).hasSize(1);
+      assertThat(find(get(client, base + "/negotiation-conversation", token).path("entries"), "kind", "OUTBOUND_MESSAGE")
+          .at("/message/sendPath").asText()).isEqualTo("CONNECTED_MAILBOX");
+
+      // An unclear outcome is never retried: the Buyer checks their Sent folder and says it was sent.
+      String second = handOff(client, base, token, dealer, "sales@dealer.example", "q2");
+      gmail.nextOutcomes(Delivery.UNKNOWN);
+      var unclear = send(client, base, token, session, second);
+      assertThat(unclear.body().path("state").asText()).isEqualTo("DELIVERY_UNKNOWN");
+      assertThat(gmail.sent()).hasSize(2);
+      assertThat(jdbc.queryForObject("select state from quote_requests where message_id = ?", String.class, second)).isEqualTo("HANDED_OFF");
+      assertThat(call(client, "POST", base + "/handoffs/" + second + "/discard", Map.of(), token, null).body().path("detail").asText())
+          .contains("Sent folder");
+      var confirmed = call(client, "POST", base + "/handoffs/" + second + "/sent", Map.of(), token, null);
+      assertThat(confirmed.body().path("state").asText()).isEqualTo("SENT");
+      assertThat(confirmed.body().path("sendPath").asText()).isEqualTo("CONNECTED_MAILBOX");
+      assertThat(jdbc.queryForObject("select state from quote_requests where message_id = ?", String.class, second)).isEqualTo("SENT");
+      assertThat(gmail.sent()).hasSize(2);
+
+      // Or the Buyer sends it again: the same stored text, audited.
+      String third = handOff(client, base, token, dealer, "sales@dealer.example", "q3");
+      gmail.nextOutcomes(Delivery.UNKNOWN);
+      assertThat(send(client, base, token, session, third).body().path("state").asText()).isEqualTo("DELIVERY_UNKNOWN");
+      var again = send(client, base, token, session, third);
+      assertThat(again.body().path("state").asText()).isEqualTo("SENT");
+      assertThat(gmail.sent()).hasSize(4);
+      assertThat(gmail.sent().get(3).message()).usingRecursiveComparison().isEqualTo(gmail.sent().get(2).message());
+      assertThat(jdbc.queryForObject("select count(*) from audit_events where aggregate_id = ? and event_type = 'DEALER_MESSAGE_SEND_AGAIN'",
+          Long.class, third)).isEqualTo(1);
+      assertThat(jdbc.queryForObject("select state from quote_requests where message_id = ?", String.class, third)).isEqualTo("SENT");
+
+      // A provider rate limit is stated plainly and not retried; the per-dealer cap stops the next send.
+      String fourth = handOff(client, base, token, dealer, "sales@dealer.example", "q4");
+      gmail.nextOutcomes(Delivery.RATE_LIMITED);
+      var limited = send(client, base, token, session, fourth);
+      assertThat(limited.status()).isEqualTo(429);
+      assertThat(limited.body().path("code").asText()).isEqualTo("PROVIDER_RATE_LIMITED");
+      assertThat(limited.body().path("detail").asText()).contains("Gmail says too many messages", "nothing was sent");
+      assertThat(handoff(client, base, token, fourth).path("state").asText()).isEqualTo("HANDED_OFF");
+      assertThat(handoff(client, base, token, fourth).path("sendPath").asText()).isEqualTo("OWN_EMAIL_APP");
+      assertThat(gmail.sent()).hasSize(4);
+      assertThat(send(client, base, token, session, fourth).body().path("state").asText()).isEqualTo("SENT");
+      String capped = handOff(client, base, token, dealer, "sales@dealer.example", "q4b");
+      var refusedByCap = send(client, base, token, session, capped);
+      assertThat(refusedByCap.status()).isEqualTo(429);
+      assertThat(refusedByCap.body().path("code").asText()).isEqualTo("MAILBOX_CAP_REACHED");
+      assertThat(refusedByCap.body().path("detail").asText()).contains("5 messages to this dealer");
+      assertThat(gmail.sent()).hasSize(5);
+      assertThat(jdbc.queryForObject("select count(*) from mailbox_sends where case_id = ?", Long.class, caseId)).isEqualTo(6);
+      assertThat(call(client, "POST", base + "/handoffs/" + capped + "/sent", Map.of(), token, null).body().path("sendPath").asText())
+          .isEqualTo("OWN_EMAIL_APP");
+
+      // Revoking the mandate blocks a Connected-mailbox send at once.
+      String fifth = handOff(client, base, token, dealer, "fleet@dealer.example", "q5");
+      post(client, base + "/mandates/" + latestMandate(client, base, token) + "/revocation", Map.of(), "revoke", token);
+      var revoked = send(client, base, token, session, fifth);
+      assertThat(revoked.status()).isEqualTo(409);
+      assertThat(revoked.body().path("detail").asText()).contains("It was not sent");
+      assertThat(gmail.sent()).hasSize(5);
+      approveMandate(client, base, token, "mandate2");
+
+      // Disconnecting deletes the tokens at once; a later send is refused with the own-email-app offer.
+      String sixth = handOff(client, base, token, dealer, "fleet@dealer.example", "q6");
+      var disconnected = call(client, "DELETE", "/api/v1/account/mailbox/connection", null, null, session);
+      assertThat(disconnected.body().path("connection").isNull()).isTrue();
+      assertThat(count(jdbc, "mailbox_connections")).isZero();
+      var afterDisconnect = send(client, base, token, session, sixth);
+      assertThat(afterDisconnect.body().path("code").asText()).isEqualTo("MAILBOX_NOT_CONNECTED");
+      assertThat(afterDisconnect.body().path("detail").asText()).contains("own email app");
+
+      // A provider revocation error deletes the connection and nothing is sent.
+      var outlookAuthorization = start(client, session, "MICROSOFT");
+      assertThat(complete(client, session, outlookAuthorization.get("state"), outlookAuthorization.get("code")).body()
+          .at("/connection/providerLabel").asText()).isEqualTo("Outlook");
+      jdbc.update("update mailbox_connections set access_expires_at = ?", java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(5)));
+      outlook.withdrawGrant();
+      var withdrawn = send(client, base, token, session, sixth);
+      assertThat(withdrawn.body().path("code").asText()).isEqualTo("MAILBOX_REVOKED");
+      assertThat(count(jdbc, "mailbox_connections")).isZero();
+      assertThat(outlook.sent()).isEmpty();
+      assertThat(handoff(client, base, token, sixth).path("state").asText()).isEqualTo("HANDED_OFF");
+
+      // Account export has the provider and address, never tokens; account deletion removes the connection at once.
+      var reconnect = start(client, session, "GOOGLE");
+      complete(client, session, reconnect.get("state"), reconnect.get("code"));
+      byte[] export = client.post().uri("/api/v1/account/export").header("Cookie", AccountSessionTestSupport.cookie(session))
+          .header("Account-Request", "1").retrieve().body(byte[].class);
+      String account = zipEntry(export, "account.json");
+      assertThat(JSON.readTree(account).at("/mailboxConnections/0/provider").asText()).isEqualTo("GOOGLE");
+      assertThat(JSON.readTree(account).at("/mailboxConnections/0/address").asText()).isEqualTo(FakeMailboxSender.ADDRESS);
+      assertThat(JSON.readTree(account).path("mailboxSends").size()).isEqualTo(7);
+      assertThat(account).doesNotContain("fake-access", "fake-refresh", "ciphertext", "sales@dealer.example");
+      call(client, "POST", "/api/v1/account/deletion", Map.of(), null, session);
+      assertThat(count(jdbc, "mailbox_connections")).isZero();
+      assertThat(count(jdbc, "mailbox_authorizations")).isZero();
+
+      // Nothing about the connection or the messages reached the logs.
+      assertThat(output.getAll()).doesNotContain("fake-access", "fake-refresh", FakeMailboxSender.ADDRESS, text, MAILBOX_KEY);
+    }
+  }
+
+  /** A case whose negotiation is ready for quote requests; returns the dealer. */
+  private static String negotiableCase(HttpAcceptanceHarness.RunningApplication app, String base, String caseId, String token)
+      throws Exception {
+    var jdbc = app.context().getBean(JdbcTemplate.class);
+    OutboundDraftAcceptanceTest.verifyAndPlan(app, base, token);
+    jdbc.update("update vehicles set vin = ? where case_id = ?", VIN, caseId);
+    String dealer = UUID.randomUUID().toString();
+    jdbc.update("insert into dealers(id, case_id, source, provider_dealer_id, name, created_at) values (?, ?, 'TEST', 'dealer', 'North Branch Motors', current_timestamp)", dealer, caseId);
+    jdbc.update("""
+        insert into listing_snapshots(id, case_id, dealer_id, provider_listing_id, listing_url, vin, source, retrieved_at, provider_version, license_metadata, created_at)
+        values (?, ?, ?, 'listing', 'https://dealer.example/vehicle/42', ?, 'TEST', current_timestamp, 'v1', 'test', current_timestamp)
+        """, UUID.randomUUID().toString(), caseId, dealer, VIN);
+    approveMandate(app.client(), base, token, "mandate1");
+    return dealer;
+  }
+
+  /** Prepares and approves a quote request; returns the handed-off message. */
+  private static String handOff(RestClient client, String base, String token, String dealer, String address, String key) throws Exception {
+    var quote = post(client, base + "/quote-requests", Map.of("dealerId", dealer, "dealerAddress", address), key, token);
+    return post(client, base + "/quote-requests/" + quote.path("id").asText() + "/approval",
+        Map.of("approved", true, "text", quote.at("/gatedDraft/draft/text").asText()), key + "-approve", token).path("messageId").asText();
+  }
+
+  private static JsonNode handoff(RestClient client, String base, String token, String messageId) throws Exception {
+    return get(client, base + "/handoffs/" + messageId, token);
+  }
+
+  private static Result send(RestClient client, String base, String token, String session, String messageId) {
+    return call(client, "POST", base + "/handoffs/" + messageId + "/mailbox-send", Map.of(), token, session);
+  }
+
+  /** Starts connecting and follows the fake consent page back: the code and state the redirect carries. */
+  private static Map<String, String> start(RestClient client, String session, String provider) {
+    var started = call(client, "POST", "/api/v1/account/mailbox/authorizations", Map.of("provider", provider), null, session);
+    assertThat(started.status()).isEqualTo(200);
+    var query = UriComponentsBuilder.fromUri(URI.create(started.body().path("authorizationUrl").asText())).build().getQueryParams();
+    return Map.of("code", decode(query.getFirst("code")), "state", decode(query.getFirst("state")));
+  }
+
+  private static Result complete(RestClient client, String session, String state, String code) {
+    return call(client, "POST", "/api/v1/account/mailbox/connection", Map.of("state", state, "code", code), null, session);
+  }
+
+  private static String decode(String value) { return java.net.URLDecoder.decode(value, java.nio.charset.StandardCharsets.UTF_8); }
+
+  private static Result call(RestClient client, String method, String path, Object body, String token, String session) {
+    var request = client.method(HttpMethod.valueOf(method)).uri(path).header("Idempotency-Key", UUID.randomUUID().toString());
+    if (token != null) request.header("Case-Access-Token", token);
+    if (session != null) request.header("Cookie", AccountSessionTestSupport.cookie(session));
+    if (!method.equals("GET")) request.header("Account-Request", "1");
+    if (body != null) request.contentType(MediaType.APPLICATION_JSON).body(body);
+    return request.exchange((ignored, response) -> {
+      byte[] bytes = response.getBody().readAllBytes();
+      return new Result(response.getStatusCode().value(), bytes.length == 0 ? JSON.nullNode() : JSON.readTree(bytes));
+    });
+  }
+
+  private static String signIn(RestClient client, String email) throws Exception {
+    post(client, "/api/v1/account/sign-in-requests", Map.of("email", email), "sign-in-" + email);
+    return AccountSessionTestSupport.verify(client, BuyerAccountAcceptanceTest.sent.getLast().link().split("#sign-in=")[1]);
+  }
+
+  private static long count(JdbcTemplate jdbc, String table) {
+    return jdbc.queryForObject("select count(*) from " + table, Long.class);
+  }
+
+  private static int latestMandate(RestClient client, String base, String token) throws Exception {
+    var versions = new ArrayList<Integer>();
+    get(client, base + "/mandates", token).findValues("version").forEach(value -> versions.add(value.asInt()));
+    return versions.stream().max(Integer::compare).orElseThrow();
+  }
+
+  private static void approveMandate(RestClient client, String base, String token, String key) throws Exception {
+    var proposal = get(client, base + "/mandates/proposal", token);
+    post(client, base + "/mandates", Map.of("planVersion", proposal.path("planVersion").asInt(), "targetMinor", proposal.path("targetMinor").asLong(),
+        "ceilingMinor", proposal.path("ceilingMinor").asLong(), "approved", true), key, token);
+  }
+
+  private static String zipEntry(byte[] bytes, String name) throws Exception {
+    try (var zip = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(bytes))) {
+      for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry())
+        if (entry.getName().equals(name)) return new String(zip.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+    }
+    throw new AssertionError("Missing archive entry: " + name);
+  }
+}

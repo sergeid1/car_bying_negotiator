@@ -19,6 +19,7 @@ class CaseGraphDeletionPlan {
       new Step("quote_acceptance_requests", "case_id = :caseId"),
       new Step("quote_requests", "case_id = :caseId"),
       new Step("case_negotiation_states", "case_id = :caseId"),
+      new Step("mailbox_sends", "case_id = :caseId"),
       new Step("dealer_relay_attachments", "case_id = :caseId"),
       new Step("dealer_relay_send_attempts", "case_id = :caseId"),
       new Step("dealer_relay_messages", "case_id = :caseId"),

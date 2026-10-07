@@ -22,6 +22,9 @@
     <tomcat.version>10.1.59</tomcat.version>
     <jackson-bom.version>2.21.7</jackson-bom.version>
     <postgresql.version>42.7.13</postgresql.version>
+    <!-- Bound concurrency independently of host CPU count; use 1 for serial troubleshooting. -->
+    <test.forkCount>2</test.forkCount>
+    <test.heapSize>2048m</test.heapSize>
   </properties>
 
   <dependencies>
@@ -84,6 +87,57 @@
   <build>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>prepare-test-directories</id>
+            <phase>generate-test-resources</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <!-- java.io.tmpdir must exist before a forked JVM starts. -->
+                <mkdir dir="${project.build.directory}/surefire-reports"/>
+                <mkdir dir="${project.build.directory}/test-forks/1/tmp"/>
+                <mkdir dir="${project.build.directory}/test-forks/2/tmp"/>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <forkCount>${test.forkCount}</forkCount>
+          <reuseForks>true</reuseForks>
+          <argLine>-Xmx${test.heapSize} -Xlog:gc:file="${project.build.directory}/surefire-reports/gc-%p.log":uptime,level,tags -Djava.io.tmpdir="${project.build.directory}/test-forks/${surefire.forkNumber}/tmp"</argLine>
+          <systemPropertyVariables>
+            <junit.jupiter.execution.parallel.enabled>false</junit.jupiter.execution.parallel.enabled>
+            <document.storage.path>${project.build.directory}/test-forks/${surefire.forkNumber}/objects</document.storage.path>
+          </systemPropertyVariables>
+        </configuration>
+        <executions>
+          <execution>
+            <id>default-test</id>
+            <configuration>
+              <excludedGroups>serial</excludedGroups>
+              <!-- Reuse warm JVMs; each slot retains its own files and runs methods sequentially. -->
+              <reuseForks>true</reuseForks>
+            </configuration>
+          </execution>
+          <execution>
+            <id>serial-tests</id>
+            <goals><goal>test</goal></goals>
+            <configuration>
+              <!-- Shared PostgreSQL evidence and latency measurements need an idle test pool. -->
+              <forkCount>1</forkCount>
+              <groups>serial</groups>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
         <configuration>
@@ -93,6 +147,12 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
+        <configuration>
+          <!-- Container security probes and executable-jar checks stay sequential. -->
+          <forkCount>1</forkCount>
+          <reuseForks>true</reuseForks>
+          <argLine>-Xmx512m -Djava.io.tmpdir="${project.build.directory}/test-forks/${surefire.forkNumber}/tmp"</argLine>
+        </configuration>
         <executions>
           <execution>
             <goals><goal>integration-test</goal><goal>verify</goal></goals>
