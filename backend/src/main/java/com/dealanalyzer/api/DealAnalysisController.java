@@ -5,7 +5,6 @@ import com.dealanalyzer.buyingcase.AnalysisWorkflow.StartedAnalysis;
 import com.dealanalyzer.buyingcase.ChangeConsentRequest;
 import com.dealanalyzer.buyingcase.CreateBuyingCaseRequest;
 import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService;
-import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService.CreatedBuyingCase;
 import com.dealanalyzer.buyingcase.persistence.BuyingCaseStore.OperationView;
 import com.dealanalyzer.buyingcase.persistence.EphemeralCasePersistence.StoredConsent;
 import com.dealanalyzer.vehicle.EstablishVehicleRequest;
@@ -37,6 +36,7 @@ import jakarta.validation.constraints.Size;
 import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -65,6 +65,7 @@ public class DealAnalysisController {
   private final MarketAssessmentService marketAssessments;
   private final com.dealanalyzer.buyingcase.persistence.CoreReportService coreReports;
   private final com.dealanalyzer.economics.SupportedJurisdictions supportedJurisdictions;
+  private final com.dealanalyzer.account.BuyerAccountService buyerAccounts;
 
   public DealAnalysisController(
       com.dealanalyzer.buyingcase.persistence.FinancingService financing,
@@ -78,7 +79,8 @@ public class DealAnalysisController {
       CashEconomicsService cashEconomics,
       MarketAssessmentService marketAssessments,
       com.dealanalyzer.buyingcase.persistence.CoreReportService coreReports,
-      com.dealanalyzer.economics.SupportedJurisdictions supportedJurisdictions) {
+      com.dealanalyzer.economics.SupportedJurisdictions supportedJurisdictions,
+      com.dealanalyzer.account.BuyerAccountService buyerAccounts) {
     this.financing = financing;
     this.workflow = workflow;
     this.ephemeralCases = ephemeralCases;
@@ -91,6 +93,7 @@ public class DealAnalysisController {
     this.marketAssessments = marketAssessments;
     this.coreReports = coreReports;
     this.supportedJurisdictions = supportedJurisdictions;
+    this.buyerAccounts = buyerAccounts;
   }
 
   @PostMapping("/cases/{caseId}/finance-offers")
@@ -269,12 +272,27 @@ public class DealAnalysisController {
 
   @PostMapping("/cases")
   @ResponseStatus(HttpStatus.CREATED)
-  public CreatedBuyingCase createCase(
+  public CreatedCase createCase(
       @NotBlank @Size(max = 200) @RequestHeader("Idempotency-Key") String idempotencyKey,
       @RequestHeader(value = "Case-Access-Token", required = false) String accessToken,
+      @CookieValue(name = com.dealanalyzer.account.AccountSessionCookie.NAME, required = false) String accountSession,
+      @RequestHeader(value = "Account-Request", required = false) String accountRequest,
       @Valid @RequestBody CreateBuyingCaseRequest request) {
-    return ephemeralCases.create(request, idempotencyKey, accessToken);
+    var created = ephemeralCases.create(request, idempotencyKey, accessToken);
+    // A signed-in Buyer saves the case to their account only by sending the account request header,
+    // so a cross-site post or a client that did not say so leaves the case unattached.
+    boolean saved = false;
+    if (created.accessToken() != null && accountSession != null && "1".equals(accountRequest)) {
+      try { saved = buyerAccounts.attachCreated(accountSession, created.buyingCase().id(), created.accessToken()); }
+      catch (RuntimeException notSaved) { saved = false; }
+    }
+    return new CreatedCase(created.buyingCase(), created.accessToken(), saved);
   }
+
+  /** {@code savedToAccount} is true when the case was attached to the signed-in Buyer's account at creation. */
+  public record CreatedCase(
+      @com.fasterxml.jackson.annotation.JsonProperty("case") EphemeralBuyingCaseService.BuyingCaseView buyingCase,
+      String accessToken, boolean savedToAccount) {}
 
   @GetMapping("/cases/{caseId}")
   public Object getCase(

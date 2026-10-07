@@ -1,8 +1,8 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import "./styles.css";
 import { RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess, SaveCaseLink } from "./CasePortability";
 import { CaseLifecycle } from "./CaseLifecycle";
-import { AccountSignedInContext, BuyerAccount } from "./BuyerAccount";
+import { AccountSignedInContext, BuyerAccount, isAccountPass } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 import { PricePlan } from "./PricePlan";
 import { NegotiationMandate } from "./NegotiationMandate";
@@ -132,6 +132,13 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   const [partnerKit] = useState(requestedPartnerKit);
   // A guide or the partner kit replaces the start screen at its own shareable address.
   const standalone = Boolean(guide || partnerKit);
+  // A case opened from the Buyer Account closes when the sign-in ends; its private case link is unaffected.
+  const openedFromAccount = Boolean(caseCredentials && isAccountPass(caseCredentials.token));
+  useEffect(() => {
+    if (!accountSignedIn && openedFromAccount) {
+      setCaseCredentials(undefined); setReport(undefined); setStage(undefined); setError(undefined);
+    }
+  }, [accountSignedIn, openedFromAccount]);
 
   async function startAnalysis(event: FormEvent) {
     event.preventDefault();
@@ -215,6 +222,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         </div>}
 
         <div className="workspace">
+          <AccountSignedInContext.Provider value={accountSignedIn}>
           <div className="column">
             {guide && <ExplainerGuide slug={guide} />}
             {!guide && partnerKit && <ReferralPartnerKit />}
@@ -228,6 +236,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             {!standalone && !report && !caseCredentials && <OfferTerms />}
             {!standalone && !report && !caseCredentials && (
               <BuyingCaseIntake
+                onSavedToAccount={() => setAccountRecheck(value => value + 1)}
                 onCaseOpened={(value, disclosure) => {
                   setReferral(disclosure ? { caseId: value.caseId, text: disclosure } : undefined);
                   setCaseRevoked(false);
@@ -296,12 +305,11 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               onOfferFrozen={offer => { setFrozenOffer({ caseId: caseCredentials.caseId, version: offer.version }); setDeskRefresh(value => value + 1); }} />}
             {caseCredentials && !caseRevoked && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <NegotiationMandate key={`mandate-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
-            {caseCredentials && !caseRevoked && <AccountSignedInContext.Provider value={accountSignedIn}>
-              <QuoteRequest key={`quote-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />
-            </AccountSignedInContext.Provider>}
+            {caseCredentials && !caseRevoked && <QuoteRequest key={`quote-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <VerifiedOfferAnalysis key={`analysis-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
               offerVersion={frozenOffer?.caseId === caseCredentials.caseId ? frozenOffer.version : undefined} pollDelayMs={pollDelayMs} />}
           </div>
+          </AccountSignedInContext.Provider>
 
           <aside className="rail" aria-label="Case access and retention">
             <p className="rail-title">Your Buying Case</p>
@@ -309,11 +317,20 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             <SavedCaseAccess onOpened={value => { setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }}
               onUnavailable={caseId => { setCaseCredentials(undefined); setRecoveryCaseId(caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
             <RecoveryAccess caseId={recoveryCaseId ?? caseCredentials?.caseId} onRecovered={value => { setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
-            {caseCredentials && !caseRevoked && <SaveCaseLink {...caseCredentials} />}
+            {caseCredentials && !caseRevoked && !openedFromAccount && <SaveCaseLink {...caseCredentials} />}
+            {caseCredentials && !caseRevoked && openedFromAccount && <section className="panel" aria-label="Opened from your Buyer Account">
+              <h2>Opened from your Buyer Account</h2>
+              <p>This case stays open while you are signed in. Signing out closes it here; the private case link you saved
+                still opens it.</p>
+            </section>}
             {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {!standalone && <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined}
-              onSignedIn={setAccountSignedIn} recheck={accountRecheck} />}
+              onSignedIn={setAccountSignedIn} recheck={accountRecheck}
+              onCaseOpened={value => {
+                setReferral(undefined); setDeskFresh(undefined); setCaseRevoked(false); setCaseCredentials(value);
+                setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined);
+              }} />}
             {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
               onRevoked={() => { setCaseRevoked(true); setReport(undefined); setStage(undefined); setError(undefined); }} />}
           </aside>
