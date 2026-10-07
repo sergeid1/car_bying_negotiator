@@ -17,7 +17,9 @@ because on a slower CI runner the polling in one test exceeded the real 600-per-
 Baseline `mvn clean verify` on 0a0effd: 8:49 locally on a quiet machine, 9:31 in CI; slowest classes
 DocumentPerformance 52 s, DealerDocument 46 s, DocumentExtraction 32 s, BuyerAccount 32 s, VehicleEvidence 24 s,
 CaseDeletion 21 s, BuyingCaseIntake 21 s, PilotFeedback 20 s, EphemeralBuyingCase 18 s, SyntheticCashDeal 18 s.
-After: ten consecutive local passes, median 5:09.5 (5:09–5:11); CI 8:03. A first version with a fresh 512 MiB JVM
+After: ten consecutive local passes, median 5:09.5 (5:09–5:11), and 2:49–2:54 on the integrated branch. In CI
+there is no gain: six runs of the final code took 7:21–11:07 (median about 10:33) against 5:42–9:31 (median 9:03)
+for five recent main runs, because the two forks share a 4-vCPU runner. A first version with a fresh 512 MiB JVM
 per class took 7:04 locally but 27:36 in CI (cold JVM starts), and reused 512 MiB JVMs took 13:27 in CI (GC pressure);
 model-client tests now allow a 10 s budget for the first call in a cold JVM. Open: a reused 512 MiB fork once exited
 with code 0 during datasource shutdown in ShortlistAcceptanceTest; normal-order and random-order replays did not
