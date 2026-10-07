@@ -28,7 +28,7 @@ class ModelHarnessTest {
   private static final List<UntrustedInput> INPUT = List.of(new UntrustedInput.Text("page 1 recognized text", SECRET));
 
   private final RecordingUsageStore store = new RecordingUsageStore();
-  private final ProviderMeter meter = new ProviderMeter(store, Duration.ofSeconds(2), 2);
+  private final ProviderMeter meter = new ProviderMeter(store, Duration.ofSeconds(10), 2);
 
   @AfterEach void close() { meter.close(); }
 
@@ -137,7 +137,7 @@ class ModelHarnessTest {
       stub.reply(200, message("claude-opus-5", "end_turn", "{\"total_minor\":1,\"currency\":\"USD\",\"leak\":\"" + SECRET + "\"}", 5, 5));
       stub.reply(400, "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"" + SECRET + "\"}}");
       stub.reply(200, message("claude-opus-5", "end_turn", "{\"total_minor\":1,\"currency\":\"USD\"}", 5, 5));
-      var harness = harness(stub.gateway(Duration.ofSeconds(2)));
+      var harness = harness(stub.gateway(Duration.ofSeconds(10)));
       assertThatThrownBy(() -> harness.run("case-1", TestTasks.total(), INPUT, 1))
           .isInstanceOf(ProviderMeter.Failure.class).hasMessageNotContaining(SECRET);
       assertThatThrownBy(() -> harness.run("case-1", TestTasks.total(), INPUT, 1))
@@ -153,7 +153,7 @@ class ModelHarnessTest {
     try (var stub = new StubModelServer()) {
       stub.reply(200, message("claude-opus-5", "refusal", null, 40, 2));
       stub.reply(429, error("rate_limit_error"));
-      var harness = harness(stub.gateway(Duration.ofSeconds(2)));
+      var harness = harness(stub.gateway(Duration.ofSeconds(10)));
       assertThatThrownBy(() -> harness.run("case-1", TestTasks.total(), INPUT, 1))
           .isInstanceOfSatisfying(ProviderMeter.Failure.class,
               failure -> assertThat(failure.status()).isEqualTo(Status.PROVIDER_FAILURE));

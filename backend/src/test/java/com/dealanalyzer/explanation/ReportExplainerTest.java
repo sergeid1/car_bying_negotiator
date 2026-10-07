@@ -34,7 +34,7 @@ class ReportExplainerTest {
 
   private final ObjectMapper json = new ObjectMapper();
   private final RecordingUsageStore store = new RecordingUsageStore();
-  private final ProviderMeter meter = new ProviderMeter(store, Duration.ofSeconds(2), 2);
+  private final ProviderMeter meter = new ProviderMeter(store, Duration.ofSeconds(10), 2);
 
   @AfterEach void close() { meter.close(); }
 

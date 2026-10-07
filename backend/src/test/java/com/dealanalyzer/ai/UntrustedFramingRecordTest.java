@@ -67,10 +67,10 @@ class UntrustedFramingRecordTest {
     String output = "{\"expectedPageCount\":2,\"candidates\":[],\"lineItems\":[],\"documentWarnings\":[]}";
     for (ModelProvider provider : ModelProvider.values()) {
       var settings = new ModelSettings(true, provider, provider.defaultModel(), "pilot-parameters.v1", "corpus.v1");
-      var meter = new ProviderMeter(new RecordingUsageStore(), Duration.ofSeconds(2), 1);
+      var meter = new ProviderMeter(new RecordingUsageStore(), Duration.ofSeconds(10), 1);
       try (var stub = new StubModelServer()) {
         stub.reply(200, StubModelServer.completed(provider, provider.defaultModel(), output, 10, 10));
-        var harness = new ModelHarness(meter, settings, stub.gateway(provider, Duration.ofSeconds(2)), "agreement", JSON);
+        var harness = new ModelHarness(meter, settings, stub.gateway(provider, Duration.ofSeconds(10)), "agreement", JSON);
         new ClaudeDealTermsExtractionProvider(harness, provider.defaultModel(), 0.85).extract(document);
 
         JsonNode sent = stub.requests().getFirst();

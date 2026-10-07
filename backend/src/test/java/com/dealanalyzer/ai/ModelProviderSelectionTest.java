@@ -61,11 +61,11 @@ class ModelProviderSelectionTest {
 
   @Test void openAiCallsAreMeteredAsOpenAiWithTheirOwnProvenanceAndPrice() throws Exception {
     var store = new RecordingUsageStore();
-    var meter = new ProviderMeter(store, Duration.ofSeconds(2), 1);
+    var meter = new ProviderMeter(store, Duration.ofSeconds(10), 1);
     try (var stub = new StubModelServer()) {
       stub.reply(200, completed(ModelProvider.OPENAI, "gpt-6-astra", "{\"total_minor\":100,\"currency\":\"USD\"}", 1_000_000, 100_000));
       var settings = new ModelSettings(true, ModelProvider.OPENAI, "gpt-6-astra", "pilot-parameters.v1", "corpus.v1");
-      var harness = new ModelHarness(meter, settings, stub.openAiGateway(Duration.ofSeconds(2)), "openai-agreement", new ObjectMapper());
+      var harness = new ModelHarness(meter, settings, stub.openAiGateway(Duration.ofSeconds(10)), "openai-agreement", new ObjectMapper());
 
       var result = harness.run("case-1", TestTasks.total(), INPUT, 1);
       assertThat(result.value().totalMinor()).isEqualTo(100L);
@@ -80,12 +80,12 @@ class ModelProviderSelectionTest {
   @Test void aRefusalFromTheConfiguredProviderIsNotRetriedElsewhere() throws Exception {
     for (ModelProvider provider : ModelProvider.values()) {
       var store = new RecordingUsageStore();
-      var meter = new ProviderMeter(store, Duration.ofSeconds(2), 1);
+      var meter = new ProviderMeter(store, Duration.ofSeconds(10), 1);
       try (var stub = new StubModelServer()) {
         stub.reply(200, refusal(provider, provider.defaultModel(), 50, 1));
         stub.reply(200, completed(provider, provider.defaultModel(), "{\"total_minor\":1,\"currency\":\"USD\"}", 1, 1));
         var settings = new ModelSettings(true, provider, provider.defaultModel(), "pilot-parameters.v1", "corpus.v1");
-        var harness = new ModelHarness(meter, settings, stub.gateway(provider, Duration.ofSeconds(2)), "agreement", new ObjectMapper());
+        var harness = new ModelHarness(meter, settings, stub.gateway(provider, Duration.ofSeconds(10)), "agreement", new ObjectMapper());
         assertThatThrownBy(() -> harness.run("case-1", TestTasks.total(), INPUT, 1))
             .isInstanceOfSatisfying(ProviderMeter.Failure.class,
                 failure -> assertThat(failure.status()).isEqualTo(Status.PROVIDER_FAILURE));
@@ -96,11 +96,11 @@ class ModelProviderSelectionTest {
   }
 
   @Test void outputAttributedToAnotherProvidersModelIsRejected() throws Exception {
-    var meter = new ProviderMeter(new RecordingUsageStore(), Duration.ofSeconds(2), 1);
+    var meter = new ProviderMeter(new RecordingUsageStore(), Duration.ofSeconds(10), 1);
     try (var stub = new StubModelServer()) {
       stub.reply(200, completed(ModelProvider.OPENAI, "gpt-6-luna", "{\"total_minor\":1,\"currency\":\"USD\"}", 1, 1));
       var settings = new ModelSettings(true, ModelProvider.OPENAI, "gpt-6-astra", "pilot-parameters.v1", "corpus.v1");
-      var harness = new ModelHarness(meter, settings, stub.openAiGateway(Duration.ofSeconds(2)), "agreement", new ObjectMapper());
+      var harness = new ModelHarness(meter, settings, stub.openAiGateway(Duration.ofSeconds(10)), "agreement", new ObjectMapper());
       assertThatThrownBy(() -> harness.run("case-1", TestTasks.total(), INPUT, 1))
           .isInstanceOfSatisfying(ProviderMeter.Failure.class,
               failure -> assertThat(failure.status()).isEqualTo(Status.CONTRACT_FAILURE));

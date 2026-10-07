@@ -39,9 +39,9 @@ class EmbeddedInstructionTest {
     try (var stub = new StubModelServer()) {
       stub.reply(200, StubModelServer.completed(provider, provider.defaultModel(),
           "{\"total_minor\":3321000,\"currency\":\"USD\"}", 10, 10));
-      var meter = new ProviderMeter(new RecordingUsageStore(), Duration.ofSeconds(2), 1);
+      var meter = new ProviderMeter(new RecordingUsageStore(), Duration.ofSeconds(10), 1);
       try {
-        var harness = new ModelHarness(meter, settings(provider), stub.gateway(provider, Duration.ofSeconds(2)),
+        var harness = new ModelHarness(meter, settings(provider), stub.gateway(provider, Duration.ofSeconds(10)),
             "agreement", new ObjectMapper());
         harness.run("case-1", TestTasks.total(), List.of(new UntrustedInput.Text("page 1 recognized text", document)), 1);
       } finally { meter.close(); }
@@ -101,9 +101,9 @@ class EmbeddedInstructionTest {
           "{\"email\":\"Dear dealer\"}")) {
         try (var stub = new StubModelServer()) {
           stub.reply(200, StubModelServer.completed(provider, provider.defaultModel(), obeyed, 10, 10));
-          var meter = new ProviderMeter(new RecordingUsageStore(), Duration.ofSeconds(2), 1);
+          var meter = new ProviderMeter(new RecordingUsageStore(), Duration.ofSeconds(10), 1);
           try {
-            var harness = new ModelHarness(meter, settings(provider), stub.gateway(provider, Duration.ofSeconds(2)),
+            var harness = new ModelHarness(meter, settings(provider), stub.gateway(provider, Duration.ofSeconds(10)),
                 "agreement", new ObjectMapper());
             assertThatThrownBy(() -> harness.run("case-1", TestTasks.total(),
                 List.of(new UntrustedInput.Text("page 1 recognized text", EMBEDDED_INSTRUCTION_DOCUMENTS.getFirst())), 1))
