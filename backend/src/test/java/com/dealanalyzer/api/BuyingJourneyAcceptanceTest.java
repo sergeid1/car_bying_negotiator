@@ -208,6 +208,7 @@ class BuyingJourneyAcceptanceTest {
       var unsupported = brief(); unsupported.put("postalCode", "10001");
       var refused = exchange(client, "POST", "/api/v1/journeys", unsupported, session, "ny");
       assertThat(refused.status()).isEqualTo(422);
+      assertThat(refused.body().path("title").asText()).isEqualTo("Unprocessable Entity");
       assertThat(refused.body().path("code").asText()).isEqualTo("LOCATION_NOT_SERVED");
       assertThat(refused.body().at("/errors/0/field").asText()).isEqualTo("postalCode");
       assertThat(refused.body().at("/errors/0/reason").asText()).isEqualTo("JURISDICTION_NOT_SUPPORTED");

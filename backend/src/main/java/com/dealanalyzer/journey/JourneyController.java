@@ -160,6 +160,8 @@ public class JourneyController {
     @ExceptionHandler(JourneyProblem.class)
     ResponseEntity<ProblemDetail> problem(JourneyProblem problem) {
       var body = ProblemDetail.forStatusAndDetail(problem.status, problem.getMessage());
+      // Keep the pre-Framework-7 API title for 422 outcomes.
+      if (problem.status.value() == 422) body.setTitle("Unprocessable Entity");
       body.setProperty("code", problem.code);
       body.setProperty("errors", problem.errors);
       return ResponseEntity.status(problem.status).body(body);

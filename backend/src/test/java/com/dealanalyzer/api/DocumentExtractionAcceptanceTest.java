@@ -665,7 +665,7 @@ class DocumentExtractionAcceptanceTest {
       var request = new com.dealanalyzer.buyingcase.persistence.FinancingService.VerifyRequest(offer.get("id").asText(), true, loan);
       assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), financePath,
           new com.dealanalyzer.buyingcase.persistence.FinancingService.VerifyRequest(offer.get("id").asText(), false, loan),
-          "unconfirmed-finance", token)).isInstanceOf(HttpClientErrorException.UnprocessableEntity.class);
+          "unconfirmed-finance", token)).isInstanceOf(HttpClientErrorException.UnprocessableContent.class);
       assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), financePath, request,
           "unauthorized-finance", "wrong-token")).isInstanceOf(HttpClientErrorException.class);
       JsonNode finance = HttpAcceptanceHarness.post(application.client(), financePath, request, "finance-one", token);
@@ -692,10 +692,10 @@ class DocumentExtractionAcceptanceTest {
           .isInstanceOf(HttpClientErrorException.Conflict.class);
       assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), outsidePath,
           Map.of("dealerFinanceOfferId", finance.get("id").asText(), "confirmed", false, "loan", outsideLoan), "unconfirmed-outside", token))
-          .isInstanceOf(HttpClientErrorException.UnprocessableEntity.class);
+          .isInstanceOf(HttpClientErrorException.UnprocessableContent.class);
       assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), outsidePath,
           Map.of("dealerFinanceOfferId", "another-case-finance-id", "confirmed", true, "loan", outsideLoan), "foreign-outside", token))
-          .isInstanceOf(HttpClientErrorException.UnprocessableEntity.class);
+          .isInstanceOf(HttpClientErrorException.UnprocessableContent.class);
       ((com.fasterxml.jackson.databind.node.ObjectNode) outsideLoan).put("purchasePriceMinor", 2500000);
       var mismatchedComparison = HttpAcceptanceHarness.post(application.client(), outsidePath, outsideRequest, "outside-two", token);
       assertThat(mismatchedComparison.at("/result/status").asText()).isEqualTo("NOT_COMPARABLE");
@@ -753,7 +753,7 @@ class DocumentExtractionAcceptanceTest {
       assertThat(HttpAcceptanceHarness.get(application.client(), "/api/v1/cases/" + caseId + "/reports/latest", token)
           .at("/analysis/financingAvailability").asText()).isEqualTo("STALE_OR_UNVERIFIED");
       assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), outsidePath, outsideRequest, "stale-outside", token))
-          .isInstanceOf(HttpClientErrorException.UnprocessableEntity.class);
+          .isInstanceOf(HttpClientErrorException.UnprocessableContent.class);
       savedCaseId = caseId; savedToken = token; savedReport = report;
       savedFinance = HttpAcceptanceHarness.get(application.client(), financePath + "/latest", token);
     }

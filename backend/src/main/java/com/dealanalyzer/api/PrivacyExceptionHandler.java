@@ -50,6 +50,8 @@ class PrivacyExceptionHandler extends ResponseEntityExceptionHandler {
   private static ProblemDetail safe(HttpStatusCode status) {
     var problem = ProblemDetail.forStatusAndDetail(status,
         status.is5xxServerError() ? "The operation could not be completed." : "The request could not be processed.");
+    // Framework 7 renamed 422's reason phrase; preserve the existing API error body.
+    if (status.value() == 422) problem.setTitle("Unprocessable Entity");
     problem.setProperty("failureCategory", status.is5xxServerError() ? "INTERNAL" : "BUYER_INPUT");
     problem.setInstance(URI.create("/api"));
     return problem;

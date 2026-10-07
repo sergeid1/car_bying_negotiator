@@ -11,9 +11,10 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
-import org.springframework.boot.web.context.WebServerApplicationContext;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestClient;
 
 final class HttpAcceptanceHarness {
@@ -73,7 +74,12 @@ final class HttpAcceptanceHarness {
             .web(WebApplicationType.SERVLET)
             .run(properties.toArray(String[]::new));
     int port = ((WebServerApplicationContext) context).getWebServer().getPort();
-    return new RunningApplication(context, RestClient.create("http://127.0.0.1:" + port));
+    return new RunningApplication(context, RestClient.builder()
+        .baseUrl("http://127.0.0.1:" + port)
+        // Match the API's Jackson 2 converter, including Jackson 2 JsonNode request fixtures.
+        .configureMessageConverters(converters -> converters.registerDefaults().withJsonConverter(
+            new MappingJackson2HttpMessageConverter(JSON)))
+        .build());
   }
 
   static JsonNode post(RestClient client, String path, Object body) throws Exception {
