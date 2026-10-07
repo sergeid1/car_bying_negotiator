@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
@@ -106,8 +107,10 @@ public class CaseAccessService {
     String[] parts = pass.split("\\.", -1);
     if (parts.length != 4 || parts[1].isEmpty() || parts[1].length() > 36 || accountPasses == null) return false;
     long epoch;
-    try { epoch = Long.parseLong(parts[2]); } catch (NumberFormatException malformed) { return false; }
-    if (!Instant.ofEpochSecond(epoch).isAfter(Instant.now())) return false;
+    try {
+      epoch = Long.parseLong(parts[2]);
+      if (!Instant.ofEpochSecond(epoch).isAfter(Instant.now())) return false;
+    } catch (NumberFormatException | DateTimeException malformed) { return false; }
     var admission = accountPasses.getIfAvailable();
     String sessionHash = admission == null ? null : admission.admittedSessionHash(parts[1]);
     return sessionHash != null && MessageDigest.isEqual(

@@ -98,6 +98,8 @@ the case is still attached to it. It expires after `account.case-pass.lifetime` 
 hours), or earlier with the session or the case. Signing out, session expiry and account deletion
 therefore end access through the account at once, and the case link keeps working for a case that
 is not being deleted. Nothing about a pass is stored server-side.
+Malformed pass fields, including expiry values outside the supported timestamp range, receive
+the same unavailable 404 response as an unknown case on case reads and writes.
 
 ## Export and deletion
 
