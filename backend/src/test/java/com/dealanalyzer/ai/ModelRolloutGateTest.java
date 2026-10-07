@@ -112,6 +112,18 @@ class ModelRolloutGateTest {
         .containsExactly(missing);
   }
 
+  @Test void anOpus5ComparisonDoesNotAdmitOpus55() {
+    var defaults = new ModelSettings(true, ANTHROPIC, ANTHROPIC.defaultModel(), "pilot-parameters.v1", "corpus.v1");
+    var oldComparison = anthropicMet(List.of(comparison(ANTHROPIC, "claude-opus-5", "total-prompt.v1", "PASS")));
+    String missing = "NO_SHADOW_COMPARISON:ANTHROPIC:EXTRACTION:total-prompt.v1:total-schema.v1";
+    assertThat(unmet(ENABLED, oldComparison, CREDENTIALS)).isEmpty();
+    assertThat(unmet(defaults, oldComparison, CREDENTIALS)).containsExactly(missing);
+    assertThatThrownBy(() -> new ModelRolloutGate(defaults, oldComparison, List.of(TestTasks.total()), CREDENTIALS))
+        .isInstanceOf(IllegalStateException.class).hasMessageContaining(missing);
+    var ownComparison = anthropicMet(List.of(comparison(ANTHROPIC, "claude-opus-5-5", "total-prompt.v1", "PASS")));
+    assertThat(unmet(defaults, ownComparison, CREDENTIALS)).isEmpty();
+  }
+
   @Test void comparisonsNotProducedByTheEvaluationHarnessAreNotEvidence() {
     assertThatThrownBy(() -> new ShadowComparison("cmp", "EXTRACTION", new Candidate(ANTHROPIC, "claude-opus-5", "p", "s"),
         "baseline", "corpus.v1", "pilot-parameters.v1", "HELD_OUT", "hand-written", "0", Instant.now(), "PASS", "r"))

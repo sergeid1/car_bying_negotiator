@@ -35,8 +35,8 @@ closed, because any other model has no recorded shadow comparison and must never
 | Gateway | `AnthropicModelGateway` | `OpenAiModelGateway` |
 | SDK | `com.anthropic:anthropic-java` 2.66.0 | `com.openai:openai-java` 4.72.0 |
 | API | Messages (`anthropic-messages-api`) | Responses (`openai-responses-api`) |
-| Default model | `claude-opus-5` | `gpt-6-astra` |
-| List price per 1M tokens (input / output) | $5 / $25 | $10 / $50 |
+| Default model | `claude-opus-5-5` | `gpt-6-astra` |
+| List price per 1M tokens (input / output) | $4 / $20 | $10 / $50 |
 | Structured output | `output_config.format` json_schema | `text.format` json_schema, `strict: true` |
 | Credentials (environment or system property) | `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` | `OPENAI_API_KEY` |
 | Endpoint overrides the gate refuses | `ANTHROPIC_BASE_URL`, `anthropic.baseUrl` | `OPENAI_BASE_URL`, `openai.baseUrl` |
@@ -45,6 +45,11 @@ closed, because any other model has no recorded shadow comparison and must never
 Both gateways send the same instructions and the same framed input, offer no tools, make no SDK
 retries, force SDK logging off, use the meter's timeout, and reduce every SDK exception and response
 to one outcome code. Images go to OpenAI as `input_image` data URLs at `detail: high`.
+
+Anthropic requests explicitly set `output_config.effort` to `high`, preserving the depth Opus 5
+used by default rather than adopting Opus 5.5's `medium` default. A deployment may still pin
+`claude-opus-5`, priced at $5 / $25 per million input / output tokens. Each model needs its own
+passing shadow comparison; an Opus 5 comparison does not admit Opus 5.5.
 
 OpenAI's strict mode requires every object in a schema to list all its properties as `required`
 and to set `additionalProperties: false`. A task schema that does not is rejected by the vendor
@@ -186,7 +191,7 @@ per comparison for reviewed integration into this resource. It never edits the b
 {
   "id": "extraction-2026-10-01-01",
   "operation": "EXTRACTION",
-  "candidate": { "provider": "ANTHROPIC", "modelId": "claude-opus-5", "promptVersion": "deal-terms-prompt.v1", "schemaVersion": "deal-terms.v1" },
+  "candidate": { "provider": "ANTHROPIC", "modelId": "claude-opus-5-5", "promptVersion": "deal-terms-prompt.v1", "schemaVersion": "deal-terms.v1" },
   "baseline": "deterministic-dealer-layout.v1",
   "evaluationSetVersion": "dealer-corpus.v1",
   "thresholdSetVersion": "pilot-parameters.v1",

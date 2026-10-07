@@ -15,7 +15,9 @@ public final class ModelPricing {
   private static final BigDecimal MILLION = BigDecimal.valueOf(1_000_000);
   private record Rates(BigDecimal input, BigDecimal output) {}
   private static final Map<ModelProvider, Map<String, Rates>> PER_MILLION = Map.of(
-      ModelProvider.ANTHROPIC, Map.of("claude-opus-5", new Rates(new BigDecimal("5.00"), new BigDecimal("25.00"))),
+      ModelProvider.ANTHROPIC, Map.of(
+          "claude-opus-5-5", new Rates(new BigDecimal("4.00"), new BigDecimal("20.00")),
+          "claude-opus-5", new Rates(new BigDecimal("5.00"), new BigDecimal("25.00"))),
       // developers.openai.com/api/docs/models/gpt-6-astra, checked 2026-09-30.
       ModelProvider.OPENAI, Map.of("gpt-6-astra", new Rates(new BigDecimal("10.00"), new BigDecimal("50.00"))));
 

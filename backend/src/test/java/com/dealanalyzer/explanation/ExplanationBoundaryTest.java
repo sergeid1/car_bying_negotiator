@@ -53,7 +53,7 @@ class ExplanationBoundaryTest {
         + analysis + "}");
     var meter = new ProviderMeter(new RecordingUsageStore(), Duration.ofSeconds(1), 1);
     try {
-      var off = new ModelSettings(false, ModelProvider.ANTHROPIC, "claude-opus-5", "pilot-parameters.v1",
+      var off = new ModelSettings(false, ModelProvider.ANTHROPIC, "claude-opus-5-5", "pilot-parameters.v1",
           ModelSettings.NO_EVALUATION_SET);
       var explanation = new ReportExplainer(new ModelHarness(meter, off, null, "none", json), json)
           .explain("case-1", report);
