@@ -97,6 +97,7 @@
             <configuration>
               <target>
                 <!-- java.io.tmpdir must exist before a forked JVM starts. -->
+                <mkdir dir="${project.build.directory}/surefire-reports"/>
                 <mkdir dir="${project.build.directory}/test-forks/1/tmp"/>
                 <mkdir dir="${project.build.directory}/test-forks/2/tmp"/>
               </target>
