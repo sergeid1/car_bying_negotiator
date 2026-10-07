@@ -20,16 +20,21 @@ Opus 5.5 differs from Opus 5 in ways that matter here:
 obligations: executed Anthropic terms (`model-vendor-terms.json`) and a passing shadow comparison for this exact
 model (tickets 28 and 39).
 
-**Status:** ready-for-agent — filed on 2026-10-06.
+**Status:** complete — `ModelProvider.ANTHROPIC` defaults to `claude-opus-5-5`, priced in `ModelPricing` at
+$4 / $20 per million tokens, with `claude-opus-5` still priced at $5 / $25 for a deployment that pins it, as of
+2026-10-07. `AnthropicModelGateway` sets `output_config.effort` to `high` through the SDK's typed builder, and
+`AnthropicModelGatewayTest` asserts it in the request body. `ModelRolloutGateTest` shows that a passing comparison
+for `claude-opus-5` does not admit `claude-opus-5-5`. Open: model calls stay disabled until the Anthropic terms are
+executed and `claude-opus-5-5` has its own passing shadow comparison (tickets 28 and 39).
 
-- [ ] `ModelProvider.ANTHROPIC` defaults to `claude-opus-5-5`, and `ModelPricing` lists it at $4.00 / $20.00 per
+- [x] `ModelProvider.ANTHROPIC` defaults to `claude-opus-5-5`, and `ModelPricing` lists it at $4.00 / $20.00 per
       million tokens. `claude-opus-5` stays priced so a deployment that pins it explicitly keeps working.
-- [ ] `AnthropicModelGateway.params` sets `output_config.effort` explicitly to `high`, matching the depth Opus 5
+- [x] `AnthropicModelGateway.params` sets `output_config.effort` explicitly to `high`, matching the depth Opus 5
       used by default, and a gateway test asserts that the request body carries it. Lowering effort to save cost
       is a separate decision for the evaluation harness to measure.
-- [ ] The gateway and explanation tests, the `application.properties` comment, `docs/ai-execution-harness.md`
+- [x] The gateway and explanation tests, the `application.properties` comment, `docs/ai-execution-harness.md`
       (default model, list price, shadow comparison example) and `docs/provider-inventory.md` name
       `claude-opus-5-5`. Ticket history that records what was true at the time stays unchanged.
-- [ ] The rollout gate is unchanged: no shadow comparison recorded for `claude-opus-5` counts for
+- [x] The rollout gate is unchanged: no shadow comparison recorded for `claude-opus-5` counts for
       `claude-opus-5-5`, and a test confirms that the gate refuses the new model without its own comparison.
-- [ ] `mvn clean verify` and `npm test` pass.
+- [x] `mvn clean verify` and `npm test` pass.
