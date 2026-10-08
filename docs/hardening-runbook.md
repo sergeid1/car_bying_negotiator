@@ -114,6 +114,12 @@ Google OAuth verification for `gmail.send` and the Microsoft publisher verificat
 and a random `MAILBOX_TOKEN_ENCRYPTION_KEY` of at least 32 bytes, separate from the document and
 case keys. The fake sender fails startup under a pilot or production declaration.
 
+Production connecting remains disabled. Record every obligation in
+[mailbox provider boundaries](mailbox-provider-boundaries.md) before enabling live adapters:
+provider app/publisher verification, exact HTTPS redirect registration, least-privilege consent,
+secret management, and real send/revocation checks. The mailbox production guard verifies
+adapter/key configuration only; it does not establish any of those deployment facts.
+
 ## Accepted scan exceptions
 
 `scripts/security-checks.sh` fails on any high or critical finding. A finding may be accepted only

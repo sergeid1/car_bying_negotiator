@@ -13,19 +13,24 @@ evidence. Found during ticket 78's 2026-10-07 review.
 **Blocked by:** None for code/stub contract tests; live release additionally requires Google
 OAuth consent-screen verification, Microsoft publisher verification and deployed redirect checks.
 
-**Status:** ready-for-agent — prerequisite evidence and identity validation for live mailbox providers.
+**Status:** complete — no migration, as of 2026-10-07. Live Gmail and Graph adapters validate identity-token
+issuer, audience, expiry, nonce and `azp` before using an address, relying on direct TLS token-endpoint delivery
+instead of JWS signature checks (`docs/mailbox-provider-boundaries.md`). `MailboxProviderContractTest` covers both
+adapters over local stub HTTP; `ConnectedMailboxAcceptanceTest` fences concurrent, slow, stale and restarted sends;
+`DeploymentStageGuardTest` covers fake, missing-key and disabled configurations. Production connecting stays disabled
+(`MAILBOX_SENDER=none`) until provider verification and the deployed checks listed there are recorded.
 
-- [ ] Validate identity issuer, audience/client binding, expiry and applicable nonce/authorized-party
+- [x] Validate identity issuer, audience/client binding, expiry and applicable nonce/authorized-party
   claims with provider-specific rules; document the trusted token-endpoint/signature decision.
-- [ ] Test authorization-code/PKCE and exact registered redirect handling, expired/reused/foreign
+- [x] Test authorization-code/PKCE and exact registered redirect handling, expired/reused/foreign
   state, send-only granted scopes and safe rejection of missing/malformed token and identity replies.
-- [ ] Add stub HTTP contract tests for Gmail and Graph covering exact recipient/subject/body,
+- [x] Add stub HTTP contract tests for Gmail and Graph covering exact recipient/subject/body,
   authentication failure, invalid_grant, quota, timeout, lost connection and 5xx; no hidden send retry.
-- [ ] Prove concurrent sends, crash/restart and slow sends past the in-flight window cannot dispatch
+- [x] Prove concurrent sends, crash/restart and slow sends past the in-flight window cannot dispatch
   an unintended second send or let late completion overwrite a newer decision. Explicit Buyer
   send-again remains a separate audited action that can duplicate an earlier UNKNOWN delivery.
-- [ ] Test `MailboxProductionGuard` across pilot/production declarations for fake refusal, missing
+- [x] Test `MailboxProductionGuard` across pilot/production declarations for fake refusal, missing
   key refusal and the disabled-provider configuration; do not present the guard as app verification.
-- [ ] Keep production connecting disabled until app/publisher verification, HTTPS redirect registration,
+- [x] Keep production connecting disabled until app/publisher verification, HTTPS redirect registration,
   least-privilege consent, secret management and live send/revocation checks are recorded.
-- [ ] Update the threat model with named executable evidence and remaining deployment obligations.
+- [x] Update the threat model with named executable evidence and remaining deployment obligations.
