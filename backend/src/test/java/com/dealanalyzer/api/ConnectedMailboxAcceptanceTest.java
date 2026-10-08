@@ -152,10 +152,74 @@ class ConnectedMailboxAcceptanceTest {
         gmail.afterRefresh(() -> {});
         probe.afterPreparation(() -> {});
         assertThat(gmail.sent()).isEmpty();
-        assertThat(jdbc.queryForObject("select state from dealer_relay_messages where id = ?", String.class, message)).isEqualTo("HANDED_OFF");
+        assertThat(jdbc.queryForObject("select state from dealer_relay_messages where id = ?", String.class, message)).as(fence).isEqualTo("HANDED_OFF");
         assertThat(jdbc.queryForObject("select outcome from mailbox_sends where message_id = ?", String.class, message)).isEqualTo("UNAVAILABLE");
         assertThat(jdbc.queryForObject("select count(*) from audit_events where case_id = ? and event_type = 'DEALER_MESSAGE_MAILBOX_NOT_SENT'", Long.class, caseId)).isPositive();
       }
+    }
+  }
+
+  @Test void concurrentExpiredAndLateAttemptsAreFenced() throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("mailbox-concurrency", true,
+        LifecycleConfiguration.class, "--case.deletion.delay=PT1H",
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef",
+        "--mailbox.token-encryption-key=" + MAILBOX_KEY);
+        var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+      var client = app.client();
+      var jdbc = app.context().getBean(JdbcTemplate.class);
+      var gmail = app.context().getBean("fakeGmail", FakeMailboxSender.class);
+      var probe = app.context().getBean(com.dealanalyzer.mailbox.MailboxLifecycleTestProbe.class);
+      var created = post(client, "/api/v1/cases", validCase(), "concurrent-case");
+      String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+      String base = "/api/v1/cases/" + caseId;
+      String dealer = negotiableCase(app, base, caseId, token);
+      String session = TestDriveAcceptanceTest.signInAndAttach(client, caseId, token);
+      var auth = start(client, session, "GOOGLE");
+      assertThat(complete(client, session, auth.get("state"), auth.get("code")).status()).isEqualTo(200);
+
+      for (String phase : List.of("prepared", "late-success", "late-refusal")) {
+        String message = handOff(client, base, token, dealer, "sales@dealer.example", phase);
+        var boundary = new Boundary();
+        probe.resetAttempt();
+        probe.afterPreparation(boundary);
+        var first = executor.submit(() -> send(client, base, token, session, message));
+        boundary.reached();
+        try {
+          assertThat(send(client, base, token, session, message).body().path("code").asText()).isEqualTo("SEND_IN_PROGRESS");
+          // Advance the persisted attempt, not wall-clock time. This also represents a process lost after claim.
+          jdbc.update("update mailbox_sends set started_at = ? where message_id = ?",
+              java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(600)), message);
+          probe.afterPreparation(() -> {});
+          assertThat(send(client, base, token, session, message).body().path("state").asText()).isEqualTo("SENT");
+        } finally { boundary.release(); }
+        var old = first.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        assertThat(old.status()).isEqualTo(409);
+        if (!phase.equals("prepared")) probe.staleCompletion(phase.equals("late-success"));
+        assertThat(handoff(client, base, token, message).path("state").asText()).isEqualTo("SENT");
+        assertThat(jdbc.queryForList("select outcome from mailbox_sends where message_id = ? order by started_at", String.class, message))
+            .containsExactly("DELIVERY_UNKNOWN", "SENT");
+        assertThat(jdbc.queryForObject("select count(*) from audit_events where case_id = ? and event_type = 'DEALER_MESSAGE_SEND_AGAIN'",
+            Long.class, caseId)).isEqualTo(phase.equals("prepared") ? 1 : phase.equals("late-success") ? 2 : 3);
+      }
+      // The superseded prepared attempt never dispatched; an explicitly repeated UNKNOWN send can duplicate.
+      assertThat(gmail.sent()).hasSize(3);
+
+      String slow = handOff(client, base, token, dealer, "sales@dealer.example", "slow-send");
+      var dispatch = new Boundary(); gmail.atSend(dispatch);
+      var sending = executor.submit(() -> send(client, base, token, session, slow));
+      dispatch.reached();
+      try {
+        jdbc.update("update mailbox_sends set started_at = ? where message_id = ?",
+            java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(600)), slow);
+        var competitorStarted = new java.util.concurrent.CountDownLatch(1);
+        var competitor = executor.submit(() -> { competitorStarted.countDown(); return send(client, base, token, session, slow); });
+        Boundary.await(competitorStarted);
+        dispatch.release();
+        assertThat(sending.get(30, java.util.concurrent.TimeUnit.SECONDS).body().path("state").asText()).isEqualTo("SENT");
+        assertThat(competitor.get(30, java.util.concurrent.TimeUnit.SECONDS).status()).isEqualTo(409);
+        assertThat(gmail.sent()).hasSize(4);
+        assertThat(jdbc.queryForObject("select count(*) from mailbox_sends where message_id = ?", Long.class, slow)).isEqualTo(1);
+      } finally { dispatch.release(); gmail.atSend(() -> {}); }
     }
   }
 
@@ -236,6 +300,48 @@ class ConnectedMailboxAcceptanceTest {
     }
   }
 
+  @Test void restartPreservesCrashedClaimWithoutDispatchingOrAutomaticallyRetrying() throws Exception {
+    var harness = new HttpAcceptanceHarness(directory);
+    String[] properties = {"--case.deletion.delay=PT1H",
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef", "--mailbox.token-encryption-key=" + MAILBOX_KEY};
+    String caseId, token, session, message, base;
+    try (var app = harness.startWithConfiguration("mailbox-restart", true, LifecycleConfiguration.class, properties)) {
+      var client = app.client();
+      var created = post(client, "/api/v1/cases", validCase(), "restart-case");
+      caseId = created.at("/case/id").asText(); token = created.path("accessToken").asText();
+      base = "/api/v1/cases/" + caseId;
+      String dealer = negotiableCase(app, base, caseId, token);
+      session = TestDriveAcceptanceTest.signInAndAttach(client, caseId, token);
+      var auth = start(client, session, "GOOGLE");
+      assertThat(complete(client, session, auth.get("state"), auth.get("code")).status()).isEqualTo(200);
+      message = handOff(client, base, token, dealer, "sales@dealer.example", "crash-claim");
+      var probe = app.context().getBean(com.dealanalyzer.mailbox.MailboxLifecycleTestProbe.class);
+      // Abrupt termination at this boundary bypasses the service's normal failure/completion handling.
+      probe.afterPreparation(() -> { throw new AssertionError("simulated process loss after committed claim"); });
+      assertThatThrownBy(() -> app.context().getBean(com.dealanalyzer.mailbox.MailboxSendService.class)
+          .send(caseId, token, session, message)).isInstanceOf(AssertionError.class);
+      assertThat(app.context().getBean("fakeGmail", FakeMailboxSender.class).sent()).isEmpty();
+      assertThat(app.context().getBean(JdbcTemplate.class).queryForObject(
+          "select outcome from mailbox_sends where message_id = ?", String.class, message)).isEqualTo("SENDING");
+    }
+    try (var app = harness.startWithConfiguration("mailbox-restart", true, LifecycleConfiguration.class, properties)) {
+      var client = app.client(); var jdbc = app.context().getBean(JdbcTemplate.class);
+      var gmail = app.context().getBean("fakeGmail", FakeMailboxSender.class);
+      assertThat(gmail.sent()).isEmpty();
+      assertThat(handoff(client, base, token, message).path("state").asText()).isEqualTo("DELIVERY_UNKNOWN");
+      assertThat(send(client, base, token, session, message).body().path("code").asText()).isEqualTo("SEND_IN_PROGRESS");
+      jdbc.update("update mailbox_sends set started_at = ? where message_id = ?",
+          java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(600)), message);
+      assertThat(gmail.sent()).isEmpty();
+      assertThat(send(client, base, token, session, message).body().path("state").asText()).isEqualTo("SENT");
+      assertThat(gmail.sent()).hasSize(1);
+      assertThat(jdbc.queryForList("select outcome from mailbox_sends where message_id = ? order by started_at", String.class, message))
+          .containsExactly("DELIVERY_UNKNOWN", "SENT");
+      assertThat(jdbc.queryForObject("select count(*) from audit_events where case_id = ? and event_type = 'DEALER_MESSAGE_SEND_AGAIN'",
+          Long.class, caseId)).isEqualTo(1);
+    }
+  }
+
   @Test void connectSendCheckUnclearOutcomesAndDisconnect(CapturedOutput output) throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("connected-mailbox", true,
         AgreedPriceAcceptanceTest.Configuration.class, "--case.deletion.delay=PT1H",
@@ -265,6 +371,11 @@ class ConnectedMailboxAcceptanceTest {
       assertThat(handoff(client, base, token, first).path("state").asText()).isEqualTo("HANDED_OFF");
 
       // Connecting checks the single-use state, the PKCE verifier and the granted scopes; a read scope is refused.
+      var expiredAuthorization = start(client, session, "GOOGLE");
+      jdbc.update("update mailbox_authorizations set expires_at = ?", java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(1)));
+      assertThat(complete(client, session, expiredAuthorization.get("state"), expiredAuthorization.get("code"))
+          .body().path("code").asText()).isEqualTo("AUTHORIZATION_UNKNOWN");
+      assertThat(count(jdbc, "mailbox_authorizations")).isZero();
       var authorization = start(client, session, "GOOGLE");
       assertThat(call(client, "POST", "/api/v1/account/mailbox/connection",
           Map.of("state", "forged-state", "code", authorization.get("code")), null, session).body().path("code").asText())

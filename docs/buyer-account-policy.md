@@ -164,6 +164,14 @@ wins, disconnect/deletion waits for the provider call to return: that call canno
 Provider withdrawal remains best effort, and email already delivered remains with its recipients.
 `ConnectedMailboxAcceptanceTest` exercises these boundaries with latches and fake providers.
 
+Ticket 92 validates live provider identity claims and HTTP contracts with loopback stubs.
+The send meter fences expired claims and stale completion; outcome persistence remains under
+the dispatch locks for slow sends. Startup never retries a persisted SENDING claim. After the
+in-flight window, an explicit Buyer send-again request converts that attempt to UNKNOWN,
+creates a new metered attempt and records its audit action; it may duplicate an earlier delivery.
+See [mailbox provider boundaries](mailbox-provider-boundaries.md) for provider-specific rules,
+the trusted token-endpoint/signature decision and the evidence required before live enablement.
+
 ## Buying Journeys
 
 A signed-in Buyer starts a Buying Journey under `/api/v1/journeys`, authorized only by

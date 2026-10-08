@@ -16,9 +16,14 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "mailbox.sender", havingValue = "live")
 class GmailMailboxSender extends OAuthMailboxSender {
+  @org.springframework.beans.factory.annotation.Autowired
   GmailMailboxSender(@Value("${mailbox.google.client-id:}") String clientId,
       @Value("${mailbox.google.client-secret:}") String clientSecret) {
     super(clientId, clientSecret);
+  }
+
+  GmailMailboxSender(String clientId, String secret, java.net.http.HttpClient http, java.time.Duration timeout) {
+    super(clientId, secret, http, timeout);
   }
 
   @Override public MailboxProvider provider() { return MailboxProvider.GOOGLE; }
@@ -29,8 +34,13 @@ class GmailMailboxSender extends OAuthMailboxSender {
   }
 
   @Override String address(JsonNode claims) {
-    return claims.path("email_verified").asBoolean(false) ? claims.path("email").asText(null) : null;
+    return claims.path("email_verified").isBoolean() && claims.path("email_verified").booleanValue() ? text(claims, "email") : null;
   }
+
+  @Override boolean validIssuer(JsonNode claims) {
+    return java.util.Set.of("https://accounts.google.com", "accounts.google.com").contains(text(claims, "iss"));
+  }
+  String sendEndpoint() { return "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"; }
 
   @Override public Delivery send(String accessToken, String from, OutgoingMessage message) {
     String raw;
@@ -40,7 +50,7 @@ class GmailMailboxSender extends OAuthMailboxSender {
     } catch (IllegalArgumentException unsafeHeader) {
       return Delivery.REJECTED;
     }
-    return post("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", accessToken, "application/json",
+    return post(sendEndpoint(), accessToken, "application/json",
         "{\"raw\":\"" + raw + "\"}");
   }
 

@@ -240,10 +240,18 @@ public class DealerMessageHandoff {
    * {@code UNKNOWN} leaves it {@code DELIVERY_UNKNOWN} for the Buyer to check their Sent folder.
    */
   public Handoff completeMailboxSend(String caseId, String token, MailboxClaim claim, MailboxOutcome outcome) {
+    return completeMailboxSend(caseId, token, claim, outcome, () -> true);
+  }
+
+  /** The meter transition and handoff decision share the case lock, fencing superseded attempts. */
+  public Handoff completeMailboxSend(String caseId, String token, MailboxClaim claim, MailboxOutcome outcome,
+      java.util.function.BooleanSupplier activeAttempt) {
     String messageId = claim.messageId();
     Runnable after = transaction.execute(status -> {
       locks.lock(caseId);
       Handoff current = read(caseId, messageId);
+      if (!activeAttempt.getAsBoolean()) return null;
+      if (!DELIVERY_UNKNOWN.equals(current.state()) || current.sendPath() != SendPath.CONNECTED_MAILBOX) return null;
       Instant now = PersistedInstant.round(Instant.now());
       switch (outcome) {
         case SENT -> {
@@ -269,7 +277,14 @@ public class DealerMessageHandoff {
         }
       }
     });
-    if (after != null) after.run();
+    if (after != null) {
+      if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+            new org.springframework.transaction.support.TransactionSynchronization() {
+              @Override public void afterCommit() { after.run(); }
+            });
+      } else after.run();
+    }
     return transaction.execute(status -> read(caseId, messageId));
   }
 

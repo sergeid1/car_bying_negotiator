@@ -33,6 +33,23 @@ class DeploymentStageGuardTest {
     refuses(runner, "relay.RelayProductionGuard", "fake reply-intake provider", "relay.FakeDealerMailRelay");
     refuses(runner, "mailbox.MailboxProductionGuard", "fake mailbox sender", "mailbox.MailboxTokenProtection",
         "mailbox.FakeMailboxSender$Senders");
+    var liveMailbox = runner.withPropertyValues("mailbox.sender=live", "mailbox.google.client-id=client",
+        "mailbox.google.client-secret=secret", "mailbox.microsoft.client-id=client", "mailbox.microsoft.client-secret=secret");
+    for (String key : List.of("", "short", "x".repeat(31))) {
+      refuses(liveMailbox.withPropertyValues("mailbox.token-encryption-key=" + key), "mailbox.MailboxProductionGuard",
+          "MAILBOX_TOKEN_ENCRYPTION_KEY", "mailbox.MailboxTokenProtection", "mailbox.GmailMailboxSender", "mailbox.GraphMailboxSender");
+    }
+    liveMailbox.withPropertyValues("mailbox.token-encryption-key=" + "k".repeat(32))
+        .withUserConfiguration(type("mailbox.MailboxProductionGuard"), type("mailbox.MailboxTokenProtection"),
+            type("mailbox.GmailMailboxSender"), type("mailbox.GraphMailboxSender"))
+        .run(context -> assertThat(context).hasNotFailed());
+    runner.withPropertyValues("mailbox.sender=none").withUserConfiguration(type("mailbox.MailboxProductionGuard"),
+        type("mailbox.MailboxTokenProtection"), type("mailbox.FakeMailboxSender$Senders"),
+        type("mailbox.GmailMailboxSender"), type("mailbox.GraphMailboxSender"))
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(context.getBeansOfType(com.dealanalyzer.mailbox.MailboxSender.class)).isEmpty();
+        });
     refuses(runner, "purchase.CheckoutProductionGuard", "DevelopmentNoChargeCheckout", "purchase.DevelopmentNoChargeCheckout");
     refuses(runner, "shopping.inventory.InventorySearchProductionGuard", "Development inventory adapter",
         "shopping.inventory.DeterministicFakeInventorySearchAdapter");

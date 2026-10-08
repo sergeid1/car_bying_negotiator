@@ -56,7 +56,7 @@ public class MailboxSendService {
     this.perDealer = perDealer; this.perCase = perCase; this.perAccount = perAccount; this.window = window; this.inFlight = inFlight;
   }
 
-  private record Attempt(String id, String caseToken, MailboxConnections.Connection connection, DealerMessageHandoff.MailboxClaim claim) {
+  record Attempt(String id, String caseToken, MailboxConnections.Connection connection, DealerMessageHandoff.MailboxClaim claim) {
     @Override public String toString() { return "Attempt[redacted]"; }
   }
 
@@ -76,12 +76,25 @@ public class MailboxSendService {
       if (sendable.isEmpty()) throw notConnected();
       delivery = transaction.execute(status -> {
         accounts.lockActiveAccount(connection.accountId());
-        return handoffs.dispatchMailbox(caseId, caseToken, attempt.claim(), () -> {
+        var result = handoffs.dispatchMailbox(caseId, caseToken, attempt.claim(), () -> {
           if (!connections.stillConnected(connection)) throw notConnected();
+          if (count("id = ? and outcome = 'SENDING'", attempt.id()) != 1) throw superseded();
           dispatched.set(true);
           return connections.sender(connection.provider()).send(sendable.get().accessToken(), sendable.get().address(),
               new MailboxSender.OutgoingMessage(attempt.claim().dealerAddress(), attempt.claim().subject(), attempt.claim().body()));
         });
+        // Commit the outcome with dispatch's locks still held, even when a call outlives inFlight.
+        finish(attempt, switch (result) {
+          case SENT -> "SENT";
+          case UNKNOWN -> "DELIVERY_UNKNOWN";
+          case RATE_LIMITED -> "RATE_LIMITED";
+          default -> "REJECTED";
+        }, switch (result) {
+          case SENT -> MailboxOutcome.SENT;
+          case UNKNOWN -> MailboxOutcome.UNKNOWN;
+          default -> MailboxOutcome.NOT_SENT;
+        });
+        return result;
       });
     } catch (MailboxSender.MailboxFailure failure) {
       if (dispatched.get()) return finish(attempt, "DELIVERY_UNKNOWN", MailboxOutcome.UNKNOWN);
@@ -94,10 +107,8 @@ public class MailboxSendService {
       };
     } catch (RuntimeException stopped) {
       if (dispatched.get()) return finish(attempt, "DELIVERY_UNKNOWN", MailboxOutcome.UNKNOWN);
-      record(attempt, "UNAVAILABLE");
-      try {
-        handoffs.completeMailboxSend(caseId, caseToken, attempt.claim(), MailboxOutcome.NOT_SENT);
-      } catch (RuntimeException removed) { /* Account/case deletion may have removed the handoff. */ }
+      try { finish(attempt, "UNAVAILABLE", MailboxOutcome.NOT_SENT); }
+      catch (RuntimeException removed) { /* Account/case deletion may have removed the handoff. */ }
       throw stopped;
     }
     return switch (delivery) {
@@ -141,6 +152,12 @@ public class MailboxSendService {
     Instant now = PersistedInstant.round(Instant.now());
     if (count("message_id = ? and outcome = 'SENDING' and started_at > ?", claim.messageId(), Timestamp.from(now.minus(inFlight))) > 0)
       throw new MailboxProblem(HttpStatus.CONFLICT, "SEND_IN_PROGRESS", "This message is being sent now. Wait a moment, then refresh.");
+    // A crashed attempt remains uncertain. Only this explicit Buyer request may supersede it.
+    // The case lock prevents expiration while the previous provider call is still entered.
+    jdbc.update("""
+        update mailbox_sends set outcome = 'DELIVERY_UNKNOWN', completed_at = ?
+        where message_id = ? and outcome = 'SENDING' and started_at <= ?
+        """, Timestamp.from(now), claim.messageId(), Timestamp.from(now.minus(inFlight)));
     Timestamp since = Timestamp.from(now.minus(window));
     String hours = window.toHours() + " hours";
     if (count("account_id = ? and dealer_address_hash = ? and " + metered() + " and started_at > ?", accountId,
@@ -161,21 +178,23 @@ public class MailboxSendService {
     return new Attempt(id, caseToken, connection, claim);
   }
 
-  private DealerMessageHandoff.Handoff finish(Attempt attempt, String metered, MailboxOutcome outcome) {
-    record(attempt, metered);
-    return handoffs.completeMailboxSend(attempt.claim().caseId(), attempt.caseToken(), attempt.claim(), outcome);
+  DealerMessageHandoff.Handoff finish(Attempt attempt, String metered, MailboxOutcome outcome) {
+    return handoffs.completeMailboxSend(attempt.claim().caseId(), attempt.caseToken(), attempt.claim(), outcome,
+        () -> record(attempt, metered));
   }
 
   private DealerMessageHandoff.Handoff notSent(Attempt attempt, String metered, MailboxProblem problem) {
-    record(attempt, metered);
-    handoffs.completeMailboxSend(attempt.claim().caseId(), attempt.caseToken(), attempt.claim(), MailboxOutcome.NOT_SENT);
+    finish(attempt, metered, MailboxOutcome.NOT_SENT);
     throw problem;
   }
 
-  private void record(Attempt attempt, String outcome) {
-    transaction.executeWithoutResult(status -> jdbc.update(
-        "update mailbox_sends set outcome = ?, completed_at = ? where id = ?", outcome,
-        Timestamp.from(PersistedInstant.round(Instant.now())), attempt.id()));
+  private boolean record(Attempt attempt, String outcome) {
+    return jdbc.update("update mailbox_sends set outcome = ?, completed_at = ? where id = ? and outcome = 'SENDING'", outcome,
+        Timestamp.from(PersistedInstant.round(Instant.now())), attempt.id()) == 1;
+  }
+
+  private static MailboxProblem superseded() {
+    return new MailboxProblem(HttpStatus.CONFLICT, "SEND_SUPERSEDED", "This attempt is no longer active. Refresh to check the message.");
   }
 
   private long count(String predicate, Object... arguments) {
