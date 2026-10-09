@@ -9,7 +9,7 @@ for long-term cost. Account and domain setup is the operator's, under ticket 93.
 
 **Blocked by:** None for code, using fake SES notifications. Live delivery needs ticket 93's AWS account,
 the verified sending domain with DKIM, SPF and DMARC in Cloudflare DNS, and SES production access (sandbox
-exit). Migration V50 is reserved for the suppression list.
+exit). Migration V51 is reserved for the suppression list (V50 went to ticket 100).
 
 **Status:** open — code agent-ready; live verification blocked on the operator.
 
@@ -20,7 +20,7 @@ exit). Migration V50 is reserved for the suppression list.
       the SNS message signature and certificate host, confirms subscriptions only for the configured topic
       ARNs, and refuses everything else before parsing content.
 - [ ] Permanent bounces and complaints add the address (stored as a keyed hash, not plaintext) to a
-      suppression list (V50). Sign-in, recovery and notification sends to a suppressed address are skipped
+      suppression list (V51). Sign-in, recovery and notification sends to a suppressed address are skipped
       without revealing suppression to the requester; the Buyer-facing response stays the same.
 - [ ] Mail carries a configured From address on the company domain and a plain-text body; no tracking
       pixels or link rewriting are enabled in SES.
