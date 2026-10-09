@@ -30,7 +30,8 @@ public class BreachedPasswords {
   public boolean contains(String password) {
     if (!enabled) return false;
     try {
-      String hash = HexFormat.of().withUpperCase().formatHex(MessageDigest.getInstance("SHA-1")
+      // The range API is keyed by SHA-1; this is a lookup key, not credential protection (bcrypt stores passwords).
+      String hash = HexFormat.of().withUpperCase().formatHex(MessageDigest.getInstance("SHA-1") // nosemgrep: scripts.no-weak-digest
           .digest(password.getBytes(StandardCharsets.UTF_8)));
       var request = HttpRequest.newBuilder(URI.create(url + hash.substring(0, 5))).timeout(timeout)
           .header("Add-Padding", "true").header("User-Agent", "Deal-X-Ray-password-check").GET().build();
