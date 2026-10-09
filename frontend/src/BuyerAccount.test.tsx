@@ -35,7 +35,7 @@ test("requests a sign-in link without storing anything in the browser", async ()
   render(<BuyerAccount />);
   const user = userEvent.setup();
   expect(screen.getByText(/Analysis works without an account/)).toBeVisible();
-  expect(screen.queryByLabelText(/password/i)).toBeNull();
+  expect(await screen.findByRole("form", { name: "Password sign-in" })).toBeVisible();
   await user.type(await screen.findByLabelText("Email for sign-in"), "buyer@example.com");
   await user.click(screen.getByRole("button", { name: "Email me a sign-in link" }));
   expect(await screen.findByRole("status")).toHaveTextContent("single-use sign-in link");
@@ -239,6 +239,7 @@ test("failed email preference saves retain the saved value and can be retried", 
   let fail = true;
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     if (String(input) === "/api/v1/account/passkeys") return json([]);
+    if (String(input) === "/api/v1/account/password") return json({ configured: false });
     if (String(input) !== "/api/v1/account/notifications") return json(account());
     if (init?.method === "PUT" && fail) return json({}, 503);
     return json([{ type: "DEALER_REPLY", enabled: init?.method !== "PUT", mandatory: false }]);

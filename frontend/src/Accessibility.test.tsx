@@ -29,7 +29,16 @@ import { NegotiationConversation } from "./NegotiationConversation";
 import { JourneyCandidates, ShortlistEntry } from "./JourneyCandidates";
 import { QuoteComparison } from "./QuoteComparison";
 import { Passkeys } from "./Passkeys";
+import { Passwords, PasswordSignIn } from "./Passwords";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+test.each([false, true])("password management and sign-in have no automated AA violations (%s)", async configured => {
+  const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ configured })));
+  const { container } = render(<main><h1>Account</h1><Passwords request={request} onSessionEnded={() => {}} />
+    <PasswordSignIn request={request} onSignedIn={async () => {}} /></main>);
+  await screen.findByRole("button", { name: configured ? "Change password" : "Set password" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
 
 test.each([{ keys: [] }, { keys: [{ id: "key", nickname: "My device", createdAt: "2026-10-09T12:00:00Z", lastUsedAt: null }] }])(
   "passkey management has no automated AA violations (%j)", async ({ keys }) => {
