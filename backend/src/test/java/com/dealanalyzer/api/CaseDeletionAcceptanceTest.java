@@ -4,14 +4,16 @@ import static com.dealanalyzer.api.HttpAcceptanceHarness.*;
 import static org.assertj.core.api.Assertions.*;
 import java.nio.file.Path;
 import java.util.Map;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.io.TempDir;
 
 class CaseDeletionAcceptanceTest {
   @TempDir Path directory;
 
-  @Test void deletionProcessesBoundedBatchesWithoutLosingTheBacklog() throws Exception {
-    try (var app = new HttpAcceptanceHarness(directory).start("bounded-deletion", false,
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void deletionProcessesBoundedBatchesWithoutLosingTheBacklog(String provider) throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory, provider).start("bounded-deletion", false,
         "--case.deletion.batch-size=2", "--case.deletion.delay=PT1H")) {
       var credentials = new java.util.ArrayList<String[]>();
       for (int i = 0; i < 5; i++) {
@@ -32,8 +34,9 @@ class CaseDeletionAcceptanceTest {
     }
   }
 
-  @Test void deletionImmediatelyRevokesAccessAndCanBeRetried() throws Exception {
-    try (var app = new HttpAcceptanceHarness(directory).start("deletion", false,
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void deletionImmediatelyRevokesAccessAndCanBeRetried(String provider) throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory, provider).start("deletion", false,
         "--case.deletion.delay=PT1H", "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var created = post(app.client(), "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase());
       String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();
@@ -58,8 +61,9 @@ class CaseDeletionAcceptanceTest {
       assertThat(get(app.client(), base + "/deletion", token)).isEqualTo(completed);
     }
   }
-  @Test void partialStorageFailureIsRecordedAndRetrySurvivesRestart() throws Exception {
-    var harness = new HttpAcceptanceHarness(directory);
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void partialStorageFailureIsRecordedAndRetrySurvivesRestart(String provider) throws Exception {
+    var harness = new HttpAcceptanceHarness(directory, provider);
     Path objects = directory.resolve("objects");
     java.nio.file.Files.createDirectories(objects);
     String id, token;
@@ -94,8 +98,9 @@ class CaseDeletionAcceptanceTest {
     }
   }
 
-  @Test void buyerCanChooseShorterRetentionButCannotExtendTheDeadline() throws Exception {
-    try (var app = new HttpAcceptanceHarness(directory).start("retention-choice", false, "--case.deletion.delay=PT1H")) {
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void buyerCanChooseShorterRetentionButCannotExtendTheDeadline(String provider) throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory, provider).start("retention-choice", false, "--case.deletion.delay=PT1H")) {
       var created = post(app.client(), "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase());
       String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();
       String path = "/api/v1/cases/" + id + "/retention";
@@ -133,9 +138,10 @@ class CaseDeletionAcceptanceTest {
         "select removed_rows, graph_duration_ms, attempts from case_deletion_jobs where case_id = ?", id));
   }
 
-  @Test void deletionInvalidatesPreviouslyIssuedRecoveryLinks() throws Exception {
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void deletionInvalidatesPreviouslyIssuedRecoveryLinks(String provider) throws Exception {
     CasePortabilityAcceptanceTest.links.clear();
-    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("revoke-recovery", false,
+    try (var app = new HttpAcceptanceHarness(directory, provider).startWithConfiguration("revoke-recovery", false,
         CasePortabilityAcceptanceTest.EmailConfiguration.class, "--case.deletion.delay=PT1H")) {
       var created = post(app.client(), "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase());
       String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();
@@ -149,8 +155,9 @@ class CaseDeletionAcceptanceTest {
     }
   }
 
-  @Test void expiryRemovesTheCaseGraphWithoutABuyerRequest() throws Exception {
-    try (var app = new HttpAcceptanceHarness(directory).start("expired-case", false,
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void expiryRemovesTheCaseGraphWithoutABuyerRequest(String provider) throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory, provider).start("expired-case", false,
         "--case.access.lifetime=PT0.2S", "--case.deletion.delay=PT1H")) {
       var created = post(app.client(), "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase());
       String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();
@@ -176,9 +183,10 @@ class CaseDeletionAcceptanceTest {
     }
   }
 
-  @Test void supportedProviderRemovalMustBeVerifiedBeforeCompletion() throws Exception {
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void supportedProviderRemovalMustBeVerifiedBeforeCompletion(String provider) throws Exception {
     ProviderConfiguration.copyExists.set(true);
-    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("provider-copy", false,
+    try (var app = new HttpAcceptanceHarness(directory, provider).startWithConfiguration("provider-copy", false,
         ProviderConfiguration.class, "--case.deletion.delay=PT1H")) {
       var created = post(app.client(), "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase());
       String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();

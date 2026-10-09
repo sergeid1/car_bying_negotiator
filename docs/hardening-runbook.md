@@ -129,6 +129,55 @@ Framework `XsltView`), guarded by the Semgrep rule `no-xslt-view` and removed by
 
 ## Document key rotation
 
+### S3 document storage
+
+Development defaults to `DOCUMENT_STORAGE_PROVIDER=file`. Pilot/production refuses file
+storage unless `DOCUMENT_STORAGE_ALLOW_FILE=true` explicitly acknowledges an operator-managed
+encrypted volume. For AWS set `DOCUMENT_STORAGE_PROVIDER=s3`, `DOCUMENT_STORAGE_S3_BUCKET`
+and `DOCUMENT_STORAGE_S3_REGION`; do not put access keys in application configuration.
+The AWS SDK v2 uses its [default credential chain](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/credentials-chain.html),
+with an instance/task role in deployment. Every original/page is encrypted with the application
+key ring before upload and requests SSE-S3 (`AES256`). Keys contain only the existing
+case/document identifiers and optional page number; filenames and contact details are excluded.
+No local plaintext or ciphertext staging is needed for S3. Requests have bounded connection,
+socket, attempt and overall timeouts; failed reads return the safe retryable document-unavailable
+outcome. Retention and case erasure retry failed physical deletion without claiming completion.
+
+Ticket 99 must create the private bucket in the declared region, enable all four bucket
+Block Public Access settings, and preferably leave versioning never enabled. The production
+guard checks bucket existence, Block Public Access, nonpublic policy and ACL, and versioning.
+An enabled/suspended bucket additionally needs a bucket-wide one-day noncurrent expiry rule
+without retained-version counts or conditional filters; see the [deletion policy](case-deletion-policy.md).
+The role needs `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:DeleteObjectVersion`,
+`s3:ListBucketVersions`, `s3:ListBucket`, `s3:GetBucketVersioning`, `s3:GetLifecycleConfiguration`,
+`s3:GetBucketPublicAccessBlock`, `s3:GetBucketPolicyStatus`, and `s3:GetBucketAcl` on the proper
+bucket/object resources. Missing inspection permissions fail startup. The guard is read-only.
+It cannot establish actual role isolation, region residency, account/access-point policies,
+Object Lock absence, replica/backup expiry or real AWS removal latency; verify those in ticket 99.
+Recheck controls after policy changes, and never enable replication or Object Lock without a
+compatible erasure design. AWS [noncurrent lifecycle expiration](https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-rules.html)
+does not prove timely physical purge by itself.
+
+Take a consistent database and encrypted-object backup with all writers stopped/fenced.
+An S3 bucket is not an independent backup: unversioned deletion is permanent, and versioned
+objects are explicitly purged by the erasure adapter. Keep the complete application key ring
+in a separate protected secret backup and record the region, bucket, object manifest/checksums,
+database cutoff and independent deletion-ledger cutoff. AWS SSE-S3 does not replace the
+application keys. Backup rotation/physical expiry remains `UNKNOWN` until measured.
+Restore encrypted objects to a new private isolated bucket under the same guard, restore a
+compatible database and key ring, and use the quarantined restoration procedure below to replay
+the latest independent deletion ledger, including orphaned prefix objects and old versions.
+Keep ingress fenced until retention and erasure have drained and synthetic reads/exports and
+deleted-case absence are verified. Never restore an old bucket snapshot directly into live service.
+
+The offline rotation command also accepts `DOCUMENT_STORAGE_PROVIDER=s3` plus bucket/region
+and the same default role credentials. S3 replacement writes one complete encrypted object;
+old versions remain subject to the policy above and physical case deletion. Preserve old
+key generations while any retained version or independent backup still needs them.
+For file rotation in pilot/production, explicitly set `DOCUMENT_STORAGE_ALLOW_FILE=true`.
+
+### Application key ring
+
 Configure `DOCUMENT_STORAGE_ACTIVE_KEY_ID` as a stable, nonsecret ID (1–64 ASCII letters,
 digits, underscores or hyphens; `legacy` is reserved). `DOCUMENT_STORAGE_KEYS` is a comma-separated
 list `id=base64,id=base64` containing the active key and all retained generations. Each value
@@ -168,7 +217,8 @@ at startup; the existing pilot/production missing-key startup refusal remains in
    `mvn -f backend/pom.xml compile dependency:copy-dependencies -DexcludeGroupIds=commons-logging`;
    exclude the conflicting `commons-logging` jar so Spring's logging bridge does not print a
    discovery warning. Do not enable debug/trace logging for this command.
-   Supply `DOCUMENT_STORAGE_PATH`, the complete key variables above, and
+   Supply `DOCUMENT_STORAGE_PATH` for file storage or the S3 provider/bucket/region variables,
+   the complete key variables above, and
    `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` through
    the environment. Preserve the deployment declaration (`SPRING_PROFILES_ACTIVE` or
    `EVIDENCE_DEPLOYMENT`) so the same startup material rules apply; development legacy

@@ -10,7 +10,8 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
@@ -49,8 +50,38 @@ class DocumentKeyRotationAcceptanceTest {
     return document;
   }
 
-  @Test void mixedGenerationsExportExpireAndDeleteAndMissingKeyReturnsSafeUnavailableResponse() throws Exception {
-    var harness = new HttpAcceptanceHarness(directory);
+  @ParameterizedTest @ValueSource(strings = {"file-missing", "file-unreadable", "s3-missing", "s3-timeout", "s3-denied"})
+  void storageReadFailuresReturnTheSameSafeBuyerUnavailableOutcome(String failureMode) throws Exception {
+    String provider = failureMode.startsWith("s3") ? "s3" : "file";
+    String key = material();
+    try (var app = new HttpAcceptanceHarness(directory, provider).start("unavailable", true, config("active", "active=" + key))) {
+      var created = post(app.client(), "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase());
+      String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+      String document = upload(app, id, token, "upload");
+      if (provider.equals("file")) {
+        Path original = directory.resolve("objects").resolve(id + "-" + document + ".enc");
+        if (failureMode.endsWith("missing")) Files.delete(original);
+        else Files.write(original, new byte[]{1});
+      } else {
+        var client = app.context().getBean(software.amazon.awssdk.services.s3.S3Client.class);
+        RuntimeException exception = failureMode.endsWith("timeout")
+            ? software.amazon.awssdk.core.exception.SdkClientException.create("secret provider timeout")
+            : software.amazon.awssdk.services.s3.model.S3Exception.builder()
+                .statusCode(failureMode.endsWith("missing") ? 404 : 403).message("secret provider diagnostics").build();
+        org.mockito.Mockito.doThrow(exception).when(client).getObjectAsBytes(
+            org.mockito.ArgumentMatchers.any(software.amazon.awssdk.services.s3.model.GetObjectRequest.class));
+      }
+      RestClientResponseException failure = catchThrowableOfType(() -> post(app.client(), "/api/v1/cases/" + id + "/exports",
+          Map.of("format", "ZIP", "reportVersion", 0), "unavailable-export", token), RestClientResponseException.class);
+      assertThat(failure.getStatusCode().value()).isEqualTo(503);
+      assertThat(failure.getResponseBodyAsString()).contains("DOCUMENT_UNREADABLE", "retryable")
+          .doesNotContain("secret provider", document, key, "S3Exception", "SdkClientException");
+    }
+  }
+
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void mixedGenerationsExportExpireAndDeleteAndMissingKeyReturnsSafeUnavailableResponse(String provider) throws Exception {
+    var harness = new HttpAcceptanceHarness(directory, provider);
     String old = material(), current = material(), id, token, oldExpire, newExpire;
     try (var app = harness.start("rotation", true, config("old", "old=" + old))) {
       var created = post(app.client(), "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase());
