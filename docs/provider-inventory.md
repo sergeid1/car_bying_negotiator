@@ -6,12 +6,16 @@ prerequisites in [the pilot readiness record](pilot-readiness-record.md). Both a
 
 ## Summary
 
-No external commercial provider processes Buyer data. Every adapter in use is a deterministic
+The default development configuration sends no Buyer documents to external commercial providers.
+Amazon S3 is selected for AWS document hosting (ticket 98); enabling `document.storage.provider=s3`
+sends encrypted originals/pages and identifier-only keys to AWS in the configured region.
+The actual region, AWS terms and deployed bucket controls remain ticket 99 obligations.
+Other adapters in default use are deterministic
 local implementation, a self-hosted component, or an opt-in connection to infrastructure the
 operator supplies. The Anthropic and OpenAI model clients are integrated but disabled, and neither
-can be enabled while its terms are unexecuted (see below). There is therefore **no subprocessor, no processing
-region, and no provider contract to describe** — not because the inventory is unfinished, but
-because no third party processes Buyer data today.
+can be enabled while its terms are unexecuted (see below). The table distinguishes available
+opt-in providers from the default local adapters; availability of an adapter does not establish
+executed terms or deployment evidence.
 
 This is exactly what blocks release. A public pilot requires real automotive and processing
 providers, and each one adds contractual and privacy obligations this table cannot yet state.
@@ -26,7 +30,7 @@ providers, and each one adds contractual and privacy obligations this table cann
 | Deal-terms extraction | `DeterministicDealerDocumentProvider`, selected by `extraction.provider=deterministic` (the default). `ClaudeDealTermsExtractionProvider` exists behind `extraction.provider=claude`, which refuses startup until the rollout gate's obligations are met | In process | None — no model provider is called. Once selected and enabled, the Claude provider sends normalized page images only to Anthropic |
 | Document parsing | Confined local container or disposable JVM | In process | None |
 | Malware scanning | `ClamAvMalwareScanner` against an operator-run daemon | Document bytes | Operator-run; not a third party |
-| Object storage | `EncryptedFileDocumentStorage` on an operator-supplied path | Encrypted originals | Operator-run |
+| Object storage | Amazon S3, operator-selected `DOCUMENT_STORAGE_S3_REGION` (record the actual region before pilot; ticket 99) | Application AES-GCM encrypted originals and normalized pages, plus SSE-S3 | AWS; instance/task role, private bucket; local file adapter remains the development default |
 | Database | PostgreSQL supplied by the operator | Case graph | Operator-run |
 | Postal-code location | `PostalJurisdictionResolver` over bundled Census reference data | In process | None — the dataset ships with the application and is never queried remotely |
 | Recovery email | `SmtpRecoveryEmail`, opt-in and unconfigured by default | Buyer email address | Operator's SMTP provider when enabled |

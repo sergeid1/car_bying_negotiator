@@ -310,6 +310,15 @@ code { font-family: var(--font-mono); font-size: 0.87em; }
   color: var(--ink-strong);
 }
 
+.header-account { display: flex; align-items: center; min-width: 0; gap: 4px; }
+.header-account button { white-space: nowrap; padding: 8px; }
+.header-email { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 600px) {
+  .masthead-inner { flex-wrap: wrap; gap: 6px; }
+  .header-account { justify-content: flex-end; width: 100%; }
+  .header-email { max-width: 210px; }
+}
+
 /* The mark: a lens reading a line of a document. */
 .mark {
   position: relative;
@@ -1297,6 +1306,9 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+}
+@media (max-width: 600px) {
+  .theme-options { top: calc(100% + 64px); }
 }
 .theme-options button {
   justify-content: flex-start;

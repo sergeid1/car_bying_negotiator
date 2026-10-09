@@ -35,6 +35,21 @@ participants verify absence and the database deletion transaction commits.
 
 Local encrypted storage inventories the complete case UUID prefix, including
 originals, normalized pages, orphaned outputs and temporary encrypted writes.
+Amazon S3 storage inventories the same identifier prefix, including all object versions
+and delete markers, with pagination. Deletion removes physical versions and markers and
+rechecks their absence; denied inventory/removal leaves the deletion job pending. Writes
+use the same case lock and application AES-GCM encryption as local storage, plus SSE-S3.
+For ticket 99, provision a private bucket with all four bucket Block Public Access settings
+enabled and **versioning never enabled**. This is the preferred deployment policy.
+If versioning is enabled or suspended instead, the pilot/production startup guard requires
+an enabled bucket-wide noncurrent expiration rule of one day, with no tag/size/prefix
+restriction and no retained newer-version count. Suspended versioning still leaves old
+versions. The adapter removes versions immediately; lifecycle expiry is a backstop, not
+proof of the 24-hour p95 objective. AWS lifecycle eligibility rounds to the next UTC day
+and physical expiry is asynchronous; ticket 99 must verify real removal latency, policy,
+role permissions and absence of Object Lock/legal holds before live use. Object Lock or
+denied version deletion keeps application deletion pending. Replicas, backups and exports
+require separately declared erasure/expiry controls and are not covered by bucket deletion.
 Missing storage with undeleted originals or normalized pages, and inaccessible storage, fail closed. Storage writes acquire the
 same database case lock and reject expired/pending/missing cases, preventing late
 normalization/upload work from recreating artifacts after verification. Retrying

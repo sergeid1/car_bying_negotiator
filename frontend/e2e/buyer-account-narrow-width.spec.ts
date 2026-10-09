@@ -25,6 +25,8 @@ async function stubAccountApi(page: Page) {
   await page.route("**/api/v1/account/sign-in/verify", route =>
     route.fulfill({ headers: { "Set-Cookie": "account_session=session-1; HttpOnly; Secure; SameSite=Strict; Path=/api/v1; Max-Age=1209600" },
       json: { expiresAt: "2026-10-17T00:00:00Z" } }));
+  await page.route("**/api/v1/account/sign-out", route => route.fulfill({ status: 204,
+    headers: { "Set-Cookie": "account_session=; HttpOnly; SameSite=Strict; Path=/api/v1; Max-Age=0" } }));
   await page.route("**/api/v1/account", route => route.request().headers().cookie?.includes("account_session=session-1")
     ? route.fulfill({ json: ACCOUNT }) : route.fulfill({ status: 401, json: { code: "SESSION_ENDED" } }));
   await page.route("**/api/v1/account/notifications", route => {
@@ -47,6 +49,7 @@ async function stubAccountApi(page: Page) {
 }
 
 async function expectNoOverflowOrViolations(page: Page) {
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   const overflow = await page.evaluate(() => ({
     documentWidth: document.documentElement.scrollWidth,
     viewportWidth: document.documentElement.clientWidth,
@@ -59,6 +62,7 @@ async function expectNoOverflowOrViolations(page: Page) {
   expect(overflow.documentWidth).toBeLessThanOrEqual(overflow.viewportWidth);
   const results = await new AxeBuilder({ page })
     .include("[aria-label='Buyer Account']")
+    .include(".masthead")
     .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
     .analyze();
   expect(results.violations).toEqual([]);
@@ -72,6 +76,39 @@ test("the signed-out account panel requests a link at 360 px without storing any
   await expectNoOverflowOrViolations(page);
   expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
 });
+
+for (const width of [360, 1280]) {
+  test(`requesting an emailed link and signing out from either place at ${width} px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await stubAccountApi(page);
+    // Mail capture lives only in this browser fixture, never in the deployed application.
+    const mailbox: string[] = [];
+    await page.route("**/api/v1/account/sign-in-requests", route => {
+      expect(route.request().postDataJSON().email).toBe(ACCOUNT.contact.email);
+      mailbox.push("/#sign-in=fixture-single-use-link");
+      return route.fulfill({ json: { status: "Check your email for a single-use sign-in link." } });
+    });
+    for (const signOutLocation of ["banner", "region"]) {
+      await page.goto("/");
+      const header = page.getByRole("banner");
+      const panel = page.getByRole("region", { name: "Buyer Account" });
+      await header.getByRole("button", { name: "Sign in", exact: true }).click();
+      await expect(panel).toBeFocused();
+      await panel.getByLabel("Email for sign-in").fill(ACCOUNT.contact.email);
+      await panel.getByRole("button", { name: "Email me a sign-in link" }).click();
+      await expect(panel.getByRole("status")).toContainText("Check your email");
+      expect(mailbox).toHaveLength(1);
+      await page.goto(mailbox.pop()!);
+      await panel.getByRole("button", { name: "Finish signing in" }).click();
+      await expect(header.getByRole("button", { name: ACCOUNT.contact.email })).toBeVisible();
+      await expectNoOverflowOrViolations(page);
+      await (signOutLocation === "banner" ? header : panel).getByRole("button", { name: "Sign out", exact: true }).click();
+      await expect(header.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
+      await expect(panel.getByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
+      await expectNoOverflowOrViolations(page);
+    }
+  });
+}
 
 test("signing in, the account screen and the deletion receipt fit 360 px", async ({ page }) => {
   await stubAccountApi(page);

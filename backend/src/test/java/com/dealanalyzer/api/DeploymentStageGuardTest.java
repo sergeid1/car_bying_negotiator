@@ -60,6 +60,8 @@ class DeploymentStageGuardTest {
     refuses(runner, "operations.EvidenceBudget", "evidence.budget.per-case-cost-usd");
     refuses(runner.withPropertyValues("account.session.cookie-secure=false"),
         "account.AccountSessionCookie", "cookies must be secure");
+    refuses(runner.withPropertyValues("case.recovery.from=sender@example.com", "spring.mail.host=mailpit"),
+        "recovery.RecoveryEmailProductionGuard", "real SMTP host");
     refuses(runner, "buyingcase.SyntheticIntakeAffordance", "intake.synthetic.enabled=false");
     refuses(runner, "pilot.PilotReadiness", "unmet readiness prerequisites");
     refuses(runner, "document.DocumentParserProcess", "container");
@@ -73,7 +75,9 @@ class DeploymentStageGuardTest {
     refuses(runner.withPropertyValues("document.storage.encryption-key=" + "x".repeat(32)),
         "document.EncryptedFileDocumentStorage", "DOCUMENT_STORAGE_ENCRYPTION_KEY");
     byte[] randomKey = new byte[32]; new java.security.SecureRandom().nextBytes(randomKey);
-    runner.withPropertyValues("document.storage.encryption-key=" + java.util.Base64.getEncoder().encodeToString(randomKey))
+    var validStorage = runner.withPropertyValues("document.storage.encryption-key=" + java.util.Base64.getEncoder().encodeToString(randomKey));
+    refuses(validStorage, "document.EncryptedFileDocumentStorage", "document.storage.allow-file");
+    validStorage.withPropertyValues("document.storage.allow-file=true")
         .withUserConfiguration(type("document.EncryptedFileDocumentStorage"))
         .run(context -> assertThat(context).hasNotFailed());
 
