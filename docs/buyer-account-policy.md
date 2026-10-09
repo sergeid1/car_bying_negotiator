@@ -44,9 +44,13 @@ and permits the change. Disable explicitly for offline operation; tests use loop
 
 V49 adds `password_hash` to the account and `sign_in_method` to its sessions. Methods are
 `EMAIL_LINK`, `PASSKEY` and `PASSWORD`; pre-migration sessions default to `EMAIL_LINK`.
-Connecting, replacing or disconnecting a mailbox requires an email-link/passkey session created
-within the last 10 minutes, including OAuth completion. Password-only sessions receive 403
-`MAILBOX_STEP_UP`. Existing reads and approved sends remain governed by their existing rules.
+Starting authorization to connect or replace a mailbox requires an email-link/passkey session
+created within the last 10 minutes. OAuth completion does not recheck session age: consent started
+inside the window can finish afterward, subject to the authorization state's own expiry. State is
+bound to the account, not the exact session, so completion still refuses password-only sessions
+with 403 `MAILBOX_STEP_UP`. Disconnecting remains available to any active session, including
+password-only and older sessions, because withdrawing send permission is a protective action.
+Existing reads and approved sends remain governed by their existing rules.
 Password sessions also cannot register new passkeys: otherwise they could manufacture their own
 mailbox step-up. Use an email link or an existing passkey to register one.
 

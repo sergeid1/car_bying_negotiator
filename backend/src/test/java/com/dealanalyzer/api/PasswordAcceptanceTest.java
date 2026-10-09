@@ -78,11 +78,9 @@ class PasswordAcceptanceTest {
       assertThat(signed.cookie).contains("HttpOnly", "SameSite=Strict", "Path=/api/v1", "Max-Age=");
       String passwordSession = signed.cookie.split(";", 2)[0].split("=", 2)[1];
       assertThat(jdbc.queryForObject("select sign_in_method from buyer_account_sessions where token_hash = (select token_hash from buyer_account_sessions where sign_in_method = 'PASSWORD')", String.class)).isEqualTo("PASSWORD");
-      for (String method : List.of("POST", "DELETE")) {
-        String mailboxPath = method.equals("POST") ? "/authorizations" : "/connection";
-        assertThat(request(client, method, "/api/v1/account/mailbox" + mailboxPath,
-            method.equals("POST") ? Map.of("provider", "GOOGLE") : null, passwordSession).body.path("code").asText()).isEqualTo("MAILBOX_STEP_UP");
-      }
+      assertThat(request(client, "POST", "/api/v1/account/mailbox/authorizations",
+          Map.of("provider", "GOOGLE"), passwordSession).body.path("code").asText()).isEqualTo("MAILBOX_STEP_UP");
+      assertThat(request(client, "DELETE", "/api/v1/account/mailbox/connection", null, passwordSession).status).isEqualTo(200);
       assertThat(request(client, "POST", "/api/v1/account/mailbox/connection", Map.of("state", "x", "code", "x"), passwordSession).status).isEqualTo(403);
       assertThat(request(client, "POST", ROOT + "/registration/options", Map.of(), passwordSession).status).isEqualTo(403);
       // A real passkey sign-in records its method and admits the mailbox step-up boundary.

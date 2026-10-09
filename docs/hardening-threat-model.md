@@ -15,9 +15,11 @@ to the address owner through delivery; it never provides a public account-existe
 Password mutations require a sign-in within 10 minutes, send mandatory account-security email,
 record credential-free security events and revoke all other sessions. Email recovery resets the
 password through the same mutation; hashes never leave storage and disappear with account deletion.
-Session methods are recorded: password-only sessions cannot change mailbox connections or add
-passkeys that would bypass this restriction. Mailbox changes require a fresh email-link/passkey
-session, checked again on OAuth completion. A stolen password still grants access to account
+Session methods are recorded: password-only sessions cannot connect or replace a mailbox or add
+passkeys that would bypass this restriction. Starting mailbox authorization requires a fresh
+email-link/passkey session. Completion checks the method but not session age because state is
+account-bound and consent may finish after the sign-in window; state retains its own expiry.
+Any active session can disconnect a mailbox to withdraw send permission. A stolen password still grants access to account
 paperwork and existing permitted actions; a compromised email inbox or authenticator remains
 an account takeover boundary. Provider-outage fail-open and per-process throttles are explicit
 operational risks, not proof that credential stuffing is impossible.

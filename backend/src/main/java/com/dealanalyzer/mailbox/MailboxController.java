@@ -47,13 +47,12 @@ public class MailboxController {
 
   @PostMapping("/account/mailbox/connection")
   public MailboxConnections.MailboxView complete(@AccountSession String session, @Valid @RequestBody CompleteRequest request) {
-    accounts.requireMailboxStepUp(session);
+    accounts.requireMailboxAuthorizationCompletion(session);
     return connections.complete(session, request.state(), request.code());
   }
 
   @DeleteMapping("/account/mailbox/connection")
   public MailboxConnections.MailboxView disconnect(@AccountSession String session) {
-    accounts.requireMailboxStepUp(session);
     return connections.disconnect(session);
   }
 

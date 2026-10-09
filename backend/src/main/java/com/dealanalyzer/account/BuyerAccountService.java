@@ -125,13 +125,19 @@ public class BuyerAccountService {
   @Transactional(readOnly = true)
   public void requireMailboxStepUp(String token) {
     var session = requireSession(token);
-    // Existing email/passkey sessions keep their mailbox access. Password sessions must step up.
-    if ("PASSWORD".equals(session.signInMethod))
-      throw new AccountProblem(HttpStatus.FORBIDDEN, "MAILBOX_STEP_UP",
-          "Sign in with a fresh email link or passkey before changing your mailbox connection.");
+    requireMailboxAuthorizationCompletion(token);
     if (!session.createdAt.plus(Duration.ofMinutes(10)).isAfter(Instant.now()))
       throw new AccountProblem(HttpStatus.FORBIDDEN, "MAILBOX_STEP_UP",
           "Sign in with a fresh email link or passkey before changing your mailbox connection.");
+  }
+
+  @Transactional(readOnly = true)
+  public void requireMailboxAuthorizationCompletion(String token) {
+    // OAuth state is account-bound, so a password session must not redeem another session's state.
+    // Freshness is checked only at start: consent may finish after the sign-in window closes.
+    if ("PASSWORD".equals(requireSession(token).signInMethod))
+      throw new AccountProblem(HttpStatus.FORBIDDEN, "MAILBOX_STEP_UP",
+          "Sign in with an email link or passkey before connecting your mailbox.");
   }
 
   @Transactional(readOnly = true)
