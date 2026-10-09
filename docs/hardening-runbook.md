@@ -78,6 +78,52 @@ reports/evidence/download controls, recovery and stored theme reloads in both th
 Vite preview uses the same header map; Vite development/HMR remains unrestricted by this
 production policy. Re-run these gates whenever adding a script, resource or client SDK.
 
+## Amazon SES transactional email (ticket 97)
+
+Use the operator-selected `SES_REGION` (default configuration: `us-east-1`; actual deployed
+region remains pending ticket 93). Set `SES_SMTP_HOST=email-smtp.<region>.amazonaws.com`,
+`SES_SMTP_PORT=587`, `SES_SMTP_AUTH=true`, and `SES_SMTP_STARTTLS=true`. STARTTLS is required
+and the SMTP server identity is checked. Set `CASE_RECOVERY_FROM` to the verified company-domain
+sender. All messages are plain text, including sign-in/password recovery, case recovery, and
+Buyer notifications. Configure SES without open/click tracking or link rewriting.
+
+Inject the region-specific **SES SMTP** username and password as `SES_SMTP_USERNAME` and
+`SES_SMTP_PASSWORD` from the deployment secret store. These differ from AWS API credentials.
+Never put them in source, shell arguments, sample commands, or logs. Keep SMTP protocol/debug
+logging disabled. See [SES SMTP setup](https://docs.aws.amazon.com/ses/latest/dg/send-email-smtp.html)
+and [STARTTLS ports](https://docs.aws.amazon.com/ses/latest/dg/smtp-connect.html).
+
+In the same AWS region, create SNS topics restricted to the SES identity's publishing permission.
+Configure **both bounce and complaint identity notifications**, with original headers disabled,
+and subscribe the HTTPS endpoint `https://<api-host>/api/v1/email/ses-notifications` without raw
+message delivery. Set `SES_SNS_TOPIC_ARNS` to the comma-separated exact topic ARNs before
+subscribing. The endpoint verifies SNS signatures (versions 1 and 2), accepts certificate URLs
+only on the topic region's exact `sns.<region>.amazonaws.com` HTTPS host, and confirms signed
+subscriptions only for those configured topics. Redirects are refused. API peer quotas and
+no-store privacy headers apply; enforce HTTPS and shared request limits at ingress as well.
+See [SES SNS configuration](https://docs.aws.amazon.com/ses/latest/dg/configure-sns-notifications.html)
+and [AWS signature field order](https://docs.aws.amazon.com/sns/latest/dg/sns-verify-signature-of-message-verify-message-signature.html).
+
+Permanent bounces and complaints retain only a keyed address hash, fixed reason, and timestamp
+in `email_suppressions` (V51). Transient bounces do not suppress. Replayed feedback is idempotent.
+The SMTP boundary silently skips suppressed recipients for every purpose, preserving request
+acknowledgements. Account removal deletes its matching suppression hash in the account worker's
+transaction; unrelated/non-account entries remain to prevent repeated sends. This permits a
+deleted account's address to enroll anew; SES's own suppression policies may still prevent
+delivery. Protect and back up `CASE_ACCESS_PEPPER`, also used for address lookups; rotation needs
+a coordinated lookup/suppression migration rather than changing the key in place.
+
+Pilot/production startup refuses enabled recovery email using a loopback mail sink or missing/
+invalid SNS topic configuration. It cannot prove that AWS topics are subscribed or both feedback
+types are routed: verify those controls in the deployed environment.
+
+Pending ticket 93: verified company domain with DKIM/SPF/DMARC, SES production access, SMTP
+credentials, exact deployed region, and HTTPS topic subscription. Then record a delivered sign-in
+email and an SES mailbox-simulator permanent bounce (`bounce@simulator.amazonses.com`), verify
+the application hash is suppressed and a later send is skipped, and repeat with the complaint
+simulator. Record timestamps, outcomes, region and topic identifiers only; omit recipients,
+credentials, link tokens and raw SNS payloads. These deployed checks remain **PENDING**.
+
 ## Request email quotas
 
 Sign-in requests, case recovery enrollment (`POST /cases/{id}/recovery-email`) and public

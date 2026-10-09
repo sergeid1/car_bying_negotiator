@@ -10,11 +10,14 @@ import org.springframework.http.HttpStatus;
 class SmtpRecoveryEmail implements RecoveryEmail {
   private final ObjectProvider<JavaMailSender> sender;
   private final String from;
-  SmtpRecoveryEmail(ObjectProvider<JavaMailSender> sender, @Value("${case.recovery.from:}") String from) {
-    this.sender = sender; this.from = from;
+  private final com.dealanalyzer.email.EmailSuppression suppression;
+  SmtpRecoveryEmail(ObjectProvider<JavaMailSender> sender, @Value("${case.recovery.from:}") String from,
+      com.dealanalyzer.email.EmailSuppression suppression) {
+    this.sender = sender; this.from = from; this.suppression = suppression;
   }
   public void send(String recipient, String link) { send(recipient, link, Purpose.CASE_RECOVERY); }
   @Override public void send(String recipient, String link, Purpose purpose) {
+    if (suppression.suppressed(recipient)) return;
     var mailer = sender.getIfAvailable();
     if (mailer == null || from.isBlank()) throw unavailable();
     var message = new SimpleMailMessage();

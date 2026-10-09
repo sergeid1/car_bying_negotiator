@@ -94,6 +94,8 @@ public class AccountDeletionWorker {
 
   private void removeAndVerify(String accountId) {
     manager.flush();
+    // Account removal permits forgetting its keyed suppression record; no plaintext is needed.
+    delete("email_suppressions", "email_hash in (select email_lookup from buyer_accounts where id = :id)", accountId);
     for (String table : ACCOUNT_GRAPH) delete(table, "account_id = :id", accountId);
     delete("buyer_accounts", "id = :id", accountId);
   }
