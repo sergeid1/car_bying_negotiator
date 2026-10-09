@@ -13,25 +13,31 @@ import java.util.Base64;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.env.MockEnvironment;
 
 class EncryptedFileDocumentStorageTest {
   @TempDir Path objects;
   private static final String LEGACY = "old-development-secret-at-least-32-bytes";
   private static final byte[] CONTENT = "private document".getBytes(StandardCharsets.UTF_8);
+  private String provider = "file";
   private static String material() {
     byte[] key = new byte[32]; new java.security.SecureRandom().nextBytes(key);
     return Base64.getEncoder().encodeToString(key);
   }
-  private EncryptedFileDocumentStorage storage(String active, String keys) {
-    return new EncryptedFileDocumentStorage(objects, LEGACY, mock(CaseWriteGuard.class),
-        new MockEnvironment().withProperty("document.storage.active-key-id", active)
-            .withProperty("document.storage.keys", keys));
+  private EncryptedDocumentStorage storage(String active, String keys) {
+    var environment = new MockEnvironment().withProperty("document.storage.active-key-id", active)
+        .withProperty("document.storage.keys", keys).withProperty("document.storage.s3.region", "us-east-1");
+    return provider.equals("s3")
+        ? new EncryptedS3DocumentStorage(FakeDocumentS3.create(objects), "offline-test-bucket", LEGACY, mock(CaseWriteGuard.class), environment)
+        : new EncryptedFileDocumentStorage(objects, LEGACY, mock(CaseWriteGuard.class), environment);
   }
 
-  @Test void selectsRecordedKeysForOriginalsAndPagesAndFailsClosedOnMissingKeysAndSubstitution() throws Exception {
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void selectsRecordedKeysForOriginalsAndPagesAndFailsClosedOnMissingKeysAndSubstitution(String provider) throws Exception {
+    this.provider = provider;
     String old = material(), current = material();
     var first = storage("first", "first=" + old);
     var original = first.store("case", "document", CONTENT);
@@ -58,7 +64,9 @@ class EncryptedFileDocumentStorageTest {
         .isInstanceOf(DocumentUnavailableException.class);
   }
 
-  @Test void readsRealHeaderlessLegacyFormatAndRotatesBothKindsWithoutLegacyKey() throws Exception {
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void readsRealHeaderlessLegacyFormatAndRotatesBothKindsWithoutLegacyKey(String provider) throws Exception {
+    this.provider = provider;
     byte[] iv = new byte[12]; new java.security.SecureRandom().nextBytes(iv);
     var cipher = Cipher.getInstance("AES/GCM/NoPadding");
     cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(java.security.MessageDigest.getInstance("SHA-256")
@@ -73,14 +81,18 @@ class EncryptedFileDocumentStorageTest {
     assertThat(target.rotate("case:document", "original.enc")).isTrue();
     assertThat(target.rotate("case:document:page:1", page.objectKey())).isTrue();
     assertThat(target.rotate("case:document", "original.enc")).isFalse();
-    var withoutLegacy = new EncryptedFileDocumentStorage(objects, "", mock(CaseWriteGuard.class),
-        new MockEnvironment().withProperty("document.storage.active-key-id", "active")
-            .withProperty("document.storage.keys", "active=" + key));
+    var environment = new MockEnvironment().withProperty("document.storage.active-key-id", "active")
+        .withProperty("document.storage.keys", "active=" + key).withProperty("document.storage.s3.region", "us-east-1");
+    EncryptedDocumentStorage withoutLegacy = provider.equals("s3")
+        ? new EncryptedS3DocumentStorage(FakeDocumentS3.create(objects), "offline-test-bucket", "", mock(CaseWriteGuard.class), environment)
+        : new EncryptedFileDocumentStorage(objects, "", mock(CaseWriteGuard.class), environment);
     assertThat(withoutLegacy.readOriginal("case", "document", "original.enc")).isEqualTo(CONTENT);
     assertThat(withoutLegacy.readNormalized("case", "document", 1, page.objectKey())).isEqualTo(CONTENT);
   }
 
-  @Test void rejectsMalformedWeakDuplicateAndMissingActiveConfigurationAtStartup() {
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void rejectsMalformedWeakDuplicateAndMissingActiveConfigurationAtStartup(String provider) {
+    this.provider = provider;
     for (String keys : java.util.List.of("bad", "id=oops", "id=" + Base64.getEncoder().encodeToString(new byte[31]),
         "id=" + Base64.getEncoder().encodeToString("a human chosen passphrase of adequate length".getBytes(StandardCharsets.UTF_8)),
         "id=" + material() + ",id=" + material(), "legacy=" + material())) {
@@ -91,7 +103,9 @@ class EncryptedFileDocumentStorageTest {
         new MockEnvironment().withProperty("evidence.deployment", "pilot"))).isInstanceOf(IllegalStateException.class);
   }
 
-  @Test void boundedRotationRepairsMetadataAfterInterruptedReplacementAndRescansSafely() throws Exception {
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void boundedRotationRepairsMetadataAfterInterruptedReplacementAndRescansSafely(String provider) throws Exception {
+    this.provider = provider;
     String old = material(), current = material();
     var source = storage("old", "old=" + old);
     var original = source.store("case", "doc", CONTENT);
@@ -120,7 +134,9 @@ class EncryptedFileDocumentStorageTest {
     }
   }
 
-  @Test void operatorCommandRotatesInBatchesAndReportsOnlyCountsAcrossRestart() throws Exception {
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void operatorCommandRotatesInBatchesAndReportsOnlyCountsAcrossRestart(String provider) throws Exception {
+    this.provider = provider;
     String old = material(), current = material();
     var source = storage("old", "old=" + old);
     var original = source.store("case", "doc", CONTENT);
@@ -132,30 +148,43 @@ class EncryptedFileDocumentStorageTest {
       statement.execute("insert into source_documents values('doc','case','" + original.objectKey() + "',null,'old')");
       statement.execute("insert into document_pages values('doc',1,'" + page.objectKey() + "',null)");
     }
-    for (int attempt = -1; attempt < 2; attempt++) {
-      String classpath = System.getProperty("java.class.path");
-      var command = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-          "-cp", classpath, DocumentKeyRotation.class.getName(), "--service-stopped", "1");
-      command.environment().put("DOCUMENT_STORAGE_PATH", objects.toString());
-      command.environment().put("DOCUMENT_STORAGE_ACTIVE_KEY_ID", "new");
-      command.environment().put("DOCUMENT_STORAGE_KEYS", (attempt == -1 ? "" : "old=" + old + ",") + "new=" + current);
-      command.environment().remove("DOCUMENT_STORAGE_ENCRYPTION_KEY");
-      command.environment().put("SPRING_DATASOURCE_URL", url);
-      command.environment().put("SPRING_DATASOURCE_USERNAME", "");
-      command.environment().put("SPRING_DATASOURCE_PASSWORD", "");
-      var process = command.redirectErrorStream(true).start();
-      assertThat(process.waitFor(20, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-      String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-      if (attempt == -1) {
-        assertThat(process.exitValue()).isEqualTo(1);
-        assertThat(output.trim()).isEqualTo("Document key rotation failed; preserve all keys and retry after repair.");
-        assertThat(source.readOriginal("case", "doc", original.objectKey())).isEqualTo(CONTENT);
-        assertThat(source.readNormalized("case", "doc", 1, page.objectKey())).isEqualTo(CONTENT);
-        continue;
+    try (var endpoint = provider.equals("s3") ? new S3RotationHttpStub(objects) : null) {
+      for (int attempt = -1; attempt < 2; attempt++) {
+        String classpath = System.getProperty("java.class.path");
+        var command = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+            "-cp", classpath, DocumentKeyRotation.class.getName(), "--service-stopped", "1");
+        command.environment().put("DOCUMENT_STORAGE_PATH", objects.toString());
+        command.environment().put("DOCUMENT_STORAGE_PROVIDER", provider);
+        if (endpoint != null) {
+          command.environment().put("DOCUMENT_STORAGE_S3_BUCKET", "offline-test-bucket");
+          command.environment().put("DOCUMENT_STORAGE_S3_REGION", "us-east-1");
+          command.environment().put("AWS_ENDPOINT_URL_S3", endpoint.endpoint());
+          command.environment().put("AWS_ACCESS_KEY_ID", "offline-test-key");
+          command.environment().put("AWS_SECRET_ACCESS_KEY", "offline-test-secret");
+          command.environment().put("AWS_EC2_METADATA_DISABLED", "true");
+          command.environment().put("AWS_REQUEST_CHECKSUM_CALCULATION", "WHEN_REQUIRED");
+          command.environment().put("AWS_RESPONSE_CHECKSUM_VALIDATION", "WHEN_REQUIRED");
+        }
+        command.environment().put("DOCUMENT_STORAGE_ACTIVE_KEY_ID", "new");
+        command.environment().put("DOCUMENT_STORAGE_KEYS", (attempt == -1 ? "" : "old=" + old + ",") + "new=" + current);
+        command.environment().remove("DOCUMENT_STORAGE_ENCRYPTION_KEY");
+        command.environment().put("SPRING_DATASOURCE_URL", url);
+        command.environment().put("SPRING_DATASOURCE_USERNAME", "");
+        command.environment().put("SPRING_DATASOURCE_PASSWORD", "");
+        var process = command.redirectErrorStream(true).start();
+        assertThat(process.waitFor(20, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        if (attempt == -1) {
+          assertThat(process.exitValue()).isEqualTo(1);
+          assertThat(output.trim()).isEqualTo("Document key rotation failed; preserve all keys and retry after repair.");
+          assertThat(source.readOriginal("case", "doc", original.objectKey())).isEqualTo(CONTENT);
+          assertThat(source.readNormalized("case", "doc", 1, page.objectKey())).isEqualTo(CONTENT);
+          continue;
+        }
+        assertThat(process.exitValue()).as("CLI output %s; requests %s", output, endpoint == null ? "file" : endpoint.requests).isZero();
+        assertThat(output.lines().toList()).containsExactly("scanned=1 rotated=" + (attempt == 0 ? 1 : 0),
+            "scanned=1 rotated=" + (attempt == 0 ? 1 : 0), "scanned=0 rotated=0");
       }
-      assertThat(process.exitValue()).isZero();
-      assertThat(output.lines().toList()).containsExactly("scanned=1 rotated=" + (attempt == 0 ? 1 : 0),
-          "scanned=1 rotated=" + (attempt == 0 ? 1 : 0), "scanned=0 rotated=0");
     }
     var target = storage("new", "new=" + current);
     assertThat(target.readOriginal("case", "doc", original.objectKey())).isEqualTo(CONTENT);

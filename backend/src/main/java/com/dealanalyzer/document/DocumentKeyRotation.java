@@ -21,11 +21,20 @@ public final class DocumentKeyRotation {
       var environment = new StandardEnvironment();
       environment.getSystemProperties().put("document.storage.active-key-id", required("DOCUMENT_STORAGE_ACTIVE_KEY_ID"));
       environment.getSystemProperties().put("document.storage.keys", required("DOCUMENT_STORAGE_KEYS"));
-      var storage = new EncryptedFileDocumentStorage(Path.of(required("DOCUMENT_STORAGE_PATH")),
-          System.getenv().getOrDefault("DOCUMENT_STORAGE_ENCRYPTION_KEY", ""), null, environment);
-      try (Connection database = DriverManager.getConnection(required("SPRING_DATASOURCE_URL"),
+      String provider = System.getenv().getOrDefault("DOCUMENT_STORAGE_PROVIDER", "file");
+      if (!provider.equals("file") && !provider.equals("s3")) throw new IllegalArgumentException("Unknown storage provider");
+      environment.getSystemProperties().put("document.storage.allow-file",
+          System.getenv().getOrDefault("DOCUMENT_STORAGE_ALLOW_FILE", "false"));
+      String legacy = System.getenv().getOrDefault("DOCUMENT_STORAGE_ENCRYPTION_KEY", "");
+      if (provider.equals("s3")) environment.getSystemProperties().put("document.storage.s3.region", required("DOCUMENT_STORAGE_S3_REGION"));
+      try (var client = provider.equals("s3") ? new S3DocumentStorageConfiguration()
+              .documentS3Client(required("DOCUMENT_STORAGE_S3_REGION")) : null;
+          Connection database = DriverManager.getConnection(required("SPRING_DATASOURCE_URL"),
           System.getenv().getOrDefault("SPRING_DATASOURCE_USERNAME", ""),
           System.getenv().getOrDefault("SPRING_DATASOURCE_PASSWORD", ""))) {
+        EncryptedDocumentStorage storage = provider.equals("s3")
+            ? new EncryptedS3DocumentStorage(client, required("DOCUMENT_STORAGE_S3_BUCKET"), legacy, null, environment)
+            : new EncryptedFileDocumentStorage(Path.of(required("DOCUMENT_STORAGE_PATH")), legacy, null, environment);
         String cursor = "";
         while (true) {
           Batch result = rotateBatch(database, storage, cursor, batch);
@@ -44,7 +53,7 @@ public final class DocumentKeyRotation {
   public record Batch(int scanned, int rotated, String cursor) {}
   private record ObjectRow(String key, String caseId, String documentId, int page) {}
 
-  static Batch rotateBatch(Connection database, EncryptedFileDocumentStorage storage, String cursor, int size)
+  static Batch rotateBatch(Connection database, EncryptedDocumentStorage storage, String cursor, int size)
       throws SQLException {
     if (size < 1 || size > 1000) throw new IllegalArgumentException("Batch size must be 1..1000");
     if (!database.getAutoCommit()) throw new IllegalArgumentException("Dedicated auto-commit connection required");

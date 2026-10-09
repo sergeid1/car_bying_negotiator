@@ -16,7 +16,8 @@ import javax.imageio.ImageIO;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
@@ -35,9 +36,9 @@ class DealerDocumentAcceptanceTest {
   @TempDir
   Path temporaryDirectory;
 
-  @Test
-  void buyerCanUploadSignedPngAndFollowSecureProcessing() throws Exception {
-    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void buyerCanUploadSignedPngAndFollowSecureProcessing(String provider) throws Exception {
+    var harness = new HttpAcceptanceHarness(temporaryDirectory, provider);
     try (RunningApplication application = harness.start(
         "document-upload",
         true,
@@ -94,9 +95,9 @@ class DealerDocumentAcceptanceTest {
     }
   }
 
-  @Test
-  void signaturesDetermineSupportedMediaAndPdfPageWarningsPreserveOrder() throws Exception {
-    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void signaturesDetermineSupportedMediaAndPdfPageWarningsPreserveOrder(String provider) throws Exception {
+    var harness = new HttpAcceptanceHarness(temporaryDirectory, provider);
     Path heicDecoder = heicDecoderScript();
     try (RunningApplication application = harness.start(
         "supported-documents",
@@ -130,9 +131,9 @@ class DealerDocumentAcceptanceTest {
     }
   }
 
-  @Test
-  void unsafeAndUnsupportedFilesFailClosedWithActionableCodes() throws Exception {
-    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void unsafeAndUnsupportedFilesFailClosedWithActionableCodes(String provider) throws Exception {
+    var harness = new HttpAcceptanceHarness(temporaryDirectory, provider);
     try (RunningApplication application = harness.start(
         "rejected-documents",
         true,
@@ -168,9 +169,9 @@ class DealerDocumentAcceptanceTest {
     }
   }
 
-  @Test
-  void configuredSizePagePixelResolutionAndExpansionLimitsFailClosed() throws Exception {
-    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void configuredSizePagePixelResolutionAndExpansionLimitsFailClosed(String provider) throws Exception {
+    var harness = new HttpAcceptanceHarness(temporaryDirectory, provider);
     try (RunningApplication application = harness.start(
         "document-limits",
         true,
@@ -204,9 +205,9 @@ class DealerDocumentAcceptanceTest {
     }
   }
 
-  @Test
-  void publishedUploadLimitsAreTheLimitsIntakeEnforces() throws Exception {
-    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void publishedUploadLimitsAreTheLimitsIntakeEnforces(String provider) throws Exception {
+    var harness = new HttpAcceptanceHarness(temporaryDirectory, provider);
     try (RunningApplication application = harness.start(
         "published-document-limits",
         false,
@@ -245,9 +246,9 @@ class DealerDocumentAcceptanceTest {
     }
   }
 
-  @Test
-  void uploadIsIdempotentWithoutDuplicatingEncryptedArtifact() throws Exception {
-    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void uploadIsIdempotentWithoutDuplicatingEncryptedArtifact(String provider) throws Exception {
+    var harness = new HttpAcceptanceHarness(temporaryDirectory, provider);
     Path objects = temporaryDirectory.resolve("idempotent-objects");
     try (RunningApplication application = harness.start(
         "idempotent-document",
@@ -270,9 +271,9 @@ class DealerDocumentAcceptanceTest {
     }
   }
 
-  @Test
-  void scannerOutageFailsClosedBeforeAnythingIsStored() throws Exception {
-    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void scannerOutageFailsClosedBeforeAnythingIsStored(String provider) throws Exception {
+    var harness = new HttpAcceptanceHarness(temporaryDirectory, provider);
     Path objects = temporaryDirectory.resolve("scanner-outage-objects");
     try (RunningApplication application = harness.startWithConfiguration(
         "scanner-outage", false, ScannerOutage.class,
@@ -293,9 +294,9 @@ class DealerDocumentAcceptanceTest {
     }
   }
 
-  @Test
-  void revokedServiceConsentPreventsReopenedUploadAndStorage() throws Exception {
-    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void revokedServiceConsentPreventsReopenedUploadAndStorage(String provider) throws Exception {
+    var harness = new HttpAcceptanceHarness(temporaryDirectory, provider);
     Path objects = temporaryDirectory.resolve("revoked-consent-objects");
     try (RunningApplication application = harness.start(
         "revoked-document-consent", false,
@@ -323,9 +324,9 @@ class DealerDocumentAcceptanceTest {
     }
   }
 
-  @Test
-  void retentionWorkerDeletesOriginalAndNormalizedArtifactsAfterDeadline() throws Exception {
-    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void retentionWorkerDeletesOriginalAndNormalizedArtifactsAfterDeadline(String provider) throws Exception {
+    var harness = new HttpAcceptanceHarness(temporaryDirectory, provider);
     Path objects = temporaryDirectory.resolve("retention-objects");
     try (RunningApplication application = harness.start(
         "document-retention", true,
@@ -360,11 +361,11 @@ class DealerDocumentAcceptanceTest {
     }
   }
 
-  @Test
-  void unavailableStorageCannotVerifyDeletionAfterOnlyTheOriginalWasRemoved() throws Exception {
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void unavailableStorageCannotVerifyDeletionAfterOnlyTheOriginalWasRemoved(String provider) throws Exception {
     Path objects = temporaryDirectory.resolve("partial-page-objects");
     Path unavailable = temporaryDirectory.resolve("unavailable-page-objects");
-    try (RunningApplication application = new HttpAcceptanceHarness(temporaryDirectory).start(
+    try (RunningApplication application = new HttpAcceptanceHarness(temporaryDirectory, provider).start(
         "partial-page", true, "--case.deletion.delay=PT1H", "--document.storage.path=" + objects,
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       JsonNode created = HttpAcceptanceHarness.post(application.client(), "/api/v1/cases", validCase());
@@ -392,10 +393,10 @@ class DealerDocumentAcceptanceTest {
     }
   }
 
-  @Test
-  void concurrentRetryReplayDispatchesOnlyOneWorkerAndOneArtifactSet() throws Exception {
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void concurrentRetryReplayDispatchesOnlyOneWorkerAndOneArtifactSet(String provider) throws Exception {
     BlockingRetryNormalization.reset();
-    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+    var harness = new HttpAcceptanceHarness(temporaryDirectory, provider);
     Path objects = temporaryDirectory.resolve("concurrent-retry-objects");
     try (RunningApplication application = harness.startWithConfiguration(
         "concurrent-document-retry", true, BlockingRetryNormalization.class,
@@ -445,9 +446,9 @@ class DealerDocumentAcceptanceTest {
     }
   }
 
-  @Test
-  void failedNormalizationCanRetryWithoutDuplicatingArtifact() throws Exception {
-    var harness = new HttpAcceptanceHarness(temporaryDirectory);
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void failedNormalizationCanRetryWithoutDuplicatingArtifact(String provider) throws Exception {
+    var harness = new HttpAcceptanceHarness(temporaryDirectory, provider);
     Path objects = temporaryDirectory.resolve("retry-objects");
     try (RunningApplication application = harness.startWithConfiguration(
         "retry-document",

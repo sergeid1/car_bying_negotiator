@@ -5,6 +5,8 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -22,8 +24,9 @@ class CasePortabilityAcceptanceTest {
     return Map.of("buyerPostalCode", "27601", "dealerPostalCode", "27604", "purchaseMethod", "CASH",
         "consents", Map.of("serviceProcessing", decision, "humanReview", decision, "anonymizedResearch", decision));
   }
-  @Test void exportsAndDownloadsFreezeTheRetainedHistoryWithoutRegeneratingReports() throws Exception {
-    try (var app = new HttpAcceptanceHarness(directory).start("exports", false, "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void exportsAndDownloadsFreezeTheRetainedHistoryWithoutRegeneratingReports(String provider) throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory, provider).start("exports", false, "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var created=post(app.client(), "/api/v1/cases", buyingCase());
       String id=created.at("/case/id").asText(), token=created.path("accessToken").asText();
       String base="/api/v1/cases/" + id;
@@ -53,7 +56,7 @@ class CasePortabilityAcceptanceTest {
         assertThat(new org.apache.pdfbox.text.PDFTextStripper().getText(document))
             .contains("Unable to verify", "limitations", "evidence");
       }
-      java.nio.file.Files.write(Path.of("/tmp/ticket16-report.pdf"), bytes);
+      java.nio.file.Files.write(directory.resolve("report.pdf"), bytes);
       post(app.client(), base + "/analyses", Map.of(), "report-two", token);
       assertThat(post(app.client(), base + "/exports", Map.of("format", "ZIP", "reportVersion", 0), "export", token)).isEqualTo(export);
       assertThat(app.client().get().uri(base + "/exports/" + export.path("id").asText())
@@ -95,8 +98,9 @@ class CasePortabilityAcceptanceTest {
       }
     }
   }
-  @Test void expiredExportsCannotBeDownloadedAndANewRequestCanRetry() throws Exception {
-    try(var app=new HttpAcceptanceHarness(directory).start("expired-export",false,
+  @ParameterizedTest @ValueSource(strings = {"file", "s3"})
+  void expiredExportsCannotBeDownloadedAndANewRequestCanRetry(String provider) throws Exception {
+    try(var app=new HttpAcceptanceHarness(directory, provider).start("expired-export",false,
         "--case.export.lifetime=PT0S", "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var created=post(app.client(),"/api/v1/cases",buyingCase());
       String id=created.at("/case/id").asText(),token=created.path("accessToken").asText(),base="/api/v1/cases/"+id;

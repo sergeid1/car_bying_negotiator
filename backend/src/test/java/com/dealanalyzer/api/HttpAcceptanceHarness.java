@@ -21,9 +21,15 @@ final class HttpAcceptanceHarness {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   private final Path temporaryDirectory;
+  private final String storageProvider;
 
   HttpAcceptanceHarness(Path temporaryDirectory) {
+    this(temporaryDirectory, "file");
+  }
+
+  HttpAcceptanceHarness(Path temporaryDirectory, String storageProvider) {
     this.temporaryDirectory = temporaryDirectory;
+    this.storageProvider = storageProvider;
   }
 
   RunningApplication start(String databaseName) {
@@ -69,8 +75,20 @@ final class HttpAcceptanceHarness {
           + temporaryDirectory.resolve(databaseName + "-objects").toAbsolutePath());
     }
     properties.addAll(Arrays.asList(additionalProperties));
+    if (storageProvider.equals("s3")) {
+      properties.add("--document.storage.provider=s3");
+      properties.add("--document.storage.s3.bucket=offline-test-bucket");
+      properties.add("--document.storage.s3.region=us-east-1");
+    }
     ConfigurableApplicationContext context =
         new SpringApplicationBuilder(DealAnalyzerApplication.class, additionalConfiguration)
+            .initializers(application -> {
+              if (storageProvider.equals("s3")) {
+                Path root = Path.of(application.getEnvironment().getRequiredProperty("document.storage.path"));
+                application.getBeanFactory().registerSingleton("offlineDocumentS3",
+                    com.dealanalyzer.document.FakeDocumentS3.create(root));
+              }
+            })
             .web(WebApplicationType.SERVLET)
             .run(properties.toArray(String[]::new));
     int port = ((WebServerApplicationContext) context).getWebServer().getPort();
