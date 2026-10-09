@@ -38,7 +38,7 @@ The Playwright account-flow fixture captures an email link inside the test runne
 it at desktop and 360 px widths. It uses stubbed account APIs, rather than a live SMTP server;
 there is no mail-reading test hook or secret-retrieval endpoint in the application.
 
-There are no passwords. `POST /api/v1/account/sign-in-requests` with `{"email"}` and an
+Email links are the default and recovery sign-in method. `POST /api/v1/account/sign-in-requests` with `{"email"}` and an
 `Idempotency-Key` creates the account on first use and emails a single-use link
 (`#sign-in=<token>`, 256 bits of entropy) through the shared `RecoveryEmail` adapter with
 purpose `ACCOUNT_SIGN_IN`. The acknowledgement is identical for new, existing and
@@ -65,6 +65,48 @@ replays, per-address link caps and ineligible recovery requests do not. Accounts
 mail is suppressed remain unverified and are purged by the same abandoned-sign-up lifecycle.
 These limits reset on restart and are not shared across replicas; ingress still needs shared
 quotas. See the [operator procedure](hardening-runbook.md).
+
+## Passkeys
+
+A signed-in Buyer may add up to 20 discoverable passkeys, name each one, list creation and
+last-used dates, and remove any of them. Email recovery remains available after removing the
+last passkey. Platform and roaming authenticators are supported, with resident credentials and
+user verification required. Yubico `webauthn-server-core` 2.9.0 verifies attestation, RP ID, exact
+origin, challenge, presence, verification, ownership, signature and backup eligibility. No
+biometric data or authenticator private key reaches the server.
+Registrations request and accept only privacy-preserving `none` attestation. Legacy Android
+SafetyNet attestation and its HTTP transport are excluded; passkeys require no remote verifier.
+
+Set `account.passkeys.rp-id` (default `localhost`), comma-separated `account.passkeys.origins`
+(default `http://localhost:5173`) and `account.passkeys.challenge-lifetime` (default `PT5M`,
+positive and at most five minutes). Origins must be exact origins without paths and belong
+to the RP ID. Pilot/production declarations through `DeploymentStage` require HTTPS and refuse
+localhost/loopback RP IDs and origins. Configure the public client domain before deployment.
+
+Routes under `/api/v1/account/passkeys`:
+
+- `GET` lists metadata; `DELETE /{id}` removes only an owned credential.
+- `POST /registration/options` and `POST /registration` require the existing session and
+  `Account-Request: 1`. Completion accepts `{attemptId, nickname, credential}`, with the browser
+  response serialized as a JSON string. Attempts bind the account and exact session hash.
+  Adding a key sends `ACCOUNT_SECURITY` after commit under existing quotas and delivery tracking.
+- `POST /sign-in/options` takes no email, returning a random attempt and discoverable options
+  without account identifiers or credential lists. `POST /sign-in` accepts `{attemptId, credential}`
+  and issues the same cookie, expiry and revocation behavior as email sign-in.
+
+V48 stores credential IDs, public COSE keys, counters and backup flags per account. Persisted
+attempts are consumed atomically once, including failed verification; invalid attempts receive
+fixed `PASSKEY_REFUSED` copy. Counter regression, including a nonzero counter resetting to zero,
+is refused after signature verification and records `PASSKEY_COUNTER_REGRESSION` in the account's
+security events. Authenticators reporting zero throughout are supported. Account locks serialize
+assertion updates, removal and deletion. Expired attempts are purged on issuance and by the worker.
+Export includes metadata IDs, nicknames, dates and security event types/times, excluding credential
+IDs, keys, challenges and session hashes. Account deletion removes and count-verifies all three
+tables; pending deletion immediately prevents passkey sign-in.
+
+The client policy allows `publickey-credentials-create` and `publickey-credentials-get` only for
+`self`. CSP retains same-origin scripts and API calls: passkeys need no remote script, frame or
+broader `connect-src`. Test-only software and CDP authenticators are never deployed bypasses.
 
 ## Sessions
 

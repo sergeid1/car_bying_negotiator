@@ -1,6 +1,7 @@
 import { createContext, FormEvent, useEffect, useRef, useState } from "react";
 import type { Credentials } from "./CasePortability";
 import { MailboxConnection } from "./MailboxConnection";
+import { Passkeys, passkeysSupported, signInWithPasskey } from "./Passkeys";
 
 type Contact = { email: string; firstName: string | null; lastName: string | null; phone: string | null };
 type AttachedCase = {
@@ -167,7 +168,13 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
     }, "The sign-in link could not be checked. Retry safely.")}>Finish signing in</button>}
     {loading && !error && <p role="status">Loading your account…</p>}
     {error && <button className="btn-secondary" onClick={() => { setError(""); setLoads(loads + 1); }}>Retry loading account</button>}
-    {!loading && <SignInRequest busy={busy} run={run} setMessage={setMessage} />}
+    {!loading && <><SignInRequest busy={busy} run={run} setMessage={setMessage} />
+      <button className="btn-secondary" disabled={busy || !passkeysSupported()} onClick={() => void run(async () => {
+        await signInWithPasskey(call);
+        setAccount(await (await call("/api/v1/account")).json()); setMessage("Signed in with a passkey.");
+      }, "Passkey sign-in could not be completed. Try again or use an email link.")}>Sign in with a passkey</button>
+      {!passkeysSupported() && <p>This browser does not support passkeys. Use an email sign-in link.</p>}
+    </>}
     {message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
   </section>;
 
@@ -182,6 +189,7 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
     }, "Contact details could not be saved. Check the phone number format and retry.")} />
     <NotificationPreferences onSessionEnded={() => signedOut(ENDED)} />
     <MailboxConnection onSessionEnded={() => signedOut(ENDED)} />
+    <Passkeys request={call} onSessionEnded={() => signedOut(ENDED)} />
     <h3>Your Buying Cases</h3>
     {account.cases.length === 0 ? <p className="muted">No cases saved yet. A case you start while signed in is saved here, and
       a case opened by its private link can be attached.</p>

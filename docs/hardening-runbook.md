@@ -58,6 +58,10 @@ through the CSSOM, which works without `unsafe-inline`. Theme initialization and
 remain external same-origin assets. See [the header rationale](../frontend/client-headers.md).
 
 The map also defines one-year HSTS, nosniff, no-referrer and a restrictive Permissions-Policy.
+WebAuthn create/get permissions are limited to `self`; passkey sign-in and registration use the
+existing same-origin CSP `connect-src` and require no CSP relaxation. Configure
+`account.passkeys.rp-id` and `account.passkeys.origins` for the public HTTPS client origin before
+pilot/production; development localhost defaults are refused by the shared deployment guard.
 HSTS is honored only over HTTPS; verify HTTPS redirects and headers at the deployed edge
 before enrollment. HSTS intentionally omits `includeSubDomains` and `preload`, which require
 a separate inventory and commitment for all subdomains. Verify framing refusal and a

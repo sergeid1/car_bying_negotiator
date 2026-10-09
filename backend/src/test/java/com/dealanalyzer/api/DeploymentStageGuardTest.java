@@ -60,6 +60,10 @@ class DeploymentStageGuardTest {
     refuses(runner, "operations.EvidenceBudget", "evidence.budget.per-case-cost-usd");
     refuses(runner.withPropertyValues("account.session.cookie-secure=false"),
         "account.AccountSessionCookie", "cookies must be secure");
+    refuses(runner, "account.PasskeyConfiguration", "localhost is refused");
+    runner.withPropertyValues("account.passkeys.rp-id=buyer.example", "account.passkeys.origins=https://buyer.example")
+        .withUserConfiguration(type("account.PasskeyConfiguration"))
+        .run(context -> assertThat(context).hasNotFailed());
     refuses(runner.withPropertyValues("case.recovery.from=sender@example.com", "spring.mail.host=mailpit"),
         "recovery.RecoveryEmailProductionGuard", "real SMTP host");
     refuses(runner, "buyingcase.SyntheticIntakeAffordance", "intake.synthetic.enabled=false");
