@@ -84,7 +84,7 @@ class PilotCopyClaimsTest {
 
   @Test void theStandingCommercialRelationshipDisclosureIsPresent() throws IOException {
     String app = normalize(Files.readString(REPOSITORY.resolve("frontend/src/App.tsx"), StandardCharsets.UTF_8));
-    assertThat(app).contains("Deal X-Ray is a tool on your side, the Buyer's.");
+    assertThat(app).contains("otdog is a tool on your side, the Buyer's.");
     assertThat(app).contains("We don't work with dealers. We help people.");
     assertThat(app).contains("You send every email from your own email and make every decision");
     assertThat(app).contains("no commercial relationship affects any");
@@ -101,12 +101,12 @@ class PilotCopyClaimsTest {
 
   @Test void positioningClaimsAreProhibited() {
     for (String claim : List.of("Our AI negotiator negotiates for you.", "We contact dealers on your behalf.",
-        "Deal X-Ray emails the dealer for you.", "Let our agent handle it.", "An autonomous buying assistant.",
+        "otdog emails the dealer for you.", "Let our agent handle it.", "An autonomous buying assistant.",
         "The platform writes to the dealer in its own name.", "It negotiates with dealers for the Buyer.",
-        "Deal X-Ray represents you at the dealership.", "This contract is safe to sign.", "Guaranteed savings.")) {
+        "otdog represents you at the dealership.", "This contract is safe to sign.", "Guaranteed savings.")) {
       assertThat(PROHIBITED.values()).as(claim).anyMatch(pattern -> pattern.matcher(claim).find());
     }
-    for (String allowed : List.of("Deal X-Ray helps you draft your emails to dealers.",
+    for (String allowed : List.of("otdog helps you draft your emails to dealers.",
         "You send every email from your own email.", "Enter the vehicle you are negotiating for.")) {
       assertThat(PROHIBITED.values()).as(allowed).noneMatch(pattern -> pattern.matcher(allowed).find());
     }

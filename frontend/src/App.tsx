@@ -192,7 +192,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 
       <header className="masthead">
         <div className="masthead-inner">
-          <span className="wordmark"><span className="mark" aria-hidden="true" />Deal X-Ray</span>
+          <span className="wordmark"><span className="mark" aria-hidden="true" />otdog</span>
           <nav aria-label="Page sections">
             <a href="#case-workflow">Your case</a>
             <a href="#scope">Scope</a>
@@ -208,7 +208,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             <p className="eyebrow">The Buyer's side of the deal</p>
             <h1>See the whole deal <span className="hero-quiet">before you decide.</span></h1>
             <p className="lede">
-              Deal X-Ray helps you find cars, check dealer quotes, draft your emails to dealers, and
+              otdog helps you find cars, check dealer quotes, draft your emails to dealers, and
               check the paperwork at the desk. You send every email from your own email and make every
               decision. Every dollar stays connected to its input or calculation.
             </p>
@@ -345,10 +345,10 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             <strong>What this is, and what it is not</strong>
             <div className="scope-columns">
               <p>
-                Deal X-Ray is a tool on your side, the Buyer's. We don't work with dealers. We help
+                otdog is a tool on your side, the Buyer's. We don't work with dealers. We help
                 people. It helps you find cars, check quotes, draft your emails to dealers, and check
                 desk paperwork. You send every email from your own email and make every decision, and
-                Deal X-Ray never contacts a dealer itself.
+                otdog never contacts a dealer itself.
               </p>
               <p>
                 No dealer, lender, or other commercial party pays for placement, leads, or referrals,

@@ -1,6 +1,6 @@
 # Price boundary expert review packet
 
-This offline packet prepares evidence for public-pilot readiness prerequisite 4. Deal X-Ray works
+This offline packet prepares evidence for public-pilot readiness prerequisite 4. otdog works
 only for Buyers and does not work with dealers, so the reviewer must be independent of the dealer
 side: not employed by, paid by, or affiliated with a dealer, dealer group, or lender. A consumer-side
 automotive expert is asked to judge whether the shipped opening, target, policy maximum, and

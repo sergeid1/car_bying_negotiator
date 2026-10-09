@@ -19,7 +19,7 @@ export function requestedPartnerKit(): boolean {
 
 /** Invented partner and wording, shown only as a labelled example of the Buyer's panel. */
 const EXAMPLE_DISCLOSURE =
-  "Example Independent Inspections, a vehicle inspection service, suggested Deal X-Ray to you. It is not paid for this referral and does not pay Deal X-Ray.";
+  "Example Independent Inspections, a vehicle inspection service, suggested otdog to you. It is not paid for this referral and does not pay otdog.";
 
 type PartnerLink = { label: string; address: string };
 
@@ -37,7 +37,7 @@ export function ReferralPartnerKit() {
     <h1 id="partner-kit-heading">Referral partner kit</h1>
     <p className="lede">
       For consumer educators and independent inspection services who want to point Buyers holding a
-      dealer quote to Deal X-Ray.
+      dealer quote to otdog.
     </p>
 
     <section aria-labelledby="partner-who-heading">
@@ -47,18 +47,18 @@ export function ReferralPartnerKit() {
         <li><strong>Independent inspection services</strong>, who examine a vehicle for the Buyer before purchase.</li>
       </ul>
       <p>
-        Dealers, lenders, and parties affiliated with a dealer cannot be referral partners. Deal X-Ray
+        Dealers, lenders, and parties affiliated with a dealer cannot be referral partners. otdog
         does not sell leads to dealers and does not contact dealers for the Buyer.
       </p>
     </section>
 
     <section aria-labelledby="partner-product-heading">
-      <h2 id="partner-product-heading">What Deal X-Ray does</h2>
+      <h2 id="partner-product-heading">What otdog does</h2>
       <p>
-        Deal X-Ray is a tool on the Buyer's side of a used-car purchase. We don't work with dealers. We
+        otdog is a tool on the Buyer's side of a used-car purchase. We don't work with dealers. We
         help people. It helps the Buyer find cars, check dealer quotes, draft their own emails to dealers,
         and check the paperwork presented at the desk. The Buyer sends every email from their own email
-        and makes every decision; Deal X-Ray never contacts a dealer itself.
+        and makes every decision; otdog never contacts a dealer itself.
       </p>
       <p>
         It reviews the dealer's own paperwork for financial consistency. When a Buyer uploads a quote, it reads each line, sorts it into the parts of the out-the-door
@@ -106,7 +106,7 @@ export function ReferralPartnerKit() {
       <h2 id="partner-terms-heading">Terms of the arrangement</h2>
       <ul>
         <li>
-          Deal X-Ray works only for Buyers. It does not work with dealers: it has no dealer customers or
+          otdog works only for Buyers. It does not work with dealers: it has no dealer customers or
           partners, takes no money from dealers, and shares nothing about a Buyer with any dealer.
         </li>
         <li>No dealer, lender, or other commercial party pays for placement, leads, or referrals.</li>
@@ -126,7 +126,7 @@ export function ReferralPartnerKit() {
 
     <LinkBuilder />
 
-    <nav className="actions" aria-label="More from Deal X-Ray">
+    <nav className="actions" aria-label="More from otdog">
       {GUIDE_LIST.map(guide => <a key={guide.slug} href={guideLink(guide.slug)}>{guide.title}</a>)}
       <a href="./">Back to the start</a>
     </nav>

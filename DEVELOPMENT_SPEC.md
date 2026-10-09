@@ -1,6 +1,6 @@
-# Deal X-Ray — Product and Development Specification
+# otdog — Product and Development Specification
 
-Status: Phase 1 (Deal X-Ray) built; Phases 2–4 largely built, Phase 3 moving to Buyer-sent email (tickets 82–84); public pilot gated by Section 18 prerequisites  
+Status: Phase 1 (document analysis) built; Phases 2–4 largely built, Phase 3 moving to Buyer-sent email (tickets 82–84); public pilot gated by Section 18 prerequisites  
 Version: 2.2  
 Date: 2026-10-09  
 Supersedes: version 2.1 (2026-10-05), which excluded trade-in valuation. Version 2.2 adds a trade-in
@@ -17,7 +17,7 @@ requirements are unchanged unless a section says otherwise. Sources consolidated
 
 ### 1.0 Vision
 
-Deal X-Ray is the Buyer's side of a used-car purchase. It exists so that a person buying a car does
+otdog is the Buyer's side of a used-car purchase. It exists so that a person buying a car does
 not get taken advantage of by a dealership. The full journey is:
 
 1. **Shop.** The Buyer describes the car they want (for example, a 2021–2023 Honda Civic under 40,000
@@ -59,7 +59,7 @@ The product uses AI to extract and explain facts. Deterministic, versioned code 
 
 The product represents the Buyer. Dealer compensation, affiliate eligibility, or lead value must never influence a market assessment, rating, finding, recommendation, search result, or negotiation.
 
-### 1.1 Phase 1 outcome (Deal X-Ray, built)
+### 1.1 Phase 1 outcome (document analysis, built)
 
 A Buyer can:
 
@@ -120,7 +120,7 @@ A design that conflicts with this credo is out of scope regardless of other bene
 
 ### 2.1 Included
 
-Phase 1 (Deal X-Ray, built):
+Phase 1 (document analysis, built):
 
 - Responsive web application.
 - Used passenger vehicles sold by licensed dealers.
@@ -851,7 +851,7 @@ Gate: 25–50 moderated cases complete safely before a gated 100–300-case pilo
 
 Expected effort: 12–16 calendar weeks for two experienced full-stack engineers plus part-time product/design, automotive expertise, security, and counsel. Provider contracting and corpus acquisition are critical-path dependencies.
 
-Milestones 0–4 make up **Phase 1 (Deal X-Ray)**. Its open release items are tracked in
+Milestones 0–4 make up **Phase 1 (document analysis)**. Its open release items are tracked in
 `docs/pilot-readiness-record.md` and ticket 22. Later phases may be built in parallel with the Phase 1
 pilot, but no Buyer outside moderated testing uses a later phase before its gate passes.
 

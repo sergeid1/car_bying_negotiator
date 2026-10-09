@@ -115,7 +115,7 @@ prepared again. Test-drive messages stay grounded on their own stored text.
 
 ## The platform never writes to a dealer (ticket 84)
 
-Spec 2.1 makes Deal X-Ray the Buyer's tool, not the Buyer's agent: it drafts and checks, and the Buyer
+Spec 2.1 makes otdog the Buyer's tool, not the Buyer's agent: it drafts and checks, and the Buyer
 approves the exact text and sends it from their own email address. Ticket 84 removed every path by
 which the platform could email a dealer in its own name. `RelayService.send`, the provider's `send`
 and `lookup`, the delivery report hook, `POST .../relay/messages/{messageId}/delivery-check` and

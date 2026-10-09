@@ -47,7 +47,7 @@
     {
       "file": "frontend/src/App.tsx",
       "pattern": "contacts dealers",
-      "contains": "Deal X-Ray never contacts a dealer itself.",
+      "contains": "otdog never contacts a dealer itself.",
       "justification": "Negated standing disclosure in the footer. DEVELOPMENT_SPEC.md sections 1.2 and 1.3 forbid the positive claim; the Buyer sends every email from their own email."
     },
     {
@@ -59,7 +59,7 @@
     {
       "file": "frontend/src/ReferralPartnerKit.tsx",
       "pattern": "contacts dealers",
-      "contains": "Deal X-Ray never contacts a dealer itself.",
+      "contains": "otdog never contacts a dealer itself.",
       "justification": "Negated positioning statement in the partner kit, matching the footer and DEVELOPMENT_SPEC.md section 1.3."
     }
   ]

@@ -139,7 +139,7 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
           {proposal.disclosures.map(item =>
             <label key={item}><input type="checkbox" name="disclosure" value={item} />{DISCLOSURE_LABELS[item]}</label>)}
         </fieldset>
-        <p>The mandate limits what you can approve. Deal X-Ray never sends anything: you approve each message and send it from your own email.</p>
+        <p>The mandate limits what you can approve. otdog never sends anything: you approve each message and send it from your own email.</p>
         <label>Mandate lasts<select name="lifetime" defaultValue="14">
           {LIFETIMES.map(days => <option key={days} value={days}>{days} days</option>)}
         </select></label>

@@ -20,7 +20,7 @@ class SmtpRecoveryEmail implements RecoveryEmail {
     var message = new SimpleMailMessage();
     message.setFrom(from); message.setTo(recipient);
     if (purpose == Purpose.ACCOUNT_SIGN_IN) {
-      message.setSubject("Your Deal X-Ray sign-in link");
+      message.setSubject("Your otdog sign-in link");
       message.setText("You asked to sign in to your Buyer Account. This single-use link expires in 15 minutes.\n"
           + link + "\nIf you did not request this, ignore this email. No account is used until the link is opened.");
     } else if (purpose == Purpose.CASE_RECOVERY) {

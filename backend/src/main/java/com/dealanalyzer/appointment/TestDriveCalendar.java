@@ -15,7 +15,7 @@ final class TestDriveCalendar {
 
   static String render(Event event) {
     var lines = new ArrayList<String>(List.of(
-        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Deal X-Ray//Test drive//EN", "CALSCALE:GREGORIAN",
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//otdog//Test drive//EN", "CALSCALE:GREGORIAN",
         "METHOD:" + (event.cancelled() ? "CANCEL" : "PUBLISH"),
         "BEGIN:VEVENT", "UID:" + event.uid() + "@test-drive.deal-xray", "DTSTAMP:" + UTC.format(event.stamp()),
         "DTSTART:" + UTC.format(event.start()), "DTEND:" + UTC.format(event.end()),

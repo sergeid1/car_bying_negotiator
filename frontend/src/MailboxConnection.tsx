@@ -128,13 +128,13 @@ export function MailboxConnection({ onSessionEnded }: { onSessionEnded: () => vo
     {connection && <>
       <p>Connected: <strong className="mailbox-address">{connection.address}</strong> ({connection.providerLabel})
         {connection.connectedAt ? ` since ${new Date(connection.connectedAt).toLocaleDateString()}` : ""}.</p>
-      <p>Deal X-Ray can only send messages you approve, exactly as approved, from this address. They appear in your Sent
+      <p>otdog can only send messages you approve, exactly as approved, from this address. They appear in your Sent
         folder. It cannot read your email, so dealer replies still come in when you paste or upload them.</p>
       <button type="button" className="btn-secondary" disabled={busy} onClick={() => void disconnect(connection.providerLabel)}>
         Disconnect {connection.providerLabel}</button>
     </>}
     {view?.available && !connection && <>
-      <p>Connect Gmail or Outlook to send an approved message from your address with one button. Deal X-Ray asks only for
+      <p>Connect Gmail or Outlook to send an approved message from your address with one button. otdog asks only for
         permission to send: it can send just the messages you approve and cannot read your email. Every message can still be
         sent from your own email app instead.</p>
       <div className="actions">
