@@ -105,9 +105,14 @@ public class BuyerAccountService {
         "This sign-in link has expired. Request a new link.");
     link.consumedAt = now;
     if (account.verifiedAt == null) account.verifiedAt = now;
+    return issueSession(account.id);
+  }
+
+  Session issueSession(String accountId) {
+    Instant now = Instant.now();
     String sessionToken = secrets.issue(now).token();
     var session = new AccountSessionEntity(secrets.protectAccountSecret("session", sessionToken));
-    session.accountId = account.id; session.createdAt = now; session.expiresAt = now.plus(sessionLifetime);
+    session.accountId = accountId; session.createdAt = now; session.expiresAt = now.plus(sessionLifetime);
     sessions.saveAndFlush(session);
     return new Session(sessionToken, session.expiresAt);
   }
@@ -204,6 +209,7 @@ public class BuyerAccountService {
   @Transactional
   public void signOut(String sessionToken, boolean everywhere) {
     var session = requireSession(sessionToken);
+    accounts.findLockedById(session.accountId).orElseThrow(BuyerAccountService::sessionEnded);
     Instant now = Instant.now();
     if (!everywhere) { session.revokedAt = now; return; }
     for (var other : sessions.findByAccountIdOrderByCreatedAt(session.accountId))

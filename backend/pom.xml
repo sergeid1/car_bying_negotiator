@@ -43,6 +43,25 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.upokecenter</groupId>
+      <artifactId>cbor</artifactId>
+      <version>4.5.6</version>
+      <!-- Pin the verifier's runtime parser; also used by the test-only authenticator encoder. -->
+    </dependency>
+    <dependency>
+      <groupId>com.yubico</groupId>
+      <artifactId>webauthn-server-core</artifactId>
+      <version>2.9.0</version>
+      <exclusions>
+        <!-- Only legacy Android SafetyNet uses this transport. Registrations accept none
+             attestation; adding Apache here would change every Spring RestClient's retries. -->
+        <exclusion>
+          <groupId>org.apache.httpcomponents.client5</groupId>
+          <artifactId>httpclient5</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>s3</artifactId>
       <!-- Use the explicit synchronous transport without changing Spring RestClient auto-selection. -->

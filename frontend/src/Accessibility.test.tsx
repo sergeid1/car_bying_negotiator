@@ -28,7 +28,16 @@ import { BuyingJourneys } from "./BuyingJourneys";
 import { NegotiationConversation } from "./NegotiationConversation";
 import { JourneyCandidates, ShortlistEntry } from "./JourneyCandidates";
 import { QuoteComparison } from "./QuoteComparison";
+import { Passkeys } from "./Passkeys";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+test.each([{ keys: [] }, { keys: [{ id: "key", nickname: "My device", createdAt: "2026-10-09T12:00:00Z", lastUsedAt: null }] }])(
+  "passkey management has no automated AA violations (%j)", async ({ keys }) => {
+    const request = vi.fn().mockResolvedValue(new Response(JSON.stringify(keys)));
+    const { container } = render(<main><h1>Account</h1><Passkeys request={request} onSessionEnded={() => {}} /></main>);
+    await screen.findByText(keys.length ? "My device" : "No passkeys added yet.");
+    expect((await axe.run(container, AA)).violations).toEqual([]);
+  });
 
 test.each([undefined, "a.long.buyer.address@example.com"])("header account controls for %s have no automated AA violations", async email => {
   const { container } = render(<header><AccountHeader controls={{ email, busy: false, signOut: () => {} }} /></header>);

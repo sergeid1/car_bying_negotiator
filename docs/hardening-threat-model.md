@@ -1,5 +1,21 @@
 # Buyer service threat model
 
+Passkeys (ticket 95): a maintained Yubico verifier checks exact configured origin/RP ID,
+challenge, user presence/verification, signature and credential/user-handle ownership. Pilot
+and production refuse localhost configuration through the shared DeploymentStage decision.
+Discoverable sign-in takes no address and exposes no account existence. Registration requires
+an active account session with the request header and binds its attempt to that exact session.
+Five-minute persisted attempts are atomically single-use even on failed verification. Account
+locks serialize credential counters with removal and deletion. Signed counter regressions are
+refused and recorded as account-security events; backup eligibility/state are retained. A
+counterless or synced authenticator is not proof of unique physical possession. Biometric data
+and private keys remain in the authenticator. Compromised browser scripts or an existing stolen
+session can still add a credential; additions send mandatory ACCOUNT_SECURITY email. Email-link
+recovery remains an account takeover boundary. Metadata-only export excludes key material and
+credential IDs; deletion verifies removal of credentials, attempts and security events. The
+client CSP stays same-origin and Permissions-Policy confines WebAuthn to self. Existing API
+peer limits bound public requests; ingress must enforce shared quotas across replicas.
+
 Scope (reviewed 2026-10-07): the account-free Buyer API and optional Buyer Accounts,
 session cookie and account case pass; React client; JPA metadata and encrypted object
 storage; document workers; recovery/export, operations and deletion; Buying Journeys,

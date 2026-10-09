@@ -172,6 +172,10 @@ class CaseIsolationInventoryAcceptanceTest {
       accountRow("POST", V + "/account/deletion", "{}"),
       accountRow("GET", V + "/account/deletion", null),
       accountRow("GET", V + "/account/notifications", null),
+      accountRow("GET", V + "/account/passkeys", null),
+      accountRow("POST", V + "/account/passkeys/registration/options", "{}"),
+      accountRow("POST", V + "/account/passkeys/registration", "{\"attemptId\":\"unknown\",\"nickname\":\"Device\",\"credential\":\"{}\"}"),
+      accountRow("DELETE", V + "/account/passkeys/{id}", null, "id=passkeyId"),
       accountRow("GET", V + "/account/mailbox", null),
       accountRow("POST", V + "/account/mailbox/authorizations", "{\"provider\":\"GOOGLE\"}"),
       accountRow("POST", V + "/account/mailbox/connection", "{\"state\":\"unknown\",\"code\":\"unknown\"}"),
@@ -206,6 +210,8 @@ class CaseIsolationInventoryAcceptanceTest {
       publicRow("POST", V + "/recovery/verify", "Redeems a single-use emailed recovery secret, which is the credential."),
       publicRow("POST", V + "/account/sign-in-requests", "Buyer Account sign-in by email; the acknowledgement is identical for every address."),
       publicRow("POST", V + "/account/sign-in/verify", "Redeems a single-use emailed sign-in secret, which is the credential."),
+      publicRow("POST", V + "/account/passkeys/sign-in/options", "Discoverable credential challenge with no account input or credential list."),
+      publicRow("POST", V + "/account/passkeys/sign-in", "Redeems a single-use challenge with a verified credential signature and user handle."),
       publicRow("GET", V + "/offer", "The current one-time purchase offer, the same for everyone."),
       publicRow("GET", V + "/sample-report", "A redacted report built from a synthetic fixture case."),
       publicRow("GET", V + "/document-limits", "Upload limits the intake form shows before a case exists."),
@@ -214,7 +220,7 @@ class CaseIsolationInventoryAcceptanceTest {
 
 
   /** Constant path values; every other placeholder names an object that belongs to one case or account. */
-  private static final Map<String, String> CONSTANTS = Map.of("version", "1", "pageNumber", "1");
+  private static final Map<String, String> CONSTANTS = Map.of("version", "1", "pageNumber", "1", "passkeyId", "00000000-0000-0000-0000-000000000095");
   private static final String MALFORMED = "not-a-case-token";
 
   /** A case, its credential and the IDs of the objects it owns, keyed as the endpoint table names them. */

@@ -26,14 +26,18 @@ public class AccountExportService {
   private final com.dealanalyzer.operations.ProviderUsageStore providerUsage;
   private final com.dealanalyzer.mailbox.MailboxConnections mailboxes;
   private final com.dealanalyzer.mailbox.MailboxSendService mailboxSends;
+  private final PasskeyService passkeys;
+  private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
   AccountExportService(BuyerAccountService accounts, AccountSessionRepository sessions, CaseExportService caseExports,
       ObjectMapper json, com.dealanalyzer.notification.BuyerNotifications notifications,
       com.dealanalyzer.journey.JourneyService journeys, com.dealanalyzer.operations.ProviderUsageStore providerUsage,
-      com.dealanalyzer.mailbox.MailboxConnections mailboxes, com.dealanalyzer.mailbox.MailboxSendService mailboxSends) {
+      com.dealanalyzer.mailbox.MailboxConnections mailboxes, com.dealanalyzer.mailbox.MailboxSendService mailboxSends,
+      PasskeyService passkeys, org.springframework.jdbc.core.JdbcTemplate jdbc) {
     this.accounts = accounts; this.sessions = sessions; this.caseExports = caseExports; this.json = json;
     this.notifications = notifications; this.journeys = journeys;
     this.providerUsage = providerUsage; this.mailboxes = mailboxes; this.mailboxSends = mailboxSends;
+    this.passkeys = passkeys; this.jdbc = jdbc;
   }
 
   @Transactional(readOnly = true)
@@ -44,6 +48,8 @@ public class AccountExportService {
     data.put("schemaVersion", "buyer-account-export.v1");
     data.put("contact", view.contact());
     data.put("createdAt", view.createdAt());
+    data.put("passkeys", passkeys.metadata(session.accountId));
+    data.put("accountSecurityEvents", jdbc.queryForList("select event_type, created_at from buyer_account_security_events where account_id = ? order by created_at", session.accountId));
     data.put("notificationPreferences", notifications.preferencesForAccount(session.accountId));
     data.put("notificationDeliveries", notifications.deliveryHistory(session.accountId));
     data.put("sessions", sessions.findByAccountIdOrderByCreatedAt(session.accountId).stream()

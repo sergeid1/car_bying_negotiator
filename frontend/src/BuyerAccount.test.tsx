@@ -238,6 +238,7 @@ test("saves each email preference independently and keeps security email require
 test("failed email preference saves retain the saved value and can be retried", async () => {
   let fail = true;
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input) === "/api/v1/account/passkeys") return json([]);
     if (String(input) !== "/api/v1/account/notifications") return json(account());
     if (init?.method === "PUT" && fail) return json({}, 503);
     return json([{ type: "DEALER_REPLY", enabled: init?.method !== "PUT", mandatory: false }]);
