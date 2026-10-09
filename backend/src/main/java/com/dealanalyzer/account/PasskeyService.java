@@ -111,7 +111,7 @@ public class PasskeyService {
       }
       jdbc.update("update buyer_account_passkeys set signature_count = ?, backup_state = ?, last_used_at = ? where id = ?",
           result.getSignatureCount(), result.isBackedUp(), Timestamp.from(Instant.now()), credential.id);
-      return accounts.issueSession(credential.owner);
+      return accounts.issueSession(credential.owner, "PASSKEY");
     } catch (AccountProblem problem) { throw problem; }
     catch (Exception invalid) { throw refused(); }
   }
@@ -141,6 +141,9 @@ public class PasskeyService {
   }
   private AccountSessionEntity registrationSession(String token) {
     var session = activeSession(token);
+    if ("PASSWORD".equals(session.signInMethod))
+      throw new AccountProblem(HttpStatus.FORBIDDEN, "PASSKEY_STEP_UP",
+          "Sign in with an email link or existing passkey before adding a passkey.");
     lockActive(session.accountId);
     // Re-read database state after the account lock, rather than relying on a cached JPA row.
     if (jdbc.queryForObject("select count(*) from buyer_account_sessions where token_hash = ? and revoked_at is null and expires_at > ?",

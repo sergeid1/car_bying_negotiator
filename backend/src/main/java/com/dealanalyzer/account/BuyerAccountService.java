@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Passwordless Buyer Accounts. Contact details are the Buyer's only: they are never logged, never
+ * Buyer Accounts. Contact details are the Buyer's only: they are never logged, never
  * sent to analytics or operator tooling, and no endpoint releases them to anyone but the Buyer.
  */
 @Service
@@ -109,12 +109,29 @@ public class BuyerAccountService {
   }
 
   Session issueSession(String accountId) {
+    return issueSession(accountId, "EMAIL_LINK");
+  }
+
+  Session issueSession(String accountId, String method) {
     Instant now = Instant.now();
     String sessionToken = secrets.issue(now).token();
     var session = new AccountSessionEntity(secrets.protectAccountSecret("session", sessionToken));
     session.accountId = accountId; session.createdAt = now; session.expiresAt = now.plus(sessionLifetime);
+    session.signInMethod = method;
     sessions.saveAndFlush(session);
     return new Session(sessionToken, session.expiresAt);
+  }
+
+  @Transactional(readOnly = true)
+  public void requireMailboxStepUp(String token) {
+    var session = requireSession(token);
+    // Existing email/passkey sessions keep their mailbox access. Password sessions must step up.
+    if ("PASSWORD".equals(session.signInMethod))
+      throw new AccountProblem(HttpStatus.FORBIDDEN, "MAILBOX_STEP_UP",
+          "Sign in with a fresh email link or passkey before changing your mailbox connection.");
+    if (!session.createdAt.plus(Duration.ofMinutes(10)).isAfter(Instant.now()))
+      throw new AccountProblem(HttpStatus.FORBIDDEN, "MAILBOX_STEP_UP",
+          "Sign in with a fresh email link or passkey before changing your mailbox connection.");
   }
 
   @Transactional(readOnly = true)

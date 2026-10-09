@@ -23,9 +23,10 @@ import org.springframework.web.bind.annotation.*;
 public class MailboxController {
   private final MailboxConnections connections;
   private final MailboxSendService sends;
+  private final com.dealanalyzer.account.BuyerAccountService accounts;
 
-  MailboxController(MailboxConnections connections, MailboxSendService sends) {
-    this.connections = connections; this.sends = sends;
+  MailboxController(MailboxConnections connections, MailboxSendService sends, com.dealanalyzer.account.BuyerAccountService accounts) {
+    this.connections = connections; this.sends = sends; this.accounts = accounts;
   }
 
   public record StartRequest(@NotNull MailboxProvider provider) {}
@@ -40,16 +41,19 @@ public class MailboxController {
 
   @PostMapping("/account/mailbox/authorizations")
   public MailboxConnections.Authorization start(@AccountSession String session, @Valid @RequestBody StartRequest request) {
+    accounts.requireMailboxStepUp(session);
     return connections.start(session, request.provider());
   }
 
   @PostMapping("/account/mailbox/connection")
   public MailboxConnections.MailboxView complete(@AccountSession String session, @Valid @RequestBody CompleteRequest request) {
+    accounts.requireMailboxStepUp(session);
     return connections.complete(session, request.state(), request.code());
   }
 
   @DeleteMapping("/account/mailbox/connection")
   public MailboxConnections.MailboxView disconnect(@AccountSession String session) {
+    accounts.requireMailboxStepUp(session);
     return connections.disconnect(session);
   }
 

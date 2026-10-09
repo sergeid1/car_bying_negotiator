@@ -5,6 +5,51 @@ works without one, by case link, exactly as before (spec §8.1 CASE-01, §8.8 AC
 
 ## Sign-in
 
+### Optional password (ticket 96)
+
+Email links remain the default and the only account-creation path. A signed-in Buyer can read
+`GET /api/v1/account/password` (only `{configured}`), set/change with `PUT` and `{password}`,
+or remove with `DELETE`. Passwords use Spring Security's bcrypt encoder at cost 12 with a random
+salt. This deliberately expensive verification needs no extra crypto or HTTP-client dependency;
+see [Spring's password storage documentation](https://docs.spring.io/spring-security/reference/features/authentication/password-storage.html).
+There are no composition rules: at least 12 Unicode code points, at most 72 UTF-8 bytes, checked
+before encoding or matching to avoid bcrypt truncation. Hashes never appear in responses, export,
+security events or logs. Removing the account row removes its hash.
+
+Set/change/remove requires a session created within the last 10 minutes. Sign out and sign in
+again when prompted. Each actual mutation records an account-security event and schedules the
+existing mandatory `ACCOUNT_SECURITY` notification after commit, under its existing delivery
+quota. Setting, changing and removing revoke every other session while retaining the current one.
+Forgot password uses the existing email sign-in link: finish signing in, then set a new password.
+There is no separate reset token or password-only sign-up.
+
+`POST /api/v1/account/password/sign-in` accepts `{email,password}` and issues the same HttpOnly
+`account_session` cookie and expiry as email/passkey sign-in. Unknown, inactive, password-free
+and wrong-password accounts receive the same 401 detail. Each performs one cost-12 bcrypt check
+(a dummy hash when no usable password exists). Backoff keys are keyed hashes of normalized email
+and the socket client address; forwarded headers are ignored. Per account the first five attempts
+are admitted; per address the first twenty are admitted. The last admitted attempt starts a
+one-second backoff, doubling per later admitted attempt up to 15 minutes. Blocked attempts return
+the same 429 for every account state and do not perform bcrypt. Counters expire after an hour,
+are capped at 20,000 entries, and fail closed at capacity without evicting live counters. These
+are per-process counters, cleared on restart, like the API backstop; ingress must enforce shared
+account and client limits across replicas. Admitted successes also count against backoff.
+
+Setting/changing checks Have I Been Pwned Pwned Passwords with only the five-character SHA-1
+prefix and `Add-Padding: true`. SHA-1 is only the range lookup, never stored as a password hash.
+`account.password.breach-check.enabled` defaults to `true`, `.url` to
+`https://api.pwnedpasswords.com/range/`, and `.timeout` to `PT2S` (positive, at most five seconds).
+Redirects are refused. Provider failure logs a fixed warning without credential or digest data
+and permits the change. Disable explicitly for offline operation; tests use loopback stubs.
+
+V49 adds `password_hash` to the account and `sign_in_method` to its sessions. Methods are
+`EMAIL_LINK`, `PASSKEY` and `PASSWORD`; pre-migration sessions default to `EMAIL_LINK`.
+Connecting, replacing or disconnecting a mailbox requires an email-link/passkey session created
+within the last 10 minutes, including OAuth completion. Password-only sessions receive 403
+`MAILBOX_STEP_UP`. Existing reads and approved sends remain governed by their existing rules.
+Password sessions also cannot register new passkeys: otherwise they could manufacture their own
+mailbox step-up. Use an email link or an existing passkey to register one.
+
 ### Try it locally
 
 Start the database and development-only mail catcher with one command:

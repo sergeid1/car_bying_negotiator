@@ -12,6 +12,7 @@ class BuyerAccountEntity {
   @Column(name = "created_at") Instant createdAt;
   @Column(name = "updated_at") Instant updatedAt;
   @Column(name = "verified_at") Instant verifiedAt;
+  @Column(name = "password_hash") String passwordHash;
   protected BuyerAccountEntity() {}
   BuyerAccountEntity(String id) { this.id = id; }
 }
@@ -35,6 +36,7 @@ class AccountSessionEntity {
   @Column(name = "created_at") Instant createdAt;
   @Column(name = "expires_at") Instant expiresAt;
   @Column(name = "revoked_at") Instant revokedAt;
+  @Column(name = "sign_in_method") String signInMethod;
   protected AccountSessionEntity() {}
   AccountSessionEntity(String tokenHash) { this.tokenHash = tokenHash; }
 }

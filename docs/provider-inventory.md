@@ -24,6 +24,7 @@ providers, and each one adds contractual and privacy obligations this table cann
 
 | Capability | Implementation | Processes Buyer data | External party |
 | --- | --- | --- | --- |
+| Breached password check (ticket 96) | `BreachedPasswords`, enabled by default; Have I Been Pwned Pwned Passwords range API with padding and a two-second timeout; outages fail open with a fixed warning. Configurable/offline disablement documented in the account policy | Only five uppercase hex characters of a SHA-1 digest; never the password, remaining digest, email or account ID. Provider also sees the server's network address | Have I Been Pwned (`api.pwnedpasswords.com`); [range API and privacy protocol](https://haveibeenpwned.com/API/v3#SearchingPwnedPasswordsByRange). No Buyer documents are sent. Operator must record applicable terms and deployment choice before release |
 | Vehicle identity | `Vin` checksum validation, Buyer-entered facts | In process | None |
 | Listing evidence | `DeterministicListingEvidenceProvider` | In process | None |
 | Market comparables | `DeterministicFakeMarketDataProvider` | In process | None |
