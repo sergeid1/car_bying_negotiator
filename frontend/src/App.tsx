@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import "./styles.css";
 import { RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess, SaveCaseLink } from "./CasePortability";
 import { CaseLifecycle } from "./CaseLifecycle";
-import { AccountSignedInContext, BuyerAccount, isAccountPass } from "./BuyerAccount";
+import { AccountControls, AccountHeader, AccountSignedInContext, BuyerAccount, isAccountPass } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 import { PricePlan } from "./PricePlan";
 import { NegotiationMandate } from "./NegotiationMandate";
@@ -127,6 +127,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   const [deskFresh, setDeskFresh] = useState<FreshDeskCase>();
   const [deskRefresh, setDeskRefresh] = useState(0);
   const [accountSignedIn, setAccountSignedIn] = useState(false);
+  const [accountControls, setAccountControls] = useState<AccountControls>();
   const [accountRecheck, setAccountRecheck] = useState(0);
   const [guide] = useState(requestedGuide);
   const [partnerKit] = useState(requestedPartnerKit);
@@ -197,6 +198,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             <a href="#scope">Scope</a>
           </nav>
           <ThemeMenu />
+          {!standalone && <AccountHeader controls={accountControls} />}
         </div>
       </header>
 
@@ -326,7 +328,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
             {!standalone && <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined}
-              onSignedIn={setAccountSignedIn} recheck={accountRecheck}
+              onSignedIn={setAccountSignedIn} onControls={setAccountControls} recheck={accountRecheck}
               onCaseOpened={value => {
                 setReferral(undefined); setDeskFresh(undefined); setCaseRevoked(false); setCaseCredentials(value);
                 setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined);

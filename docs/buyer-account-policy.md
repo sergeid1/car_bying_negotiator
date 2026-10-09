@@ -5,6 +5,39 @@ works without one, by case link, exactly as before (spec §8.1 CASE-01, §8.8 AC
 
 ## Sign-in
 
+### Try it locally
+
+Start the database and development-only mail catcher with one command:
+
+```sh
+docker compose --profile development up -d database mailpit
+```
+
+Use the usual local backend secrets and document setup described in README, then start the
+backend with `mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=development`
+and the frontend with `npm run dev` in `frontend`. The explicit development profile defaults
+`SPRING_MAIL_HOST` to `127.0.0.1`, `SPRING_MAIL_PORT` to `1025`, and `CASE_RECOVERY_FROM` to
+`deal-xray@localhost.test`, and permits the account cookie over local HTTP. These defaults
+do not apply without that profile. Set `CASE_RECOVERY_PUBLIC_URL` if the frontend is not at
+`http://localhost:5173/`. If changing `MAILPIT_SMTP_PORT`, also set `SPRING_MAIL_PORT`.
+
+Click **Sign in** in the header, enter an email, then open the message at
+`http://localhost:8025` and follow its link. Click **Finish signing in**; the header shows
+your email and **Sign out**. Entering an email creates an account if needed. Analysis still
+works without an account: a private case link opens one case, while sign-in opens saved cases.
+Case recovery and account notifications use the same SMTP adapter and arrive in Mailpit too;
+opt into case recovery or trigger an enabled notification to inspect those messages.
+
+Mailpit exposes only loopback ports and is started only by the Compose development profile.
+Pilot/production declarations (profiles or any shared deployment setting) refuse enabled
+recovery mail with a missing, loopback, Docker-host or named catcher SMTP host. Do not combine
+the development profile with a live deployment; configure a real mail host, sender, HTTPS
+public URL and secure account cookie for those environments.
+
+The Playwright account-flow fixture captures an email link inside the test runner and follows
+it at desktop and 360 px widths. It uses stubbed account APIs, rather than a live SMTP server;
+there is no mail-reading test hook or secret-retrieval endpoint in the application.
+
 There are no passwords. `POST /api/v1/account/sign-in-requests` with `{"email"}` and an
 `Idempotency-Key` creates the account on first use and emails a single-use link
 (`#sign-in=<token>`, 256 bits of entropy) through the shared `RecoveryEmail` adapter with

@@ -12,6 +12,21 @@ type Problem = { status: number; code?: string; detail?: string };
 
 export const AccountSignedInContext = createContext<boolean | undefined>(undefined);
 
+export type AccountControls = { email?: string; busy: boolean; signOut: () => void };
+export function AccountHeader({ controls }: { controls?: AccountControls }) {
+  function openAccount() {
+    const panel = document.getElementById("buyer-account");
+    panel?.scrollIntoView({ block: "start" });
+    panel?.focus();
+  }
+  return <div className="header-account" aria-label="Account controls">
+    {controls?.email ? <>
+      <button className="btn-ghost header-email" title={controls.email} onClick={openAccount}>{controls.email}</button>
+      <button className="btn-ghost" disabled={controls.busy} onClick={controls.signOut}>Sign out</button>
+    </> : <button className="btn-ghost" onClick={openAccount}>Sign in</button>}
+  </div>;
+}
+
 async function call(path: string, init: RequestInit & { caseToken?: string; key?: string } = {}) {
   const { caseToken, key, ...rest } = init;
   const response = await fetch(path, { ...rest, headers: {
@@ -54,8 +69,9 @@ function startedOn(value?: string | null) {
  * `onSignedIn` reports whether the account has loaded successfully.
  * Changing `recheck` re-reads the account, so a panel that saw the session end can sign it out here.
  */
-export function BuyerAccount({ caseCredentials, onSignedIn, onCaseOpened, recheck = 0 }: {
+export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOpened, recheck = 0 }: {
   caseCredentials?: Credentials; onSignedIn?: (signedIn: boolean) => void; recheck?: number;
+  onControls?: (controls: AccountControls) => void;
   /** Opens an attached case with access that ends when this sign-in ends. */
   onCaseOpened?: (value: Credentials) => void;
 }) {
@@ -71,6 +87,15 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onCaseOpened, rechec
   useEffect(() => {
     try { window.localStorage.removeItem("deal-xray.account-session"); } catch { /* Browser storage can be unavailable. */ }
     if (window.location.hash.startsWith("#sign-in=")) window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    function receiveLink() {
+      const secret = new URLSearchParams(window.location.hash.slice(1)).get("sign-in");
+      if (!secret) return;
+      setLinkSecret(secret);
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      document.getElementById("buyer-account")?.focus();
+    }
+    window.addEventListener("hashchange", receiveLink);
+    return () => window.removeEventListener("hashchange", receiveLink);
   }, []);
   useEffect(() => {
     let current = true;
@@ -88,6 +113,13 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onCaseOpened, rechec
     return () => { current = false; };
   }, [loads, recheck]);
   useEffect(() => { onSignedIn?.(!!account); }, [account]);
+  useEffect(() => { onControls?.({ email: account?.contact.email, busy, signOut }); }, [account, busy]);
+
+  function signOut() {
+    void run(async () => {
+      await call("/api/v1/account/sign-out", { method: "POST" }); signedOut(); setMessage("Signed out.");
+    }, "Sign-out failed. Retry safely.");
+  }
 
   function signedOut(notice = "") {
     setLoading(false); setAccount(undefined); setMessage(""); setError(notice);
@@ -120,6 +152,9 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onCaseOpened, rechec
     <h2>Buyer Account</h2>
     <p>Optional. Analysis works without an account. An account keeps your Buying Cases in one place for decisions that
       take more than a day. There is no password: each sign-in uses a single-use email link that expires in 15 minutes.</p>
+    <p>Entering your email creates an account if none exists. No account is needed to analyze a deal.
+      A private case link opens one case; signing in opens the cases saved to your account. Keep your case link
+      if you want to return without signing in.</p>
     {linkSecret && <button disabled={busy} onClick={() => run(async () => {
       try {
         await call("/api/v1/account/sign-in/verify", { method: "POST", body: JSON.stringify({ token: linkSecret }) });
@@ -186,9 +221,7 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onCaseOpened, rechec
         link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
         setMessage("Account export ready. It includes the export of every attached case.");
       }, "Export failed. Retry safely.")}>Export account data</button>
-      <button className="btn-ghost" disabled={busy} onClick={() => run(async () => {
-        await call("/api/v1/account/sign-out", { method: "POST" }); signedOut(); setMessage("Signed out.");
-      }, "Sign-out failed. Retry safely.")}>Sign out</button>
+      <button className="btn-ghost" disabled={busy} onClick={signOut}>Sign out</button>
       <button className="btn-ghost" disabled={busy} onClick={() => run(async () => {
         await call("/api/v1/account/sign-out?everywhere=true", { method: "POST" }); signedOut(); setMessage("Signed out on every device.");
       }, "Sign-out failed. Retry safely.")}>Sign out everywhere</button>

@@ -60,6 +60,8 @@ class DeploymentStageGuardTest {
     refuses(runner, "operations.EvidenceBudget", "evidence.budget.per-case-cost-usd");
     refuses(runner.withPropertyValues("account.session.cookie-secure=false"),
         "account.AccountSessionCookie", "cookies must be secure");
+    refuses(runner.withPropertyValues("case.recovery.from=sender@example.com", "spring.mail.host=mailpit"),
+        "recovery.RecoveryEmailProductionGuard", "real SMTP host");
     refuses(runner, "buyingcase.SyntheticIntakeAffordance", "intake.synthetic.enabled=false");
     refuses(runner, "pilot.PilotReadiness", "unmet readiness prerequisites");
     refuses(runner, "document.DocumentParserProcess", "container");
