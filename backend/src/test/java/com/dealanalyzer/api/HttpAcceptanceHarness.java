@@ -75,6 +75,9 @@ final class HttpAcceptanceHarness {
           + temporaryDirectory.resolve(databaseName + "-objects").toAbsolutePath());
     }
     properties.addAll(Arrays.asList(additionalProperties));
+    // Tests never contact the real breach service; password tests supply a loopback range stub.
+    if (Arrays.stream(additionalProperties).noneMatch(value -> value.startsWith("--account.password.breach-check.")))
+      properties.add("--account.password.breach-check.enabled=false");
     if (storageProvider.equals("s3")) {
       properties.add("--document.storage.provider=s3");
       properties.add("--document.storage.s3.bucket=offline-test-bucket");

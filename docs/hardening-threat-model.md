@@ -1,5 +1,29 @@
 # Buyer service threat model
 
+Optional passwords (ticket 96) introduce credential-stuffing and online guessing risk. Account
+creation/recovery remains email-link based. Passwords use random-salted bcrypt cost 12, minimum
+12 code points and maximum 72 UTF-8 bytes without composition rules. Breached-password screening
+sends only a five-character SHA-1 prefix to Pwned Passwords with response padding; outages permit
+changes and emit a fixed warning. Unknown/password-free/wrong-password accounts do the same
+bcrypt work and receive identical credential-failure details. Keyed email/client counters apply
+exponential backoff alongside the API peer limit, without trusting forwarding headers. Counters
+are bounded and fail closed at capacity; restart and multiple replicas require shared ingress
+quotas. Throttled attempts skip expensive hashing uniformly. This limits timing disclosure but
+does not claim constant-time network/database behavior. Email-link creation remains observable
+to the address owner through delivery; it never provides a public account-existence response.
+
+Password mutations require a sign-in within 10 minutes, send mandatory account-security email,
+record credential-free security events and revoke all other sessions. Email recovery resets the
+password through the same mutation; hashes never leave storage and disappear with account deletion.
+Session methods are recorded: password-only sessions cannot connect or replace a mailbox or add
+passkeys that would bypass this restriction. Starting mailbox authorization requires a fresh
+email-link/passkey session. Completion checks the method but not session age because state is
+account-bound and consent may finish after the sign-in window; state retains its own expiry.
+Any active session can disconnect a mailbox to withdraw send permission. A stolen password still grants access to account
+paperwork and existing permitted actions; a compromised email inbox or authenticator remains
+an account takeover boundary. Provider-outage fail-open and per-process throttles are explicit
+operational risks, not proof that credential stuffing is impossible.
+
 Passkeys (ticket 95): a maintained Yubico verifier checks exact configured origin/RP ID,
 challenge, user presence/verification, signature and credential/user-handle ownership. Pilot
 and production refuse localhost configuration through the shared DeploymentStage decision.

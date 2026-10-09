@@ -7,7 +7,8 @@ on:
 permissions:
   contents: read
 jobs:
-  tests:
+  # Backend and frontend run as parallel jobs; neither uses the other's build output.
+  backend:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -27,9 +28,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
       - run: mvn -B clean verify
         working-directory: backend
       - name: Preserve full-suite reports before PostgreSQL verification
@@ -39,6 +39,29 @@ jobs:
         env:
           HARDENING_DATABASE_URL: jdbc:postgresql://localhost:5432/ci
           DATABASE_PASSWORD: ci-only-password
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-evidence
+          path: |
+            backend/target/full-suite-reports
+            backend/target/failsafe-reports
+            backend/target/surefire-reports
+            backend/target/hardening
+            backend/target/readiness
+          retention-days: 14
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci && npm test && npm run build
         working-directory: frontend
       - name: Install the browser for the narrow-width accessibility gate
@@ -50,13 +73,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-evidence
+          name: frontend-test-evidence
           path: |
-            backend/target/full-suite-reports
-            backend/target/failsafe-reports
-            backend/target/surefire-reports
-            backend/target/hardening
-            backend/target/readiness
             frontend/playwright-report
             frontend/test-results
           retention-days: 14
@@ -71,9 +89,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - run: |
           python3 -m venv /tmp/scanners
           /tmp/scanners/bin/pip install semgrep==1.177.0

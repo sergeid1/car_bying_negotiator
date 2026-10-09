@@ -41,6 +41,37 @@ class ConnectedMailboxAcceptanceTest {
       com.dealanalyzer.mailbox.MailboxLifecycleTestProbe.class})
   static class LifecycleConfiguration {}
 
+  @Test void consentCanFinishAfterSignInWindowAndAnyActiveSessionCanDisconnect() throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("mailbox-step-up", false,
+        AgreedPriceAcceptanceTest.Configuration.class,
+        "--document.storage.encryption-key=0123456789abcdef0123456789abcdef",
+        "--mailbox.token-encryption-key=" + MAILBOX_KEY)) {
+      var client = app.client(); var jdbc = app.context().getBean(JdbcTemplate.class);
+      var gmail = app.context().getBean("fakeGmail", FakeMailboxSender.class);
+      String session = signIn(client, "step-up@example.com");
+      String password = "a long mailbox test phrase";
+      assertThat(call(client, "PUT", "/api/v1/account/password", Map.of("password", password), null, session).status()).isEqualTo(200);
+      var signed = PasskeyAcceptanceTest.request(client, "POST", "/api/v1/account/password/sign-in",
+          Map.of("email", "step-up@example.com", "password", password), null);
+      assertThat(signed.status()).isEqualTo(200);
+      String passwordSession = signed.cookie().split(";", 2)[0].split("=", 2)[1];
+      jdbc.update("update buyer_account_sessions set created_at = ? where sign_in_method = 'EMAIL_LINK'",
+          java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(540)));
+      var authorization = start(client, session, "GOOGLE");
+      // State belongs to the account, not the exact session: password sign-in must not redeem it.
+      assertThat(complete(client, passwordSession, authorization.get("state"), authorization.get("code")).status()).isEqualTo(403);
+      assertThat(count(jdbc, "mailbox_authorizations")).isEqualTo(1);
+      jdbc.update("update buyer_account_sessions set created_at = ?",
+          java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(661)));
+      assertThat(complete(client, session, authorization.get("state"), authorization.get("code")).status()).isEqualTo(200);
+      assertThat(call(client, "POST", "/api/v1/account/mailbox/authorizations", Map.of("provider", "GOOGLE"), null, session).status()).isEqualTo(403);
+      assertThat(call(client, "DELETE", "/api/v1/account/mailbox/connection", null, null, passwordSession).status()).isEqualTo(200);
+      assertThat(count(jdbc, "mailbox_connections")).isZero();
+      assertThat(gmail.withdrawals()).isEqualTo(1);
+      assertThat(call(client, "DELETE", "/api/v1/account/mailbox/connection", null, null, session).status()).isEqualTo(200);
+    }
+  }
+
   /** No timing guesses: the adapter stops at a boundary until the competing write has committed. */
   private static final class Boundary implements Runnable {
     final java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);

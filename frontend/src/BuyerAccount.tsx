@@ -2,6 +2,7 @@ import { createContext, FormEvent, useEffect, useRef, useState } from "react";
 import type { Credentials } from "./CasePortability";
 import { MailboxConnection } from "./MailboxConnection";
 import { Passkeys, passkeysSupported, signInWithPasskey } from "./Passkeys";
+import { Passwords, PasswordSignIn } from "./Passwords";
 
 type Contact = { email: string; firstName: string | null; lastName: string | null; phone: string | null };
 type AttachedCase = {
@@ -134,6 +135,17 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
     } finally { setBusy(false); }
   }
 
+  const finishLink = linkSecret && <button disabled={busy} onClick={() => run(async () => {
+    try {
+      await call("/api/v1/account/sign-in/verify", { method: "POST", body: JSON.stringify({ token: linkSecret }) });
+      setLinkSecret(""); setLoads(value => value + 1);
+    } catch (problem) {
+      const code = (problem as Problem)?.code;
+      if (code && LINK_MESSAGES[code]) { setLinkSecret(""); throw { status: 0, detail: LINK_MESSAGES[code] }; }
+      throw problem;
+    }
+  }, "The sign-in link could not be checked. Retry safely.")}>Finish signing in</button>;
+
   if (receipt) return <section id="buyer-account" tabIndex={-1} className="panel" aria-label="Buyer Account">
     <h2>Buyer Account</h2>
     <p role="status">{receipt.state === "DELETED" ? "Active-system removal of your account and its cases is verified."
@@ -152,23 +164,17 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
   if (!account) return <section id="buyer-account" tabIndex={-1} className="panel" aria-label="Buyer Account">
     <h2>Buyer Account</h2>
     <p>Optional. Analysis works without an account. An account keeps your Buying Cases in one place for decisions that
-      take more than a day. There is no password: each sign-in uses a single-use email link that expires in 15 minutes.</p>
+      take more than a day. Email sign-in links expire in 15 minutes. You can also add a passkey or optional password after signing in.</p>
     <p>Entering your email creates an account if none exists. No account is needed to analyze a deal.
       A private case link opens one case; signing in opens the cases saved to your account. Keep your case link
       if you want to return without signing in.</p>
-    {linkSecret && <button disabled={busy} onClick={() => run(async () => {
-      try {
-        await call("/api/v1/account/sign-in/verify", { method: "POST", body: JSON.stringify({ token: linkSecret }) });
-        setLinkSecret(""); setLoads(value => value + 1);
-      } catch (problem) {
-        const code = (problem as Problem)?.code;
-        if (code && LINK_MESSAGES[code]) { setLinkSecret(""); throw { status: 0, detail: LINK_MESSAGES[code] }; }
-        throw problem;
-      }
-    }, "The sign-in link could not be checked. Retry safely.")}>Finish signing in</button>}
+    {finishLink}
     {loading && !error && <p role="status">Loading your account…</p>}
     {error && <button className="btn-secondary" onClick={() => { setError(""); setLoads(loads + 1); }}>Retry loading account</button>}
     {!loading && <><SignInRequest busy={busy} run={run} setMessage={setMessage} />
+      <PasswordSignIn request={call} onSignedIn={async () => {
+        setAccount(await (await call("/api/v1/account")).json()); setMessage("Signed in with a password.");
+      }} />
       <button className="btn-secondary" disabled={busy || !passkeysSupported()} onClick={() => void run(async () => {
         await signInWithPasskey(call);
         setAccount(await (await call("/api/v1/account")).json()); setMessage("Signed in with a passkey.");
@@ -181,6 +187,7 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
   const attached = caseCredentials && account.cases.some(c => c.caseId === caseCredentials.caseId);
   return <section id="buyer-account" tabIndex={-1} className="panel" aria-label="Buyer Account">
     <h2>Buyer Account</h2>
+    {finishLink}
     <p>Signed in as <strong className="account-email">{account.contact.email}</strong>. Your contact details are stored
       once, encrypted, and are never handed to a dealer.</p>
     <ContactForm account={account} busy={busy} onSave={(body) => run(async () => {
@@ -190,6 +197,7 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
     <NotificationPreferences onSessionEnded={() => signedOut(ENDED)} />
     <MailboxConnection onSessionEnded={() => signedOut(ENDED)} />
     <Passkeys request={call} onSessionEnded={() => signedOut(ENDED)} />
+    <Passwords key={loads} request={call} onSessionEnded={() => signedOut(ENDED)} />
     <h3>Your Buying Cases</h3>
     {account.cases.length === 0 ? <p className="muted">No cases saved yet. A case you start while signed in is saved here, and
       a case opened by its private link can be attached.</p>
