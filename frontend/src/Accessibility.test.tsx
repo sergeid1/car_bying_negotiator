@@ -463,7 +463,7 @@ test("offer terms, the example report and the payment point have no automated AA
     const body = url.endsWith("/api/v1/offer") ? offer : url.endsWith("/sample-report") ? sample : {};
     return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
   });
-  const { container } = render(<main><h1>Deal X-Ray</h1><SampleReportEntry /><OfferTerms />
+  const { container } = render(<main><h1>otdog</h1><SampleReportEntry /><OfferTerms />
     <PurchasePoint caseId="case" token="token" onPurchased={() => {}} /></main>);
   await userEvent.setup().click(screen.getByRole("button", { name: "Open the example report" }));
   await screen.findByRole("note", { name: "About this example" });

@@ -35,7 +35,7 @@ test("shows the exact approved text as not sent yet, opens it in the email app, 
   const { container } = render(<main><h1>Case</h1><DealerHandoff caseId="c1" token="secret" messageId="m1" onChanged={vi.fn()} /></main>);
   expect(await screen.findByText(/Not sent yet/)).toBeInTheDocument();
   expect(screen.getByText(body, { normalizer: text => text })).toBeInTheDocument();
-  expect(screen.queryByText(/on behalf|Deal X-Ray sent|opt out/i)).toBeNull();
+  expect(screen.queryByText(/on behalf|otdog sent|opt out/i)).toBeNull();
   const open = screen.getByRole("link", { name: "Open in my email app" });
   expect(open).toHaveAttribute("href", mailtoLink("sales@dealer.example", "Request for an itemized vehicle quote", body));
   await user.click(screen.getByRole("button", { name: "Copy subject" }));

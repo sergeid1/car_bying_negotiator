@@ -60,7 +60,7 @@ class TestDriveCalendarTest {
     var gate = new OutboundGate();
     for (String text : texts) {
       // Sent from the Buyer's own mailbox: first person, with no sign of an intermediary.
-      assertThat(text).doesNotContain("The Buyer", "Buyer's", "Deal X-Ray", "this conversation", "relay");
+      assertThat(text).doesNotContain("The Buyer", "Buyer's", "otdog", "this conversation", "relay");
       assertThat(text).doesNotContainIgnoringCase("will buy").doesNotContainIgnoringCase("purchase").doesNotContainIgnoringCase("deposit")
           .doesNotContain("@");
       var ungrounded = gate.check(new OutboundGate.Draft("d", text), new OutboundGate.GateContext(null, java.util.Set.of(), java.util.Set.of(),

@@ -39,7 +39,7 @@ for (const width of [360, 1280]) {
         const attemptId = randomUUID(), challenge = randomBytes(32).toString("base64url");
         attempts.set(attemptId, { challenge, type: register ? "webauthn.create" : "webauthn.get" });
         return route.fulfill({ json: { attemptId, publicKey: register ? {
-          challenge, rp: { id: "localhost", name: "Deal X-Ray" }, user: { id: user, name: "Buyer Account", displayName: "Buyer Account" },
+          challenge, rp: { id: "localhost", name: "otdog" }, user: { id: user, name: "Buyer Account", displayName: "Buyer Account" },
           pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }], timeout: 60000, attestation: "none",
           authenticatorSelection: { residentKey: "required", userVerification: "required" },
         } : { challenge, rpId: "localhost", userVerification: "required", timeout: 60000 } } });

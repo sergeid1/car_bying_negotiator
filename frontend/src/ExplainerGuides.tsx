@@ -87,7 +87,7 @@ export function ExplainerGuide({ slug }: { slug: GuideSlug }) {
         came from before any analysis runs.
       </p>
       <p>
-        Deal X-Ray is a tool on your side: it helps you find cars, check quotes, draft your emails to
+        otdog is a tool on your side: it helps you find cars, check quotes, draft your emails to
         dealers, and check desk paperwork. You send every email from your own email and make every
         decision. We don't work with dealers. We help people.
       </p>
@@ -145,9 +145,9 @@ function OutTheDoorQuote() {
       </ul>
     </section>
     <section aria-labelledby="otd-product-heading">
-      <h2 id="otd-product-heading">What Deal X-Ray checks</h2>
+      <h2 id="otd-product-heading">What otdog checks</h2>
       <p>
-        When you upload a quote, Deal X-Ray reads each line, sorts it into the parts above, and asks you
+        When you upload a quote, otdog reads each line, sorts it into the parts above, and asks you
         to confirm every amount against the page it came from. It then checks that the parts add up to
         the out-the-door total, compares the selling price with a market range where enough evidence
         exists, and turns its findings into questions you can edit and copy for the dealer. If the dealer sends a revised quote, the
@@ -191,9 +191,9 @@ function DealerFees() {
       <p>Asking for the answer in writing, on a revised quote, keeps every change on the record.</p>
     </section>
     <section aria-labelledby="fees-product-heading">
-      <h2 id="fees-product-heading">What Deal X-Ray checks</h2>
+      <h2 id="fees-product-heading">What otdog checks</h2>
       <p>
-        When you upload a quote, Deal X-Ray sorts each line into dealer fees, add-ons, taxes, government
+        When you upload a quote, otdog sorts each line into dealer fees, add-ons, taxes, government
         charges and the other parts of the total, and asks you to confirm each amount against its page.
         The report shows dealer fees and add-ons as their own parts of the total, and turns its
         findings into questions you can edit and copy for the dealer. If the dealer sends a revised quote, the report shows what changed between

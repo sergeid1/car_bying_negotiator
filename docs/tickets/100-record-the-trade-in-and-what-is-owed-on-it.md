@@ -1,0 +1,29 @@
+# 100 — Record the trade-in and what is owed on it
+
+**What to build:** A Buyer who is trading a car in records it once: VIN (decoded), mileage and a simple
+condition choice, then answers "Do you still owe money on it?" If yes, the platform asks for the lender,
+the payoff amount and the date it is good through, and suggests getting a payoff quote from the lender.
+The Buyer can also add written trade offers they got themselves (amount, who made it, date, expiry and a
+photo or PDF of the offer). The Trade Vehicle belongs to the journey and carries into every Buying Case in
+it, including a fresh desk case for a different car; a case without a journey holds its own. Spec 5.9,
+TRADE-01, TRADE-02.
+
+**Blocked by:** 51 — Describe the car in a Shopping Brief; 52 — Add reference vehicles by VIN (VIN decoding);
+24 — Upload dealer paperwork from a phone (offer evidence upload). Migration V50 is reserved for this ticket.
+
+**Status:** open — agent-ready.
+
+- [ ] A Trade Vehicle has VIN, decoded year, make, model and trim, mileage, and a condition choice with a plain
+      description of each level. An invalid VIN is refused with the checksum message from ticket 52.
+- [ ] "Do you still owe money on it?" is required before the trade is complete. Yes asks for lender, payoff
+      amount and good-through date; "I don't know" is allowed and leaves the payoff unknown, never zero.
+- [ ] A payoff past its good-through date is marked stale wherever it is used, with a prompt to refresh it.
+- [ ] Written trade offers record amount, source, offer date, expiry and an evidence document that goes
+      through the ordinary intake pipeline. Expired offers stay visible but are not used for comparison.
+- [ ] No feature requests, arranges, sells or refers trade offers, and no trade data is shared with any
+      dealer or buyer of cars. Copy says the platform does not buy cars or send the trade anywhere.
+- [ ] The trade carries into every case in the journey, including the fresh case from the Desk Check's
+      "Start a fresh case for this car"; a change after a case was analyzed marks that analysis as outdated.
+- [ ] Trade and payoff data are exported with the account and deleted with the journey, case and account
+      (tickets 16, 17, 88).
+- [ ] The trade panel works one-handed at 360 px in both themes and is registered in `Accessibility.test.tsx`.

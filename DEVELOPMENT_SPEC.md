@@ -1,9 +1,11 @@
-# Deal X-Ray — Product and Development Specification
+# otdog — Product and Development Specification
 
-Status: Phase 1 (Deal X-Ray) built; Phases 2–4 largely built, Phase 3 moving to Buyer-sent email (tickets 82–84); public pilot gated by Section 18 prerequisites  
-Version: 2.1  
-Date: 2026-10-05  
-Supersedes: version 2.0 (2026-10-03), which had the platform contact dealers as the Buyer's disclosed
+Status: Phase 1 (document analysis) built; Phases 2–4 largely built, Phase 3 moving to Buyer-sent email (tickets 82–84); public pilot gated by Section 18 prerequisites  
+Version: 2.2  
+Date: 2026-10-09  
+Supersedes: version 2.1 (2026-10-05), which excluded trade-in valuation. Version 2.2 adds a trade-in
+check: the Buyer records the trade and any payoff, and the platform compares the dealer's trade allowance
+with the Buyer's own written offers and a licensed valuation range. Version 2.1 superseded version 2.0 (2026-10-03), which had the platform contact dealers as the Buyer's disclosed
 representative through a relay address and planned a delegated mode. Version 2.1 makes the platform a
 tool: it drafts and checks, and the Buyer sends every dealer email from the Buyer's own address after
 approving it. Version 2.0 superseded 1.0 (2026-08-25), which specified Phase 1 only. Phase 1
@@ -15,7 +17,12 @@ requirements are unchanged unless a section says otherwise. Sources consolidated
 
 ### 1.0 Vision
 
-Deal X-Ray is the Buyer's side of a used-car purchase. It exists so that a person buying a car does
+**Promise.** otdog is like having your own car-buying expert, from the first search to the moment you
+sign. No dealer commissions, no paid recommendations, no dealer customers: it is completely on the
+Buyer's side. Section 1.3 turns this promise into enforceable rules, and Section 1.2 keeps it honest:
+the expert is a tool the Buyer uses, never an agent that acts or signs for them.
+
+otdog is the Buyer's side of a used-car purchase. It exists so that a person buying a car does
 not get taken advantage of by a dealership. The full journey is:
 
 1. **Shop.** The Buyer describes the car they want (for example, a 2021–2023 Honda Civic under 40,000
@@ -36,7 +43,9 @@ not get taken advantage of by a dealership. The full journey is:
 5. **At the desk.** When the dealer presents paperwork (a buyer's order, quote, or four-square
    worksheet), the Buyer uploads it and the platform checks it against the Agreed Price. If the Buyer
    switches to a different car at the dealership, or never negotiated beforehand, the Buyer can upload
-   that car's paperwork and get the same market, fee, and jurisdiction check on the spot.
+   that car's paperwork and get the same market, fee, and jurisdiction check on the spot. If the Buyer
+   trades a car in, the platform asks whether money is owed on it and how much, and checks the dealer's
+   trade allowance against the trade's value.
 6. **Later.** Financing and insurance shopping on the Buyer's behalf. Not specified in this version.
 
 Phase 1 (Section 17) is the document analysis at the core of steps 3 and 5 and is built. Phases 2–4 add
@@ -55,7 +64,7 @@ The product uses AI to extract and explain facts. Deterministic, versioned code 
 
 The product represents the Buyer. Dealer compensation, affiliate eligibility, or lead value must never influence a market assessment, rating, finding, recommendation, search result, or negotiation.
 
-### 1.1 Phase 1 outcome (Deal X-Ray, built)
+### 1.1 Phase 1 outcome (document analysis, built)
 
 A Buyer can:
 
@@ -83,7 +92,7 @@ Phases 2–4 add these outcomes. A Buyer can:
 ### 1.2 Positioning
 
 Position the product as **the Buyer's side of the deal**: a tool that finds cars, checks quotes,
-drafts the Buyer's emails to dealers, and checks the dealer's actual paperwork (the “deal X-ray”). The
+drafts the Buyer's emails to dealers, and checks the dealer's actual paperwork. The
 Buyer sends every email and makes every decision. Copy says the platform **helps the Buyer** ask for
 quotes, check them, and write replies; it never says the platform negotiates, contacts dealers, or acts
 on the Buyer's behalf. Do not market it as a legal review, a negotiator or agent, a guaranteed savings
@@ -116,7 +125,7 @@ A design that conflicts with this credo is out of scope regardless of other bene
 
 ### 2.1 Included
 
-Phase 1 (Deal X-Ray, built):
+Phase 1 (document analysis, built):
 
 - Responsive web application.
 - Used passenger vehicles sold by licensed dealers.
@@ -160,6 +169,11 @@ Phases 2–4 (to build):
 - Test-drive scheduling by a drafted email the Buyer sends, with a calendar file and reminders for the Buyer.
 - A Desk Check: fast mobile upload of desk paperwork, including four-square worksheets, compared with
   the Agreed Price, and an on-the-spot analysis path for a different car.
+- A trade-in check: the Buyer records the trade, any amount owed on it, and written trade offers the
+  Buyer obtained; the platform compares the dealer's trade allowance with those offers and a licensed
+  valuation range, and shows equity, negative equity, and their effect on the deal.
+- Named desk tactics: findings that name common worksheet tactics, such as payment packing, a stretched
+  term, or negative equity folded into the loan, each with a question the Buyer can ask at the desk.
 - Notifications to the Buyer by email for dealer replies, approvals needed, and appointments.
 
 ### 2.2 Excluded
@@ -175,7 +189,9 @@ Phases 2–4 (to build):
 - Deposits, payments to dealers, signatures, credit applications, or any binding commitment made by
   the platform. Only the Buyer agrees to buy, and only in person or by their own action.
 - Credit pulls, lender matching, loan origination, insurance quoting, or credit eligibility decisions (planned for a later version).
-- Trade-in valuation or external trade offers. If a quote includes trade terms, preserve and show them separately but do not assess their fairness.
+- Proprietary trade-in valuation models, buying or selling the Buyer's trade, and requesting, arranging,
+  or referring trade offers from third parties. The trade check uses only the Buyer's own written offers
+  and a licensed valuation source.
 - Definitive legal, tax, mechanical, title, accident, recall, odometer, dealer-legitimacy, or vehicle-history conclusions.
 - Final-contract legal review or the phrase “safe to sign.”
 - Proprietary market-value machine learning.
@@ -366,6 +382,13 @@ or never negotiated, the Buyer starts a Buying Case from that car's VIN and pape
 Phase 1 analysis, including the jurisdiction's fees and taxes. A Desk Check has the same p95 latency
 target as Phase 1 document review and is usable one-handed at 360 px.
 
+If the Buyer is trading a car in, the platform asks once per journey for the trade's VIN, mileage, and
+condition, whether money is owed on it, and if so the lender and payoff amount. These carry into every
+Buying Case in the journey, including a fresh desk case for a different car. When desk paperwork shows
+a trade allowance, the Desk Check compares it with the Buyer's best unexpired written trade offer and a
+licensed valuation range, checks the payoff the dealer used against the Buyer's, and shows the trade's
+equity. Negative equity added to the amount financed is shown with its cost over the loan.
+
 ## 6. Workflow state model
 
 The Phase 1 Buying Case states below are unchanged. A Buying Journey adds `SHOPPING`, `NEGOTIATING`,
@@ -552,6 +575,12 @@ Every Discrepancy records expected value, observed value, delta where meaningful
 - **DESK-01:** A Desk Check compares desk paperwork with the Agreed Price and leads with differences.
 - **DESK-02:** Support four-square worksheets as a document type, extracting price, trade, down payment, payment, term, and APR fields with evidence.
 - **DESK-03:** Starting a fresh case at the desk from a VIN and paperwork needs no prior journey.
+- **DESK-04:** Name common desk tactics in findings, each with its dollar effect where calculable and a plain question the Buyer can ask: payment packing, a term stretched to lower the payment, negative equity folded into the loan, a generous trade allowance offset by a higher price, and a dealer APR above the Buyer's own financing offer.
+- **TRADE-01:** A Buyer records a Trade Vehicle once per journey, or per case without a journey: VIN, mileage, condition, and whether money is owed; if owed, the lender, payoff amount, and good-through date. It carries into every case in the journey.
+- **TRADE-02:** A Buyer may add written trade offers they obtained themselves, with amount, source, date, expiry, and evidence. The platform never requests, arranges, sells, or refers trade offers.
+- **TRADE-03:** A trade value range comes only from a licensed valuation provider, labelled with source, retrieval date, and condition assumption. When unavailable it is shown as unavailable, never estimated.
+- **TRADE-04:** When paperwork shows a trade allowance, compare it with the Buyer's best unexpired written offer and the valuation range, check the paperwork's payoff against the Buyer's, and show trade equity. A shortfall is shown in dollars; it is never counted as a dealer discount (DEAL-09).
+- **TRADE-05:** Judge trade allowance and vehicle price together: an allowance above the trade's value that is offset by a higher price or smaller discount is shown as its net effect.
 - **NOTE-01:** Notify the Buyer by email for dealer replies, approvals needed, mandate expiry, and appointments, with per-type opt-out.
 
 ## 9. Canonical financial model
@@ -575,6 +604,8 @@ out-the-door total
 trade equity
   = trade-in allowance
   - trade-in payoff
+  (negative when more is owed than the allowance; the shortfall is
+   negative equity and raises the net amount due)
 
 net amount due
   = out-the-door total
@@ -662,6 +693,7 @@ Provider-specific response objects must be normalized at ingestion and must not 
 
 - VIN decoder.
 - Licensed inventory/valuation provider.
+- Licensed trade-in valuation provider.
 - Jurisdiction/tax/government-fee source.
 - OCR/layout and vision-capable structured extraction provider.
 - Object storage, malware scanner, email delivery, and optional consented human-review queue.
@@ -766,6 +798,10 @@ Upload, correction, baseline approval, analysis, export, and deletion operations
 25. **Disconnect:** A Buyer who disconnects Gmail or Outlook has the tokens deleted, and a send attempted afterwards is refused with an offer to use their own email app instead.
 26. **Mandate revocation:** Revoking a mandate cancels pending drafts and blocks Connected-mailbox sends within one second.
 27. **Own email app:** An approved quote request opens in the Buyer's mail app addressed to the dealer with the approved subject and body, or is copied exactly; the conversation records it as sent only when the Buyer marks it sent.
+28. **Trade below offer:** A Buyer with a written $14,000 trade offer receives desk paperwork with an $11,500 trade allowance; the Desk Check leads with the $2,500 shortfall and names the offer it came from.
+29. **Negative equity:** A Buyer who owes $18,000 on a trade allowed at $15,000 sees $3,000 of negative equity added to the amount financed, with its scheduled-payment and interest cost over the term.
+30. **Payoff mismatch:** Desk paperwork using a $19,200 payoff when the Buyer recorded $18,000 good through that day is flagged with the $1,200 difference.
+31. **Payment packing:** A four-square payment $40 a month above the payment calculated from its own price, APR, and term is named as a possible packed product, with the question to ask.
 
 ## 16. Test strategy
 
@@ -820,7 +856,7 @@ Gate: 25–50 moderated cases complete safely before a gated 100–300-case pilo
 
 Expected effort: 12–16 calendar weeks for two experienced full-stack engineers plus part-time product/design, automotive expertise, security, and counsel. Provider contracting and corpus acquisition are critical-path dependencies.
 
-Milestones 0–4 make up **Phase 1 (Deal X-Ray)**. Its open release items are tracked in
+Milestones 0–4 make up **Phase 1 (document analysis)**. Its open release items are tracked in
 `docs/pilot-readiness-record.md` and ticket 22. Later phases may be built in parallel with the Phase 1
 pilot, but no Buyer outside moderated testing uses a later phase before its gate passes.
 
@@ -846,7 +882,7 @@ written itemized quotes.
 ### Phase 4 — Test drive and desk
 
 Deliver test-drive scheduling, contact release, reminders, the Desk Check, four-square extraction, and
-the switch-cars path.
+the switch-cars path, the trade-in check, and named desk tactics.
 
 Gate: Desk Check meets latency targets on phones; four-square extraction meets Section 14 thresholds on
 a permissioned corpus.
@@ -881,6 +917,8 @@ Before Phase 2 and 3 reach Buyers outside moderated testing:
    drafts, the Buyer decides and sends, and a Mailbox Connection is send-only.
 10. Complete Google OAuth app verification for `gmail.send` and Microsoft publisher verification for
     `Mail.Send`, and choose an inbound provider for the forwarded-reply intake address.
+11. Execute terms with a licensed trade-in valuation provider covering consumer display, caching, and
+    pricing before trade value ranges reach Buyers outside moderated testing.
 
 Open decisions for the product owner:
 

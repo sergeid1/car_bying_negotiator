@@ -29,7 +29,7 @@ public class PasskeyService {
       BuyerNotifications notifications, PasskeyConfiguration configuration) {
     this.jdbc = jdbc; this.accounts = accounts; this.owners = owners;
     this.notifications = notifications; this.configuration = configuration;
-    rp = RelyingParty.builder().identity(RelyingPartyIdentity.builder().id(configuration.rpId).name("Deal X-Ray").build())
+    rp = RelyingParty.builder().identity(RelyingPartyIdentity.builder().id(configuration.rpId).name("otdog").build())
         .credentialRepository(new Credentials()).origins(configuration.origins)
         .allowOriginPort(false).allowOriginSubdomain(false)
         // Inspect the library's counter verdict only after successful signature verification, so

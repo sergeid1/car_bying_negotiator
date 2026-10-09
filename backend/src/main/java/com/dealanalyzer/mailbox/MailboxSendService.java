@@ -100,7 +100,7 @@ public class MailboxSendService {
       if (dispatched.get()) return finish(attempt, "DELIVERY_UNKNOWN", MailboxOutcome.UNKNOWN);
       return switch (failure.kind()) {
         case REVOKED -> notSent(attempt, "REVOKED", new MailboxProblem(HttpStatus.CONFLICT, "MAILBOX_REVOKED", label
-            + " no longer allows Deal X-Ray to send from your account, so nothing was sent and the connection was removed. "
+            + " no longer allows otdog to send from your account, so nothing was sent and the connection was removed. "
             + "Send it from your own email app, or connect again on your account page.", true));
         default -> notSent(attempt, "UNAVAILABLE", new MailboxProblem(HttpStatus.SERVICE_UNAVAILABLE, "PROVIDER_UNAVAILABLE",
             label + " could not be reached, so nothing was sent. Try again, or send it from your own email app.", true));

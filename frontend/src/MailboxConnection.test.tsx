@@ -47,7 +47,7 @@ test("on return from the provider, completes once, clears the code from the addr
 test("a grant that would allow reading email is refused with the reason, and a declined consent connects nothing", async () => {
   window.history.replaceState(null, "", "/?code=read-code&state=state-2");
   vi.stubGlobal("fetch", vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => init?.method === "POST"
-    ? json({ code: "READ_SCOPE_REFUSED", detail: "The permission you granted would let Deal X-Ray read your email. It never needs that, so nothing was connected." }, 400)
+    ? json({ code: "READ_SCOPE_REFUSED", detail: "The permission you granted would let otdog read your email. It never needs that, so nothing was connected." }, 400)
     : json(unconnected)));
   render(<MailboxConnection onSessionEnded={vi.fn()} />);
   expect(await screen.findByRole("alert")).toHaveTextContent("nothing was connected");

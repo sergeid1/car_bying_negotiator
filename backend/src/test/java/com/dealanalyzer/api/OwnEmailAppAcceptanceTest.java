@@ -64,7 +64,7 @@ class OwnEmailAppAcceptanceTest {
       assertThat(handoff.path("subject").asText()).isEqualTo("Request for an itemized vehicle quote");
       assertThat(handoff.path("body").asText()).isEqualTo(text);
       String relayDomain = app.context().getBean(DealerMailRelay.class).domain();
-      assertThat(handoff.toString()).doesNotContain("Deal X-Ray", "on behalf", "AI assistance", "STOP", "opt-out", relayDomain);
+      assertThat(handoff.toString()).doesNotContain("otdog", "on behalf", "AI assistance", "STOP", "opt-out", relayDomain);
       assertThat(handoff.path("sentAt").isNull()).isTrue();
       assertThat(jdbc.queryForObject("select count(*) from dealer_relay_messages where send_path = 'RELAY'", Long.class)).isZero();
       assertThat(get(client, base + "/quote-requests", token).path("negotiationState").asText()).isEqualTo("MANDATE_ACTIVE");
@@ -167,7 +167,7 @@ class OwnEmailAppAcceptanceTest {
       assertThat(booking.path("state").asText()).isEqualTo("HANDED_OFF");
       var bookingText = get(client, base + "/handoffs/" + booking.path("messageId").asText(), token);
       assertThat(bookingText.path("body").asText()).contains("First name: Rosalind")
-          .doesNotContain(TestDriveAcceptanceTest.EMAIL, "Quixote", "312 555 0199", "Deal X-Ray");
+          .doesNotContain(TestDriveAcceptanceTest.EMAIL, "Quixote", "312 555 0199", "otdog");
       assertThat(get(client, path, token).at("/appointments/0/state").asText()).isEqualTo("PENDING_BOOKING");
       post(client, base + "/handoffs/" + booking.path("messageId").asText() + "/sent", Map.of(), "sent-booking", token);
       var appointment = get(client, path, token).path("appointments").get(0);

@@ -1,15 +1,18 @@
-# Deal X-Ray
+# otdog
 
 **The Buyer's side of a used-car purchase.**
 
-Deal X-Ray helps a person buying a used car from a dealership know what they are really paying, what
+Like having your own car-buying expert, from the first search to the moment you sign. No dealer
+commissions, no paid recommendations, no dealer customers: otdog is completely on your side.
+
+otdog helps a person buying a used car from a dealership know what they are really paying, what
 a fair price looks like, and what to push back on, so they don't get taken advantage of. It finds,
 checks, explains and drafts. The Buyer makes every decision and is the only one who talks to the
 dealer.
 
 ## How it helps
 
-1. **Shop.** Describe the car you want and add VINs of cars you like. Deal X-Ray matches cars for sale
+1. **Shop.** Describe the car you want and add VINs of cars you like. otdog matches cars for sale
    and explains why each one fits.
 2. **Ask for a quote.** Pick a car and get a drafted email asking the dealer for an itemized
    out-the-door quote.
@@ -18,8 +21,8 @@ dealer.
 4. **Agree.** Compare quotes across cars. When you accept a written quote, it becomes your Agreed
    Price.
 5. **Test drive.** A drafted email books the test drive, so you arrive already knowing the number.
-6. **At the desk.** Upload the buyer's order or four-square worksheet the dealer hands you, and Deal
-   X-Ray checks it against the Agreed Price. If you never negotiated first, you get the
+6. **At the desk.** Upload the buyer's order or four-square worksheet the dealer hands you, and
+   otdog checks it against the Agreed Price. If you never negotiated first, you get the
    same market, fee and add-on check on the spot.
 
 At the core is the **Deal Analysis Report**: a versioned, evidence-backed answer to *what am I really
@@ -29,10 +32,10 @@ should guide the next conversation?*
 ## What we stand for
 
 - **Buyers only.** Dealer payments, affiliate deals or lead value never influence a search result,
-  rating, finding or draft. Deal X-Ray is never a lead source for dealers.
+  rating, finding or draft. otdog is never a lead source for dealers.
 - **A tool, not an agent.** Nothing reaches a dealer unless the Buyer approved it word for word, and it
   goes from the Buyer's own email address, either from the Buyer's email app or through their
-  connected Gmail or Outlook account. Deal X-Ray never writes to a dealer in its own name.
+  connected Gmail or Outlook account. otdog never writes to a dealer in its own name.
 - **Code does the math.** AI reads documents and explains findings. Deterministic, versioned code owns
   every money calculation, classification, threshold and price limit, so the same inputs always give
   the same report.

@@ -50,7 +50,7 @@ test("the page footer links to the kit, and an unknown page shows the usual star
   const footer = screen.getByRole("contentinfo");
   expect(within(footer).getByRole("link", { name: KIT }).getAttribute("href")).toBe("?page=referral-partners");
   const terms = footer.textContent!.replace(/\s+/g, " ");
-  expect(terms).toContain("Deal X-Ray is a tool on your side, the Buyer's. We don't work with dealers. We help people.");
+  expect(terms).toContain("otdog is a tool on your side, the Buyer's. We don't work with dealers. We help people.");
   expect(terms).toContain("You send every email from your own email and make every decision");
   expect(terms).toContain("No dealer, lender, or other commercial party pays for placement, leads, or referrals");
   expect(terms).not.toMatch(/gmail|outlook|mailbox/i);
@@ -81,7 +81,7 @@ test("the kit describes the product as help the Buyer uses and states the credo"
   render(<ReferralPartnerKit />);
   const text = (name: string) => screen.getByRole("region", { name }).textContent!.replace(/\s+/g, " ");
   expect(text("Who can be a referral partner")).toContain("does not contact dealers for the Buyer.");
-  const product = text("What Deal X-Ray does");
+  const product = text("What otdog does");
   expect(product).toContain("We don't work with dealers. We help people.");
   expect(product).toContain("find cars, check dealer quotes, draft their own emails to dealers, and check the paperwork");
   expect(product).toContain("The Buyer sends every email from their own email and makes every decision");

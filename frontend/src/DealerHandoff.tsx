@@ -110,7 +110,7 @@ export function DealerHandoff({ caseId, token, messageId, onChanged }: {
       </div>
     </div>}
     {waiting && <>
-      <p>This is your message, exactly as you approved it. It goes from your email address, and Deal X-Ray adds nothing to it.</p>
+      <p>This is your message, exactly as you approved it. It goes from your email address, and otdog adds nothing to it.</p>
       <div className="handoff-actions">
         {link.length <= MAILTO_LIMIT
           ? <a className="button-link" href={link}>Open in my email app</a>

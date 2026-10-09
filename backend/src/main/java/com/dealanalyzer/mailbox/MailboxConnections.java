@@ -138,13 +138,13 @@ public class MailboxConnections {
     }
     if (!pending.provider().sendOnly(grant.scopes())) {
       revokeQuietly(pending.provider(), grant.refreshToken());
-      throw new MailboxProblem(HttpStatus.BAD_REQUEST, "READ_SCOPE_REFUSED", "The permission you granted would let Deal X-Ray "
+      throw new MailboxProblem(HttpStatus.BAD_REQUEST, "READ_SCOPE_REFUSED", "The permission you granted would let otdog "
           + "read your email. It never needs that, so nothing was connected. Connect again and allow sending only.");
     }
     if (!pending.provider().grantsSend(grant.scopes())) {
       revokeQuietly(pending.provider(), grant.refreshToken());
       throw new MailboxProblem(HttpStatus.BAD_REQUEST, "SEND_SCOPE_MISSING", "Sending email was not allowed, so nothing "
-          + "was connected. Connect again and allow Deal X-Ray to send email.");
+          + "was connected. Connect again and allow otdog to send email.");
     }
     record Previous(MailboxProvider provider, String refresh) {}
     Previous previousRefresh;
