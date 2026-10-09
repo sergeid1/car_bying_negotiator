@@ -23,12 +23,17 @@ import { OfferTerms, PurchasePoint } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 import { ReferralPartnerKit } from "./ReferralPartnerKit";
-import { AccountSignedInContext, BuyerAccount } from "./BuyerAccount";
+import { AccountHeader, AccountSignedInContext, BuyerAccount } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 import { NegotiationConversation } from "./NegotiationConversation";
 import { JourneyCandidates, ShortlistEntry } from "./JourneyCandidates";
 import { QuoteComparison } from "./QuoteComparison";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+test.each([undefined, "a.long.buyer.address@example.com"])("header account controls for %s have no automated AA violations", async email => {
+  const { container } = render(<header><AccountHeader controls={{ email, busy: false, signOut: () => {} }} /></header>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
 
 // Ticket 63: acceptance, written confirmation and saved agreement states.
 test.each(["ACCEPTANCE", "WRITTEN_CONFIRMATION", "AGREED", "BLOCKED", "JOURNEY_OPTIONS"])("Agreed Price %s has no automated AA violations", async state => {

@@ -35,7 +35,7 @@ test("a case opened from the Buyer Account shows the workspace without a case li
   expect(fetcher.mock.calls.some(([path, init]) => String(path).startsWith("/api/v1/cases/case-1")
     && (init?.headers as Record<string, string> | undefined)?.["Case-Access-Token"] === "acct.case-1.1999999999.signature")).toBe(true);
 
-  await user.click(screen.getByRole("button", { name: "Sign out" }));
+  await user.click(within(screen.getByRole("banner")).getByRole("button", { name: "Sign out" }));
   await waitFor(() => expect(screen.queryByRole("region", { name: "Opened from your Buyer Account" })).toBeNull());
   expect(await screen.findByRole("heading", { name: "Start your Buying Case" })).toBeVisible();
   expect(await screen.findByText(/No account is required/)).toBeVisible();
