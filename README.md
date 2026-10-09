@@ -2,6 +2,9 @@
 
 **The Buyer's side of a used-car purchase.**
 
+Like having your own car-buying expert, from the first search to the moment you sign. No dealer
+commissions, no paid recommendations, no dealer customers: otdog is completely on your side.
+
 otdog helps a person buying a used car from a dealership know what they are really paying, what
 a fair price looks like, and what to push back on, so they don't get taken advantage of. It finds,
 checks, explains and drafts. The Buyer makes every decision and is the only one who talks to the

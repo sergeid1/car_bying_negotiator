@@ -17,6 +17,11 @@ requirements are unchanged unless a section says otherwise. Sources consolidated
 
 ### 1.0 Vision
 
+**Promise.** otdog is like having your own car-buying expert, from the first search to the moment you
+sign. No dealer commissions, no paid recommendations, no dealer customers: it is completely on the
+Buyer's side. Section 1.3 turns this promise into enforceable rules, and Section 1.2 keeps it honest:
+the expert is a tool the Buyer uses, never an agent that acts or signs for them.
+
 otdog is the Buyer's side of a used-car purchase. It exists so that a person buying a car does
 not get taken advantage of by a dealership. The full journey is:
 
@@ -87,7 +92,7 @@ Phases 2–4 add these outcomes. A Buyer can:
 ### 1.2 Positioning
 
 Position the product as **the Buyer's side of the deal**: a tool that finds cars, checks quotes,
-drafts the Buyer's emails to dealers, and checks the dealer's actual paperwork (the “deal X-ray”). The
+drafts the Buyer's emails to dealers, and checks the dealer's actual paperwork. The
 Buyer sends every email and makes every decision. Copy says the platform **helps the Buyer** ask for
 quotes, check them, and write replies; it never says the platform negotiates, contacts dealers, or acts
 on the Buyer's behalf. Do not market it as a legal review, a negotiator or agent, a guaranteed savings
