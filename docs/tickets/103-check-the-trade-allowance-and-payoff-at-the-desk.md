@@ -11,22 +11,31 @@ TRADE-04, TRADE-05, acceptance scenarios 28 to 30.
 with a deterministic fake; 66 — Check desk paperwork against the Agreed Price; 67 — Extract four-square
 worksheets.
 
-**Status:** open — agent-ready (100 and 101 complete). Real value ranges need ticket 102; Buyer-held written
-offers work without it.
+**Status:** complete for text-bearing paperwork and recorded trades — no migration (V52 unused), as of 2026-10-10.
+`trade.desk.TradeDeskCheck` (`trade-desk-check.v1`) compares a paperwork trade allowance with the best unexpired
+written offer, the valuation range from ticket 101's adapter (labelled as an estimate from its source, or
+unavailable), the Buyer's payoff (stale or unknown never matches) and the trade VIN (new deal-terms field
+`TRADE_VIN`; a different VIN blocks). It shows equity, and negative equity's loan cost through
+`FinancingCalculator` as a financed add-on. Findings lead the Desk Check's `TRADE` group, join the "I'm at the
+dealer" result and the report (`analysis.tradeCheck`). The trade-in tax credit comes from the case's jurisdiction
+pack and enters the outside-offer comparison. Open: no US-FL jurisdiction pack exists, so Florida cases show the
+tax effect as unavailable until a sourced pack lands (it also needs the county surtax on the first $5,000); the
+Claude extraction prompt needs a new version to read `TRADE_VIN` from photos; valuations are fetched on read with
+a 10-minute in-memory reuse, to revisit against ticket 102's caching terms; real value ranges need ticket 102.
 
-- [ ] An allowance below the best unexpired written offer leads the trade findings with the shortfall in
+- [x] An allowance below the best unexpired written offer leads the trade findings with the shortfall in
       dollars and names the offer it is measured against.
-- [ ] An allowance below the low end of the valuation range is flagged with the gap, labelled as an
+- [x] An allowance below the low end of the valuation range is flagged with the gap, labelled as an
       estimate from the named source; within or above the range is said plainly.
-- [ ] A payoff on the paperwork that differs from the Buyer's current payoff is flagged with the
+- [x] A payoff on the paperwork that differs from the Buyer's current payoff is flagged with the
       difference; a stale or unknown Buyer payoff is said, never treated as matching.
-- [ ] Trade equity is shown. Negative equity added to the amount financed shows its scheduled-payment and
+- [x] Trade equity is shown. Negative equity added to the amount financed shows its scheduled-payment and
       interest effect through `FinancingCalculator`, like a financed add-on.
-- [ ] The trade VIN on the paperwork is checked against the Buyer's Trade Vehicle; a different VIN is a
+- [x] The trade VIN on the paperwork is checked against the Buyer's Trade Vehicle; a different VIN is a
       blocking finding.
-- [ ] A trade shortfall is never counted as a dealer discount, and an allowance above value never offsets
+- [x] A trade shortfall is never counted as a dealer discount, and an allowance above value never offsets
       a price finding silently (DEAL-09, TRADE-05).
-- [ ] Florida's trade-in sales-tax credit is applied through the existing jurisdiction policy, so the
+- [x] Florida's trade-in sales-tax credit is applied through the existing jurisdiction policy, so the
       comparison with an outside offer includes the tax the Buyer would lose by selling the car elsewhere.
-- [ ] Findings appear in the Desk Check (`TRADE` group, ahead of totals) and in a fresh desk case's report.
-- [ ] Explanations and the copy stay within `ClaimVocabulary` and `PilotCopyClaimsTest`.
+- [x] Findings appear in the Desk Check (`TRADE` group, ahead of totals) and in a fresh desk case's report.
+- [x] Explanations and the copy stay within `ClaimVocabulary` and `PilotCopyClaimsTest`.

@@ -77,3 +77,27 @@ test("recording a trade-in that is still owed on works one-handed at 360 px", as
   await expect(panel.getByText(/Ask your lender for a payoff quote/)).toBeVisible();
   await expectUsableAtNarrowWidth(page, panel);
 });
+
+// Ticket 106: the free value checks, the estimates the Buyer typed back, and the estimate form.
+test("the free trade value checks and the Buyer's estimates work one-handed at 360 px", async ({ page }) => {
+  const estimates = [
+    { id: "kbb", source: "Kelley Blue Book Private Party and Trade-In Values", lowMinor: 1300000, highMinor: null, checkedOn: "2026-08-01",
+      old: true, createdAt: "2026-08-01T12:00:00Z" },
+    { id: "carfax", source: "Carfax", lowMinor: 1400000, highMinor: 1600000, checkedOn: "2026-10-05", old: false, createdAt: "2026-10-05T12:00:00Z" },
+  ];
+  const panel = await openCase(page, { holder: "JOURNEY", trade: { ...trade, estimates, estimateInUseId: "carfax" }, conditions,
+    analysis: { analyzedAt: null, outdated: false } });
+  const checks = panel.locator(".trade-value-checks");
+  await expect(checks.getByRole("link", { name: /Carfax value lookup/ })).toHaveAttribute("href", "https://www.carfax.com/value/");
+  await expect(checks.getByRole("link", { name: /CarMax instant offer/ })).toHaveAttribute("target", "_blank");
+  await expect(checks.getByRole("button", { name: "Copy VIN" })).toBeVisible();
+  for (const link of await checks.getByRole("link").all()) expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect(panel.getByRole("list", { name: "Your trade-in estimates" }).getByRole("listitem").first())
+    .toContainText("Old: looked up more than 30 days ago");
+  await panel.getByRole("button", { name: "Add an estimate I looked up" }).click();
+  await panel.getByRole("radio", { name: "Another site" }).check();
+  await panel.getByLabel("Site name").fill("CarMax");
+  await expect(panel.getByText(/is a written offer, not an estimate/)).toBeVisible();
+  await expect(panel.getByLabel("Date you looked it up")).toBeVisible();
+  await expectUsableAtNarrowWidth(page, panel);
+});

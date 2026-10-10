@@ -10,13 +10,24 @@ model usage.
 **Blocked by:** Ticket 93 (AWS and Cloudflare accounts owned by the company). The infrastructure code and
 runbook can be written before then; applying them cannot. Tickets 97 and 98 should land first.
 
-**Status:** open — infrastructure-as-code and runbook are agent work; provisioning and DNS are operator actions.
+**Status:** open — infrastructure code and runbook written and validated locally, nothing provisioned, as of
+2026-10-10; provisioning and deployed evidence are blocked on ticket 93 and the existing pilot prerequisites.
+Terraform (`infra/pilot`, AWS provider 6.68.0, chosen for directly reviewable resources) defines one t3.medium
+EC2 origin admitting HTTPS only from Cloudflare's ranges, private encrypted RDS PostgreSQL with seven-day backups,
+the private TLS-only S3 bucket, SES identity with bounce/complaint topics, ECR and a scoped instance role.
+`deploy/pilot` runs the backend container with ClamAV, rootless parser confinement, an origin-secret-verifying
+Nginx and secrets loaded from SSM into RAM-backed files; `deploy/cloudflare` serves the client and ticket 79's
+headers from a Worker and proxies `/api/*` with the origin secret, `no-store` and fail-closed behaviour. Both new
+workflows (`build-pilot-images.yml`, `deploy-client.yml`) run only on manual dispatch. `docs/pilot-deployment.md`
+covers deploy, rollback, migration, restore and rotation, and lists every check still to run against the real
+stack: the zone's actual upload limit, startup guards under `pilot`, HTTPS/HSTS/headers, a synthetic document
+preview, role isolation, rollback and restore.
 
-- [ ] Infrastructure is described as code (Terraform or AWS CDK, chosen and recorded) in the repository,
+- [x] Infrastructure is described as code (Terraform or AWS CDK, chosen and recorded) in the repository,
       with no secrets in it: one EC2 instance (about 2 vCPU, 4 GB) with an instance role limited to the
       document bucket and SES, RDS PostgreSQL (smallest class, encrypted, automatic backups, not publicly
       reachable), the S3 bucket from ticket 98, and security groups that admit HTTPS only from Cloudflare.
-- [ ] The backend runs as a container with the ClamAV daemon and the document parser's confinement
+- [x] The backend runs as a container with the ClamAV daemon and the document parser's confinement
       (`document.parser.mode`) set up as the hardening runbook requires; secrets come from SSM Parameter
       Store or Secrets Manager, never from files in the image.
 - [ ] The client builds and deploys to Cloudflare (Pages or Workers static assets) from CI. Security
@@ -30,6 +41,6 @@ runbook can be written before then; applying them cannot. Tickets 97 and 98 shou
 - [ ] The hardening runbook gains deploy, rollback, database migration, backup restore and secret rotation
       steps for this stack, and the deployed checks it already lists (HTTPS redirect, HSTS, headers, a
       synthetic case's document preview) are recorded against the real deployment.
-- [ ] `docs/provider-inventory.md` lists Cloudflare (it terminates TLS and sees uploads in transit) and the
+- [x] `docs/provider-inventory.md` lists Cloudflare (it terminates TLS and sees uploads in transit) and the
       AWS services with their regions; `docs/pilot-readiness-record.md` updates its
       `infrastructure-and-privacy-inventory` prerequisite.

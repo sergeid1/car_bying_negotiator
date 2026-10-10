@@ -1,0 +1,43 @@
+name: Build pilot images manually
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: pilot-image-build
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: pilot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - run: mvn -f backend/pom.xml -DskipTests package
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.PILOT_IMAGE_BUILD_ROLE }}
+          aws-region: ${{ vars.PILOT_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile.pilot
+          platforms: linux/amd64
+          push: true
+          tags: ${{ vars.PILOT_IMAGE_REPOSITORY }}:backend-${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile.parser
+          target: release
+          platforms: linux/amd64
+          push: true
+          tags: ${{ vars.PILOT_IMAGE_REPOSITORY }}:parser-${{ github.sha }}
+      # Host rollout is a separate operator step after image/security review.

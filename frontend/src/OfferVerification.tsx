@@ -58,6 +58,7 @@ const FIELD_LABELS: Record<string, string> = {
   FINANCE_CHARGE: "Finance charge",
   TOTAL_OF_PAYMENTS: "Total of payments",
   VEHICLE_VIN: "VIN",
+  TRADE_VIN: "Trade-in VIN",
   VEHICLE_YEAR: "Vehicle year",
   VEHICLE_MAKE: "Vehicle make",
   VEHICLE_MODEL: "Vehicle model",

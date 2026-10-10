@@ -16,6 +16,7 @@ class CaseGraphDeletionPlan {
       new Step("negotiation_drafts", "case_id = :caseId"),
       new Step("journey_candidate_cases", "case_id = :caseId"),
       new Step("trade_offers", "evidence_case_id = :caseId or trade_id in (select id from trade_vehicles where case_id = :caseId)"),
+      new Step("trade_estimates", "trade_id in (select id from trade_vehicles where case_id = :caseId)"),
       new Step("trade_case_journeys", "case_id = :caseId"),
       new Step("trade_vehicles", "case_id = :caseId"),
       new Step("agreed_prices", "case_id = :caseId"),

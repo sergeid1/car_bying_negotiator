@@ -1702,6 +1702,21 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
 .desk-check-findings > li:first-child > p:first-child { font-size: 1.05rem; font-weight: 600; }
 .desk-check-meta { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; color: var(--ink-muted); font-size: 0.9rem; }
 .desk-check-meta .badge, .desk-check-meta .cash-badge { white-space: normal; }
+/* Ticket 103: the trade-in check in the Desk Check and the report. */
+.trade-check { min-width: 0; overflow-wrap: anywhere; margin-top: 16px; }
+.trade-check h3 { margin: 0 0 8px; }
+.trade-check-findings { margin: 8px 0 12px; padding-left: 1.3rem; display: grid; gap: 10px; }
+.trade-check-findings > li { min-width: 0; padding-left: 4px; }
+.trade-check-findings > li > p { margin: 0 0 4px; }
+.trade-check-findings > li[data-severity="BLOCKING"] > p:first-child,
+.trade-check-findings > li[data-severity="WARNING"]:first-child > p:first-child { font-weight: 600; }
+.trade-check-figures { display: grid; gap: 6px; margin: 0 0 12px; }
+.trade-check-figures > div { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-width: 0; }
+.trade-check-figures dt { color: var(--ink-muted); font-size: 0.9rem; }
+.trade-check-figures dd { margin: 0; min-width: 0; }
+@media (min-width: 640px) {
+  .trade-check-figures > div { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 12px; }
+}
 .desk-check details { margin: 12px 0; }
 .desk-check details summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
 .desk-check button, .desk-fresh-case button { max-width: 100%; white-space: normal; min-height: 44px; }
@@ -1802,6 +1817,22 @@ fieldset.trade-choices input[type="radio"] { flex: none; width: 20px; height: 20
 .trade-offer-page { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
 /* End ticket 100. */
 
+/* Ticket 106: free trade value checks the Buyer runs themselves, and the estimates they type back. */
+.trade-value-checks, .trade-estimates { display: grid; gap: 12px; min-width: 0; overflow-wrap: anywhere; }
+.trade-value-checks h3, .trade-value-checks h4, .trade-estimates h3 { margin: 0; }
+.trade-value-checks > p, .trade-estimates > p { margin: 0; }
+.trade-value-links { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.trade-value-links > li { display: grid; gap: 4px; min-width: 0; padding: 14px 16px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--card); }
+.trade-value-links p { margin: 0; }
+.trade-value-links a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
+.trade-copy-values { display: grid; gap: 8px; margin: 0; }
+.trade-copy > dt { color: var(--ink-muted); font-size: 0.9rem; }
+.trade-copy > dd { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; min-width: 0; }
+.trade-copy .vin { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.trade-copy button { min-height: 44px; max-width: 100%; white-space: normal; }
+/* End ticket 106. */
+
 /* Ticket 105: "I'm at the dealer" in the header, and the flow from a photo to a first result. */
 .header-camera {
   position: relative; display: inline-flex; flex-direction: row; align-items: center; gap: 8px; min-height: 44px;
@@ -1850,3 +1881,10 @@ fieldset.trade-choices input[type="radio"] { flex: none; width: 20px; height: 20
 .dealer-result .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .dealer-result button { max-width: 100%; white-space: normal; min-height: 44px; }
 /* End ticket 105. */
+
+/* Ticket 104: worksheet tactic findings and evidence. */
+.desk-tactics { min-width: 0; overflow-wrap: anywhere; }
+.desk-tactics > ul { padding-left: 1.25rem; display: grid; gap: 16px; }
+.desk-tactics h4 { margin-bottom: 8px; }
+.desk-tactics summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+/* End ticket 104. */

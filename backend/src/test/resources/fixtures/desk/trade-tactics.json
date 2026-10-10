@@ -1,0 +1,28 @@
+{
+  "label": "Synthetic development trade worksheets and frozen ticket 103 results; not accuracy evidence",
+  "worksheets": [
+    {
+      "name": "negative equity folded in without a negative equity label",
+      "fields": {"TRADE_ALLOWANCE": "900000", "TRADE_PAYOFF": "1200000", "AMOUNT_FINANCED": "3300000", "APR": "6", "TERM_MONTHS": "60"},
+      "trade": {"policyVersion": "trade-desk-check.v1", "status": "CHECKED", "currency": "USD", "equityBasis": "PAPERWORK_PAYOFF", "negativeEquityFinancedMinor": 300000,
+        "negativeEquityCost": {"status": "AVAILABLE", "paymentIncreaseMinor": 5799, "scheduledPaymentsIncreaseMinor": 347940, "interestMinor": 47940, "policyVersion": "dealer-financing.v1"},
+        "findings": [{"code": "NEGATIVE_EQUITY_FINANCED", "severity": "WARNING", "summary": "Negative equity is added to the amount financed.", "amountMinor": 347940}]},
+      "code": "NEGATIVE_EQUITY_FOLDED_IN", "tradeCode": "NEGATIVE_EQUITY_FINANCED", "monthlyMinor": 5799, "totalMinor": 347940
+    },
+    {
+      "name": "allowance paid for by higher price against written offer",
+      "fields": {"TRADE_ALLOWANCE": "1600000", "SELLING_PRICE": "2700000", "DISCOUNT_TOTAL": "0"},
+      "trade": {"policyVersion": "trade-desk-check.v1", "status": "CHECKED", "currency": "USD", "equityBasis": "NOTHING_OWED",
+        "bestOffer": {"id": "synthetic-offer", "amountMinor": 1500000, "source": "Synthetic Car Exchange", "label": "Synthetic written offer"},
+        "priceTogether": {"reference": "WRITTEN_OFFER", "referenceMinor": 1500000, "allowanceAboveValueMinor": 100000, "priceIncreaseMinor": 200000, "netEffectMinor": -100000},
+        "findings": [{"code": "ALLOWANCE_OFFSET_BY_PRICE", "severity": "WARNING", "summary": "The higher price leaves the Buyer behind despite the higher allowance.", "amountMinor": 100000}]},
+      "code": "ALLOWANCE_PAID_FOR_BY_PRICE", "tradeCode": "ALLOWANCE_OFFSET_BY_PRICE", "totalMinor": -100000
+    },
+    {
+      "name": "clean trade worksheet triggers neither tactic",
+      "fields": {"TRADE_ALLOWANCE": "1500000", "TRADE_PAYOFF": "0", "SELLING_PRICE": "2500000"},
+      "trade": {"policyVersion": "trade-desk-check.v1", "status": "CHECKED", "currency": "USD", "equityBasis": "NOTHING_OWED",
+        "priceTogether": {"reference": "WRITTEN_OFFER", "referenceMinor": 1500000, "priceIncreaseMinor": 0}, "findings": []}
+    }
+  ]
+}

@@ -41,13 +41,19 @@ public class CoreReportService {
   private final FinancingService financing;
   private final com.dealanalyzer.review.DealReviewService reviews;
   private final com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence extractions;
+  private final com.dealanalyzer.trade.desk.TradeDeskCheck trades;
+  private final com.dealanalyzer.desk.tactic.DeskTacticService tactics;
 
   public CoreReportService(EphemeralBuyingCaseService access, AnalysisCaseRepository cases,
       OperationRepository operations, AnalysisReportRepository reports, BuyingCaseStore store,
       DealerOfferPersistence offers, CashEconomicsPersistence economics, MarketAssessmentPersistence market,
       PricePlanService plans, VehicleEvidenceService vehicles, ObjectMapper json, FinancingService financing, com.dealanalyzer.review.DealReviewService reviews, NegotiationService negotiation, com.dealanalyzer.pilot.PilotEvents pilotEvents,
-      com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence extractions) {
+      com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence extractions,
+      com.dealanalyzer.trade.desk.TradeDeskCheck trades,
+      com.dealanalyzer.desk.tactic.DeskTacticService tactics) {
     this.extractions = extractions;
+    this.trades = trades;
+    this.tactics = tactics;
     this.pilotEvents = pilotEvents;
     this.negotiation = negotiation;
     this.reviews = reviews;
@@ -59,6 +65,11 @@ public class CoreReportService {
   @Transactional
   public StartedReport analyze(String caseId, String token, String key) {
     Instant startedAt = Instant.now();
+    // The trade check may call the valuation provider, whose meter row commits on its own and references the
+    // case, so it runs before the case row is locked.
+    var tradeOffer = operations.findByIdempotencyKey(key).isPresent() ? null : offers.latestOffer(caseId).orElse(null);
+    var trade = tradeOffer == null ? null : trades.check(caseId, token, tradeOffer.terms(),
+        plans.latest(caseId, "BASELINE").map(value -> value.payload().at("/dealerOffer/terms")).orElse(null));
     var buyingCase = cases.findLockedById(caseId)
         .orElseThrow(() -> new com.dealanalyzer.buyingcase.ResourceNotFoundException("Buying Case not found"));
     access.reopen(caseId, token);
@@ -135,6 +146,14 @@ public class CoreReportService {
     evidence.put("caseStatusAtAnalysis", buyingCase.status);
     evidence.put("buyerJurisdiction", buyingCase.buyerJurisdiction);
     ObjectNode analysis = json.createObjectNode();
+    JsonNode tacticTerms = worksheet != null && (offer == null || !worksheet.id().equals(offer.extractionId()) || !dealerCurrent)
+        ? tactics.asRead(worksheet) : offer == null ? tactics.asRead(null) : offer.terms();
+    var tacticFindings = new ArrayList<>(tactics.findings(caseId, tacticTerms, null));
+    if (trade != null && offer != null && offer.id().equals(tradeOffer.id()))
+      tacticFindings.addAll(tactics.tradeFindings(offer.terms(), trade));
+    analysis.set("tacticFindings", json.valueToTree(tacticFindings));
+    evidence.set("deskTacticInputs", tacticTerms);
+    if (!tacticFindings.isEmpty() && worksheet != null) evidence.set("deskTacticWorksheet", json.valueToTree(worksheet));
     if (offer != null && offer.version() > 1) {
       JsonNode review = reviews.append(caseId, offer, baseline, status, now);
       analysis.set("dealReview", review);
@@ -158,6 +177,16 @@ public class CoreReportService {
       List<String> reasons = new ArrayList<>();
       analysis.path("topReasons").forEach(reason -> reasons.add(reason.asText()));
       analysis.set("topReasons", json.valueToTree(worksheetPolicy.topReasons(worksheetFindings, reasons)));
+    }
+    // A trade allowance on the offer is checked against the Buyer's trade (ticket 103) and leads the reasons.
+    if (trade != null && offer != null && offer.id().equals(tradeOffer.id()) && !"NO_ALLOWANCE".equals(trade.status())) {
+      analysis.set("tradeCheck", json.valueToTree(trade));
+      if (!trade.leading().isEmpty()) {
+        List<String> reasons = new ArrayList<>();
+        reasons.add(trade.leading().getFirst().summary());
+        analysis.path("topReasons").forEach(reason -> reasons.add(reason.asText()));
+        analysis.set("topReasons", json.valueToTree(reasons.stream().limit(3).toList()));
+      }
     }
     analysis.put("financingAvailability", financeAvailability);
     analysis.set("financingTerms", json.valueToTree(finance == null ? null : finance.inputs()));
@@ -208,6 +237,7 @@ public class CoreReportService {
     amounts.replaceAll(amount -> amount.explainedBy(explained));
     analysis.set("materialAmounts", json.valueToTree(amounts));
     analysis.set("policyVersions", json.valueToTree(Map.of("review", CoreReviewPolicy.VERSION,
+        "deskTactics", com.dealanalyzer.desk.tactic.DeskTacticPolicy.VERSION,
         "revisedReview", com.dealanalyzer.review.RevisedOfferPolicy.VERSION,
         "materiality", "core-materiality.v1: zero term/calculation delta; quoted-total tolerance is recorded in cash economics",
         "rating", "selling-price-rating.v1", "cashEconomics", cash == null ? "UNAVAILABLE" : cash.policyVersion(),

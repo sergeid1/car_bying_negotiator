@@ -1,0 +1,9 @@
+{
+  "label": "Synthetic development worksheets; no real-document accuracy evidence",
+  "worksheets": [
+    {"name": "payment packing - forty dollars above own numbers", "fields": {"SELLING_PRICE": "3000000", "CASH_DOWN": "0", "APR": "0", "TERM_MONTHS": "60", "MONTHLY_PAYMENT": "54000"}, "codes": ["PAYMENT_PACKING"], "monthlyMinor": 4000, "totalMinor": 240000},
+    {"name": "stretched term - same principal and APR", "fields": {"AMOUNT_FINANCED": "3000000", "APR": "6", "TERM_MONTHS": "72"}, "ownTerm": 60, "codes": ["STRETCHED_TERM"]},
+    {"name": "APR above buyer offer", "fields": {"AMOUNT_FINANCED": "3000000", "APR": "8", "TERM_MONTHS": "60"}, "ownApr": "6", "codes": ["APR_ABOVE_OWN_OFFER"]},
+    {"name": "clean worksheet - no named tactics", "fields": {"AMOUNT_FINANCED": "3000000", "APR": "0", "TERM_MONTHS": "60", "MONTHLY_PAYMENT": "50000"}, "ownApr": "0", "ownTerm": 60, "codes": []}
+  ]
+}

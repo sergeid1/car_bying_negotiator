@@ -3,6 +3,8 @@ import { AccountSignedInContext } from "./BuyerAccount";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import type { FreshDeskCase } from "./DeskCheck";
 import { toMinor, vehicleName, type Trade, type TradeView } from "./TradeVehicle";
+import { TradeValueLinks } from "./TradeValueChecks";
+import type { DeskTacticFinding } from "./DeskTactics";
 
 type Credentials = { caseId: string; token: string };
 type Route = "AGREED_CAR" | "THIS_CASE";
@@ -18,11 +20,12 @@ export type DeskRouting = {
     financing: { ask: boolean; paperworkShowsLoan: boolean; ownAprPercent: number | null; ownTermMonths: number | null };
   };
 };
-export type DeskFinding = { code: string; summary: string; amountMinor: number | null; deskQuestion: string };
+export type DeskFinding = { code: string; summary: string; amountMinor: number | null; deskQuestion: string; tacticCode?: string | null };
 export type FirstResult = {
   route: Route; source: "READ_FROM_PAPERWORK" | "TYPED_BY_BUYER";
   outTheDoor: { amountMinor: number | null; agreedMinor: number | null; differenceMinor: number | null };
   lead: DeskFinding | null; findings: DeskFinding[];
+  tacticFindings?: DeskTacticFinding[];
 };
 type Typed = { vin?: string; sellingPriceMinor?: number; tradeAllowanceMinor?: number; cashDownMinor?: number;
   monthlyPaymentMinor?: number; termMonths?: number; aprPercent?: number; outTheDoorMinor?: number };
@@ -452,6 +455,8 @@ function Questions({ credentials, ask, recorded, financing, busy, error, onDone 
   const [owed, setOwed] = useState<string>("");
   const [unknownPayoff, setUnknownPayoff] = useState(false);
   const [hasOwn, setHasOwn] = useState<"YES" | "NO">();
+  const [typedVin, setTypedVin] = useState("");
+  const [typedMileage, setTypedMileage] = useState("");
   const [conditions, setConditions] = useState(CONDITIONS);
   const [problem, setProblem] = useState<{ field: string; message: string }>();
   useEffect(() => {
@@ -510,8 +515,10 @@ function Questions({ credentials, ask, recorded, financing, busy, error, onDone 
     {ask === "DETAILS" && <p>This paperwork shows a trade-in. Tell us about the car, once; it stays with your journey.</p>}
     {ask === "OWED" && recorded && <p>Your trade-in: {vehicleName(recorded)}.</p>}
     {(ask === "DETAILS" || ask === "WHETHER") && trading === "YES" && <>
-      <label>Trade-in VIN<input name="tradeVin" autoComplete="off" required /></label>{field("vin")}
-      <label>Mileage<input name="mileage" inputMode="numeric" required /></label>{field("mileage")}
+      <label>Trade-in VIN<input name="tradeVin" autoComplete="off" required value={typedVin}
+        onChange={event => setTypedVin(event.target.value)} /></label>{field("vin")}
+      <label>Mileage<input name="mileage" inputMode="numeric" required value={typedMileage}
+        onChange={event => setTypedMileage(event.target.value)} /></label>{field("mileage")}
       <label>Condition<select name="condition" required defaultValue="">
         <option value="" disabled>Choose one</option>
         {conditions.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>{field("condition")}
@@ -527,6 +534,9 @@ function Questions({ credentials, ask, recorded, financing, busy, error, onDone 
         </>}
       </>}
     </>}
+    {(recorded && ask !== "WHETHER" && ask !== "DETAILS" ? <TradeValueLinks headingLevel={4} vin={recorded.vehicle.vin} mileage={recorded.mileage} />
+      : (ask === "DETAILS" || ask === "WHETHER") && trading === "YES" ? <TradeValueLinks headingLevel={4} vin={typedVin.trim() || null}
+        mileage={/^\d+$/.test(typedMileage.replace(/[,\s]/g, "")) ? Number(typedMileage.replace(/[,\s]/g, "")) : null} /> : null)}
     {financing && <fieldset><legend>The worksheet shows a loan. Do you have your own loan offer from a bank or credit union?</legend>
       <div className="segmented">
         <label><input type="radio" name="hasOwn" required checked={hasOwn === "YES"} onChange={() => setHasOwn("YES")} />Yes</label>
@@ -557,11 +567,16 @@ function ResultView({ result, headingRef, elapsed, onDeskCheck, onType, onClose 
       <p className="dealer-lead-summary">{result.lead.summary}</p>
       <p className="dealer-question"><span className="dealer-question-label">Ask at the desk</span>
         <q>{result.lead.deskQuestion}</q></p>
+      {result.tacticFindings?.some(tactic => (tactic.code === result.lead?.code || tactic.tradeFindingCode === result.lead?.code) && tactic.questionReview === "PENDING_OPERATOR_REVIEW")
+        && <p className="muted">Draft question wording awaits operator review.</p>}
     </div> : <p>Nothing in these terms stood out. Check them against the paperwork for the full result.</p>}
     {more.length > 0 && <details>
       <summary>{more.length} more to ask about</summary>
       <ul className="dealer-more">{more.map((finding, index) => <li key={`${finding.code}-${index}`}>
-        <p>{finding.summary}</p><p className="muted"><q>{finding.deskQuestion}</q></p></li>)}</ul>
+        <p>{finding.summary}</p><p className="muted"><q>{finding.deskQuestion}</q></p>
+        {result.tacticFindings?.some(tactic => (tactic.code === finding.code || tactic.tradeFindingCode === finding.code) && tactic.questionReview === "PENDING_OPERATOR_REVIEW")
+          && <p className="muted">Draft question wording awaits operator review.</p>}
+      </li>)}</ul>
     </details>}
     <div className="actions">
       {result.route === "AGREED_CAR" && <button type="button" onClick={onDeskCheck}>Open the full Desk Check</button>}

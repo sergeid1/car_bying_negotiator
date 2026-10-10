@@ -198,3 +198,23 @@ test("the header entry opens the flow over the start screen", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Close" }));
   expect(await screen.findByRole("heading", { name: "Start your Buying Case" })).toBeInTheDocument();
 });
+
+test("saying yes to a trade-in links to the free value checks, with the VIN and mileage typed so far to copy", async () => {
+  stub({ routings: { new: [routing("THIS_CASE")] } });
+  render(<AtTheDealer files={[photo()]} pollDelayMs={1} onCaseOpened={vi.fn()} onFreshCase={vi.fn()} onDeskCheck={vi.fn()} onClose={vi.fn()} />);
+  await userEvent.type(screen.getByLabelText("Your ZIP code"), "27601");
+  await userEvent.type(screen.getByLabelText("Dealer ZIP code"), "27604");
+  await userEvent.click(screen.getByRole("button", { name: "Read my paperwork" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Yes, check this car" }));
+  expect(screen.queryByRole("heading", { name: "Check what your car is worth" })).not.toBeInTheDocument();
+  await userEvent.click(within(screen.getByRole("group", { name: "Are you trading a car in?" })).getByLabelText("Yes"));
+  const section = screen.getByRole("heading", { name: "Check what your car is worth" }).closest("section")!;
+  expect(within(section).getByRole("link", { name: /Carfax value lookup/ })).toHaveAttribute("href", "https://www.carfax.com/value/");
+  expect(within(section).getByRole("link", { name: /CarMax instant offer/ })).toHaveAttribute("rel", "noopener noreferrer");
+  expect(within(section).queryByRole("button", { name: "Copy VIN" })).not.toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText("Trade-in VIN"), "5J6RW2H52ML000002");
+  await userEvent.type(screen.getByLabelText("Mileage"), "61,000");
+  expect(within(section).getByText("5J6RW2H52ML000002")).toBeInTheDocument();
+  expect(within(section).getByRole("button", { name: "Copy mileage" })).toBeInTheDocument();
+  expect(within(section).getByText("61000")).toBeInTheDocument();
+});

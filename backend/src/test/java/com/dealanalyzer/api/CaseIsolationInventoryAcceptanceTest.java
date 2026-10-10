@@ -168,6 +168,8 @@ class CaseIsolationInventoryAcceptanceTest {
       caseRow("POST", C + "/trade/offers", MULTIPART),
       caseRow("DELETE", C + "/trade/offers/{offerId}", null, "offerId=tradeOfferId"),
       caseRow("GET", C + "/trade/offers/{offerId}/pages/{pageNumber}/image", null, "offerId=tradeOfferId"),
+      caseRow("POST", C + "/trade/estimates", "{\"source\":\"Carfax\",\"lowMinor\":1500000,\"checkedOn\":\"2026-01-02\"}"),
+      caseRow("DELETE", C + "/trade/estimates/{estimateId}", null, "estimateId=tradeEstimateId"),
       caseRow("POST", C + "/trade/carry-over", "{\"sourceCaseId\":\"{otherCaseId}\"}"));
 
   /** Buyer Account endpoints: the account_session cookie, plus Account-Request: 1 on writes. */
@@ -463,6 +465,7 @@ class CaseIsolationInventoryAcceptanceTest {
     objects.put("exportId", post(client, base + "/exports", Map.of("format", "ZIP", "reportVersion", 0), label + "-export", token).path("id").asText());
     objects.put("reportTotalId", post(client, base + "/feedback/report-total", Map.of("reportVersion", 1), label + "-total", token).path("id").asText());
     objects.put("tradeOfferId", TradeVehicleAcceptanceTest.recordTradeWithOffer(app, id, token, label));
+    objects.put("tradeEstimateId", TradeVehicleAcceptanceTest.addEstimate(app, id, token, label));
 
     // The owning account, with a journey, a candidate and a reference vehicle.
     post(client, V + "/account/sign-in-requests", Map.of("email", email), label + "-sign-in");
