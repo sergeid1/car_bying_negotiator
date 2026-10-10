@@ -59,6 +59,17 @@ disabled until `ModelRolloutGate` admits the selected provider and exact task ve
 
 Trust boundaries:
 
+Ticket 99 selects Cloudflare Workers and AWS but provisions nothing. Cloudflare terminates
+TLS and sees API uploads in transit at its global edge; AWS regional encryption does not
+limit that edge processing to the AWS region. The Worker overwrites an origin-secret header,
+and the EC2 Nginx ingress requires it in addition to Cloudflare-only TCP443 security-group
+rules. Spring and ClamAV listen on loopback. Local Worker tests and `deploy/pilot/test_ingress.py`
+prove the exercised routing/header/refusal behavior with synthetic fixtures. Actual origin TLS,
+network isolation, upload limits, scanner freshness, rootless parser quotas, deletion and
+backup expiry remain deployment obligations in [pilot deployment](pilot-deployment.md).
+The dedicated rootless parser socket is a trusted launcher capability: a compromised app can
+control that user's daemon; it must never be a privileged host socket or own other workloads.
+
 - **Buyer-controlled:** browser, case-link possession, sign-in mailbox access, shopping
   inputs, pasted/uploaded replies, mandates, exact-text approval, appointment choices,
   contact-release fields and OAuth consent. In the own-email-app path the Buyer controls

@@ -56,9 +56,10 @@
       "id": "infrastructure-and-privacy-inventory",
       "requirement": "Recovery mechanism, infrastructure/provider choices, provider inventory, purposes, subprocessors, regions, retention, and deletion behavior are documented.",
       "status": "BLOCKED",
-      "blocker": "The recovery mechanism, purposes, retention and deletion behavior are documented and implemented, but no hosting, object-storage, queue, mail or model provider has been selected. Subprocessors and processing regions therefore cannot be stated, so the inventory is incomplete.",
+      "blocker": "Cloudflare Workers and AWS EC2, RDS, S3, SES/SNS, SSM/KMS and ECR are selected with unapplied Terraform and a deployment runbook. The proposed AWS region is us-east-1; Cloudflare processes at its global edge. Company accounts, actual regions, processor terms, deployed startup/TLS/header/upload/preview checks, role isolation, physical deletion/backup expiry and restore verification remain pending. Infrastructure and privacy approval is still blocked.",
       "evidence": [
         "docs/provider-inventory.md",
+        "docs/pilot-deployment.md",
         "docs/case-portability-policy.md",
         "docs/case-deletion-policy.md"
       ]
