@@ -12,7 +12,7 @@ current scroll-animated product pages. The home page invites a new visitor to it
 **Status:** open — the page and its scroll behaviour are agent-ready with placeholder visuals; the generated
 footage is an operator action. The operator may change the step list and copy.
 
-**Visuals:** the operator generates a short cinematic clip per step with Higgsfield (or a similar AI video
+**Visuals:** ticket 109 holds the clip specification and the per-step brief; build the page to it. The operator generates a short cinematic clip per step with Higgsfield (or a similar AI video
 tool): a Buyer at home with a laptop, a phone over dealer paperwork, a dealership desk with a four-square.
 The page scrubs each clip with scroll position, Apple-style, and lays the real product screen for that step
 over or beside it. Generated footage sets the scene; it never stands in for a product screen, because an
