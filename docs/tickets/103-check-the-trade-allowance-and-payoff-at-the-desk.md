@@ -11,7 +11,7 @@ TRADE-04, TRADE-05, acceptance scenarios 28 to 30.
 with a deterministic fake; 66 — Check desk paperwork against the Agreed Price; 67 — Extract four-square
 worksheets.
 
-**Status:** open — agent-ready after 100 and 101. Real value ranges need ticket 102; Buyer-held written
+**Status:** open — agent-ready (100 and 101 complete). Real value ranges need ticket 102; Buyer-held written
 offers work without it.
 
 - [ ] An allowance below the best unexpired written offer leads the trade findings with the shortfall in
