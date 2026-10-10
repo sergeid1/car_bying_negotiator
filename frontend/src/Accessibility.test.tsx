@@ -704,6 +704,48 @@ test("the fresh desk case label has no automated AA violations", async () => {
 });
 // End ticket 66.
 
+// Ticket 103: the trade-in check in the Desk Check and the report: checked, a different trade VIN, unrecorded.
+import { TradeCheckPanel, type TradeCheckResult } from "./TradeCheck";
+function tradeCheckA11y(state: string): TradeCheckResult {
+  const finding = (code: string, severity: "BLOCKING" | "WARNING" | "INFORMATIONAL", summary: string, estimate = false) =>
+    ({ code, severity, summary, amountMinor: null, deskQuestion: severity === "INFORMATIONAL" ? null : "Will you match it?", estimate });
+  return { status: state === "UNRECORDED" ? "TRADE_NOT_RECORDED" : "CHECKED", allowanceMinor: 1150000, paperworkPayoffMinor: 1920000,
+    buyerPayoff: state === "UNRECORDED" ? null : { state: state === "STALE" ? "STALE" : "CURRENT", amountMinor: 1800000, goodThrough: "2026-10-10" },
+    payoffDifferenceMinor: 120000, equityMinor: state === "OTHER_TRADE" ? null : -770000, equityBasis: "PAPERWORK_PAYOFF",
+    negativeEquityFinancedMinor: state === "CHECKED" ? 770000 : null,
+    negativeEquityCost: { status: "AVAILABLE", reason: null, aprPercent: 6.9, termMonths: 72, paymentIncreaseMinor: 13093,
+      scheduledPaymentsIncreaseMinor: 942696, interestMinor: 172696 },
+    bestOffer: { id: "o1", amountMinor: 1400000, source: "Synthetic Car Exchange", offerDate: "2026-10-09", expiresOn: "2026-10-17", label: "the written offer" },
+    shortfallToOfferMinor: 250000,
+    taxCredit: { status: "UNAVAILABLE", reason: "No tax rules are configured for US-FL yet.", jurisdiction: "US-FL", policyVersion: null, creditMinor: null },
+    offerGapAfterTaxMinor: null,
+    valuation: { availability: "AVAILABLE", notice: "Synthetic trade-in range for development only.", source: "SYNTHETIC_TRADE_VALUATION", synthetic: true,
+      retrievedAt: "2026-10-10T15:00:00Z", conditionAssumption: "GOOD", lowMinor: 1400000, typicalMinor: 1600000, highMinor: 1800000, position: "BELOW" },
+    vinMatch: { status: state === "OTHER_TRADE" ? "DIFFERENT" : "SAME", paperworkVin: state === "OTHER_TRADE" ? "2T3P1RFV5MW000001" : "5J6RW2H52ML000002",
+      recordedVin: "5J6RW2H52ML000002" },
+    findings: state === "OTHER_TRADE" ? [finding("TRADE_VIN_DIFFERENT", "BLOCKING", "The trade-in VIN on this paperwork is not your recorded trade-in.")]
+      : state === "UNRECORDED" ? [finding("TRADE_NOT_RECORDED", "WARNING", "No trade-in is recorded on this case.")]
+      : [finding("BELOW_WRITTEN_OFFER", "WARNING", "The trade-in allowance is $2,500 below the written offer."),
+        finding("BELOW_VALUATION_RANGE", "WARNING", "The allowance is below the trade-in range (an estimate).", true),
+        finding("TRADE_VIN_SAME", "INFORMATIONAL", "The trade-in VIN is the same as your recorded trade-in.")] };
+}
+test.each(["CHECKED", "STALE", "OTHER_TRADE", "UNRECORDED"])("the Desk Check with a trade check (%s) has no automated AA violations", async state => {
+  const view = { ...deskCheckFixture("READ"), trade: tradeCheckA11y(state), findings: [{ group: "TRADE", term: `trade:${tradeCheckA11y(state).findings[0].code}`,
+    label: tradeCheckA11y(state).findings[0].code, kind: "TRADE_CHECK", agreed: null, desk: null, delta: null, unit: "USD_MINOR",
+    severity: tradeCheckA11y(state).findings[0].severity, verified: false, evidence: null, buyerAction: "Will you match it?" }] };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input =>
+    String(input).endsWith("/desk-check") ? new Response(JSON.stringify(view)) : new Response(null, { status: 404 }));
+  const { container } = render(<main><h1>Buying Case</h1><DeskCheck caseId="case" token="token" /></main>);
+  await screen.findByRole("list", { name: "Trade-in findings" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+test("the report's trade check has no automated AA violations", async () => {
+  const { container } = render(<main><h1>Buying Case</h1><section className="panel"><h2>Deal Analysis Report</h2>
+    <TradeCheckPanel result={tradeCheckA11y("CHECKED")} /></section></main>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+// End ticket 103.
+
 // Ticket 100: the trade-in panel recorded, being recorded with field errors, and with written offers.
 import { TradeVehicle } from "./TradeVehicle";
 function tradeA11yView(state: string) {

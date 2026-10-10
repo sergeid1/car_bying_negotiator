@@ -11,7 +11,7 @@ function fixture(state: string) {
     findings: [{ group: "VEHICLE", term: "candidate:VEHICLE_VIN#1", label: "VEHICLE_VIN", kind: "CHANGED", agreed: { value: agreedPrice.vin, unit: "VIN" },
       desk: { value: "1M8GDM9AXKP042788", unit: "VIN" }, delta: null, unit: "VIN", severity: "BLOCKING", verified: false, evidence: null, buyerAction: null }],
     freshCase: { vin: "1M8GDM9AXKP042788", dealerPostalCode: "27604", purchaseMethod: "CASH" } };
-  return { ...base, status: "DIFFERENCES", source: "READ_FROM_PAPERWORK",
+  const differences = { ...base, status: "DIFFERENCES", source: "READ_FROM_PAPERWORK",
     findings: [{ group: "ADDED", term: "line:service contract#1", label: "Vehicle service contract with extended powertrain and wear-item coverage", kind: "ADDED",
       agreed: null, desk: { amountMinor: 149500, currency: "USD" }, delta: null, unit: "USD_MINOR", severity: "MATERIAL", verified: false,
       evidence: { pageNumber: 2 }, buyerAction: "Ask the dealer to clarify and verify this term." },
@@ -20,10 +20,35 @@ function fixture(state: string) {
     otherDifferences: [{ group: "OTHER", term: "candidate:DOCUMENT_NUMBER#1", label: "DOCUMENT_NUMBER", kind: "CHANGED", agreed: { value: "A-42", unit: "TEXT" },
       desk: { value: "A-57", unit: "TEXT" }, delta: null, unit: "TEXT", severity: "MATERIAL", verified: false, evidence: null, buyerAction: null }],
     totalEffect: { basis: "QUOTED", currency: "USD", outTheDoorDeltaMinor: 149500, preTaxDeltaMinor: null, taxEffectMinor: null, addedChargesMinor: 149500 } };
+  if (state !== "TRADE") return differences;
+  // Ticket 103, labelled synthetic: an $11,500 allowance against a $14,000 written offer and a $19,200 payoff.
+  const shortfall = "The trade-in allowance of $11,500 is $2,500 below the written offer from Synthetic Coastal Vehicle Exchange and Appraisal Center dated 2026-10-09 for $14,000.";
+  return { ...differences, findings: [{ group: "TRADE", term: "trade:BELOW_WRITTEN_OFFER", label: "BELOW_WRITTEN_OFFER", kind: "TRADE_CHECK",
+    agreed: null, desk: null, delta: 250000, unit: "USD_MINOR", severity: "WARNING", verified: false, evidence: { pageNumber: 2 },
+    buyerAction: "I have a written offer of $14,000 for my trade. Will you match it?" }],
+  trade: { status: "CHECKED", allowanceMinor: 1150000, paperworkPayoffMinor: 1920000,
+    buyerPayoff: { state: "CURRENT", amountMinor: 1800000, goodThrough: "2026-10-10" }, payoffDifferenceMinor: 120000, equityMinor: -770000,
+    equityBasis: "PAPERWORK_PAYOFF", negativeEquityFinancedMinor: 770000,
+    negativeEquityCost: { status: "AVAILABLE", reason: null, aprPercent: 6.9, termMonths: 72, paymentIncreaseMinor: 13093,
+      scheduledPaymentsIncreaseMinor: 942696, interestMinor: 172696 },
+    bestOffer: { id: "o1", amountMinor: 1400000, source: "Synthetic Coastal Vehicle Exchange and Appraisal Center", offerDate: "2026-10-09",
+      expiresOn: "2026-10-17", label: "the written offer" },
+    shortfallToOfferMinor: 250000,
+    taxCredit: { status: "AVAILABLE", reason: null, jurisdiction: "US-NC", policyVersion: "US-NC.cash.v1", creditMinor: 34500 }, offerGapAfterTaxMinor: 215500,
+    valuation: { availability: "AVAILABLE", notice: "Synthetic trade-in range for development only.", source: "SYNTHETIC_TRADE_VALUATION", synthetic: true,
+      retrievedAt: "2026-10-10T15:00:00Z", conditionAssumption: "GOOD", lowMinor: 1400000, typicalMinor: 1600000, highMinor: 1800000, position: "BELOW" },
+    vinMatch: { status: "SAME", paperworkVin: "5J6RW2H52ML000002", recordedVin: "5J6RW2H52ML000002" },
+    findings: [
+      { code: "BELOW_WRITTEN_OFFER", severity: "WARNING", summary: shortfall, amountMinor: 250000,
+        deskQuestion: "I have a written offer of $14,000 for my trade. Will you match it?", estimate: false },
+      { code: "BELOW_VALUATION_RANGE", severity: "WARNING", summary: "The trade-in allowance of $11,500 is $2,500 below the low end of the trade-in range, $14,000 to $18,000 (an estimate from SYNTHETIC_TRADE_VALUATION).",
+        amountMinor: 250000, deskQuestion: "The trade-in range I have starts at $14,000. How did you arrive at $11,500?", estimate: true },
+      { code: "PAYOFF_DIFFERS", severity: "WARNING", summary: "This paperwork uses a payoff of $19,200, $1,200 more than your payoff of $18,000 valid through 2026-10-10.",
+        amountMinor: 120000, deskQuestion: "My lender's payoff is $18,000 valid through 2026-10-10. Why does this use $19,200?", estimate: false }] } };
 }
 
 // The narrow and narrow-dark projects run each state in both themes.
-for (const state of ["AWAITING", "DIFFERENCES", "OTHER_CAR"]) {
+for (const state of ["AWAITING", "DIFFERENCES", "OTHER_CAR", "TRADE"]) {
   test(`Desk Check ${state} works one-handed at 360 px`, async ({ page }) => {
     await page.route("**/api/v1/**", route => route.fulfill({ status: 204, body: "" }));
     await page.route("**/api/v1/intake-options", route => route.fulfill({ json: { supported: ["US-NC"], consentPolicies: {
@@ -47,6 +72,12 @@ for (const state of ["AWAITING", "DIFFERENCES", "OTHER_CAR"]) {
       await expect(panel.getByRole("list", { name: "Differences from your Agreed Price" }).getByRole("listitem").first())
         .toContainText("Added: Vehicle service contract");
       await panel.getByText("1 other change on the paperwork").click();
+    }
+    if (state === "TRADE") {
+      await expect(panel.getByRole("list", { name: "Differences from your Agreed Price" }).getByRole("listitem").first())
+        .toContainText("$2,500 below the written offer");
+      await expect(panel.getByRole("heading", { name: "Trade-in check" })).toBeVisible();
+      await expect(panel.getByRole("list", { name: "Trade-in findings" }).getByText("Estimate", { exact: true })).toBeVisible();
     }
     if (state === "OTHER_CAR") {
       await expect(panel.getByRole("alert").first()).toContainText("Different car");

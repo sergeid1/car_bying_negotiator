@@ -23,7 +23,7 @@ MONEY_FIELDS = {"SELLING_PRICE", "DISCOUNT_TOTAL", "REBATE_TOTAL", "SUBTOTAL", "
 def expected_unit(field):
     if field in MONEY_FIELDS:
         return "USD_MINOR"
-    return {"APR": "PERCENT", "TERM_MONTHS": "MONTH", "VEHICLE_VIN": "VIN",
+    return {"APR": "PERCENT", "TERM_MONTHS": "MONTH", "VEHICLE_VIN": "VIN", "TRADE_VIN": "VIN",
             "OFFER_DATE": "DATE", "EXPIRATION_DATE": "DATE", "VEHICLE_YEAR": "YEAR"}.get(field, "TEXT")
 
 

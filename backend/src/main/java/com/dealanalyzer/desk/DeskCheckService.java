@@ -5,6 +5,7 @@ import com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence;
 import com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence.ExtractionView;
 import com.dealanalyzer.plan.PricePlanService;
 import com.dealanalyzer.review.RevisedOfferPolicy;
+import com.dealanalyzer.trade.desk.TradeDeskCheck;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence.DealerOfferView;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -44,17 +45,18 @@ public class DeskCheckService {
   private final JdbcTemplate jdbc;
   private final ObjectMapper json;
   private final com.dealanalyzer.purchase.PurchaseService purchases;
+  private final TradeDeskCheck trade;
 
   public DeskCheckService(EphemeralBuyingCaseService cases, PricePlanService plans, DealerOfferPersistence offers,
       DocumentExtractionPersistence extractions, JdbcTemplate jdbc, ObjectMapper json,
-      com.dealanalyzer.purchase.PurchaseService purchases) {
+      com.dealanalyzer.purchase.PurchaseService purchases, TradeDeskCheck trade) {
     this.cases = cases; this.plans = plans; this.offers = offers; this.extractions = extractions;
-    this.jdbc = jdbc; this.json = json; this.purchases = purchases;
+    this.jdbc = jdbc; this.json = json; this.purchases = purchases; this.trade = trade;
   }
 
   public record View(String policyVersion, String status, String source, Agreed agreedPrice, Paperwork paperwork,
       List<Finding> findings, List<Finding> otherDifferences, int unchangedTerms, TotalEffect totalEffect,
-      FreshCase freshCase, Integer dealReviewVersion) {}
+      FreshCase freshCase, Integer dealReviewVersion, TradeDeskCheck.Result trade) {}
   public record Agreed(int offerVersion, int baselineVersion, String vin, Long sellingPriceMinor,
       Long outTheDoorMinor, Instant acceptedAt) {}
   public record Paperwork(String documentId, Instant uploadedAt, String extractionId, Integer offerVersion, String vin) {}
@@ -111,7 +113,7 @@ public class DeskCheckService {
     try { extraction = extractions.requireLatest(caseId, document.id()); }
     catch (com.dealanalyzer.buyingcase.ResourceNotFoundException reading) {
       return new View(VERSION, "READING", null, agreed, new Paperwork(document.id(), document.createdAt(), null, null, null),
-          List.of(), List.of(), 0, unavailable(), null, null);
+          List.of(), List.of(), 0, unavailable(), null, null, null);
     }
     String deskVin = extraction.candidates().stream().filter(c -> c.field().equals("VEHICLE_VIN")).findFirst()
         .map(c -> c.currentCorrection() == null ? c.normalizedValue() : c.currentCorrection().normalizedValue()).orElse(null);
@@ -130,7 +132,7 @@ public class DeskCheckService {
           null, "VIN", "BLOCKING", false, evidence(extraction, "VEHICLE_VIN"),
           "Start a separate case for this car. Nothing on this paperwork is compared with or added to the agreed car.");
       return new View(VERSION, "DIFFERENT_VIN", "READ_FROM_PAPERWORK", agreed, paperwork, List.of(vin), List.of(), 0,
-          unavailable(), new FreshCase(deskVin, place.dealerLocation(), place.purchaseMethod()), null);
+          unavailable(), new FreshCase(deskVin, place.dealerLocation(), place.purchaseMethod()), null, null);
     }
     String source;
     List<JsonNode> discrepancies = new ArrayList<>();
@@ -192,7 +194,16 @@ public class DeskCheckService {
           nullable(row.at("/observedEvidence/evidence")), row.path("buyerAction").asText(null));
       (group.equals("OTHER") ? other : lead).add(finding);
     }
-    lead.sort(Comparator.comparingInt(finding -> ORDER.indexOf(finding.group())));
+    // The trade check (ticket 103) leads the TRADE group, ahead of totals; its terms rest on the same source.
+    var tradeCheck = trade.check(caseId, token, deskTerms, agreedTerms);
+    boolean tradeVerified = !"READ_FROM_PAPERWORK".equals(source);
+    JsonNode allowanceEvidence = evidence(extraction, "TRADE_ALLOWANCE");
+    for (var item : tradeCheck.leading())
+      lead.add(new Finding("TRADE", "trade:" + item.code(), item.code(), "TRADE_CHECK", null, null,
+          item.amountMinor() == null ? null : BigDecimal.valueOf(item.amountMinor()), "USD_MINOR", item.severity(),
+          tradeVerified, allowanceEvidence, item.deskQuestion()));
+    lead.sort(Comparator.comparingInt((Finding finding) -> ORDER.indexOf(finding.group()))
+        .thenComparing(finding -> finding.term().startsWith("trade:") ? 0 : 1));
     Long addedCharges = addedKnown ? added : null;
     TotalEffect effect;
     if (cash != null && "ESTIMATED".equals(cash.path("availability").asText()))
@@ -205,7 +216,8 @@ public class DeskCheckService {
           : new TotalEffect("QUOTED", "USD", Math.subtractExact(desk, agreed.outTheDoorMinor()), null, null, addedCharges);
     }
     return new View(VERSION, lead.isEmpty() ? "NO_DIFFERENCES" : "DIFFERENCES", source, agreed, paperwork,
-        List.copyOf(lead), List.copyOf(other), Math.max(0, count(agreedTerms) - differing), effect, null, reviewVersion);
+        List.copyOf(lead), List.copyOf(other), Math.max(0, count(agreedTerms) - differing), effect, null, reviewVersion,
+        "NO_ALLOWANCE".equals(tradeCheck.status()) ? null : tradeCheck);
   }
 
   /** The extraction in the verified-offer term shape, every value marked as not yet verified by the Buyer. */
@@ -241,7 +253,7 @@ public class DeskCheckService {
   }
 
   private View empty(String status, Agreed agreed) {
-    return new View(VERSION, status, null, agreed, null, List.of(), List.of(), 0, unavailable(), null, null);
+    return new View(VERSION, status, null, agreed, null, List.of(), List.of(), 0, unavailable(), null, null, null);
   }
   private static TotalEffect unavailable() { return new TotalEffect("UNAVAILABLE", "USD", null, null, null, null); }
   private JsonNode evidence(ExtractionView extraction, String field) {

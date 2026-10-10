@@ -9,6 +9,7 @@ import { Arithmetic, DocumentSourceView, type Calculation, type DocumentSource }
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { ReportExplanationLoader } from "./ReportExplanation";
 import { AnimatedAmount } from "./AnimatedAmount";
+import { TradeCheckPanel, type TradeCheckResult } from "./TradeCheck";
 
 export type MaterialAmount = {
   label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string;
@@ -19,6 +20,7 @@ export type CoreReport = {
   version: number; asOf: string; status: string;
   analysis: {
     dealReview?: DealReview;
+    tradeCheck?: TradeCheckResult | null;
     financingAvailability?: string; financing?: FinancingResult | null; financingTerms?: { aprPercent: number | null; termMonths: number | null } | null;
     reviewLabel: string; dealRating: string; ratingBasis: string; nextAction: string;
     topReasons: string[]; marketAvailability: string; cashAvailability: string;
@@ -125,6 +127,7 @@ export function CoreDealReport({ report, caseId, token, redacted, children }: { 
     {report.status === "PARTIAL" && <p className="notice">Warning: this report is partial. One or more analysis areas are unavailable.</p>}
     <nav aria-label="Report sections">{analysis.dealReview && <><a href="#revised-offer-review">Revised offer comparison</a> · </>}<a href="#core-amounts">Amounts</a> · {showFinancing && <><a href="#core-financing">Financing</a> · </>} <a href="#core-evidence">Evidence and calculations</a> · <a href="#core-scope">Scope and policies</a></nav>
     {analysis.dealReview && <RevisedOfferReview review={analysis.dealReview} redacted={redacted} />}
+    {analysis.tradeCheck && <div className="panel"><TradeCheckPanel result={analysis.tradeCheck} /></div>}
     <ul className="report-sections" aria-label="Report details">
       <ReportSection id="core-amounts" title="Amounts and sources">
         <p>Market analysis: {analysis.marketAvailability}. Cash economics: {analysis.cashAvailability}.</p>

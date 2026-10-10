@@ -1702,6 +1702,21 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
 .desk-check-findings > li:first-child > p:first-child { font-size: 1.05rem; font-weight: 600; }
 .desk-check-meta { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; color: var(--ink-muted); font-size: 0.9rem; }
 .desk-check-meta .badge, .desk-check-meta .cash-badge { white-space: normal; }
+/* Ticket 103: the trade-in check in the Desk Check and the report. */
+.trade-check { min-width: 0; overflow-wrap: anywhere; margin-top: 16px; }
+.trade-check h3 { margin: 0 0 8px; }
+.trade-check-findings { margin: 8px 0 12px; padding-left: 1.3rem; display: grid; gap: 10px; }
+.trade-check-findings > li { min-width: 0; padding-left: 4px; }
+.trade-check-findings > li > p { margin: 0 0 4px; }
+.trade-check-findings > li[data-severity="BLOCKING"] > p:first-child,
+.trade-check-findings > li[data-severity="WARNING"]:first-child > p:first-child { font-weight: 600; }
+.trade-check-figures { display: grid; gap: 6px; margin: 0 0 12px; }
+.trade-check-figures > div { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-width: 0; }
+.trade-check-figures dt { color: var(--ink-muted); font-size: 0.9rem; }
+.trade-check-figures dd { margin: 0; min-width: 0; }
+@media (min-width: 640px) {
+  .trade-check-figures > div { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 12px; }
+}
 .desk-check details { margin: 12px 0; }
 .desk-check details summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
 .desk-check button, .desk-fresh-case button { max-width: 100%; white-space: normal; min-height: 44px; }

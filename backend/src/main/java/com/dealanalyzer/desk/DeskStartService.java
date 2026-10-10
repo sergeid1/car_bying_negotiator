@@ -7,6 +7,7 @@ import com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence.Ext
 import com.dealanalyzer.finance.FinancingCalculator;
 import com.dealanalyzer.review.RevisedOfferPolicy;
 import com.dealanalyzer.trade.TradeService;
+import com.dealanalyzer.trade.desk.TradeDeskCheck;
 import com.dealanalyzer.vehicle.InvalidVehicleEvidenceException;
 import com.dealanalyzer.vehicle.Vin;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -41,12 +42,13 @@ public class DeskStartService {
   private final TradeService trades;
   private final JdbcTemplate jdbc;
   private final ObjectMapper json;
+  private final TradeDeskCheck tradeCheck;
   private final FinancingCalculator financing = new FinancingCalculator();
 
   DeskStartService(EphemeralBuyingCaseService cases, DeskCheckService desk, DocumentExtractionPersistence extractions,
-      TradeService trades, JdbcTemplate jdbc, ObjectMapper json) {
+      TradeService trades, JdbcTemplate jdbc, ObjectMapper json, TradeDeskCheck tradeCheck) {
     this.cases = cases; this.desk = desk; this.extractions = extractions; this.trades = trades;
-    this.jdbc = jdbc; this.json = json;
+    this.jdbc = jdbc; this.json = json; this.tradeCheck = tradeCheck;
   }
 
   /**
@@ -73,7 +75,7 @@ public class DeskStartService {
 
   /** source: READ_FROM_PAPERWORK or TYPED_BY_BUYER; neither is verified. */
   public record FirstResult(String policyVersion, String route, String source, OutTheDoor outTheDoor, Finding lead,
-      List<Finding> findings) {}
+      List<Finding> findings, TradeDeskCheck.Result trade) {}
   /** amountMinor is null when the paperwork shows no out-the-door total; it is never treated as zero. */
   public record OutTheDoor(Long amountMinor, Long agreedMinor, Long differenceMinor) {}
   /** amountMinor is the finding's dollar effect when it can be calculated, otherwise null. */
@@ -154,13 +156,21 @@ public class DeskStartService {
     Long otd = amount(terms, "OUT_THE_DOOR_TOTAL");
     if (otd == null) findings.add(missingTotal(terms));
     aprAboveOwn(terms, ownApr).ifPresent(findings::add);
-    // Largest calculable dollar effect first; findings without an amount keep their rule order after those.
-    findings.sort(Comparator.comparing((Finding finding) -> finding.amountMinor() == null)
+    var trade = tradeCheck.check(caseId, token, terms, agreed == null ? null : agreed.terms());
+    JsonNode allowanceEvidence = stream(terms.path("candidates"))
+        .filter(term -> "TRADE_ALLOWANCE".equals(term.path("field").asText())).findFirst()
+        .map(term -> nullable(term.path("evidence"))).orElse(null);
+    for (var item : trade.leading())
+      findings.add(new Finding(item.code(), item.summary(), item.amountMinor(), item.deskQuestion(), allowanceEvidence));
+    // A different trade-in VIN leads; then the largest calculable dollar effect; findings without an amount
+    // keep their rule order after those.
+    findings.sort(Comparator.comparing((Finding finding) -> !finding.code().equals("TRADE_VIN_DIFFERENT"))
+        .thenComparing(finding -> finding.amountMinor() == null)
         .thenComparing(finding -> finding.amountMinor() == null ? 0 : -finding.amountMinor()));
     Long agreedOtd = agreed == null ? null : agreed.agreed().outTheDoorMinor();
     var total = new OutTheDoor(otd, agreedOtd, otd == null || agreedOtd == null ? null : Math.subtractExact(otd, agreedOtd));
     return new FirstResult(VERSION, request.route(), source, total, findings.isEmpty() ? null : findings.get(0),
-        List.copyOf(findings));
+        List.copyOf(findings), "NO_ALLOWANCE".equals(trade.status()) ? null : trade);
   }
 
   private static String route(String vin, String agreedVin, String caseVin) {

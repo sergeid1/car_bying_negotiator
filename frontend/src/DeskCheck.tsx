@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BuyingCaseIntake } from "./BuyingCaseIntake";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
+import { TradeCheckPanel, type TradeCheckResult } from "./TradeCheck";
 
 type Credentials = { caseId: string; token: string };
 type Term = { value?: string | null; unit?: string; amountMinor?: number; currency?: string; category?: string } | number;
@@ -20,6 +21,7 @@ export type DeskCheckView = {
     preTaxDeltaMinor: number | null; taxEffectMinor: number | null; addedChargesMinor: number | null };
   freshCase: null | { vin: string; dealerPostalCode: string | null; purchaseMethod: string };
   dealReviewVersion: number | null;
+  trade?: TradeCheckResult | null;
 };
 export type FreshDeskCase = Credentials & { agreed: Credentials; agreedVin: string | null; vin: string; files: File[] };
 
@@ -29,7 +31,7 @@ const LABELS: Record<string, string> = {
   DEALER_CHARGES_TOTAL: "Dealer charges", GOVERNMENT_CHARGES_TOTAL: "Government charges", ADD_ON_TOTAL: "Add-ons total",
   AMOUNT_FINANCED: "Amount financed", APR: "APR", TERM_MONTHS: "Loan term", MONTHLY_PAYMENT: "Monthly payment",
   FINANCE_CHARGE: "Finance charge", TOTAL_OF_PAYMENTS: "Total of payments", CASH_DOWN: "Cash down",
-  TRADE_ALLOWANCE: "Trade-in allowance", TRADE_PAYOFF: "Trade-in payoff", VEHICLE_VIN: "VIN",
+  TRADE_ALLOWANCE: "Trade-in allowance", TRADE_PAYOFF: "Trade-in payoff", VEHICLE_VIN: "VIN", TRADE_VIN: "Trade-in VIN",
   "sellingPrice.walkAwayMinor": "Your walk-away selling price", buyerMaxSellingPriceMinor: "Your maximum selling price",
   "outTheDoor.walkAwayMinor": "Your walk-away out-the-door price", buyerMaxOutTheDoorPriceMinor: "Your maximum out-the-door price",
 };
@@ -68,6 +70,14 @@ export function describeFinding(finding: DeskFinding) {
       if (finding.agreed === null) return `${label} is new on this paperwork: ${show(finding.desk)}.`;
       return `${label} changed from ${show(finding.agreed)} to ${show(finding.desk)}${moneyDelta(finding)}.`;
   }
+}
+/** A trade finding's sentence comes from the trade check itself (ticket 103). */
+function describe(view: DeskCheckView, finding: DeskFinding) {
+  if (finding.term.startsWith("trade:")) {
+    const trade = view.trade?.findings.find(item => `trade:${item.code}` === finding.term);
+    if (trade) return trade.summary;
+  }
+  return describeFinding(finding);
 }
 /** The lead line: how many differences and what they do to the total. */
 export function totalEffectSentence(view: DeskCheckView) {
@@ -155,7 +165,7 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
           : `No differences from your Agreed Price in the ${read ? "terms as read" : "verified terms"}. ${totalEffectSentence(view)}`}</p>
         {view.findings.length > 0 && <ol className="desk-check-findings" aria-label="Differences from your Agreed Price">
           {view.findings.map(finding => <li key={`${finding.group}-${finding.term}`} data-severity={finding.severity}>
-            <p>{describeFinding(finding)}</p>
+            <p>{describe(view, finding)}</p>
             <p className="desk-check-meta">
               <span className={finding.verified ? "cash-badge" : "badge badge-warn"}>{finding.verified ? "Verified" : "As read, not verified"}</span>
               {finding.evidence?.pageNumber ? <span> Page {finding.evidence.pageNumber}.</span> : null}
@@ -163,6 +173,7 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
             </p>
           </li>)}
         </ol>}
+        {view.trade && <TradeCheckPanel result={view.trade} />}
         {view.otherDifferences.length > 0 && <details>
           <summary>{view.otherDifferences.length} other {view.otherDifferences.length === 1 ? "change" : "changes"} on the paperwork</summary>
           <ul>{view.otherDifferences.map(finding => <li key={`${finding.group}-${finding.term}`}>
