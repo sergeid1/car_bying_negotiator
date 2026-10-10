@@ -3,6 +3,9 @@ package com.dealanalyzer.operations;
 import com.dealanalyzer.ai.ModelProvenance;
 import com.dealanalyzer.shopping.inventory.InventoryResults;
 import com.dealanalyzer.shopping.inventory.InventorySearchAdapter;
+import com.dealanalyzer.trade.valuation.TradeValuationAdapter;
+import com.dealanalyzer.trade.valuation.TradeValuationContract;
+import com.dealanalyzer.trade.valuation.TradeVehicle;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -16,7 +19,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class ProviderMeter {
-  public enum Operation { EXTRACTION, MARKET_RETRIEVAL, LISTING_RETRIEVAL, SYNTHETIC_MARKET, REPLY_DRAFT, EXPLANATION, INVENTORY_SEARCH }
+  public enum Operation { EXTRACTION, MARKET_RETRIEVAL, LISTING_RETRIEVAL, SYNTHETIC_MARKET, REPLY_DRAFT, EXPLANATION, INVENTORY_SEARCH, TRADE_VALUATION }
   public enum Status { SUCCESS, PROVIDER_UNAVAILABLE, PROVIDER_FAILURE, CONTRACT_FAILURE, BUYER_INPUT, INTERNAL }
   /** A safe boundary error: provider text and exception causes must never escape into diagnostics. */
   public static final class Failure extends RuntimeException {
@@ -99,6 +102,37 @@ public class ProviderMeter {
       return unavailable;
     } finally {
       store.inventoryLatency(id, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+    }
+  }
+
+  /** Trade valuations share the timeout and concurrency limits; rejected evidence has no range. */
+  public TradeValuationAdapter.Result callTradeValuation(String caseId, TradeValuationAdapter.Provider provider,
+      TradeVehicle vehicle, Supplier<TradeValuationAdapter.Result> invocation) {
+    String id = store.startTradeValuation(caseId, provider);
+    long started = System.nanoTime();
+    var rejected = new java.util.concurrent.atomic.AtomicReference<TradeValuationAdapter.Reason>();
+    var spent = new java.util.concurrent.atomic.AtomicReference<BigDecimal>();
+    try {
+      return run(id, invocation, result -> {
+        spent.set(result.costUsd());
+        var failure = TradeValuationContract.failure(result, provider, vehicle, Instant.now());
+        if (failure != null) {
+          rejected.set(failure);
+          throw new IllegalArgumentException("Invalid trade valuation contract");
+        }
+        store.tradeValuationResult(id, result);
+        return result.availability() == TradeValuationAdapter.Availability.AVAILABLE
+            ? Status.SUCCESS : Status.PROVIDER_UNAVAILABLE;
+      }, null);
+    } catch (Failure failure) {
+      var reason = rejected.get() != null ? rejected.get() : failure.timedOut
+          ? TradeValuationAdapter.Reason.TIMED_OUT : failure.status() == Status.CONTRACT_FAILURE
+          ? TradeValuationAdapter.Reason.INVALID_RESPONSE : TradeValuationAdapter.Reason.PROVIDER_UNAVAILABLE;
+      var unavailable = TradeValuationContract.unavailable(provider, reason, Instant.now(), spent.get());
+      store.tradeValuationResult(id, unavailable);
+      return unavailable;
+    } finally {
+      store.tradeValuationLatency(id, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
     }
   }
 
