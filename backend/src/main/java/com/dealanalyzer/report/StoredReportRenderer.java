@@ -51,9 +51,25 @@ public class StoredReportRenderer {
       for (var paragraph : analysis.path("marketEvidence").path("paragraphs"))
         lines.add(new Line(paragraph.asText(), false));
     } else lines.add(new Line("Market evidence details are unavailable in this saved report.", false));
-    if (!analysis.path("tacticFindings").isEmpty()) {
+    var standaloneTactics = new ArrayList<JsonNode>();
+    var linkedTactics = new ArrayList<JsonNode>();
+    for (var finding : analysis.path("tacticFindings"))
+      (finding.path("tradeFindingCode").asText("").isEmpty() ? standaloneTactics : linkedTactics).add(finding);
+    if (!linkedTactics.isEmpty()) {
+      lines.add(new Line("Trade-in findings", true));
+      for (var tradeFinding : analysis.at("/tradeCheck/findings")) {
+        lines.add(new Line(tradeFinding.path("summary").asText(), false));
+        for (var tactic : linkedTactics) if (tradeFinding.path("code").asText().equals(tactic.path("tradeFindingCode").asText())) {
+          lines.add(new Line(tactic.path("label").asText(), false));
+          lines.add(new Line("Draft desk question (" + tactic.path("questionReview").asText() + "): " + tactic.path("deskQuestion").asText(), false));
+          lines.add(new Line("Calculation: " + tactic.path("effectBasis").asText(), false));
+          if (!tactic.path("noDollarEffectReason").isNull()) lines.add(new Line(tactic.path("noDollarEffectReason").asText(), false));
+        }
+      }
+    }
+    if (!standaloneTactics.isEmpty()) {
       lines.add(new Line("Worksheet tactics", true));
-      for (var finding : analysis.path("tacticFindings")) {
+      for (var finding : standaloneTactics) {
         lines.add(new Line(finding.path("label").asText() + ": " + finding.path("summary").asText(), false));
         if (finding.path("monthlyEffectMinor").isNumber()) lines.add(new Line("Monthly effect: " + tacticMoney(finding.path("monthlyEffectMinor").asLong()), false));
         if (finding.path("totalEffectMinor").isNumber()) lines.add(new Line("Full-term effect: " + tacticMoney(finding.path("totalEffectMinor").asLong()), false));

@@ -2,12 +2,14 @@ export type DeskTacticFinding = {
   code: string; label: string; summary: string; policyVersion: string; verified: boolean;
   monthlyEffectMinor: number | null; totalEffectMinor: number | null; effectBasis: string;
   noDollarEffectReason: string | null; deskQuestion: string; questionReview: string;
+  tradeFindingCode?: string | null;
   evidenceRegions: { field: string; region: { pageNumber?: number; source?: string; version?: number } | null; verified: boolean }[];
 };
 
 const money = (minor: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(minor / 100);
 
 export function DeskTactics({ findings = [] }: { findings?: DeskTacticFinding[] }) {
+  findings = findings.filter(finding => !finding.tradeFindingCode);
   if (!findings.length) return null;
   return <section className="desk-tactics" aria-label="Worksheet tactics">
     <h3>Worksheet tactics to ask about</h3>
@@ -32,4 +34,23 @@ export function DeskTactics({ findings = [] }: { findings?: DeskTacticFinding[] 
       </details>
     </li>)}</ul>
   </section>;
+}
+
+/** Adds the tactic name and policy context to an existing trade line, without another dollar display. */
+export function TradeTacticAnnotation({ finding }: { finding: DeskTacticFinding }) {
+  return <div className="desk-tactics">
+    <p><strong>{finding.label}</strong></p>
+    <p>Draft desk question: <q>{finding.deskQuestion}</q></p>
+    {finding.questionReview === "PENDING_OPERATOR_REVIEW" && <p className="muted">Question wording awaits operator review.</p>}
+    <details><summary>Tactic evidence and policy</summary>
+      <p>{finding.verified ? "Verified terms." : "As read, not verified."}</p>
+      <p>{finding.effectBasis}</p>
+      {finding.noDollarEffectReason && <p>{finding.noDollarEffectReason}</p>}
+      <p>Policy: {finding.policyVersion}. Code: {finding.code}.</p>
+      <ul>{finding.evidenceRegions.map((evidence, index) => <li key={`${evidence.field}-${index}`}>
+        {evidence.field.replaceAll("_", " ")}: {evidence.verified ? "verified" : "as read"}
+        {evidence.region?.pageNumber ? `, page ${evidence.region.pageNumber}` : ""}.
+      </li>)}</ul>
+    </details>
+  </div>;
 }

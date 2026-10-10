@@ -1,17 +1,20 @@
 package com.dealanalyzer.desk.tactic;
 
 import com.dealanalyzer.finance.FinancingCalculator;
+import com.dealanalyzer.trade.desk.TradeDeskCheck;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.util.*;
 
 /** Pure documentary rules. No model, valuation, trade equity calculation or persistence. */
 public final class DeskTacticPolicy {
-  public static final String VERSION = "desk-tactics.v1";
+  public static final String VERSION = "desk-tactics.v2";
   public static final long PAYMENT_TOLERANCE_MINOR = 100;
   public static final String PAYMENT_QUESTION = "Please show how this payment follows from the price, amount financed, APR, term and down payment, including any products in it.";
   public static final String TERM_QUESTION = "Please show the payment and total interest at my shorter term, with the same amount financed and APR.";
   public static final String APR_QUESTION = "Please show the payment and total interest using my own lender's APR, with the same amount financed and term.";
+  public static final String EQUITY_QUESTION = "Please show where the amount still owed on my trade is included in the loan, and its payment and interest effect.";
+  public static final String ALLOWANCE_QUESTION = "Please show the trade allowance with the selling price and discount we agreed, so I can compare their combined effect.";
 
   public record BuyerOffer(BigDecimal aprPercent, Integer termMonths, JsonNode evidence) {}
   public record Input(JsonNode terms, BuyerOffer buyerOffer) {}
@@ -20,7 +23,51 @@ public final class DeskTacticPolicy {
   public record Evidence(String field, JsonNode region, boolean verified) {}
   public record Finding(String code, String label, String summary, List<Evidence> evidenceRegions,
       Long monthlyEffectMinor, Long totalEffectMinor, String effectBasis, String noDollarEffectReason,
-      String deskQuestion, String questionReview, String policyVersion, boolean verified) {}
+      String deskQuestion, String questionReview, String policyVersion, boolean verified, String tradeFindingCode) {}
+
+  /** Names ticket 103 findings using its already computed result, without another provider or calculation. */
+  public List<Finding> tradeFindings(Input input, TradeDeskCheck.Result trade, JsonNode source) {
+    if (trade == null || !"CHECKED".equals(trade.status()) || trade.blocking()) return List.of();
+    List<Finding> findings = new ArrayList<>();
+    var negative = trade.findings().stream().filter(f -> "NEGATIVE_EQUITY_FINANCED".equals(f.code())).findFirst().orElse(null);
+    if (negative != null && trade.negativeEquityFinancedMinor() != null && trade.negativeEquityFinancedMinor() > 0) {
+      var cost = trade.negativeEquityCost();
+      boolean available = cost != null && "AVAILABLE".equals(cost.status());
+      String reason = available ? null : cost != null && cost.reason() != null ? cost.reason()
+          : "The scheduled payment and interest effect is unavailable; the amount of negative equity is shown instead.";
+      findings.add(tradeFinding(input, "NEGATIVE_EQUITY_FOLDED_IN", "Negative equity folded in", negative,
+          List.of("TRADE_ALLOWANCE", "TRADE_PAYOFF", "AMOUNT_FINANCED", "APR", "TERM_MONTHS"),
+          available ? cost.paymentIncreaseMinor() : null,
+          available ? cost.scheduledPaymentsIncreaseMinor() : trade.negativeEquityFinancedMinor(),
+          "From " + trade.policyVersion() + "; equity basis " + trade.equityBasis()
+              + (available ? "; scheduled-payment effect includes principal and interest under " + cost.policyVersion()
+                  : "; principal amount only; scheduled payments and interest unavailable"), reason, EQUITY_QUESTION, source));
+    }
+    var together = trade.priceTogether();
+    var offset = trade.findings().stream().filter(f -> "ALLOWANCE_OFFSET_BY_PRICE".equals(f.code())).findFirst().orElse(null);
+    if (offset != null && together != null && together.priceIncreaseMinor() != null && together.priceIncreaseMinor() > 0
+        && together.allowanceAboveValueMinor() != null && together.allowanceAboveValueMinor() > 0) {
+      findings.add(tradeFinding(input, "ALLOWANCE_PAID_FOR_BY_PRICE", "Allowance paid for by the price", offset,
+          List.of("TRADE_ALLOWANCE", "SELLING_PRICE", "DISCOUNT_TOTAL"), null, together.netEffectMinor(),
+          "Net trade-and-price effect from " + trade.policyVersion() + "; reference " + together.reference()
+              + "; positive means the Buyer is ahead, negative means behind. This purchase-price comparison has no monthly effect.",
+          together.netEffectMinor() == null ? "The combined trade-and-price dollar effect is unavailable in the trade check." : null,
+          ALLOWANCE_QUESTION, source));
+    }
+    return List.copyOf(findings);
+  }
+
+  private Finding tradeFinding(Input input, String code, String label, TradeDeskCheck.Finding tradeFinding,
+      List<String> fields, Long monthly, Long total, String basis, String reason, String question, JsonNode source) {
+    var base = finding(input, code, label, tradeFinding.summary(), fields, monthly, total, basis, reason, question, false);
+    var evidence = new ArrayList<>(base.evidenceRegions());
+    for (JsonNode line : input.terms().path("lineItems")) if ("TRADE".equals(line.path("category").asText()))
+      evidence.add(new Evidence("TRADE_LINE_ITEM", nullable(line.path("evidence")), line.path("buyerVerified").asBoolean(false)));
+    boolean verified = !evidence.isEmpty() && evidence.stream().allMatch(Evidence::verified);
+    evidence.add(new Evidence("TRADE_CHECK_RESULT", source, verified));
+    return new Finding(code, label, base.summary(), List.copyOf(evidence), monthly, total, basis, reason, question,
+        base.questionReview(), VERSION, verified, tradeFinding.code());
+  }
 
   private final FinancingCalculator calculator = new FinancingCalculator();
   public List<Finding> evaluate(Input input) { return evaluate(input, List.of()); }
@@ -94,7 +141,7 @@ public final class DeskTacticPolicy {
     }
     if (buyerEvidence) evidence.add(new Evidence("BUYER_FINANCING_OFFER", input.buyerOffer().evidence(), true));
     return new Finding(code, label, summary, List.copyOf(evidence), monthly, total, basis, reason, question,
-        "PENDING_OPERATOR_REVIEW", VERSION, !evidence.isEmpty() && evidence.stream().allMatch(Evidence::verified));
+        "PENDING_OPERATOR_REVIEW", VERSION, !evidence.isEmpty() && evidence.stream().allMatch(Evidence::verified), null);
   }
   private record Principal(Long amount, List<String> fields, String basis) {}
   private Principal principal(JsonNode terms) {

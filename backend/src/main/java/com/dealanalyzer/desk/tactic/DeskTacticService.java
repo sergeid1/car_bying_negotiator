@@ -43,6 +43,17 @@ public class DeskTacticService {
     return new DeskTacticPolicy().evaluate(new DeskTacticPolicy.Input(terms, buyer));
   }
 
+  public List<DeskTacticPolicy.Finding> findings(String caseId, JsonNode terms, JsonNode agreedTerms, BigDecimal ownApr,
+      com.dealanalyzer.trade.desk.TradeDeskCheck.Result trade) {
+    var findings = new java.util.ArrayList<>(findings(caseId, terms, agreedTerms, ownApr));
+    findings.addAll(tradeFindings(terms, trade));
+    return List.copyOf(findings);
+  }
+
+  public List<DeskTacticPolicy.Finding> tradeFindings(JsonNode terms, com.dealanalyzer.trade.desk.TradeDeskCheck.Result trade) {
+    return new DeskTacticPolicy().tradeFindings(new DeskTacticPolicy.Input(terms, null), trade, json.valueToTree(trade));
+  }
+
   public JsonNode asRead(ExtractionView extraction) {
     var terms = json.createObjectNode();
     var candidates = terms.putArray("candidates");

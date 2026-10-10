@@ -145,6 +145,8 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
   if (view?.status === "NO_AGREED_PRICE") return null;
   const agreed = view?.agreedPrice;
   const read = view?.source === "READ_FROM_PAPERWORK";
+  const shownFindings = view?.findings.filter(finding => !view.tacticFindings?.some(tactic =>
+    tactic.tradeFindingCode && finding.term === `trade:${tactic.tradeFindingCode}`)) ?? [];
   return <section className="stack desk-check" aria-label="Desk Check">
     <div className="panel desk-check-result">
       <div className="section-heading"><div>
@@ -165,8 +167,8 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
         <p role="status" className="desk-check-lead">{view.status === "DIFFERENCES"
           ? `${view.findings.length} ${view.findings.length === 1 ? "difference" : "differences"} from your Agreed Price. ${totalEffectSentence(view)}`
           : `No differences from your Agreed Price in the ${read ? "terms as read" : "verified terms"}. ${totalEffectSentence(view)}`}</p>
-        {view.findings.length > 0 && <ol className="desk-check-findings" aria-label="Differences from your Agreed Price">
-          {view.findings.map(finding => <li key={`${finding.group}-${finding.term}`} data-severity={finding.severity}>
+        {shownFindings.length > 0 && <ol className="desk-check-findings" aria-label="Differences from your Agreed Price">
+          {shownFindings.map(finding => <li key={`${finding.group}-${finding.term}`} data-severity={finding.severity}>
             <p>{describe(view, finding)}</p>
             <p className="desk-check-meta">
               <span className={finding.verified ? "cash-badge" : "badge badge-warn"}>{finding.verified ? "Verified" : "As read, not verified"}</span>
@@ -175,7 +177,7 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
             </p>
           </li>)}
         </ol>}
-        {view.trade && <TradeCheckPanel result={view.trade} />}
+        {view.trade && <TradeCheckPanel result={view.trade} tactics={view.tacticFindings} />}
         {view.otherDifferences.length > 0 && <details>
           <summary>{view.otherDifferences.length} other {view.otherDifferences.length === 1 ? "change" : "changes"} on the paperwork</summary>
           <ul>{view.otherDifferences.map(finding => <li key={`${finding.group}-${finding.term}`}>

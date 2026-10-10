@@ -1,4 +1,7 @@
-# Desk tactic policy v1 — Phase 1 of ticket 104
+# Desk tactic policy — ticket 104
+
+The current rule set is `desk-tactics.v2`. The v1 rules and calculations below remain the basis for
+the three financing tactics; existing v1 reports keep their stored questions, effects and rendering.
 
 `desk-tactics.v1` is a deterministic documentary policy. It accepts the Dealer Offer's verified
 candidate terms or the latest extraction's corrected terms as read, plus the Buyer's saved outside
@@ -49,10 +52,41 @@ PDF and the report UI render the saved findings rather than recalculating.
 dealer-start result also appends `tacticFindings` and projects those into its existing lead selection.
 The frontend uses `DeskTactics.tsx`. No migration or endpoint was added.
 
-`DeskTacticPolicy.Rule` is the Phase 2 extension point: an adapter can close over the actual ticket
-103 trade-result record and return a finding. It must consume that result, not calculate equity or
-valuation here. The trade rules are pending coordinator authorization and ticket 103's interface.
+`DeskTacticPolicy.Rule` remains an extension point for additional documentary rules. The Phase 2
+trade rules consume ticket 103's actual `TradeDeskCheck.Result` directly, without calculating equity
+or valuation here.
 
 The labelled fixtures in `backend/src/test/resources/fixtures/desk/tactics.json` are synthetic
 development checks, covering each Phase 1 tactic and a clean worksheet. They do not measure accuracy
 on real paperwork.
+
+## Phase 2 — trade tactics in v2
+
+- `NEGATIVE_EQUITY_FOLDED_IN` names ticket 103's `NEGATIVE_EQUITY_FINANCED` finding when
+  `negativeEquityFinancedMinor` is positive. It does not require a worksheet label saying negative
+  equity. It copies `negativeEquityCost.paymentIncreaseMinor` and `scheduledPaymentsIncreaseMinor`
+  when the cost is available. Otherwise the known principal amount is shown, with the recorded reason
+  the payment and interest effect is unavailable. The evidence retains `equityBasis` and the complete
+  ticket 103 result, including the interest effect and policy version.
+- `ALLOWANCE_PAID_FOR_BY_PRICE` names ticket 103's `ALLOWANCE_OFFSET_BY_PRICE` finding only when
+  `priceTogether` shows both an allowance above its reference and a positive price increase. Its
+  total effect is the already computed `netEffectMinor`: positive means the Buyer is ahead, negative
+  means behind. There is no monthly effect for this purchase-price comparison. A fresh case without
+  an Agreed Price has a null price increase and receives no tactic; the informational trade line remains.
+
+Both tactics consume the existing `TradeDeskCheck.Result`, including its offer/valuation reference.
+They do not calculate equity, payoff, value or the net effect, and they make no provider call. Report
+trade tactics use the same offer terms as the saved `analysis.tradeCheck`, even if newer extraction
+terms are used by the financing tactics. The existing same-offer guard is retained.
+
+Each linked finding appends `tradeFindingCode`. In the Desk Check and report UI its label, draft
+question, review state and evidence appear on the corresponding trade line. It is filtered out of
+the standalone `DeskTactics` list; the repeated general Desk Check line is also omitted. The dealer-start
+result carries `tacticCode` on its existing TRADE entry and retains that entry's amount, with no
+second merged finding. Saved HTML/PDF attach the label and draft question to the trade line rather
+than adding a separate worksheet-tactic item. The complete-payload reference appendix still preserves
+all stored fields. v1 findings have no trade reference and render as before.
+
+The new questions also remain `PENDING_OPERATOR_REVIEW`. No Phase 1 question has been changed or
+marked approved. Labelled synthetic trade worksheets, frozen ticket 103 results and a clean trade
+worksheet are in `fixtures/desk/trade-tactics.json`.

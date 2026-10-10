@@ -148,7 +148,9 @@ public class CoreReportService {
     ObjectNode analysis = json.createObjectNode();
     JsonNode tacticTerms = worksheet != null && (offer == null || !worksheet.id().equals(offer.extractionId()) || !dealerCurrent)
         ? tactics.asRead(worksheet) : offer == null ? tactics.asRead(null) : offer.terms();
-    var tacticFindings = tactics.findings(caseId, tacticTerms, null);
+    var tacticFindings = new ArrayList<>(tactics.findings(caseId, tacticTerms, null));
+    if (trade != null && offer != null && offer.id().equals(tradeOffer.id()))
+      tacticFindings.addAll(tactics.tradeFindings(offer.terms(), trade));
     analysis.set("tacticFindings", json.valueToTree(tacticFindings));
     evidence.set("deskTacticInputs", tacticTerms);
     if (!tacticFindings.isEmpty() && worksheet != null) evidence.set("deskTacticWorksheet", json.valueToTree(worksheet));

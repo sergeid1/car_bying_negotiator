@@ -82,7 +82,11 @@ public class DeskStartService {
   /** amountMinor is null when the paperwork shows no out-the-door total; it is never treated as zero. */
   public record OutTheDoor(Long amountMinor, Long agreedMinor, Long differenceMinor) {}
   /** amountMinor is the finding's dollar effect when it can be calculated, otherwise null. */
-  public record Finding(String code, String summary, Long amountMinor, String deskQuestion, JsonNode evidence) {}
+  public record Finding(String code, String summary, Long amountMinor, String deskQuestion, JsonNode evidence, String tacticCode) {
+    public Finding(String code, String summary, Long amountMinor, String deskQuestion, JsonNode evidence) {
+      this(code, summary, amountMinor, deskQuestion, evidence, null);
+    }
+  }
 
   private record Document(String id, String stage) {}
 
@@ -158,15 +162,19 @@ public class DeskStartService {
         ? againstAgreed(agreed.terms(), terms, typedFields) : fromTermsAlone(terms));
     Long otd = amount(terms, "OUT_THE_DOOR_TOTAL");
     if (otd == null) findings.add(missingTotal(terms));
-    var tacticFindings = tactics.findings(caseId, terms, agreed == null ? null : agreed.terms(), request.ownAprPercent());
-    for (var tactic : tacticFindings) findings.add(new Finding(tactic.code(), tactic.summary(), tactic.totalEffectMinor(),
-        tactic.deskQuestion(), json.valueToTree(tactic.evidenceRegions())));
     var trade = tradeCheck.check(caseId, token, terms, agreed == null ? null : agreed.terms());
+    var tacticFindings = tactics.findings(caseId, terms, agreed == null ? null : agreed.terms(), request.ownAprPercent(), trade);
+    for (var tactic : tacticFindings) if (tactic.tradeFindingCode() == null)
+      findings.add(new Finding(tactic.code(), tactic.summary(), tactic.totalEffectMinor(),
+          tactic.deskQuestion(), json.valueToTree(tactic.evidenceRegions())));
     JsonNode allowanceEvidence = stream(terms.path("candidates"))
         .filter(term -> "TRADE_ALLOWANCE".equals(term.path("field").asText())).findFirst()
         .map(term -> nullable(term.path("evidence"))).orElse(null);
-    for (var item : trade.leading())
-      findings.add(new Finding(item.code(), item.summary(), item.amountMinor(), item.deskQuestion(), allowanceEvidence));
+    for (var item : trade.leading()) {
+      var tactic = tacticFindings.stream().filter(f -> item.code().equals(f.tradeFindingCode())).findFirst().orElse(null);
+      findings.add(new Finding(item.code(), (tactic == null ? "" : tactic.label() + ": ") + item.summary(), item.amountMinor(),
+          tactic == null ? item.deskQuestion() : tactic.deskQuestion(), allowanceEvidence, tactic == null ? null : tactic.code()));
+    }
     // A different trade-in VIN leads; then the largest calculable dollar effect; findings without an amount
     // keep their rule order after those.
     findings.sort(Comparator.comparing((Finding finding) -> !finding.code().equals("TRADE_VIN_DIFFERENT"))

@@ -76,7 +76,7 @@ class DeskTacticAcceptanceTest {
       post(client, freshBase + "/analyses", Map.of(), "packed-report", freshToken);
       var report = get(client, freshBase + "/reports/latest", freshToken);
       assertThat(report.at("/analysis/tacticFindings/0")).isEqualTo(tactic);
-      assertThat(report.at("/analysis/policyVersions/deskTactics").asText()).isEqualTo("desk-tactics.v1");
+      assertThat(report.at("/analysis/policyVersions/deskTactics").asText()).isEqualTo("desk-tactics.v2");
       assertThat(report.at("/evidence/deskTacticInputs/candidates")).isNotEmpty();
       var renderer = app.context().getBean(StoredReportRenderer.class);
       assertThat(new String(renderer.html(report), StandardCharsets.UTF_8)).contains("Possible payment packing", "Monthly effect: $40.00", "Full-term effect: $2400.00", "PENDING_OPERATOR_REVIEW", "Please show how");

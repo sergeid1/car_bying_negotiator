@@ -129,7 +129,7 @@ export function CoreDealReport({ report, caseId, token, redacted, children }: { 
     {report.status === "PARTIAL" && <p className="notice">Warning: this report is partial. One or more analysis areas are unavailable.</p>}
     <nav aria-label="Report sections">{analysis.dealReview && <><a href="#revised-offer-review">Revised offer comparison</a> · </>}<a href="#core-amounts">Amounts</a> · {showFinancing && <><a href="#core-financing">Financing</a> · </>} <a href="#core-evidence">Evidence and calculations</a> · <a href="#core-scope">Scope and policies</a></nav>
     {analysis.dealReview && <RevisedOfferReview review={analysis.dealReview} redacted={redacted} />}
-    {analysis.tradeCheck && <div className="panel"><TradeCheckPanel result={analysis.tradeCheck} /></div>}
+    {analysis.tradeCheck && <div className="panel"><TradeCheckPanel result={analysis.tradeCheck} tactics={analysis.tacticFindings} /></div>}
     <ul className="report-sections" aria-label="Report details">
       <ReportSection id="core-amounts" title="Amounts and sources">
         <p>Market analysis: {analysis.marketAvailability}. Cash economics: {analysis.cashAvailability}.</p>
@@ -143,7 +143,7 @@ export function CoreDealReport({ report, caseId, token, redacted, children }: { 
       {showFinancing && <ReportSection id="core-financing" title="Dealer financing">
         <DealerFinancingResult result={analysis.financing ?? null} availability={analysis.financingAvailability!} terms={analysis.financingTerms} headless />
       </ReportSection>}
-      {!!analysis.tacticFindings?.length && <ReportSection id="core-tactics" title="Worksheet tactics">
+      {analysis.tacticFindings?.some(finding => !finding.tradeFindingCode) && <ReportSection id="core-tactics" title="Worksheet tactics">
         <DeskTactics findings={analysis.tacticFindings} />
       </ReportSection>}
       <ReportSection id="core-market" title="Market evidence" headingId="market-evidence-heading">

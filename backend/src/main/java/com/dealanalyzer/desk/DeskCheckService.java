@@ -222,7 +222,7 @@ public class DeskCheckService {
     return new View(VERSION, lead.isEmpty() ? "NO_DIFFERENCES" : "DIFFERENCES", source, agreed, paperwork,
         List.copyOf(lead), List.copyOf(other), Math.max(0, count(agreedTerms) - differing), effect, null, reviewVersion,
         "NO_ALLOWANCE".equals(tradeCheck.status()) ? null : tradeCheck,
-        tactics.findings(caseId, deskTerms, agreedTerms));
+        tactics.findings(caseId, deskTerms, agreedTerms, null, tradeCheck));
   }
 
   /** The extraction in the verified-offer term shape, every value marked as not yet verified by the Buyer. */

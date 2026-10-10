@@ -31,7 +31,7 @@ import { QuoteComparison } from "./QuoteComparison";
 import { Passkeys } from "./Passkeys";
 import { Passwords, PasswordSignIn } from "./Passwords";
 import { DeskTactics } from "./DeskTactics";
-import { syntheticTactic } from "./DeskTactics.fixture";
+import { syntheticTactic, syntheticTradeTactics } from "./DeskTactics.fixture";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 test("worksheet tactics and pending questions have no automated AA violations", async () => {
@@ -753,6 +753,16 @@ test("the report's trade check has no automated AA violations", async () => {
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 // End ticket 103.
+
+test("trade tactic labels with expanded evidence have no automated AA violations", async () => {
+  const result: TradeCheckResult = { ...tradeCheckA11y("CHECKED"), findings: syntheticTradeTactics.map(tactic => ({
+    code: tactic.tradeFindingCode!, summary: tactic.summary, amountMinor: tactic.totalEffectMinor,
+    deskQuestion: "Original trade question", severity: "WARNING", estimate: false,
+  })) };
+  const { container } = render(<main><h1>Buying Case</h1><h2>Desk Check</h2><TradeCheckPanel result={result} tactics={syntheticTradeTactics} /></main>);
+  for (const summary of screen.getAllByText("Tactic evidence and policy")) await userEvent.click(summary);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
 
 // Ticket 100: the trade-in panel recorded, being recorded with field errors, and with written offers.
 import { TradeVehicle } from "./TradeVehicle";

@@ -48,9 +48,11 @@ class TradeDeskCheckAcceptanceTest {
           // The financed amount as agreed, so only the trade differs.
           if (candidate.field().equals("AMOUNT_FINANCED"))
             candidate = new Candidate("AMOUNT_FINANCED", "Amount financed $26,800", "2680000", "USD_MINOR", candidate.evidence(), .98, true);
+          if (paperwork.equals("ALLOWANCE_OFFSET") && candidate.field().equals("SELLING_PRICE"))
+            candidate = new Candidate("SELLING_PRICE", "Selling price $27,000", "2700000", "USD_MINOR", candidate.evidence(), .98, true);
           candidates.add(candidate);
         }
-        candidates.add(new Candidate("TRADE_ALLOWANCE", "Trade allowance $11,500", "1150000", "USD_MINOR", second, .98, true));
+        candidates.add(new Candidate("TRADE_ALLOWANCE", "Synthetic trade allowance", paperwork.equals("ALLOWANCE_OFFSET") ? "1600000" : "1150000", "USD_MINOR", second, .98, true));
         candidates.add(new Candidate("TRADE_PAYOFF", "Trade payoff $19,200", "1920000", "USD_MINOR", second, .98, true));
         String vin = paperwork.equals("OTHER_TRADE") ? OTHER_TRADE_VIN : TRADE_VIN;
         candidates.add(new Candidate("TRADE_VIN", "Trade VIN " + vin, vin, "VIN", second, .98, true));
@@ -104,6 +106,11 @@ class TradeDeskCheckAcceptanceTest {
       assertThat(groups.indexOf("TRADE")).isLessThan(groups.contains("TOTAL") ? groups.indexOf("TOTAL") : Integer.MAX_VALUE);
       assertThat(groups).doesNotContain("PRICE");
       assertThat(view.at("/totalEffect/outTheDoorDeltaMinor").asLong()).isZero();
+      var negativeTactic = find(view.path("tacticFindings"), "code", "NEGATIVE_EQUITY_FOLDED_IN");
+      assertThat(negativeTactic.path("tradeFindingCode").asText()).isEqualTo("NEGATIVE_EQUITY_FINANCED");
+      assertThat(negativeTactic.path("questionReview").asText()).isEqualTo("PENDING_OPERATOR_REVIEW");
+      assertThat(negativeTactic.path("totalEffectMinor").asLong()).isEqualTo("AVAILABLE".equals(trade.at("/negativeEquityCost/status").asText())
+          ? trade.at("/negativeEquityCost/scheduledPaymentsIncreaseMinor").asLong() : trade.path("negativeEquityFinancedMinor").asLong());
 
       // The first result from "I'm at the dealer" carries the same trade findings.
       var result = TradeVehicleAcceptanceTest.call(client, "POST", base + "/desk-start/result",
@@ -111,6 +118,21 @@ class TradeDeskCheckAcceptanceTest {
       assertThat(result.status()).isEqualTo(200);
       assertThat(result.body().path("findings").findValuesAsText("code")).contains("BELOW_WRITTEN_OFFER", "PAYOFF_DIFFERS");
       assertThat(result.body().at("/trade/shortfallToOfferMinor").asLong()).isEqualTo(250_000);
+      assertThat(result.body().path("findings").findValuesAsText("code")).doesNotContain("NEGATIVE_EQUITY_FOLDED_IN");
+      assertThat(result.body().path("findings").findValuesAsText("code").stream().filter("NEGATIVE_EQUITY_FINANCED"::equals).count()).isEqualTo(1);
+      assertThat(find(result.body().path("findings"), "code", "NEGATIVE_EQUITY_FINANCED").path("tacticCode").asText()).isEqualTo("NEGATIVE_EQUITY_FOLDED_IN");
+
+      paperwork = "ALLOWANCE_OFFSET";
+      String offsetDocument = upload(app, base, token, "desk-allowance-offset");
+      var offsetView = get(client, desk, token);
+      var allowanceTactic = find(offsetView.path("tacticFindings"), "code", "ALLOWANCE_PAID_FOR_BY_PRICE");
+      assertThat(allowanceTactic.path("tradeFindingCode").asText()).isEqualTo("ALLOWANCE_OFFSET_BY_PRICE");
+      assertThat(allowanceTactic.path("totalEffectMinor")).isEqualTo(offsetView.at("/trade/priceTogether/netEffectMinor"));
+      var offsetResult = TradeVehicleAcceptanceTest.call(client, "POST", base + "/desk-start/result",
+          Map.of("documentId", offsetDocument, "route", "AGREED_CAR"), token, null).body();
+      assertThat(offsetResult.path("findings").findValuesAsText("code")).doesNotContain("ALLOWANCE_PAID_FOR_BY_PRICE");
+      assertThat(offsetResult.path("findings").findValuesAsText("code").stream().filter("ALLOWANCE_OFFSET_BY_PRICE"::equals).count()).isEqualTo(1);
+      assertThat(find(offsetResult.path("findings"), "code", "ALLOWANCE_OFFSET_BY_PRICE").path("tacticCode").asText()).isEqualTo("ALLOWANCE_PAID_FOR_BY_PRICE");
 
       // A different trade-in VIN is one blocking finding; nothing about the trade is compared.
       paperwork = "OTHER_TRADE";
@@ -139,7 +161,21 @@ class TradeDeskCheckAcceptanceTest {
       assertThat(check.path("shortfallToOfferMinor").asLong()).isEqualTo(250_000);
       assertThat(check.path("payoffDifferenceMinor").asLong()).isEqualTo(120_000);
       assertThat(report.at("/analysis/topReasons/0").asText()).contains("$2,500 below", "Synthetic Car Exchange");
+      assertThat(find(report.at("/analysis/tacticFindings"), "code", "NEGATIVE_EQUITY_FOLDED_IN").path("tradeFindingCode").asText()).isEqualTo("NEGATIVE_EQUITY_FINANCED");
+      assertThat(report.at("/analysis/tacticFindings").findValuesAsText("code")).doesNotContain("ALLOWANCE_PAID_FOR_BY_PRICE");
       assertThat(get(client, freshBase + "/desk-check", freshToken).path("status").asText()).isEqualTo("NO_AGREED_PRICE");
+
+      // An above-value allowance on a fresh case has no agreed-price increase to name as a tactic.
+      paperwork = "ALLOWANCE_OFFSET";
+      String freshAboveDocument = upload(app, freshBase, freshToken, "fresh-above-value");
+      verify(client, freshBase, freshToken, freshAboveDocument, "fresh-above");
+      post(client, freshBase + "/cash-economics", Map.of(), "fresh-above-cash", freshToken);
+      post(client, freshBase + "/analyses", Map.of(), "fresh-above-analysis", freshToken);
+      var freshAboveReport = get(client, freshBase + "/reports/latest", freshToken);
+      assertThat(freshAboveReport.at("/analysis/tradeCheck/findings").findValuesAsText("code")).contains("ALLOWANCE_ABOVE_VALUE");
+      assertThat(freshAboveReport.at("/analysis/tradeCheck/priceTogether/priceIncreaseMinor").isNull()).isTrue();
+      assertThat(freshAboveReport.at("/analysis/tacticFindings").findValuesAsText("code")).doesNotContain("ALLOWANCE_PAID_FOR_BY_PRICE");
+      assertThat(get(client, freshBase + "/reports/1", freshToken)).isEqualTo(report);
     }
   }
 

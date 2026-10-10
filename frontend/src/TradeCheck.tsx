@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { TradeTacticAnnotation, type DeskTacticFinding } from "./DeskTactics";
 
 export type TradeCheckFinding = {
   code: string; severity: "BLOCKING" | "WARNING" | "INFORMATIONAL"; summary: string;
@@ -38,7 +39,9 @@ function yourPayoff(payoff: NonNullable<TradeCheckResult["buyerPayoff"]>) {
 }
 
 /** Trade findings first, then the figures they rest on. Range figures are labelled as estimates from their source. */
-export function TradeCheckPanel({ result, heading = "Trade-in check" }: { result: TradeCheckResult; heading?: string }) {
+export function TradeCheckPanel({ result, heading = "Trade-in check", tactics = [] }: {
+  result: TradeCheckResult; heading?: string; tactics?: DeskTacticFinding[];
+}) {
   const id = useId();
   if (result.status === "NO_ALLOWANCE") return null;
   const valuation = result.valuation;
@@ -47,13 +50,16 @@ export function TradeCheckPanel({ result, heading = "Trade-in check" }: { result
   return <section className="trade-check" aria-labelledby={`${id}-heading`}>
     <h3 id={`${id}-heading`}>{heading}</h3>
     <ol className="trade-check-findings" aria-label="Trade-in findings">
-      {result.findings.map(finding => <li key={finding.code} data-severity={finding.severity}>
+      {result.findings.map(finding => {
+        const tactic = tactics.find(item => item.tradeFindingCode === finding.code);
+        return <li key={finding.code} data-severity={finding.severity}>
         <p>{finding.summary}</p>
         {(finding.estimate || finding.deskQuestion) && <p className="desk-check-meta">
           {finding.estimate && <span className="badge">Estimate</span>}
-          {finding.deskQuestion && <span>Ask at the desk: <q>{finding.deskQuestion}</q></span>}
+          {finding.deskQuestion && !tactic && <span>Ask at the desk: <q>{finding.deskQuestion}</q></span>}
         </p>}
-      </li>)}
+        {tactic && <TradeTacticAnnotation finding={tactic} />}
+      </li>; })}
     </ol>
     <dl className="trade-check-figures">
       {result.allowanceMinor !== null && <div><dt>Trade-in allowance on the paperwork</dt><dd>{money(result.allowanceMinor)}</dd></div>}

@@ -3,6 +3,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { TradeCheckPanel, type TradeCheckResult } from "./TradeCheck";
 import { DeskCheck, type DeskCheckView } from "./DeskCheck";
 import { CoreDealReport, type CoreReport } from "./CoreDealReport";
+import { syntheticTradeTactics } from "./DeskTactics.fixture";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -105,4 +106,21 @@ test("a report with a trade check shows it", () => {
   render(<CoreDealReport report={report} />);
   expect(screen.getByRole("heading", { name: "Trade-in check" })).toBeInTheDocument();
   expect(screen.getByRole("list", { name: "Trade-in findings" })).toHaveTextContent("$1,200 more than your payoff");
+});
+
+test("trade tactics label the existing report lines and keep one question per line", () => {
+  const trade: TradeCheckResult = { ...tradeCheckFixture(), findings: syntheticTradeTactics.map(tactic => ({
+    code: tactic.tradeFindingCode!, summary: tactic.summary, amountMinor: tactic.totalEffectMinor,
+    deskQuestion: "Original trade question", severity: "WARNING", estimate: false,
+  })) };
+  const report: CoreReport = { version: 2, status: "PARTIAL", asOf: "2026-10-10", analysis: {
+    reviewLabel: "Review required", dealRating: "INSUFFICIENT_DATA", ratingBasis: "Selling price", nextAction: "Ask the dealer",
+    topReasons: [], marketAvailability: "UNAVAILABLE", cashAvailability: "AVAILABLE", materialAmounts: [],
+    policyVersions: {}, limitations: [], tradeCheck: trade, tacticFindings: syntheticTradeTactics,
+  }, evidence: {}, reproduction: {} };
+  render(<CoreDealReport report={report} />);
+  for (const tactic of syntheticTradeTactics) expect(screen.getAllByText(tactic.label)).toHaveLength(1);
+  expect(screen.queryByText("Original trade question")).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Worksheet tactics" })).not.toBeInTheDocument();
+  expect(screen.queryByText(/Monthly effect:/)).not.toBeInTheDocument();
 });
