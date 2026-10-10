@@ -51,3 +51,8 @@ Case credentials as for any case resource. Once an Agreed Price exists the check
 report purchase gate (402 `PURCHASE_REQUIRED`). It adds no processing stage: document-to-review
 latency is the Phase 1 intake and extraction pipeline's, and the comparison itself is a
 deterministic read, which `DeskCheckAcceptanceTest` holds under the 500 ms recalculation p95.
+
+## Starting from a photo
+
+The header's "I'm at the dealer" routes photographed paperwork here or to a fresh case by its VIN,
+after the Buyer confirms which car it is for. See [desk-start.md](desk-start.md).

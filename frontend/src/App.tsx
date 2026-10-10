@@ -14,6 +14,7 @@ import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
 import { DeskCheck, DeskFreshCase, type FreshDeskCase } from "./DeskCheck";
 import { TradeVehicle } from "./TradeVehicle";
+import { AtTheDealer, DealerCameraEntry } from "./AtTheDealer";
 import { ThemeMenu } from "./ThemeMenu";
 import { OfferTerms } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
@@ -127,6 +128,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   // A case started at the desk for another car, remembered so it is shown apart from the agreed one.
   const [deskFresh, setDeskFresh] = useState<FreshDeskCase>();
   const [deskRefresh, setDeskRefresh] = useState(0);
+  // Photos taken from the header's "I'm at the dealer"; while set, that flow leads the page.
+  const [atDealer, setAtDealer] = useState<{ files: File[]; started: number }>();
   const [accountSignedIn, setAccountSignedIn] = useState(false);
   const [accountControls, setAccountControls] = useState<AccountControls>();
   const [accountRecheck, setAccountRecheck] = useState(0);
@@ -198,6 +201,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             <a href="#case-workflow">Your case</a>
             <a href="#scope">Scope</a>
           </nav>
+          {!standalone && <DealerCameraEntry onPhotos={files => setAtDealer({ files, started: Date.now() })} />}
           <ThemeMenu />
           {!standalone && <AccountHeader controls={accountControls} />}
         </div>
@@ -228,6 +232,16 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
           <AccountSignedInContext.Provider value={accountSignedIn}>
           <div className="column">
             {guide && <ExplainerGuide slug={guide} />}
+            {!standalone && atDealer && <AtTheDealer key={atDealer.started} files={atDealer.files}
+              open={caseCredentials && !caseRevoked ? caseCredentials : undefined}
+              onCaseOpened={value => {
+                setReferral(undefined); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId);
+                setReport(undefined); setStage(undefined); setError(undefined);
+              }}
+              onFreshCase={value => {
+                setDeskFresh(value); setCaseRevoked(false); setCaseCredentials({ caseId: value.caseId, token: value.token }); setRecoveryCaseId(value.caseId);
+              }}
+              onDeskCheck={() => setAtDealer(undefined)} onClose={() => setAtDealer(undefined)} />}
             {!guide && partnerKit && <ReferralPartnerKit />}
             {!standalone && accountSignedIn && <BuyingJourneys
               onSessionEnded={() => { setAccountSignedIn(false); setAccountRecheck(value => value + 1); }}
@@ -235,9 +249,9 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
                 setReferral(disclosure ? { caseId: value.caseId, text: disclosure } : undefined);
                 setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId);
               }} />}
-            {!standalone && !report && !caseCredentials && <SampleReportEntry />}
-            {!standalone && !report && !caseCredentials && <OfferTerms />}
-            {!standalone && !report && !caseCredentials && (
+            {!standalone && !report && !caseCredentials && !atDealer && <SampleReportEntry />}
+            {!standalone && !report && !caseCredentials && !atDealer && <OfferTerms />}
+            {!standalone && !report && !caseCredentials && !atDealer && (
               <BuyingCaseIntake
                 onSavedToAccount={() => setAccountRecheck(value => value + 1)}
                 onCaseOpened={(value, disclosure) => {
@@ -249,7 +263,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               />
             )}
 
-            {!standalone && !report && !caseCredentials && <GuideLinks />}
+            {!standalone && !report && !caseCredentials && !atDealer && <GuideLinks />}
 
             {!standalone && !report && import.meta.env.DEV && (
               <section className="panel" aria-labelledby="case-heading">
@@ -298,7 +312,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             {caseCredentials && !caseRevoked && referral?.caseId === caseCredentials.caseId && <ReferralDisclosure text={referral.text} />}
             {caseCredentials && !caseRevoked && deskFresh?.caseId === caseCredentials.caseId && <DeskFreshCase value={deskFresh}
               onBack={() => { setCaseRevoked(false); setCaseCredentials(deskFresh.agreed); setRecoveryCaseId(deskFresh.agreed.caseId); setDeskFresh(undefined); }} />}
-            {caseCredentials && !caseRevoked && <DeskCheck key={`desk-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
+            {/* The Buyer confirms which car the paperwork is for in the flow before the Desk Check compares it. */}
+            {caseCredentials && !caseRevoked && !atDealer && <DeskCheck key={`desk-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
               refreshKey={deskRefresh} onFreshCase={value => {
                 setDeskFresh(value); setCaseRevoked(false); setCaseCredentials({ caseId: value.caseId, token: value.token }); setRecoveryCaseId(value.caseId);
               }} />}

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, expect, test, vi } from "vitest";
@@ -742,3 +742,66 @@ test.each(["RECORDED", "EDITING", "EMPTY"])("the trade-in panel (%s) has no auto
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 // End ticket 100.
+
+// Ticket 105: "I'm at the dealer" from the header — starting a case, routing, typing the numbers, questions and the first result.
+import { AtTheDealer, DealerCameraEntry } from "./AtTheDealer";
+function dealerFetch(route: string, status = "READ") {
+  const vin = route === "FRESH_CASE" ? "1M8GDM9AXKP042788" : "1HGCM82633A004352";
+  const routing = { status, documentId: "d1", documentType: null, vin: status === "UNREADABLE" ? null : vin, route,
+    agreedVin: route === "THIS_CASE" ? null : "1HGCM82633A004352", caseVin: null,
+    freshCase: route === "FRESH_CASE" ? { vin, dealerPostalCode: "27604", purchaseMethod: "CASH" } : null,
+    questions: { trade: { ask: "DETAILS", paperworkShowsTrade: true, recorded: null },
+      financing: { ask: true, paperworkShowsLoan: true, ownAprPercent: null, ownTermMonths: null } } };
+  const lead = { code: "ADDED_CHARGE", summary: "Added: Service contract, $1,495. It is not in your Agreed Price.", amountMinor: 149500,
+    deskQuestion: "The Service contract for $1,495 was not in the price we agreed. Will you take it off?" };
+  const result = { route: "AGREED_CAR", source: "READ_FROM_PAPERWORK", outTheDoor: { amountMinor: 2829500, agreedMinor: 2680000, differenceMinor: 149500 },
+    lead, findings: [lead, { code: "TOTAL_NOT_SHOWN", summary: "Second finding.", amountMinor: null, deskQuestion: "Second question?" }] };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input), method = init?.method ?? "GET";
+    if (url.endsWith("/document-limits")) return new Response(JSON.stringify({ acceptedMediaTypes: ["image/jpeg"], maxFileBytes: 20971520,
+      maxPages: 25, maxPixels: 40000000, minWidth: 2, minHeight: 2 }));
+    if (url.endsWith("/documents") && method === "POST") return new Response(JSON.stringify({ document: { id: "d1", pages: [] },
+      operation: { id: "op1", stage: "QUEUED" } }), { status: 202 });
+    if (url.includes("/operations/")) return new Response(JSON.stringify({ id: "op1", documentId: "d1", stage: "EXTRACTION_COMPLETE", retryCount: 0, updatedAt: "now" }));
+    if (url.includes("/desk-start/result")) return new Response(JSON.stringify(result));
+    if (url.includes("/desk-start")) return new Response(JSON.stringify(routing));
+    return new Response(null, { status: 404 });
+  });
+}
+const dealerPhoto = () => new File(["desk"], "desk.jpg", { type: "image/jpeg" });
+test("the header's I'm at the dealer control has no automated AA violations", async () => {
+  const { container } = render(<header><DealerCameraEntry onPhotos={() => undefined} /></header>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+test.each(["START", "AGREED_CAR", "FRESH_CASE", "TYPED", "QUESTIONS", "RESULT"])("I'm at the dealer (%s) has no automated AA violations", async state => {
+  dealerFetch(state === "FRESH_CASE" ? "FRESH_CASE" : "AGREED_CAR", state === "TYPED" ? "UNREADABLE" : "READ");
+  const { container } = render(<main><h1>Buying Case</h1><AtTheDealer files={[dealerPhoto()]} pollDelayMs={1}
+    open={state === "START" ? undefined : { caseId: "case", token: "token" }}
+    onCaseOpened={() => undefined} onFreshCase={() => undefined} onDeskCheck={() => undefined} onClose={() => undefined} /></main>);
+  if (state === "START") await screen.findByRole("button", { name: "Read my paperwork" });
+  if (state === "AGREED_CAR" || state === "QUESTIONS" || state === "RESULT")
+    await userEvent.click(await screen.findByRole("button", { name: "Check it against my Agreed Price" }));
+  if (state === "QUESTIONS" || state === "RESULT") {
+    await userEvent.click(within(await screen.findByRole("group", { name: "Do you still owe money on it?" })).getByLabelText("Yes"));
+    await userEvent.click(within(screen.getByRole("group", { name: /own loan offer/ })).getByLabelText("Yes"));
+  }
+  if (state === "FRESH_CASE") await userEvent.click(await screen.findByRole("button", { name: "Start a separate case for this car" }));
+  if (state === "TYPED") {
+    await userEvent.type(await screen.findByLabelText("Selling price"), "lots");
+    await userEvent.click(screen.getByRole("button", { name: "Check these numbers" }));
+    await screen.findByText(/Enter a dollar amount/);
+  }
+  if (state === "RESULT") {
+    await userEvent.click(within(screen.getByRole("group", { name: "Do you still owe money on it?" })).getByLabelText("No"));
+    await userEvent.click(within(screen.getByRole("group", { name: /own loan offer/ })).getByLabelText("No"));
+    await userEvent.type(screen.getByLabelText("Trade-in VIN"), "5J6RW2H52ML000002");
+    await userEvent.type(screen.getByLabelText("Mileage"), "61000");
+    await userEvent.selectOptions(screen.getByLabelText("Condition"), "GOOD");
+    vi.mocked(fetch).mockImplementationOnce(async () => new Response(JSON.stringify({ holder: "CASE", trade: null, analysis: {}, conditions: [] })));
+    await userEvent.click(screen.getByRole("button", { name: "Show my result" }));
+    await screen.findByRole("heading", { name: "Out the door: $28,295" });
+    await userEvent.click(screen.getByText("1 more to ask about"));
+  }
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+// End ticket 105.

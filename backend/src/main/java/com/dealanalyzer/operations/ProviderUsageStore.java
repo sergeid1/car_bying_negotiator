@@ -2,6 +2,7 @@ package com.dealanalyzer.operations;
 
 import com.dealanalyzer.ai.ModelProvenance;
 import com.dealanalyzer.shopping.inventory.InventorySearchAdapter;
+import com.dealanalyzer.trade.valuation.TradeValuationAdapter;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -97,6 +98,36 @@ public class ProviderUsageStore {
       throw new com.dealanalyzer.buyingcase.ResourceNotFoundException("Buying Case not found");
     }
   }
+  /** Valuation is requested for a case, including a case using its journey's Trade Vehicle. */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public String startTradeValuation(String caseId, TradeValuationAdapter.Provider provider) {
+    requireActiveCase(caseId);
+    var row = new ProviderUsageEntity();
+    row.id = UUID.randomUUID().toString(); row.caseId = caseId;
+    row.operation = ProviderMeter.Operation.TRADE_VALUATION.name(); row.provider = provider.name();
+    row.providerVersion = provider.version(); row.modelVersion = "none"; row.schemaVersion = "trade-valuation.v1";
+    row.license = provider.licenceMetadata(); row.unit = "REQUEST"; row.units = 1;
+    row.status = "STARTED"; row.createdAt = Instant.now(); row.resultCount = 0;
+    row.inventoryAvailability = "PENDING";
+    manager.persist(row); return row.id;
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void tradeValuationResult(String id, TradeValuationAdapter.Result result) {
+    // Existing result columns are shared by evidence operations. No VIN, ZIP or payoff is stored.
+    manager.createQuery("update ProviderUsageEntity u set u.resultCount = :count, u.retrievedAt = :time, "
+        + "u.costUsd = :cost, u.inventoryAvailability = :availability where u.id = :id")
+        .setParameter("count", result.range() == null ? 0 : 1).setParameter("time", result.retrievedAt())
+        .setParameter("cost", result.costUsd()).setParameter("availability", result.availability().name())
+        .setParameter("id", id).executeUpdate();
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void tradeValuationLatency(String id, long millis) {
+    manager.createQuery("update ProviderUsageEntity u set u.latencyMillis = :millis where u.id = :id")
+        .setParameter("millis", millis).setParameter("id", id).executeUpdate();
+  }
+
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public String start(String caseId, ProviderMeter.Operation operation, Object provider, long units) {
     requireActiveCase(caseId);

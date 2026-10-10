@@ -179,6 +179,39 @@ attributes. Each Reference Vehicle records its source (`NHTSA vPIC`) and decoder
 version they belong to, exported with the account, and deleted with the journey or the account.
 NHTSA receives VINs only; what it logs is outside this service's control.
 
+# Trade valuation adapter (ticket 101)
+
+`TradeValuationAdapter.value(TradeVehicle, zip)` returns an ordered low/typical/high USD range in
+minor units or stated unavailability with a fixed reason. Its domain records carry code-owned source,
+provider version, licence metadata, retrieval and observation times, condition assumption and reported
+cost. `TradeVehicle.from(TradeService.Trade)` projects only VIN, mileage, condition and optional trim;
+payoff, lender, offers and Buyer identifiers do not cross the adapter boundary. ZIP is a structured
+five-digit postal code. There is no scraping, URL-fetch operation or platform fallback estimate.
+
+No licensed trade valuation source is integrated; ticket 102 owns that work.
+`DeterministicFakeTradeValuationAdapter` performs no I/O and labels its ranges as synthetic development
+fixtures. A clock supplies repeatable normal, wide-range, unknown-trim, high-mileage, stale, unavailable,
+timed-out and rate-limited scenarios. Missing VIN, mileage or condition produces `MISSING_FIELDS`;
+missing trim remains unknown and widens the synthetic fixture range. Observation or retrieval evidence
+older than 45 days is unavailable with no range. This development freshness policy must be checked
+against a licensed provider's terms and coverage in ticket 102. Every replacement adapter must extend
+`TradeValuationAdapterConformance` with recorded fixture scenarios. Provider payload types stay internal.
+
+`TradeValuationProductionGuard` uses the existing `DevelopmentEvidenceAdapter` marker and shared
+`DeploymentStage` decision to refuse development or synthetic adapters under `pilot`, `prod`,
+`production` or equivalent evidence deployment configuration, naming the adapter at startup.
+
+Ticket 103 can call `TradeValuationService.value(caseId, vehicle, zip)` after authorizing the case and
+reading its recorded Trade Vehicle. Each attempt uses `ProviderMeter`'s existing timeout, concurrency
+bound and safe failure classification. Case-scoped `TRADE_VALUATION` rows store provider, version,
+licence, availability, result count (one range or zero), retrieval time, elapsed latency and cost.
+The existing `inventory_availability` database column also holds valuation availability; no migration
+or new scope is needed. The synthetic fixture reports zero cost; unknown cost remains null, and a
+reported cost is retained even when the boundary rejects stale evidence. VIN, ZIP and payoff are not
+stored in usage. Existing case retention and deletion govern these operational rows, and late results only
+update existing rows. This ticket adds no endpoint, UI or saved valuation evidence; ticket 103 owns
+consumer integration and immutable report evidence.
+
 # Shopping inventory adapter (ticket 53)
 
 `InventorySearchAdapter` accepts structured Shopping Brief criteria and a radius, returning normalized

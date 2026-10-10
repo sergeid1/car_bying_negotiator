@@ -70,21 +70,36 @@ public class DeskCheckService {
   private record CaseRow(String dealerLocation, String purchaseMethod) {}
   private record Document(String id, Instant createdAt) {}
 
+  /** The Agreed Price's Approved Baseline terms and the agreed car's VIN, read under the report purchase gate. */
+  record AgreedBaseline(Agreed agreed, String baselineId, JsonNode terms) {}
+
+  /** Empty when the case has no Agreed Price; otherwise its baseline, once the purchase gate allows it. */
   @Transactional(readOnly = true)
-  public View view(String caseId, String token) {
-    cases.reopen(caseId, token);
+  Optional<AgreedBaseline> agreedBaseline(String caseId, String token) {
     var agreedRow = jdbc.query("select offer_version, baseline_version, baseline_id, accepted_at from agreed_prices where case_id = ?",
         (r, n) -> new AgreedRow(r.getInt(1), r.getInt(2), r.getString(3), r.getTimestamp(4).toInstant()), caseId)
         .stream().findFirst().orElse(null);
-    if (agreedRow == null) return empty("NO_AGREED_PRICE", null);
+    if (agreedRow == null) return Optional.empty();
     // The check reads the Approved Baseline and saved Deal Reviews, so it shares their purchase gate.
     purchases.requireReport(caseId, token);
     var baseline = plans.get(caseId, token, "BASELINE", agreedRow.baselineVersion());
     JsonNode agreedTerms = baseline.payload().at("/dealerOffer/terms");
     String agreedVin = text(baseline.payload().at("/vehicleEvidence/vehicle/vin"));
     if (agreedVin == null) agreedVin = candidate(agreedTerms, "VEHICLE_VIN");
-    var agreed = new Agreed(agreedRow.offerVersion(), agreedRow.baselineVersion(), agreedVin,
-        amount(agreedTerms, "SELLING_PRICE"), amount(agreedTerms, "OUT_THE_DOOR_TOTAL"), agreedRow.acceptedAt());
+    return Optional.of(new AgreedBaseline(new Agreed(agreedRow.offerVersion(), agreedRow.baselineVersion(), agreedVin,
+        amount(agreedTerms, "SELLING_PRICE"), amount(agreedTerms, "OUT_THE_DOOR_TOTAL"), agreedRow.acceptedAt()),
+        agreedRow.baselineId(), agreedTerms));
+  }
+
+  @Transactional(readOnly = true)
+  public View view(String caseId, String token) {
+    cases.reopen(caseId, token);
+    var baseline = agreedBaseline(caseId, token).orElse(null);
+    if (baseline == null) return empty("NO_AGREED_PRICE", null);
+    var agreed = baseline.agreed();
+    var agreedRow = new AgreedRow(agreed.offerVersion(), agreed.baselineVersion(), baseline.baselineId(), agreed.acceptedAt());
+    JsonNode agreedTerms = baseline.terms();
+    String agreedVin = agreed.vin();
     // Desk paperwork is whatever the Buyer adds after accepting; the accepted quote itself never counts.
     var document = jdbc.query("""
         select id, created_at from source_documents where case_id = ? and purpose = 'DEALER_PAPERWORK' and created_at > ?
@@ -194,7 +209,7 @@ public class DeskCheckService {
   }
 
   /** The extraction in the verified-offer term shape, every value marked as not yet verified by the Buyer. */
-  private JsonNode asRead(ExtractionView extraction) {
+  JsonNode asRead(ExtractionView extraction) {
     ObjectNode terms = json.createObjectNode();
     ArrayNode candidates = terms.putArray("candidates");
     for (var candidate : extraction.candidates()) {

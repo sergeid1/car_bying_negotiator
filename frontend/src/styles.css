@@ -1801,3 +1801,52 @@ fieldset.trade-choices input[type="radio"] { flex: none; width: 20px; height: 20
 .trade-offer-amount { font-weight: 600; }
 .trade-offer-page { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
 /* End ticket 100. */
+
+/* Ticket 105: "I'm at the dealer" in the header, and the flow from a photo to a first result. */
+.header-camera {
+  position: relative; display: inline-flex; flex-direction: row; align-items: center; gap: 8px; min-height: 44px;
+  padding: 8px 14px; border-radius: var(--radius-pill); background: var(--brand); color: var(--on-brand);
+  font-size: 0.88rem; font-weight: 600; white-space: nowrap; cursor: pointer;
+}
+.header-camera:hover { background: var(--brand-hover); }
+.header-camera:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+.header-camera-icon { position: relative; flex: none; width: 18px; height: 13px; border: 2px solid currentColor; border-radius: 4px; }
+.header-camera-icon::after {
+  content: ""; position: absolute; top: 50%; left: 50%; width: 5px; height: 5px; border: 2px solid currentColor;
+  border-radius: 50%; transform: translate(-50%, -50%);
+}
+@media (max-width: 640px) { .header-camera { margin-left: auto; } }
+.at-the-dealer, .at-the-dealer .panel, .dealer-result { min-width: 0; overflow-wrap: anywhere; }
+.at-the-dealer h2:focus, .dealer-result h2:focus { outline: none; }
+.at-the-dealer h2:focus-visible, .dealer-result h2:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.at-the-dealer button { max-width: 100%; white-space: normal; min-height: 44px; }
+.at-the-dealer input, .at-the-dealer select { min-width: 0; max-width: 100%; }
+.at-the-dealer .vin { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.at-the-dealer input[name="vin"], .at-the-dealer input[name="tradeVin"] { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
+.at-the-dealer .btn-link {
+  min-height: 44px; padding: 0 2px; background: transparent; border: 0; border-radius: var(--radius-sm);
+  color: var(--focus); font-weight: 600; text-decoration: underline; text-underline-offset: 3px;
+}
+.at-the-dealer .btn-link:hover { background: transparent; color: var(--ink-strong); }
+.dealer-route { display: grid; gap: 10px; justify-items: start; }
+.dealer-route h3, .dealer-route p, .dealer-typed h3, .dealer-questions h3 { margin: 0; }
+.dealer-typed, .dealer-questions { display: grid; gap: 12px; }
+.dealer-typed-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr)); gap: 10px 14px; }
+.dealer-typed-grid > .error { grid-column: 1 / -1; margin: 0; }
+.dealer-result { display: grid; gap: 10px; }
+.dealer-result > * { margin: 0; }
+.dealer-result h2 { font-size: clamp(1.5rem, 6vw, 2rem); }
+.dealer-result-delta { font-weight: 600; }
+.dealer-lead { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line); border-left: 4px solid var(--accent);
+  border-radius: var(--radius); background: var(--card-sunk); }
+.dealer-lead p { margin: 0; }
+.dealer-lead-summary { font-size: 1.05rem; font-weight: 600; color: var(--ink-strong); }
+.dealer-question { display: grid; gap: 4px; }
+.dealer-question-label { color: var(--accent-ink); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.dealer-question q { font-size: 1.02rem; color: var(--ink-strong); }
+.dealer-result details summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.dealer-more { margin: 0; padding-left: 1.2rem; display: grid; gap: 10px; }
+.dealer-more p { margin: 0; }
+.dealer-result .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dealer-result button { max-width: 100%; white-space: normal; min-height: 44px; }
+/* End ticket 105. */

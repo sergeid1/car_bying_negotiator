@@ -11,15 +11,23 @@ DESK-03.
 owed on it. Reading real photos needs 36 — the Claude extraction provider enabled; until then this flow
 works only with text-bearing paperwork and Buyer-typed terms.
 
-**Status:** open — agent-ready (100 complete). Field use waits on ticket 36.
+**Status:** complete for text-bearing paperwork and typed four-square numbers — no migration, as of
+2026-10-09. "I'm at the dealer" in the header opens the camera in one tap (`AtTheDealer.tsx`). `GET
+/api/v1/cases/{caseId}/desk-start` routes paperwork by its VIN to the agreed car, the open case or a fresh case
+and asks only the trade and financing questions the paperwork cannot answer, reusing the journey's Trade Vehicle;
+the Buyer confirms the route before `POST .../desk-start/result` compares anything (`com.dealanalyzer.desk`,
+`docs/desk-start.md`). Unreadable photos fall back to a typed four-square form; typed numbers are compared, not
+stored. Open: reading photos of paper waits on ticket 36; the phone-over-cellular latency has not been measured
+(timing marks and procedure in `docs/desk-start.md`); the entry point is in the header, not inside the journey
+panel; a fresh case asks for the Buyer's ZIP again.
 
-- [ ] The entry point is in the header or journey on a phone and reaches the camera in one tap.
-- [ ] A VIN read from the paperwork routes to the agreed car's Desk Check or to a fresh case, and the
+- [x] The entry point is in the header or journey on a phone and reaches the camera in one tap.
+- [x] A VIN read from the paperwork routes to the agreed car's Desk Check or to a fresh case, and the
       Buyer confirms the routing before anything is compared.
-- [ ] Questions appear only when needed and reuse the journey's Trade Vehicle and payoff when they exist.
-- [ ] When a photo cannot be read, the Buyer can type the four-square's numbers in a short form instead of
+- [x] Questions appear only when needed and reuse the journey's Trade Vehicle and payoff when they exist.
+- [x] When a photo cannot be read, the Buyer can type the four-square's numbers in a short form instead of
       being stopped.
-- [ ] The first result leads with the out-the-door total (or its absence), the largest finding and the
+- [x] The first result leads with the out-the-door total (or its absence), the largest finding and the
       desk question for it, readable without scrolling at 360 px.
 - [ ] Upload-to-first-result latency is measured on a phone over a cellular network and recorded.
-- [ ] The flow is registered in `Accessibility.test.tsx` and the 360 px browser gate in both themes.
+- [x] The flow is registered in `Accessibility.test.tsx` and the 360 px browser gate in both themes.

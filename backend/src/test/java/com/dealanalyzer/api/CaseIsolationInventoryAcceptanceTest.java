@@ -104,6 +104,8 @@ class CaseIsolationInventoryAcceptanceTest {
       caseRow("POST", C + "/appointment/appointments/{appointmentId}/cancellation", "{}"),
       caseRow("POST", C + "/appointment/messages/{id}/approval", "{\"approved\":true,\"text\":\"x\"}", "id=bookingMessageId"),
       caseRow("GET", C + "/desk-check", null),
+      caseRow("GET", C + "/desk-start", null),
+      caseRow("POST", C + "/desk-start/result", "{\"route\":\"THIS_CASE\",\"typed\":{\"sellingPriceMinor\":1}}"),
       caseRow("GET", C + "/quote-acceptance", null),
       caseRow("GET", C + "/quote-acceptance/summary", null),
       caseRow("POST", C + "/quote-acceptance", "{\"quoteRequestId\":\"{quoteId}\",\"offerVersion\":1}"),
