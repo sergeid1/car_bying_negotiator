@@ -281,7 +281,7 @@ async function problem(response: Response) {
 }
 
 export function DealerDocumentUpload({
-  caseId, token, pollDelayMs = 700, heading, onChosen, onExtracted, initialFiles,
+  caseId, token, pollDelayMs = 700, heading, onChosen, onExtracted, onFailed, initialFiles,
 }: {
   caseId: string; token: string; pollDelayMs?: number;
   /** Lets another panel, such as the Desk Check, present this intake under its own heading. */
@@ -289,6 +289,8 @@ export function DealerDocumentUpload({
   /** The chosen files stay in memory only, so a fresh case can be given the same paperwork. */
   onChosen?: (files: File[]) => void;
   onExtracted?: (documentId: string) => void;
+  /** A file was refused or its processing failed, so its terms will not be read. */
+  onFailed?: () => void;
   /** Paperwork already chosen elsewhere, sent once through the same pre-checks. */
   initialFiles?: File[];
 }) {
@@ -344,6 +346,7 @@ export function DealerDocumentUpload({
       const refusal = await precheck(file, limits);
       if (refusal) {
         update(key, { state: "REFUSED", problem: refusal });
+        onFailed?.();
       } else {
         await send(file, key);
       }
@@ -372,6 +375,7 @@ export function DealerDocumentUpload({
           state: "REFUSED",
           problem: refusalMessage(file.name, response.status, code, detail, limits),
         });
+        onFailed?.();
         return;
       }
       const started = await response.json();
@@ -387,6 +391,7 @@ export function DealerDocumentUpload({
         state: "REFUSED",
         problem: refusalMessage(file.name, 0, undefined, undefined, limits),
       });
+      onFailed?.();
     }
   }
 
@@ -418,6 +423,7 @@ export function DealerDocumentUpload({
       }
       update(item.key, change);
       if (operation.stage === "EXTRACTION_COMPLETE" && item.documentId) onExtracted?.(item.documentId);
+      if (operation.stage === "FAILED") onFailed?.();
     } catch {
       // A dropped request on a dealership connection is retried by the next poll.
     }
