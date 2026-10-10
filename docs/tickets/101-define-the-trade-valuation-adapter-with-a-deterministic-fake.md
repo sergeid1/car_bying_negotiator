@@ -7,7 +7,7 @@ condition it assumes. A licensed provider is ticket 102. Spec TRADE-03, 11.2.
 
 **Blocked by:** 100 — Record the trade-in and what is owed on it.
 
-**Status:** open — agent-ready after 100. Reserve migration V52 only if metering needs a new scope (V50 and V51 went to tickets 100 and 97).
+**Status:** open — agent-ready (100 complete). Reserve migration V52 only if metering needs a new scope (V50 and V51 went to tickets 100 and 97).
 
 - [ ] `TradeValuationAdapter.value(tradeVehicle, zip)` returns a low/typical/high trade-in range in minor
       units, or a stated unavailability with a reason. Provider response objects do not leak past it.
