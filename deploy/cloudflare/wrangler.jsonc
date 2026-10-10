@@ -1,0 +1,15 @@
+{
+  "name": "otdog-pilot",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-08",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "otdog.com", "custom_domain": true }],
+  "assets": {
+    "directory": "../../frontend/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "observability": { "enabled": false }
+}

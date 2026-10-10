@@ -139,8 +139,29 @@ display, caching, attribution, derived values, retention, deletion, training use
 processing, coverage, and cost. Until a provider is selected and its terms are executed, the
 `provider-terms` prerequisite stays blocked and this table stays hypothetical.
 
-Selecting hosting, object storage, queue, mail, and model providers also completes the
-`infrastructure-and-privacy-inventory` prerequisite by making subprocessors and regions statable.
+Selecting providers makes subprocessors statable; actual regions, terms and deployed verification
+are still needed to approve `infrastructure-and-privacy-inventory`.
+
+## Selected hosting stack (ticket 99; not provisioned)
+
+| Processor/service | Proposed region | Buyer data and control |
+| --- | --- | --- |
+| Cloudflare Workers static assets, DNS and edge TLS | Global edge; no residency guarantee established | Client requests, IPs, cookies and API uploads in transit; terminates TLS and can see plaintext uploads. API no-store/cache bypass, no Worker request logging; actual plan/upload limit and processor terms pending |
+| AWS EC2 | us-east-1 proposed; operator confirmation pending | Case processing, plaintext during scanning/parsing, app memory; encrypted EBS and loopback-only backend/scanner, origin allowlist and secret verification |
+| AWS RDS PostgreSQL | Same selected AWS region; proposed us-east-1 | Case/account graph, keyed identifiers, encrypted storage and seven-day automated backups; private SG, TLS, restore/deletion reconciliation required |
+| AWS S3 | Same selected AWS region; proposed us-east-1 | Application-encrypted originals/pages plus SSE-S3; private unversioned bucket, no Object Lock/replication; independent backups and purge latency unverified |
+| AWS SES and SNS | Same selected AWS region; proposed us-east-1 | Recipient and plain-text transactional message; signed bounce/complaint feedback, retained keyed-hash suppression; live verification pending ticket 93 |
+| AWS SSM Parameter Store/KMS and Secrets Manager | Same selected AWS region; proposed us-east-1 | Runtime credentials, document key ring, pepper, origin secret and TLS key; exact parameter/key grants. RDS master secret service-managed, separate from runtime SQL user |
+| AWS ECR and GitHub Actions | ECR in selected AWS region; GitHub runner location not established | Code/container artifacts and deployment credentials, no Buyer documents; workflows manual only, environment-reviewed OIDC/deploy token |
+
+Terraform and operating steps are in [pilot deployment](pilot-deployment.md). No account,
+region deployment, processing contract or backup physical-expiry result is claimed. The earlier
+operator-supplied database row is superseded by the selected RDS design for the future pilot;
+local development remains unchanged. Cloudflare's global edge is a separate processing boundary
+from AWS regional storage. Before approval record actual regions, terms, IAM isolation,
+upload limit, backup expiry and every deployed check; infrastructure selection alone leaves
+`infrastructure-and-privacy-inventory` BLOCKED.
+
 # Development checkout (ticket 44)
 
 DevelopmentNoChargeCheckout is local, collects no payment or payment credentials, has no

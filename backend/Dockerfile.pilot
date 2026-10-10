@@ -1,0 +1,11 @@
+FROM eclipse-temurin:21-jre
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends docker.io \
+    && rm -rf /var/lib/apt/lists/* && rm -f /usr/bin/pebble \
+    && groupadd --gid 10001 analyzer \
+    && useradd --uid 10001 --gid analyzer --no-create-home analyzer \
+    && mkdir -p /app && chown analyzer:analyzer /app
+WORKDIR /app
+COPY --chown=analyzer:analyzer target/ai-deal-analyzer-0.1.0-SNAPSHOT.jar /app/application.jar
+USER 10001:10001
+ENTRYPOINT ["java", "-Xmx384m", "-XX:ActiveProcessorCount=2", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/application.jar"]

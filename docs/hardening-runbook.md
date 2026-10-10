@@ -37,6 +37,16 @@ the measured workload, queue backlog and failed operations are understood. Never
 failed/stuck operations to make a percentile pass. Deletion completion p95 must remain within
 24 hours, accompanied by the overdue/pending counts.
 
+## Cloudflare and AWS deployment (ticket 99)
+
+The repeatable, unprovisioned stack and operator steps are in
+[pilot deployment](pilot-deployment.md): Terraform, manual-only client/image workflows,
+Cloudflare edge headers/SPA/API proxy, origin-secret verification, dedicated rootless parser
+daemon, ClamAV, SSM runtime secrets, migration, rollback, backup restore and rotation.
+Nothing has been deployed. Actual upload-limit, HTTPS/HSTS/headers, synthetic preview,
+startup guards, erasure/restore and SES outcomes remain PENDING there. Ticket 93 and all
+pilot readiness/provider approvals must be completed before enrollment.
+
 ## Buyer client response headers
 
 Serve `frontend/dist` over HTTPS and apply the single header definition in

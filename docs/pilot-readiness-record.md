@@ -22,7 +22,7 @@ CI runs `clean verify` so results cannot be inherited from an earlier build.
 | 3 | `document-corpus` | **BLOCKED** | No permissioned Dealer documents acquired |
 | 4 | `expert-policy-validation` | **BLOCKED** | No automotive-expert review of boundary policy |
 | 5 | `frozen-parameters` | APPROVED | Parameter and media checks plus synthetic/core report contract acceptance tests |
-| 6 | `infrastructure-and-privacy-inventory` | **BLOCKED** | No hosting or provider stack selected |
+| 6 | `infrastructure-and-privacy-inventory` | **BLOCKED** | Cloudflare/AWS selected; accounts, actual regions, terms and deployed verification pending |
 | 7 | `legal-and-product-copy` | APPROVED | `PilotCopyClaimsTest` |
 | 8 | `preregistered-thresholds` | **BLOCKED** | No approved thresholds frozen |
 | 9 | `schema-and-orm-evidence` | APPROVED | `SchemaAndOrmEvidenceTest` |
@@ -79,7 +79,13 @@ and the evidence-backed approval owned by ticket 22.
 Recovery, purposes, retention, and deletion behavior are documented and implemented. Amazon SES
 was selected for transactional mail on 2026-10-08, with SNS for bounce and complaint feedback
 (ticket 97). Its actual region and deployed controls remain pending ticket 93. Other infrastructure
-selections and processing regions are incomplete, so this prerequisite remains blocked.
+selections are now Cloudflare Workers plus AWS EC2/RDS/S3/SES/SNS/SSM/KMS/ECR (ticket 99),
+with Terraform and the [deployment procedure](pilot-deployment.md) written but unapplied.
+The proposed AWS region is us-east-1; the actual region awaits operator confirmation.
+Cloudflare terminates TLS and sees uploads at its global edge. Company accounts, processor
+terms, actual processing regions, upload limit, startup guards, TLS/headers/preview checks,
+role isolation, physical deletion/backup expiry and restore exercises remain pending.
+This prerequisite remains BLOCKED; no deployment or pilot approval is claimed.
 
 Ticket 97 provides a signed, topic-allowlisted SNS endpoint, keyed-hash suppression (V51), SMTP
 suppression for every email purpose, account-removal cleanup, and shared deployment-stage guards.
