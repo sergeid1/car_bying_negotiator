@@ -31,13 +31,17 @@ resource "aws_route_table_association" "origin" {
 resource "aws_security_group" "origin" {
   name   = "${var.name}-origin"
   vpc_id = aws_vpc.pilot.id
-  # Outbound TLS: S3, SSM, image registry and approved evidence providers.
+  # Outbound TLS: S3, SSM, image registry and approved evidence providers. Provider addresses change, so the
+  # destinations cannot be pinned to CIDRs; inbound stays limited to Cloudflare.
+  #trivy:ignore:AWS-0104:exp:2027-04-10
   egress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+  # SES SMTP submission (ticket 97); SES endpoints are not published as fixed CIDRs.
+  #trivy:ignore:AWS-0104:exp:2027-04-10
   egress {
     from_port   = 587
     to_port     = 587
@@ -115,6 +119,9 @@ resource "aws_s3_bucket_ownership_controls" "documents" {
   bucket = aws_s3_bucket.documents.id
   rule { object_ownership = "BucketOwnerEnforced" }
 }
+# SSE-S3 is deliberate (ticket 98): the application encrypts every document with its own rotatable key (ticket 80)
+# before upload, so a customer-managed KMS key would add cost without protecting the plaintext.
+#trivy:ignore:AWS-0132:exp:2027-04-10
 resource "aws_s3_bucket_server_side_encryption_configuration" "documents" {
   bucket = aws_s3_bucket.documents.id
   rule {
@@ -224,9 +231,25 @@ resource "aws_eip" "origin" {
 }
 resource "aws_ses_domain_identity" "company" { domain = "otdog.com" }
 resource "aws_ses_domain_dkim" "company" { domain = aws_ses_domain_identity.company.domain }
+data "aws_caller_identity" "current" {}
+# Bounce and complaint notices carry recipient addresses, so their topics are encrypted. SES cannot publish to a
+# topic under the AWS-managed SNS key, so this customer-managed key grants SES the use it needs.
+resource "aws_kms_key" "notifications" {
+  description         = "${var.name} SES bounce and complaint topics"
+  enable_key_rotation = true
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      { Sid = "AccountAdministration", Effect = "Allow", Principal = { AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" }, Action = "kms:*", Resource = "*" },
+      { Sid = "SesPublish", Effect = "Allow", Principal = { Service = "ses.amazonaws.com" }, Action = ["kms:GenerateDataKey*", "kms:Decrypt"], Resource = "*",
+      Condition = { StringEquals = { "aws:SourceAccount" = data.aws_caller_identity.current.account_id } } }
+    ]
+  })
+}
 resource "aws_sns_topic" "feedback" {
-  for_each = toset(["Bounce", "Complaint"])
-  name     = "${var.name}-${lower(each.value)}"
+  for_each          = toset(["Bounce", "Complaint"])
+  name              = "${var.name}-${lower(each.value)}"
+  kms_master_key_id = aws_kms_key.notifications.arn
 }
 resource "aws_sns_topic_policy" "feedback" {
   for_each = aws_sns_topic.feedback
