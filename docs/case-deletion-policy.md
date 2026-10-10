@@ -218,3 +218,20 @@ delivery metadata stays until case deletion. A dealer opt-out recorded on a rela
 ticket 84 is kept with the identity and goes with the case; new addresses have no opt-out. Nothing is kept in any anonymous total. Metadata from all four
 tables is in `case-data.json`, and retained message content is in `relay/messages.json` of the
 case export, and so of the account export.
+
+## Trade-in and written trade offers (ticket 100)
+
+V50 `trade_vehicles`, `trade_offers` and `trade_case_journeys` hold the Buyer's trade-in. A Trade
+Vehicle belongs to its Buying Journey (`journey_id`, `account_id`) or, for a case without a journey,
+to that case (`case_id`). A written trade offer's photo or PDF is a `source_documents` row in the case
+it was uploaded through, with `purpose = 'TRADE_OFFER_EVIDENCE'`: it takes the ordinary inspection,
+malware scan, encryption, page normalization and retention, is never extracted for Deal Terms, and is
+never listed or compared as dealer paperwork. `trade_case_journeys` links a case started at the Desk
+Check for another car to the journey whose trade it uses.
+CaseGraphDeletionPlan erases the case's offers (including journey offers whose evidence is in the
+case), its Desk Check journey link and a case-held Trade Vehicle before the source documents.
+Journey deletion and account deletion erase the journey's Trade Vehicle, offers and links, verify
+their absence, and bring the offers' evidence retention deadline forward so the ordinary retention
+sweep erases the files; removing a single offer or the whole trade-in does the same. The case export
+holds the trade the case uses, its offers and its link; the account export holds each journey's
+trade-in. Nothing is kept in any anonymous total.

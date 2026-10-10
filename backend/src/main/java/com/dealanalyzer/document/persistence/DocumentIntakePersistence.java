@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class DocumentIntakePersistence {
   private static final List<String> RETENTION_PENDING = List.of("ACTIVE", "DELETION_PENDING");
+  public static final String DEALER_PAPERWORK = "DEALER_PAPERWORK";
+  public static final String TRADE_OFFER_EVIDENCE = "TRADE_OFFER_EVIDENCE";
   private final com.dealanalyzer.buyingcase.persistence.CaseRetentionService retention;
   private final SourceDocumentRepository documents;
   private final DocumentPageRepository pages;
@@ -33,12 +35,19 @@ public class DocumentIntakePersistence {
   @Transactional
   public UploadRecords create(
       NewDocument document, String operationId, String idempotencyKey, Instant now) {
+    return create(document, operationId, idempotencyKey, now, DEALER_PAPERWORK);
+  }
+
+  @Transactional
+  public UploadRecords create(
+      NewDocument document, String operationId, String idempotencyKey, Instant now, String purpose) {
     Instant deadline = retention.registerDocumentDeadline(document.caseId(), document.retentionDeadline());
     SourceDocumentEntity savedDocument = documents.save(new SourceDocumentEntity(
         document.id(), document.caseId(), document.originalFilename(), document.objectKey(),
         document.checksumSha256(), document.verifiedMediaType(), document.sizeBytes(),
         deadline, document.encryptionKeyReference(), now));
     savedDocument.pageCount = document.pageCount();
+    savedDocument.purpose = purpose;
     for (int pageNumber = 1; pageNumber <= document.pageCount(); pageNumber++) {
       pages.save(new DocumentPageEntity(
           UUID.randomUUID().toString(), document.id(), pageNumber, document.width(),
@@ -76,11 +85,14 @@ public class DocumentIntakePersistence {
         .orElseThrow(() -> new ResourceNotFoundException("Source Document not found"));
   }
 
-  /** The case's active documents, oldest first, so the Buyer can return to verify any of them. */
+  /**
+   * The case's active dealer paperwork, oldest first, so the Buyer can return to verify any of it.
+   * Trade offer evidence is shown with its trade offer instead.
+   */
   @Transactional(readOnly = true)
   public List<SourceDocumentView> activeDocuments(String caseId) {
     return documents.findByCaseIdOrderByCreatedAt(caseId).stream()
-        .filter(document -> document.lifecycle.equals("ACTIVE"))
+        .filter(document -> document.lifecycle.equals("ACTIVE") && document.purpose.equals(DEALER_PAPERWORK))
         .map(this::documentView)
         .toList();
   }
@@ -158,6 +170,22 @@ public class DocumentIntakePersistence {
     operation.stage = "NORMALIZING";
     operation.updatedAt = now;
     return true;
+  }
+
+  /** Whether the document is trade offer evidence, which is stored and normalized but never extracted. */
+  @Transactional(readOnly = true)
+  public boolean isTradeOfferEvidence(String documentId) {
+    return documents.findById(documentId).map(document -> document.purpose.equals(TRADE_OFFER_EVIDENCE)).orElse(false);
+  }
+
+  /** Ends the processing of trade offer evidence once its pages are normalized. */
+  @Transactional
+  public void completeEvidence(String operationId, Instant now) {
+    DocumentOperationEntity operation = requireLockedOperation(operationId);
+    if (operation.stage.equals("READY_FOR_EXTRACTION")) {
+      operation.stage = "EVIDENCE_STORED";
+      operation.updatedAt = now;
+    }
   }
 
   @Transactional

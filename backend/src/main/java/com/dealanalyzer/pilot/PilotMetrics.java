@@ -36,7 +36,7 @@ public class PilotMetrics {
         + " and exists (select 1 from outcome_feedback o where o.case_id = a.case_id and o.stage = 'FINAL' and o.understood_decision = true)"
         + " and exists (select 1 from pilot_events e where e.case_id = a.case_id and e.event_type = 'REVIEW_STATUS' and e.category = 'MATCHES_APPROVED_BASELINE'"
         + " and not exists (select 1 from pilot_events newer where newer.case_id = e.case_id and newer.event_type = 'REVIEW_STATUS' and newer.created_at > e.created_at))") + count("select removed_understood_count from pilot_cohort_totals where id = 1"), qualified));
-    long uploaded = count("select count(*)" + COHORT + " and exists (select 1 from source_documents d where d.case_id = a.case_id)");
+    long uploaded = count("select count(*)" + COHORT + " and exists (select 1 from source_documents d where d.case_id = a.case_id and d.purpose = 'DEALER_PAPERWORK')");
     long verified = count("select count(*)" + COHORT + " and exists (select 1 from dealer_offers o where o.case_id = a.case_id)");
     result.put("uploadToVerifiedExtraction", rate(verified, uploaded));
     result.put("verifiedExtractionToReport", rate(count("select count(*)" + COHORT + " and exists (select 1 from dealer_offers o where o.case_id = a.case_id) and" + COMPLETED), verified));
@@ -80,7 +80,7 @@ public class PilotMetrics {
   public Map<String, Object> channels() {
     var keys = new ArrayList<String>(); keys.add("");
     for (Object code : manager.createNativeQuery("select code from acquisition_channels order by code").getResultList()) keys.add((String) code);
-    var qualified = grouped("select coalesce(c.acquisition_channel, ''), count(*), sum(case when exists (select 1 from source_documents d where d.case_id = a.case_id) then 1 else 0 end)"
+    var qualified = grouped("select coalesce(c.acquisition_channel, ''), count(*), sum(case when exists (select 1 from source_documents d where d.case_id = a.case_id and d.purpose = 'DEALER_PAPERWORK') then 1 else 0 end)"
         + " from experiment_assignments a join analysis_cases c on c.id = a.case_id where a.qualified = true and" + SUPPORTED + " group by coalesce(c.acquisition_channel, '')");
     var starts = grouped("select coalesce(c.acquisition_channel, ''), count(*), 0 from analysis_cases c where" + SUPPORTED + " group by coalesce(c.acquisition_channel, '')");
     var removed = new HashMap<String, long[]>();

@@ -11,7 +11,7 @@ DESK-03.
 owed on it. Reading real photos needs 36 — the Claude extraction provider enabled; until then this flow
 works only with text-bearing paperwork and Buyer-typed terms.
 
-**Status:** open — agent-ready after 100. Field use waits on ticket 36.
+**Status:** open — agent-ready (100 complete). Field use waits on ticket 36.
 
 - [ ] The entry point is in the header or journey on a phone and reaches the camera in one tap.
 - [ ] A VIN read from the paperwork routes to the agreed car's Desk Check or to a fresh case, and the

@@ -260,6 +260,14 @@ class BuyerAccountAcceptanceTest {
       var client = app.client();
       String token = signIn(client, "buyer@example.com");
       String other = signIn(client, "buyer@example.com");
+      var suppression = app.context().getBean(com.dealanalyzer.email.EmailSuppression.class);
+      suppression.suppress("BUYER@example.com", "BOUNCE");
+      suppression.suppress("buyer@example.com", "COMPLAINT");
+      suppression.suppress("unrelated@example.com", "COMPLAINT");
+      assertThat(suppression.suppressed(" buyer@example.com ")).isTrue();
+      var suppressionJdbc = new JdbcTemplate(app.context().getBean(javax.sql.DataSource.class));
+      assertThat(suppressionJdbc.queryForObject("select count(*) from email_suppressions", Long.class)).isEqualTo(2);
+      assertThat(suppressionJdbc.queryForList("select * from email_suppressions").toString()).doesNotContain("buyer@", "unrelated@");
       var created = post(client, "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase());
       String caseId = created.at("/case/id").asText(), caseToken = created.path("accessToken").asText();
       attach(client, token, caseId, caseToken);
@@ -284,6 +292,8 @@ class BuyerAccountAcceptanceTest {
 
       var accountWorker = app.context().getBean(com.dealanalyzer.account.AccountDeletionWorker.class);
       accountWorker.runOnce();
+      assertThat(suppression.suppressed("buyer@example.com")).isFalse();
+      assertThat(suppression.suppressed("unrelated@example.com")).isTrue();
       var waitingResponse = exchange(client, "GET", "/api/v1/account/deletion", null, token);
       assertThat(waitingResponse.setCookie()).isNull();
       var waiting = waitingResponse.body();

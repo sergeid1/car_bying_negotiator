@@ -13,13 +13,24 @@ it never extends the case lifetime. Recovery token hashes are domain-separated H
 Requests for unknown cases or addresses return the same acknowledgement as matching requests.
 Responses containing credentials or downloads disable caching.
 
-Configure delivery using `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`,
-`SPRING_MAIL_PASSWORD`, `CASE_RECOVERY_FROM`, and `CASE_RECOVERY_PUBLIC_URL` (the deployed
-frontend's HTTPS URL, without a query or fragment). Configure SMTP authentication and TLS
-with Spring Mail properties, for example `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true` and
-`SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true`. Connection, read and write timeouts
-are five seconds. The localhost URL is only a development default. An unconfigured mail
-transport fails the authorized opt-in request without changing case access.
+Configure SES delivery using `SES_REGION`, `SES_SMTP_HOST`, `SES_SMTP_PORT` (default 587),
+`SES_SMTP_USERNAME`, `SES_SMTP_PASSWORD`, and `SES_SNS_TOPIC_ARNS`, as described in the
+[hardening runbook](hardening-runbook.md#amazon-ses-transactional-email-ticket-97). Inject SMTP
+credentials from the deployment secret store. Set `CASE_RECOVERY_FROM` to the verified company
+sender and `CASE_RECOVERY_PUBLIC_URL` to the deployed frontend's HTTPS URL, without a query or
+fragment. SMTP authentication and STARTTLS (enabled and required) default to true, controlled by
+`SES_SMTP_AUTH` and `SES_SMTP_STARTTLS`. Connection, read and write timeouts are five seconds.
+
+The standard Spring environment variables `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`,
+`SPRING_MAIL_USERNAME`, and `SPRING_MAIL_PASSWORD` remain supported: a directly supplied
+`SPRING_MAIL_*` value overrides the corresponding `SES_SMTP_*` alias in application properties
+when both are set. Direct Spring SMTP-property environment overrides likewise take precedence
+over the auth/TLS settings in the files. Prefer one configuration family to avoid ambiguity.
+The explicit development profile instead defaults to loopback Mailpit on port 1025 and turns
+auth and both STARTTLS properties off; see the [local account flow](buyer-account-policy.md#try-it-locally).
+The localhost public URL is only a development default. An unconfigured mail transport fails
+the authorized opt-in request without changing case access. Suppressed recipients are silently
+skipped with the same acknowledgement as other recipients.
 
 Delivery requests and recovery tokens commit together after SMTP acceptance. A delivery
 failure rolls back enrollment and issuance, allowing retry with the same idempotency key.

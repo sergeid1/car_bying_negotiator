@@ -55,6 +55,10 @@ class SourceDocumentEntity {
   @Column(name = "original_deleted_at")
   Instant originalDeletedAt;
 
+  /** DEALER_PAPERWORK, or TRADE_OFFER_EVIDENCE for a written trade offer, which is never read for Deal Terms. */
+  @Column(nullable = false, length = 32)
+  String purpose = DocumentIntakePersistence.DEALER_PAPERWORK;
+
   protected SourceDocumentEntity() {}
 
   SourceDocumentEntity(

@@ -76,9 +76,19 @@ and the evidence-backed approval owned by ticket 22.
 
 ### 6. Infrastructure and privacy inventory — BLOCKED
 
-Recovery, purposes, retention, and deletion behavior are documented and implemented. Hosting,
-object storage, queue, mail, and model providers have **not** been selected, so subprocessors and
-processing regions cannot be stated and the inventory is incomplete.
+Recovery, purposes, retention, and deletion behavior are documented and implemented. Amazon SES
+was selected for transactional mail on 2026-10-08, with SNS for bounce and complaint feedback
+(ticket 97). Its actual region and deployed controls remain pending ticket 93. Other infrastructure
+selections and processing regions are incomplete, so this prerequisite remains blocked.
+
+Ticket 97 provides a signed, topic-allowlisted SNS endpoint, keyed-hash suppression (V51), SMTP
+suppression for every email purpose, account-removal cleanup, and shared deployment-stage guards.
+Offline tests use test-key signatures and injected certificate fetching; they prove application
+behavior without contacting AWS. Setup and [deployed verification](hardening-runbook.md#amazon-ses-transactional-email-ticket-97)
+remain **PENDING**: company-domain verification/DKIM/SPF/DMARC, production access, actual region,
+HTTPS subscription for both bounce and complaint topics, a delivered sign-in email, and an SES
+mailbox-simulator bounce proving suppression of the subsequent send. No deployed outcome or
+provider-terms approval is claimed by the offline checks.
 
 ### 8. Preregistered thresholds — BLOCKED
 
