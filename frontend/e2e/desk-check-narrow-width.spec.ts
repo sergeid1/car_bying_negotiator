@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { syntheticTactic } from "../src/DeskTactics.fixture";
 
 const agreedPrice = { offerVersion: 2, baselineVersion: 1, vin: "1HGCM82633A004352", sellingPriceMinor: 2500000,
   outTheDoorMinor: 2680000, acceptedAt: "2026-10-04T12:00:00Z" };
@@ -12,6 +13,7 @@ function fixture(state: string) {
       desk: { value: "1M8GDM9AXKP042788", unit: "VIN" }, delta: null, unit: "VIN", severity: "BLOCKING", verified: false, evidence: null, buyerAction: null }],
     freshCase: { vin: "1M8GDM9AXKP042788", dealerPostalCode: "27604", purchaseMethod: "CASH" } };
   const differences = { ...base, status: "DIFFERENCES", source: "READ_FROM_PAPERWORK",
+    tacticFindings: [syntheticTactic],
     findings: [{ group: "ADDED", term: "line:service contract#1", label: "Vehicle service contract with extended powertrain and wear-item coverage", kind: "ADDED",
       agreed: null, desk: { amountMinor: 149500, currency: "USD" }, delta: null, unit: "USD_MINOR", severity: "MATERIAL", verified: false,
       evidence: { pageNumber: 2 }, buyerAction: "Ask the dealer to clarify and verify this term." },
@@ -72,6 +74,8 @@ for (const state of ["AWAITING", "DIFFERENCES", "OTHER_CAR", "TRADE"]) {
       await expect(panel.getByRole("list", { name: "Differences from your Agreed Price" }).getByRole("listitem").first())
         .toContainText("Added: Vehicle service contract");
       await panel.getByText("1 other change on the paperwork").click();
+      await expect(panel.getByText("Question wording awaits operator review.")).toBeVisible();
+      await panel.getByText("Calculation and evidence", { exact: true }).click();
     }
     if (state === "TRADE") {
       await expect(panel.getByRole("list", { name: "Differences from your Agreed Price" }).getByRole("listitem").first())

@@ -27,6 +27,14 @@ public final class FinancingCalculator {
 
   public record PaymentReconciliation(Long paymentMinor, Boolean withinTolerance, long toleranceMinor) {}
 
+  /** Documentary counterfactual only; purchase totals, fees and actual loan timing remain unconfirmed. */
+  public PartialSchedule partialSchedule(Long principal, BigDecimal apr, Integer months) {
+    if (reconcilePayment(principal, apr, months, 0L).paymentMinor() == null) return null;
+    Schedule result = schedule(principal, apr.divide(new BigDecimal("1200"), MC), months);
+    return new PartialSchedule(result.payment(), result.total(), result.total() - principal);
+  }
+  public record PartialSchedule(long paymentMinor, long totalPaymentsMinor, long interestMinor) {}
+
   public Result calculate(FinanceLoan loan) {
     List<String> issues = new ArrayList<>();
     if (loan == null) return unavailable("UNAVAILABLE", List.of("Verified Finance Offer is missing."));

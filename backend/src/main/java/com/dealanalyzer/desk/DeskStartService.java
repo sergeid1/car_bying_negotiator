@@ -34,7 +34,6 @@ public class DeskStartService {
   private static final List<String> LOAN = List.of("APR", "TERM_MONTHS", "MONTHLY_PAYMENT", "AMOUNT_FINANCED");
   private static final List<String> TRADE = List.of("TRADE_ALLOWANCE", "TRADE_PAYOFF");
   private static final long MAX_MONEY = 100_000_000_000L;
-  private static final BigDecimal APR_TOLERANCE = new BigDecimal("0.1");
 
   private final EphemeralBuyingCaseService cases;
   private final DeskCheckService desk;
@@ -43,12 +42,15 @@ public class DeskStartService {
   private final JdbcTemplate jdbc;
   private final ObjectMapper json;
   private final TradeDeskCheck tradeCheck;
+  private final com.dealanalyzer.desk.tactic.DeskTacticService tactics;
   private final FinancingCalculator financing = new FinancingCalculator();
 
   DeskStartService(EphemeralBuyingCaseService cases, DeskCheckService desk, DocumentExtractionPersistence extractions,
-      TradeService trades, JdbcTemplate jdbc, ObjectMapper json, TradeDeskCheck tradeCheck) {
+      TradeService trades, JdbcTemplate jdbc, ObjectMapper json, TradeDeskCheck tradeCheck,
+      com.dealanalyzer.desk.tactic.DeskTacticService tactics) {
     this.cases = cases; this.desk = desk; this.extractions = extractions; this.trades = trades;
     this.jdbc = jdbc; this.json = json; this.tradeCheck = tradeCheck;
+    this.tactics = tactics;
   }
 
   /**
@@ -75,7 +77,8 @@ public class DeskStartService {
 
   /** source: READ_FROM_PAPERWORK or TYPED_BY_BUYER; neither is verified. */
   public record FirstResult(String policyVersion, String route, String source, OutTheDoor outTheDoor, Finding lead,
-      List<Finding> findings, TradeDeskCheck.Result trade) {}
+      List<Finding> findings, TradeDeskCheck.Result trade,
+      List<com.dealanalyzer.desk.tactic.DeskTacticPolicy.Finding> tacticFindings) {}
   /** amountMinor is null when the paperwork shows no out-the-door total; it is never treated as zero. */
   public record OutTheDoor(Long amountMinor, Long agreedMinor, Long differenceMinor) {}
   /** amountMinor is the finding's dollar effect when it can be calculated, otherwise null. */
@@ -155,7 +158,9 @@ public class DeskStartService {
         ? againstAgreed(agreed.terms(), terms, typedFields) : fromTermsAlone(terms));
     Long otd = amount(terms, "OUT_THE_DOOR_TOTAL");
     if (otd == null) findings.add(missingTotal(terms));
-    aprAboveOwn(terms, ownApr).ifPresent(findings::add);
+    var tacticFindings = tactics.findings(caseId, terms, agreed == null ? null : agreed.terms(), request.ownAprPercent());
+    for (var tactic : tacticFindings) findings.add(new Finding(tactic.code(), tactic.summary(), tactic.totalEffectMinor(),
+        tactic.deskQuestion(), json.valueToTree(tactic.evidenceRegions())));
     var trade = tradeCheck.check(caseId, token, terms, agreed == null ? null : agreed.terms());
     JsonNode allowanceEvidence = stream(terms.path("candidates"))
         .filter(term -> "TRADE_ALLOWANCE".equals(term.path("field").asText())).findFirst()
@@ -170,7 +175,8 @@ public class DeskStartService {
     Long agreedOtd = agreed == null ? null : agreed.agreed().outTheDoorMinor();
     var total = new OutTheDoor(otd, agreedOtd, otd == null || agreedOtd == null ? null : Math.subtractExact(otd, agreedOtd));
     return new FirstResult(VERSION, request.route(), source, total, findings.isEmpty() ? null : findings.get(0),
-        List.copyOf(findings), "NO_ALLOWANCE".equals(trade.status()) ? null : trade);
+        List.copyOf(findings), "NO_ALLOWANCE".equals(trade.status()) ? null : trade,
+        tacticFindings);
   }
 
   private static String route(String vin, String agreedVin, String caseVin) {
@@ -352,16 +358,6 @@ public class DeskStartService {
             "What is the out-the-door total, and what price, APR and term is this payment based on?", null)
         : new Finding("TOTAL_NOT_SHOWN", "This paperwork shows no out-the-door total.", null,
             "What is the out-the-door total, with every fee and tax included?", null);
-  }
-
-  private Optional<Finding> aprAboveOwn(JsonNode terms, BigDecimal own) {
-    BigDecimal dealer = decimal(value(terms, "APR"));
-    if (own == null || dealer == null || dealer.subtract(own).compareTo(APR_TOLERANCE) < 0) return Optional.empty();
-    Long cost = interestDifference(terms, own, dealer);
-    return Optional.of(new Finding("APR_ABOVE_OWN_OFFER", "The dealer's APR of " + dealer.toPlainString()
-        + "% is above your own lender's " + own.stripTrailingZeros().toPlainString() + "%"
-        + (cost == null ? "." : ", about " + money(cost) + " more in payments over the loan."), cost,
-        "My own lender offered " + own.stripTrailingZeros().toPlainString() + "% APR. Will you match it?", null));
   }
 
   /** Scheduled payments at the higher APR minus the lower, on the paperwork's amount financed and term. */

@@ -1865,3 +1865,10 @@ fieldset.trade-choices input[type="radio"] { flex: none; width: 20px; height: 20
 .dealer-result .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .dealer-result button { max-width: 100%; white-space: normal; min-height: 44px; }
 /* End ticket 105. */
+
+/* Ticket 104: worksheet tactic findings and evidence. */
+.desk-tactics { min-width: 0; overflow-wrap: anywhere; }
+.desk-tactics > ul { padding-left: 1.25rem; display: grid; gap: 16px; }
+.desk-tactics h4 { margin-bottom: 8px; }
+.desk-tactics summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+/* End ticket 104. */

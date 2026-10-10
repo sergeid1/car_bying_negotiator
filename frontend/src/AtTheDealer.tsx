@@ -3,6 +3,7 @@ import { AccountSignedInContext } from "./BuyerAccount";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import type { FreshDeskCase } from "./DeskCheck";
 import { toMinor, vehicleName, type Trade, type TradeView } from "./TradeVehicle";
+import type { DeskTacticFinding } from "./DeskTactics";
 
 type Credentials = { caseId: string; token: string };
 type Route = "AGREED_CAR" | "THIS_CASE";
@@ -23,6 +24,7 @@ export type FirstResult = {
   route: Route; source: "READ_FROM_PAPERWORK" | "TYPED_BY_BUYER";
   outTheDoor: { amountMinor: number | null; agreedMinor: number | null; differenceMinor: number | null };
   lead: DeskFinding | null; findings: DeskFinding[];
+  tacticFindings?: DeskTacticFinding[];
 };
 type Typed = { vin?: string; sellingPriceMinor?: number; tradeAllowanceMinor?: number; cashDownMinor?: number;
   monthlyPaymentMinor?: number; termMonths?: number; aprPercent?: number; outTheDoorMinor?: number };
@@ -557,11 +559,16 @@ function ResultView({ result, headingRef, elapsed, onDeskCheck, onType, onClose 
       <p className="dealer-lead-summary">{result.lead.summary}</p>
       <p className="dealer-question"><span className="dealer-question-label">Ask at the desk</span>
         <q>{result.lead.deskQuestion}</q></p>
+      {result.tacticFindings?.some(tactic => tactic.code === result.lead?.code && tactic.questionReview === "PENDING_OPERATOR_REVIEW")
+        && <p className="muted">Draft question wording awaits operator review.</p>}
     </div> : <p>Nothing in these terms stood out. Check them against the paperwork for the full result.</p>}
     {more.length > 0 && <details>
       <summary>{more.length} more to ask about</summary>
       <ul className="dealer-more">{more.map((finding, index) => <li key={`${finding.code}-${index}`}>
-        <p>{finding.summary}</p><p className="muted"><q>{finding.deskQuestion}</q></p></li>)}</ul>
+        <p>{finding.summary}</p><p className="muted"><q>{finding.deskQuestion}</q></p>
+        {result.tacticFindings?.some(tactic => tactic.code === finding.code && tactic.questionReview === "PENDING_OPERATOR_REVIEW")
+          && <p className="muted">Draft question wording awaits operator review.</p>}
+      </li>)}</ul>
     </details>}
     <div className="actions">
       {result.route === "AGREED_CAR" && <button type="button" onClick={onDeskCheck}>Open the full Desk Check</button>}

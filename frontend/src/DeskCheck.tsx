@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { BuyingCaseIntake } from "./BuyingCaseIntake";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { TradeCheckPanel, type TradeCheckResult } from "./TradeCheck";
+import { DeskTactics, type DeskTacticFinding } from "./DeskTactics";
 
 type Credentials = { caseId: string; token: string };
 type Term = { value?: string | null; unit?: string; amountMinor?: number; currency?: string; category?: string } | number;
@@ -22,6 +23,7 @@ export type DeskCheckView = {
   freshCase: null | { vin: string; dealerPostalCode: string | null; purchaseMethod: string };
   dealReviewVersion: number | null;
   trade?: TradeCheckResult | null;
+  tacticFindings?: DeskTacticFinding[];
 };
 export type FreshDeskCase = Credentials & { agreed: Credentials; agreedVin: string | null; vin: string; files: File[] };
 
@@ -191,6 +193,7 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
         }}>Verify these terms</button>}
       </>}
       <button type="button" className="btn-secondary" onClick={() => void refresh()}>Refresh Desk Check</button>
+      <DeskTactics findings={view?.tacticFindings} />
       {error && <p role="alert">{error}</p>}
     </div>
     {starting && view?.freshCase && <BuyingCaseIntake title={`Start a fresh case for VIN ${view.freshCase.vin}`}
