@@ -66,7 +66,8 @@ Use the usual local backend secrets and document setup described in README, then
 backend with `mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=development`
 and the frontend with `npm run dev` in `frontend`. The explicit development profile defaults
 `SPRING_MAIL_HOST` to `127.0.0.1`, `SPRING_MAIL_PORT` to `1025`, and `CASE_RECOVERY_FROM` to
-`deal-xray@localhost.test`, and permits the account cookie over local HTTP. These defaults
+`deal-xray@localhost.test`, turns SMTP authentication and STARTTLS (enabled and required) off
+for Mailpit, and permits the account cookie over local HTTP. These defaults
 do not apply without that profile. Set `CASE_RECOVERY_PUBLIC_URL` if the frontend is not at
 `http://localhost:5173/`. If changing `MAILPIT_SMTP_PORT`, also set `SPRING_MAIL_PORT`.
 

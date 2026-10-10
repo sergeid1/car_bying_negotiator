@@ -13,6 +13,12 @@ public class RecoveryEmailProductionGuard {
     String host = environment.getProperty("spring.mail.host", "").trim().toLowerCase(Locale.ROOT);
     if (DeploymentStage.from(environment).productionLike() && !from.isEmpty() && localHost(host))
       throw new IllegalStateException("Pilot/production recovery email requires a real SMTP host.");
+    if (DeploymentStage.from(environment).productionLike() && !from.isEmpty()) {
+      String topics = environment.getProperty("email.ses.topic-arns", "");
+      if (topics.isBlank() || java.util.Arrays.stream(topics.split(",", -1))
+          .anyMatch(topic -> !com.dealanalyzer.email.SnsVerifier.validTopic(topic.trim())))
+        throw new IllegalStateException("Pilot/production recovery email requires SES bounce/complaint topic configuration.");
+    }
   }
 
   private static boolean localHost(String host) {

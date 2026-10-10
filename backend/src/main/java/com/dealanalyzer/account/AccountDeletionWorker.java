@@ -99,6 +99,8 @@ public class AccountDeletionWorker {
     manager.createNativeQuery("update source_documents set retention_deadline = current_timestamp where purpose = 'TRADE_OFFER_EVIDENCE' "
         + "and retention_deadline > current_timestamp and id in (select evidence_document_id from trade_offers where account_id = :id)")
         .setParameter("id", accountId).executeUpdate();
+    // Account removal permits forgetting its keyed suppression record; no plaintext is needed.
+    delete("email_suppressions", "email_hash in (select email_lookup from buyer_accounts where id = :id)", accountId);
     for (String table : ACCOUNT_GRAPH) delete(table, "account_id = :id", accountId);
     delete("buyer_accounts", "id = :id", accountId);
   }

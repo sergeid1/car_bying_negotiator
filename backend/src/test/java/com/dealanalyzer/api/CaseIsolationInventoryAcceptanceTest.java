@@ -218,6 +218,7 @@ class CaseIsolationInventoryAcceptanceTest {
       publicRow("POST", V + "/cases/synthetic", "Fixture-backed case creation; the optional token only authorizes an idempotent replay."),
       publicRow("POST", V + "/recovery/requests", "Case recovery by email; the acknowledgement is identical whether or not anything matched."),
       publicRow("POST", V + "/recovery/verify", "Redeems a single-use emailed recovery secret, which is the credential."),
+      publicRow("POST", V + "/email/ses-notifications", "Provider callback: configured SNS topic and verified AWS signature required before reading SES content; API peer rate limit applies."),
       publicRow("POST", V + "/account/sign-in-requests", "Buyer Account sign-in by email; the acknowledgement is identical for every address."),
       publicRow("POST", V + "/account/sign-in/verify", "Redeems a single-use emailed sign-in secret, which is the credential."),
       publicRow("POST", V + "/account/passkeys/sign-in/options", "Discoverable credential challenge with no account input or credential list."),
