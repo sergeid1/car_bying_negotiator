@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { TradeValueChecks } from "./TradeValueChecks";
 
 type Credentials = { caseId: string; token: string };
 type Condition = "EXCELLENT" | "GOOD" | "FAIR" | "POOR";
@@ -6,6 +7,9 @@ type Owed = "YES" | "NO" | "NOT_SURE";
 type Evidence = { documentId: string; state: "PROCESSING" | "READY" | "FAILED" | "REMOVED"; pageCount: number | null };
 export type TradeOffer = { id: string; amountMinor: number; source: string; offerDate: string; expiresOn: string;
   expired: boolean; usedForComparison: boolean; evidence: Evidence; createdAt: string };
+/** A value the Buyer looked up themselves (ticket 106); highMinor is null for a single value. Never an offer. */
+export type TradeEstimate = { id: string; source: string; lowMinor: number; highMinor: number | null; checkedOn: string;
+  old: boolean; createdAt: string };
 export type Trade = {
   id: string; revision: number;
   vehicle: { vin: string; decodeOutcome: "DECODED" | "UNDECODABLE"; source: string; decoderVersion: string; decodedAt: string;
@@ -13,6 +17,7 @@ export type Trade = {
   mileage: number; condition: Condition; moneyOwed: Owed | null; lender: string | null; payoffMinor: number | null;
   payoffGoodThrough: string | null; payoffUnknown: boolean; payoffStale: boolean; complete: boolean; changedAt: string;
   offers: TradeOffer[]; bestOfferId: string | null;
+  estimates?: TradeEstimate[]; estimateInUseId?: string | null;
 };
 export type TradeView = {
   holder: "JOURNEY" | "CASE"; trade: Trade | null;
@@ -131,6 +136,7 @@ export function TradeVehicle({ caseId, token, carryFrom }: Credentials & { carry
       } finally { setBusy(false); }
     }} />}
     {error && <p role="alert">{error}</p>}
+    {trade && <TradeValueChecks trade={trade} path={path} request={request} onView={setView} />}
     {trade && <TradeOffers trade={trade} path={path} token={token} request={request} onView={setView} />}
   </section>;
 }
@@ -300,8 +306,8 @@ function TradeOffers({ trade, path, token, request, onView }: { trade: Trade; pa
 
   return <section className="trade-offers" aria-labelledby="trade-offers-heading">
     <h3 id="trade-offers-heading">Written trade offers you got</h3>
-    <p className="muted">Add an offer you got in writing yourself, such as from a car-buying service or another dealer, with a
-      photo or PDF of it. otdog never requests, arranges, sells or refers trade offers. Only an unexpired offer is used to
+    <p className="muted">Add an offer you got in writing yourself, such as a CarMax or Carvana instant offer or one from another
+      dealer, with a photo or PDF of it. otdog never requests, arranges, sells or refers trade offers. Only an unexpired offer is used to
       compare a dealer's trade allowance.</p>
     {trade.offers.length > 0 && <ul className="trade-offer-list" aria-label="Your written trade offers">
       {trade.offers.map(offer => <li key={offer.id}>

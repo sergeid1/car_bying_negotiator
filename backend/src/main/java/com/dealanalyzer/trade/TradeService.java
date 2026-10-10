@@ -49,6 +49,8 @@ public class TradeService {
   static final long MAX_AMOUNT_MINOR = 50_000_000L;
   static final int MAX_MILEAGE = 999_999;
   static final int MAX_TEXT = 120;
+  /** An estimate checked more than this many days ago is called old; it is still shown and used. */
+  public static final int ESTIMATE_OLD_AFTER_DAYS = 30;
 
   /** Condition levels, each with the plain description the Buyer chooses by. */
   public enum Condition {
@@ -72,6 +74,8 @@ public class TradeService {
   public record Input(Integer basedOnRevision, String vin, Integer mileage, String condition, String moneyOwed,
       String lender, Long payoffMinor, String payoffGoodThrough, Boolean payoffUnknown) {}
   public record OfferInput(String amountMinor, String source, String offerDate, String expiresOn) {}
+  /** A value the Buyer looked up: a single value (no {@code highMinor}) or a low-high range. */
+  public record EstimateInput(String source, Long lowMinor, Long highMinor, String checkedOn) {}
 
   public record View(String holder, Trade trade, Analysis analysis, List<ConditionOption> conditions) {}
   public record ConditionOption(Condition value, String label, String description) {}
@@ -79,11 +83,18 @@ public class TradeService {
   public record Analysis(Instant analyzedAt, boolean outdated) {}
   public record Trade(String id, int revision, Vehicle vehicle, int mileage, Condition condition, MoneyOwed moneyOwed,
       String lender, Long payoffMinor, String payoffGoodThrough, boolean payoffUnknown, boolean payoffStale,
-      boolean complete, Instant changedAt, List<Offer> offers, String bestOfferId) {}
+      boolean complete, Instant changedAt, List<Offer> offers, String bestOfferId, List<Estimate> estimates,
+      String estimateInUseId) {}
   public record Vehicle(String vin, VinDecoding.Outcome decodeOutcome, String source, String decoderVersion,
       Instant decodedAt, String year, String make, String model, String trim) {}
   public record Offer(String id, long amountMinor, String source, String offerDate, String expiresOn, boolean expired,
       boolean usedForComparison, Evidence evidence, Instant createdAt) {}
+  /**
+   * A trade value the Buyer looked up on another site (ticket 106). It is the Buyer's record of an outside
+   * estimate, never an offer: nothing here checked it. Older than {@link #ESTIMATE_OLD_AFTER_DAYS} days it is old.
+   */
+  public record Estimate(String id, String source, long lowMinor, Long highMinor, String checkedOn, boolean old,
+      Instant createdAt) {}
   /** The offer's photo or PDF: PROCESSING, READY, FAILED, or REMOVED once retention erased it. */
   public record Evidence(String documentId, String state, Integer pageCount) {}
 
@@ -96,6 +107,7 @@ public class TradeService {
       Long payoffMinor, LocalDate payoffGoodThrough) {}
   private record Row(String id, int revision, Content content, Decoded decoded, Instant changedAt) {}
   private record ValidOffer(long amountMinor, String source, LocalDate offerDate, LocalDate expiresOn) {}
+  private record ValidEstimate(String source, long lowMinor, Long highMinor, LocalDate checkedOn) {}
 
   private static final List<ConditionOption> CONDITIONS = java.util.Arrays.stream(Condition.values())
       .map(value -> new ConditionOption(value, value.label(), value.description())).toList();
@@ -173,6 +185,7 @@ public class TradeService {
               and purpose = 'TRADE_OFFER_EVIDENCE' and retention_deadline > ?
             """, Timestamp.from(now), Timestamp.from(now), row.id(), Timestamp.from(now));
         jdbc.update("delete from trade_offers where trade_id = ?", row.id());
+        jdbc.update("delete from trade_estimates where trade_id = ?", row.id());
         jdbc.update("delete from trade_vehicles where id = ?", row.id());
       });
       return view(holder);
@@ -238,6 +251,49 @@ public class TradeService {
     });
   }
 
+  /**
+   * Records a trade value the Buyer looked up themselves, such as a Carfax value. The platform never
+   * queries the site; it stores what the Buyer typed. A retried request with the same key changes nothing.
+   */
+  public View addEstimate(String caseId, String token, String key, EstimateInput input) {
+    cases.reopen(caseId, token);
+    if (key == null || key.isBlank() || key.length() > 200) throw new TradeProblem(HttpStatus.BAD_REQUEST,
+        "IDEMPOTENCY_KEY_REQUIRED", "Retry the request; it was missing its request key.", List.of());
+    var estimate = validateEstimate(input);
+    String keyHash = sha256(key);
+    return writes.execute(status -> {
+      var holder = holder(caseId);
+      lock(holder);
+      var trade = trade(holder).orElseThrow(TradeProblem::notRecorded);
+      if (Boolean.TRUE.equals(jdbc.queryForObject(
+          "select count(*) > 0 from trade_estimates where trade_id = ? and idempotency_key_hash = ?", Boolean.class,
+          trade.id(), keyHash))) return view(holder);
+      Instant now = Instant.now();
+      jdbc.update("""
+          insert into trade_estimates(id, trade_id, account_id, idempotency_key_hash, source, low_minor, high_minor,
+            checked_on, created_at)
+          values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          """, UUID.randomUUID().toString(), trade.id(), holder.accountId(), keyHash, estimate.source(),
+          estimate.lowMinor(), estimate.highMinor(), date(estimate.checkedOn()), Timestamp.from(now));
+      touch(trade.id(), now);
+      return view(holder);
+    });
+  }
+
+  /** Removes one Buyer-entered estimate. */
+  public View removeEstimate(String caseId, String token, String estimateId) {
+    cases.reopen(caseId, token);
+    return writes.execute(status -> {
+      var holder = holder(caseId);
+      lock(holder);
+      var trade = trade(holder).orElseThrow(TradeService::estimateNotFound);
+      if (jdbc.update("delete from trade_estimates where id = ? and trade_id = ?", estimateId, trade.id()) == 0)
+        throw estimateNotFound();
+      touch(trade.id(), Instant.now());
+      return view(holder);
+    });
+  }
+
   /** One normalized page of an offer's evidence, wherever in the journey it was uploaded. */
   public byte[] evidencePage(String caseId, String token, String offerId, int pageNumber) {
     cases.reopen(caseId, token);
@@ -276,7 +332,18 @@ public class TradeService {
       var held = trade(source);
       if (held.isEmpty() || trade(target).isPresent()) return view(target);
       lock(target);
-      insert(target, held.get().content(), held.get().decoded(), Instant.now());
+      String copied = insert(target, held.get().content(), held.get().decoded(), Instant.now());
+      // Estimates have no evidence held by the earlier case, so they carry over with the vehicle.
+      for (var estimate : jdbc.queryForList("""
+          select idempotency_key_hash, source, low_minor, high_minor, checked_on, created_at from trade_estimates
+          where trade_id = ? order by created_at, id
+          """, held.get().id()))
+        jdbc.update("""
+            insert into trade_estimates(id, trade_id, account_id, idempotency_key_hash, source, low_minor, high_minor,
+              checked_on, created_at)
+            values (?, ?, null, ?, ?, ?, ?, ?, ?)
+            """, UUID.randomUUID().toString(), copied, estimate.get("idempotency_key_hash"), estimate.get("source"),
+            estimate.get("low_minor"), estimate.get("high_minor"), estimate.get("checked_on"), estimate.get("created_at"));
       return view(target);
     });
   }
@@ -310,6 +377,16 @@ public class TradeService {
     // Only an unexpired written offer is used to compare a dealer's trade allowance.
     String best = offers.stream().filter(Offer::usedForComparison).max(Comparator.comparingLong(Offer::amountMinor))
         .map(Offer::id).orElse(null);
+    var estimates = jdbc.query("""
+        select id, source, low_minor, high_minor, checked_on, created_at from trade_estimates where trade_id = ?
+        order by checked_on, created_at, id
+        """, (r, n) -> {
+      LocalDate checked = r.getDate(5).toLocalDate();
+      return new Estimate(r.getString(1), r.getString(2), r.getLong(3), (Long) r.getObject(4, Long.class), checked.toString(),
+          estimateOld(checked, today), instant(r, 6));
+    }, row.id());
+    // The most recently checked estimate stands in for a valuation range when no licensed range exists.
+    String inUse = estimates.isEmpty() ? null : estimates.getLast().id();
     var decoded = row.decoded();
     boolean owed = content.moneyOwed() == MoneyOwed.YES;
     return new Trade(row.id(), row.revision(), new Vehicle(content.vin(), decoded.outcome(), decoded.source(), decoded.version(),
@@ -318,7 +395,7 @@ public class TradeService {
         content.payoffGoodThrough() == null ? null : content.payoffGoodThrough().toString(),
         content.moneyOwed() == MoneyOwed.NOT_SURE || owed && content.payoffMinor() == null,
         owed && content.payoffGoodThrough() != null && content.payoffGoodThrough().isBefore(today),
-        content.moneyOwed() != null, row.changedAt(), offers, best);
+        content.moneyOwed() != null, row.changedAt(), offers, best, estimates, inUse);
   }
 
   private Holder holder(String caseId) {
@@ -354,17 +431,19 @@ public class TradeService {
         holder.journey() ? holder.journeyId() : holder.caseId()).stream().findFirst();
   }
 
-  private void insert(Holder holder, Content content, Decoded decoded, Instant now) {
+  private String insert(Holder holder, Content content, Decoded decoded, Instant now) {
+    String id = UUID.randomUUID().toString();
     jdbc.update("""
         insert into trade_vehicles(id, journey_id, account_id, case_id, vin, decode_outcome, decoder_source, decoder_version,
           decoded_at, model_year, make, model, trim_name, mileage, condition, money_owed, lender, payoff_minor,
           payoff_good_through, revision, changed_at, created_at)
         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-        """, UUID.randomUUID().toString(), holder.journeyId(), holder.accountId(), holder.journey() ? null : holder.caseId(),
+        """, id, holder.journeyId(), holder.accountId(), holder.journey() ? null : holder.caseId(),
         content.vin(), decoded.outcome().name(), decoded.source(), decoded.version(), Timestamp.from(decoded.decodedAt()),
         decoded.year(), decoded.make(), decoded.model(), decoded.trim(), content.mileage(), content.condition().name(),
         name(content.moneyOwed()), content.lender(), content.payoffMinor(), date(content.payoffGoodThrough()),
         Timestamp.from(now), Timestamp.from(now));
+    return id;
   }
 
   /** An offer added or removed changes what the trade is compared with, so it also dates the trade. */
@@ -465,11 +544,36 @@ public class TradeService {
     return new ValidOffer(amount, source, offerDate, expiresOn);
   }
 
+  private static ValidEstimate validateEstimate(EstimateInput input) {
+    var errors = new ArrayList<TradeProblem.FieldError>();
+    var given = input == null ? new EstimateInput(null, null, null, null) : input;
+    String source = text(given.source());
+    if (source == null) errors.add(new TradeProblem.FieldError("source",
+        "Enter where you looked up the value, such as Carfax, up to 120 characters."));
+    Long low = given.lowMinor(), high = given.highMinor();
+    if (low == null || low <= 0 || low > MAX_AMOUNT_MINOR)
+      errors.add(new TradeProblem.FieldError("lowMinor", "Enter the value you were shown, or the low end of its range."));
+    else if (high != null && (high < low || high > MAX_AMOUNT_MINOR))
+      errors.add(new TradeProblem.FieldError("highMinor", "Enter the high end of the range, at or above the low end."));
+    if (high != null && high.equals(low)) high = null;
+    LocalDate checked = date(given.checkedOn(), LocalDate.of(2000, 1, 1), LocalDate.now(CALENDAR));
+    if (checked == null) errors.add(new TradeProblem.FieldError("checkedOn",
+        "Enter the date you looked up the value; it cannot be in the future."));
+    if (!errors.isEmpty()) throw invalid(errors);
+    return new ValidEstimate(source, low, high, checked);
+  }
+
+  /** Older than {@link #ESTIMATE_OLD_AFTER_DAYS} days on the pilot calendar. */
+  public static boolean estimateOld(LocalDate checkedOn, LocalDate today) {
+    return checkedOn.plusDays(ESTIMATE_OLD_AFTER_DAYS).isBefore(today);
+  }
+
   private static TradeProblem invalid(List<TradeProblem.FieldError> errors) {
     return new TradeProblem(HttpStatus.BAD_REQUEST, "TRADE_INVALID", "Check the highlighted trade-in details.", errors);
   }
 
   private static ResourceNotFoundException offerNotFound() { return new ResourceNotFoundException("Trade offer not found"); }
+  private static ResourceNotFoundException estimateNotFound() { return new ResourceNotFoundException("Trade estimate not found"); }
 
   private static <E extends Enum<E>> E parse(Class<E> type, String value) {
     if (value == null) return null;

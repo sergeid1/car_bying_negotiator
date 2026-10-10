@@ -1817,6 +1817,22 @@ fieldset.trade-choices input[type="radio"] { flex: none; width: 20px; height: 20
 .trade-offer-page { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
 /* End ticket 100. */
 
+/* Ticket 106: free trade value checks the Buyer runs themselves, and the estimates they type back. */
+.trade-value-checks, .trade-estimates { display: grid; gap: 12px; min-width: 0; overflow-wrap: anywhere; }
+.trade-value-checks h3, .trade-value-checks h4, .trade-estimates h3 { margin: 0; }
+.trade-value-checks > p, .trade-estimates > p { margin: 0; }
+.trade-value-links { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.trade-value-links > li { display: grid; gap: 4px; min-width: 0; padding: 14px 16px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--card); }
+.trade-value-links p { margin: 0; }
+.trade-value-links a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
+.trade-copy-values { display: grid; gap: 8px; margin: 0; }
+.trade-copy > dt { color: var(--ink-muted); font-size: 0.9rem; }
+.trade-copy > dd { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; min-width: 0; }
+.trade-copy .vin { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.trade-copy button { min-height: 44px; max-width: 100%; white-space: normal; }
+/* End ticket 106. */
+
 /* Ticket 105: "I'm at the dealer" in the header, and the flow from a photo to a first result. */
 .header-camera {
   position: relative; display: inline-flex; flex-direction: row; align-items: center; gap: 8px; min-height: 44px;

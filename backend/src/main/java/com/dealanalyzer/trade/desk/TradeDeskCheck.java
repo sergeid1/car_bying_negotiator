@@ -22,7 +22,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Checks the trade on desk paperwork against what the Buyer recorded (spec 5.9, TRADE-04, TRADE-05):
- * the allowance against the best unexpired written offer and a licensed valuation range, the
+ * the allowance against the best unexpired written offer and a licensed valuation range (or, without
+ * one, the Buyer's own most recent estimate from a site such as Carfax, ticket 106), the
  * paperwork's payoff against the Buyer's, the trade's equity, and the trade VIN. A shortfall is
  * shown in dollars and never counted as a dealer discount (DEAL-09); an allowance above the trade's
  * value is shown next to any price increase, never netted against it silently.
@@ -32,7 +33,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class TradeDeskCheck {
-  public static final String VERSION = "trade-desk-check.v1";
+  public static final String VERSION = "trade-desk-check.v2";
   private static final List<String> LOAN = List.of("AMOUNT_FINANCED", "APR", "TERM_MONTHS", "MONTHLY_PAYMENT");
   /** Lead order inside the TRADE group; informational lines follow. */
   private static final List<String> ORDER = List.of("TRADE_VIN_DIFFERENT", "BELOW_WRITTEN_OFFER", "BELOW_VALUATION_RANGE",
@@ -68,15 +69,27 @@ public class TradeDeskCheck {
    */
   public record TaxCredit(String status, String reason, String jurisdiction, String policyVersion, BigDecimal rate,
       Long creditMinor) {}
-  /** position: BELOW, WITHIN or ABOVE the range, or null when unavailable. Every amount is an estimate from the source. */
+  /**
+   * position: BELOW, WITHIN or ABOVE the range, or null when unavailable. Every amount is an estimate from the source.
+   * basis (v2): PROVIDER for ticket 101's adapter, or BUYER_ESTIMATE for a value the Buyer looked up and entered
+   * (ticket 106), which carries its {@code checkedOn} date, whether it is {@code old}, and the {@code label} the
+   * copy names it by. A v1 result has none of these and is read as PROVIDER.
+   */
   public record Valuation(String availability, String reason, String notice, String source, String licence,
       boolean synthetic, Instant retrievedAt, Instant observedAt, String conditionAssumption, Long lowMinor,
-      Long typicalMinor, Long highMinor, String position, Long belowLowMinor, Long aboveHighMinor) {}
+      Long typicalMinor, Long highMinor, String position, Long belowLowMinor, Long aboveHighMinor,
+      String basis, String estimateId, String checkedOn, Boolean old, String label) {
+    boolean buyerEstimate() { return BUYER_ESTIMATE.equals(basis); }
+    /** A single looked-up value rather than a range. */
+    boolean single() { return buyerEstimate() && Objects.equals(lowMinor, highMinor); }
+  }
+  static final String PROVIDER = "PROVIDER", BUYER_ESTIMATE = "BUYER_ESTIMATE";
   /** status: SAME, DIFFERENT, NOT_ON_PAPERWORK or NO_TRADE_RECORDED. */
   public record VinMatch(String status, String paperworkVin, String recordedVin) {}
   /**
    * TRADE-05: the allowance above the trade's value (the best written offer, else the top of the valuation
    * range) next to the price increase over the Agreed Price. netEffectMinor is positive when the Buyer is ahead.
+   * reference: WRITTEN_OFFER, VALUATION_HIGH, or BUYER_ESTIMATE_HIGH when the Buyer's estimate stood in.
    */
   public record PriceTogether(String reference, Long referenceMinor, Long allowanceAboveValueMinor,
       Long priceIncreaseMinor, Long netEffectMinor) {}
@@ -161,22 +174,25 @@ public class TradeDeskCheck {
           + " is at or above " + best.label() + " for " + money(best.amountMinor()) + "."));
     }
 
-    // Licensed valuation range, labelled as an estimate from its source; never estimated here.
+    // A licensed valuation range, labelled as an estimate from its source; without one, the Buyer's own
+    // estimate, named by where and when they looked it up. Nothing is estimated here.
     var valuation = compare ? valuation(caseId, trade, facts.zip(), allowance) : null;
     if (valuation != null) {
-      String from = " (an estimate from " + valuation.source() + ")";
       if (!"AVAILABLE".equals(valuation.availability()))
         findings.add(info("VALUATION_UNAVAILABLE", "A trade-in value range is unavailable: " + valuation.notice()
             + " The allowance is not compared with a value range."));
+      else if (valuation.buyerEstimate()) findings.add(estimateFinding(valuation, allowance));
       else if ("BELOW".equals(valuation.position()))
         findings.add(new Finding("BELOW_VALUATION_RANGE", "WARNING", "The trade-in allowance of " + money(allowance)
             + " is " + money(valuation.belowLowMinor()) + " below the low end of the trade-in range, "
-            + money(valuation.lowMinor()) + " to " + money(valuation.highMinor()) + from + ".", valuation.belowLowMinor(),
+            + money(valuation.lowMinor()) + " to " + money(valuation.highMinor()) + " (an estimate from " + valuation.source()
+            + ").", valuation.belowLowMinor(),
             "The trade-in range I have starts at " + money(valuation.lowMinor()) + ". How did you arrive at " + money(allowance) + "?", true));
       else findings.add(new Finding("ABOVE".equals(valuation.position()) ? "ABOVE_VALUATION_RANGE" : "WITHIN_VALUATION_RANGE",
           "INFORMATIONAL", "The trade-in allowance of " + money(allowance) + " is "
               + ("ABOVE".equals(valuation.position()) ? "above" : "within") + " the trade-in range, "
-              + money(valuation.lowMinor()) + " to " + money(valuation.highMinor()) + from + ".", null, null, true));
+              + money(valuation.lowMinor()) + " to " + money(valuation.highMinor()) + " (an estimate from "
+              + valuation.source() + ").", null, null, true));
     }
 
     // Payoff: the paperwork's against the Buyer's; stale or unknown never counts as the same.
@@ -243,7 +259,8 @@ public class TradeDeskCheck {
     // TRADE-05: an allowance above the trade's value is shown next to any price increase, never netted silently.
     PriceTogether together = null;
     if (compare) {
-      String reference = best != null ? "WRITTEN_OFFER" : valuation != null && valuation.highMinor() != null ? "VALUATION_HIGH" : null;
+      String reference = best != null ? "WRITTEN_OFFER" : valuation == null || valuation.highMinor() == null ? null
+          : valuation.buyerEstimate() ? "BUYER_ESTIMATE_HIGH" : "VALUATION_HIGH";
       Long referenceMinor = best != null ? Long.valueOf(best.amountMinor()) : reference == null ? null : valuation.highMinor();
       Long above = referenceMinor == null || allowance <= referenceMinor ? null : allowance - referenceMinor;
       Long increase = priceIncrease(deskTerms, agreedTerms);
@@ -251,24 +268,44 @@ public class TradeDeskCheck {
         together = new PriceTogether(reference, referenceMinor, above, increase,
             above == null || increase == null ? null : above - increase);
       String against = "WRITTEN_OFFER".equals(reference) ? best.label() + " for " + money(referenceMinor)
+          : "BUYER_ESTIMATE_HIGH".equals(reference) ? (valuation.single() ? "" : "the top of ") + valuation.label()
+              + " (" + money(referenceMinor) + ")"
           : "the top of the trade-in range (" + money(referenceMinor == null ? 0 : referenceMinor) + ", an estimate from "
               + (valuation == null ? "" : valuation.source()) + ")";
+      boolean estimated = "VALUATION_HIGH".equals(reference) || "BUYER_ESTIMATE_HIGH".equals(reference);
       if (above != null && increase != null && increase > 0) {
         long net = above - increase;
         findings.add(new Finding("ALLOWANCE_OFFSET_BY_PRICE", "WARNING", "The trade-in allowance is " + money(above)
             + " above " + against + ", but the price is " + money(increase) + " higher than agreed, so together they leave you "
             + (net == 0 ? "even." : money(Math.abs(net)) + (net > 0 ? " ahead." : " behind.")), net < 0 ? -net : null,
-            "If you lower the price back to what we agreed, what is the trade-in allowance?", "VALUATION_HIGH".equals(reference)));
+            "If you lower the price back to what we agreed, what is the trade-in allowance?", estimated));
       } else if (above != null)
         findings.add(new Finding("ALLOWANCE_ABOVE_VALUE", "INFORMATIONAL", "The trade-in allowance is " + money(above)
             + " above " + against + ". Judge it together with the selling price, which is where a higher allowance can be "
-            + "paid for.", null, "What is the selling price without the trade-in?", "VALUATION_HIGH".equals(reference)));
+            + "paid for.", null, "What is the selling price without the trade-in?", estimated));
     }
 
     findings.sort(Comparator.comparingInt(finding -> ORDER.indexOf(finding.code())));
     return new Result(VERSION, "CHECKED", "USD", allowance, paperworkPayoff, buyerPayoff, payoffDifference, equity, basis,
         negativeFinanced, cost, best, compare ? shortfall : null, tax, compare ? gapAfterTax : null, valuation, vin, together,
         List.copyOf(findings));
+  }
+
+  /** The allowance against the Buyer's own estimate, named by its source and date; an old estimate is said to be old. */
+  private static Finding estimateFinding(Valuation estimate, long allowance) {
+    String amount = estimate.single() ? money(estimate.lowMinor())
+        : money(estimate.lowMinor()) + " to " + money(estimate.highMinor());
+    String old = Boolean.TRUE.equals(estimate.old()) ? " That estimate is old: you looked it up on " + estimate.checkedOn()
+        + ". Look it up again before relying on it." : "";
+    if ("BELOW".equals(estimate.position()))
+      return new Finding("BELOW_VALUATION_RANGE", "WARNING", "The trade-in allowance of " + money(allowance) + " is "
+          + money(estimate.belowLowMinor()) + " below " + (estimate.single() ? "" : "the low end of ") + estimate.label()
+          + ", " + amount + "." + old, estimate.belowLowMinor(),
+          "My " + estimate.source() + " estimate for this car is " + amount + ". How did you arrive at " + money(allowance) + "?", true);
+    boolean above = "ABOVE".equals(estimate.position());
+    return new Finding(above ? "ABOVE_VALUATION_RANGE" : "WITHIN_VALUATION_RANGE", "INFORMATIONAL", "The trade-in allowance of "
+        + money(allowance) + " is " + (above ? "above " : "within ") + estimate.label() + ", " + amount + "." + old,
+        null, null, true);
   }
 
   private static Finding info(String code, String summary) {
@@ -353,10 +390,36 @@ public class TradeDeskCheck {
     return new TaxCredit("AVAILABLE", null, jurisdiction, policy.version(), policy.taxRate(), credit);
   }
 
+  /**
+   * The licensed range when the adapter gives one; otherwise the Buyer's most recent estimate, when they
+   * recorded one. A synthetic development range is not licensed, so a Buyer estimate stands in for it too.
+   */
   private Valuation valuation(String caseId, TradeService.Trade trade, String zip, long allowance) {
+    var estimate = trade.estimates() == null ? null : trade.estimates().stream()
+        .filter(item -> item.id().equals(trade.estimateInUseId())).findFirst().orElse(null);
+    var provided = providerValuation(caseId, trade, zip, allowance);
+    boolean licensed = "AVAILABLE".equals(provided.availability()) && !provided.synthetic();
+    return estimate == null || licensed ? provided : buyerEstimate(estimate, allowance);
+  }
+
+  private Valuation buyerEstimate(TradeService.Estimate estimate, long allowance) {
+    long low = estimate.lowMinor(), high = estimate.highMinor() == null ? low : estimate.highMinor();
+    String position = allowance < low ? "BELOW" : allowance > high ? "ABOVE" : "WITHIN";
+    boolean old = TradeService.estimateOld(java.time.LocalDate.parse(estimate.checkedOn()),
+        java.time.LocalDate.ofInstant(clock.instant(), java.time.ZoneId.of("America/New_York")));
+    String label = "your " + estimate.source() + " estimate from " + estimate.checkedOn();
+    String notice = "You looked this value up on " + estimate.source() + " and entered it yourself; otdog has not "
+        + "checked it, and it is not an offer." + (old ? " It is old, from " + estimate.checkedOn() + "." : "");
+    return new Valuation("AVAILABLE", null, notice, estimate.source(), "BUYER_ENTERED", false, null, null, null, low,
+        estimate.highMinor() == null ? low : null, high, position, position.equals("BELOW") ? low - allowance : null,
+        position.equals("ABOVE") ? allowance - high : null, BUYER_ESTIMATE, estimate.id(), estimate.checkedOn(), old, label);
+  }
+
+  private Valuation providerValuation(String caseId, TradeService.Trade trade, String zip, long allowance) {
     TradeValuationAdapter.Result result;
     if (zip == null) return new Valuation("UNAVAILABLE", "MISSING_FIELDS", "A trade-in value range needs the dealer's "
-        + "five-digit ZIP, which this case does not have.", null, null, false, null, null, null, null, null, null, null, null, null);
+        + "five-digit ZIP, which this case does not have.", null, null, false, null, null, null, null, null, null, null, null, null,
+        PROVIDER, null, null, null, null);
     String key = caseId + "|" + trade.id() + "|" + trade.revision() + "|" + zip;
     var cached = recent.get(key);
     Instant now = clock.instant();
@@ -371,13 +434,14 @@ public class TradeDeskCheck {
     var provider = result.provider();
     if (result.availability() != TradeValuationAdapter.Availability.AVAILABLE)
       return new Valuation(result.availability().name(), result.reason().name(), result.notice(), provider.name(),
-          provider.licenceMetadata(), provider.synthetic(), result.retrievedAt(), null, null, null, null, null, null, null, null);
+          provider.licenceMetadata(), provider.synthetic(), result.retrievedAt(), null, null, null, null, null, null, null, null,
+          PROVIDER, null, null, null, null);
     var range = result.range();
     String position = allowance < range.lowMinor() ? "BELOW" : allowance > range.highMinor() ? "ABOVE" : "WITHIN";
     return new Valuation("AVAILABLE", null, result.notice(), provider.name(), provider.licenceMetadata(), provider.synthetic(),
         result.retrievedAt(), result.observedAt(), result.conditionAssumption().name(), range.lowMinor(), range.typicalMinor(),
         range.highMinor(), position, position.equals("BELOW") ? range.lowMinor() - allowance : null,
-        position.equals("ABOVE") ? allowance - range.highMinor() : null);
+        position.equals("ABOVE") ? allowance - range.highMinor() : null, PROVIDER, null, null, null, null);
   }
 
   /** Price added since the Agreed Price: a higher selling price plus a smaller discount. Null without one. */

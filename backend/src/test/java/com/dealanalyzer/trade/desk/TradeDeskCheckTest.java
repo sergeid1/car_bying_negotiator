@@ -51,16 +51,25 @@ class TradeDeskCheckTest {
   }
 
   private void recorded(MoneyOwed owed, Long payoff, String goodThrough, boolean stale, Offer... offers) {
+    recorded(List.of(), owed, payoff, goodThrough, stale, offers);
+  }
+
+  private void recorded(List<Estimate> estimates, MoneyOwed owed, Long payoff, String goodThrough, boolean stale, Offer... offers) {
     var best = Arrays.stream(offers).filter(Offer::usedForComparison).max(Comparator.comparingLong(Offer::amountMinor))
         .map(Offer::id).orElse(null);
     var trade = new Trade("trade-1", 3, new Vehicle(TRADE_VIN, null, "SYNTHETIC", "v1", Instant.EPOCH, "2021", "Honda",
         "CR-V", "EX"), 61000, Condition.GOOD, owed, owed == MoneyOwed.YES ? "Synthetic Credit Union" : null, payoff,
-        goodThrough, owed != MoneyOwed.NO && payoff == null, stale, true, Instant.EPOCH, List.of(offers), best);
+        goodThrough, owed != MoneyOwed.NO && payoff == null, stale, true, Instant.EPOCH, List.of(offers), best, estimates,
+        estimates.isEmpty() ? null : estimates.getLast().id());
     when(trades.view(anyString(), anyString())).thenReturn(new View("CASE", trade, null, List.of()));
   }
 
   private static Offer offer(String id, long amount, String source, boolean expired) {
     return new Offer(id, amount, source, "2026-10-08", expired ? "2026-10-09" : "2026-10-15", expired, !expired, null, Instant.EPOCH);
+  }
+
+  private static Estimate estimate(String id, String source, long low, Long high, String checkedOn) {
+    return new Estimate(id, source, low, high, checkedOn, false, Instant.EPOCH);
   }
 
   private static JsonNode terms(Object... fieldsAndValues) {
@@ -194,6 +203,82 @@ class TradeDeskCheckTest {
     assertThat(codes(none)).contains("VALUATION_UNAVAILABLE").doesNotContain("BELOW_VALUATION_RANGE");
   }
 
+  @Test void withoutALicensedRangeTheBuyersEstimateStandsInNamedByWhereAndWhenItWasLookedUp() {
+    var desk = check(Scenario.UNAVAILABLE);
+    recorded(List.of(estimate("older", "Kelley Blue Book", 1_000_000, 1_200_000L, "2026-09-20"),
+        estimate("carfax", "Carfax", 1_400_000, 1_600_000L, "2026-10-05")), MoneyOwed.NO, null, null, false);
+    var below = desk.check("case", "token", terms("TRADE_ALLOWANCE", 1_150_000), null);
+    var valuation = below.valuation();
+    assertThat(valuation.basis()).isEqualTo("BUYER_ESTIMATE");
+    assertThat(valuation.estimateId()).as("the most recently looked-up estimate is used").isEqualTo("carfax");
+    assertThat(valuation.label()).isEqualTo("your Carfax estimate from 2026-10-05");
+    assertThat(valuation.licence()).isEqualTo("BUYER_ENTERED");
+    assertThat(valuation.old()).isFalse();
+    assertThat(valuation.notice()).contains("entered it yourself", "not an offer");
+    assertThat(codes(below)).contains("BELOW_VALUATION_RANGE").doesNotContain("VALUATION_UNAVAILABLE");
+    var finding = below.leading().stream().filter(item -> item.code().equals("BELOW_VALUATION_RANGE")).findFirst().orElseThrow();
+    assertThat(finding.amountMinor()).isEqualTo(250_000);
+    assertThat(finding.estimate()).isTrue();
+    assertThat(finding.summary()).contains("$2,500 below the low end of your Carfax estimate from 2026-10-05, $14,000 to $16,000");
+    assertThat(finding.deskQuestion()).contains("My Carfax estimate", "$14,000 to $16,000");
+    assertThat(below.bestOffer()).as("an estimate is never an offer").isNull();
+    assertThat(below.shortfallToOfferMinor()).isNull();
+
+    // A single value: at it is within, above it is said plainly, and an allowance above it sits next to the price.
+    recorded(List.of(estimate("one", "Carfax", 1_500_000, null, "2026-10-05")), MoneyOwed.NO, null, null, false);
+    var at = desk.check("case", "token", terms("TRADE_ALLOWANCE", 1_500_000), null);
+    assertThat(at.valuation().typicalMinor()).isEqualTo(1_500_000);
+    assertThat(at.findings().stream().filter(item -> item.code().equals("WITHIN_VALUATION_RANGE")).findFirst().orElseThrow()
+        .summary()).contains("within your Carfax estimate from 2026-10-05, $15,000.");
+    var agreed = terms("SELLING_PRICE", 2_500_000);
+    var paidFor = desk.check("case", "token", terms("TRADE_ALLOWANCE", 1_700_000, "SELLING_PRICE", 2_800_000), agreed);
+    assertThat(codes(paidFor)).contains("ABOVE_VALUATION_RANGE", "ALLOWANCE_OFFSET_BY_PRICE");
+    assertThat(paidFor.priceTogether().reference()).isEqualTo("BUYER_ESTIMATE_HIGH");
+    assertThat(paidFor.priceTogether().netEffectMinor()).isEqualTo(200_000 - 300_000);
+    var offset = paidFor.leading().stream().filter(item -> item.code().equals("ALLOWANCE_OFFSET_BY_PRICE")).findFirst().orElseThrow();
+    assertThat(offset.summary()).contains("$2,000 above your Carfax estimate from 2026-10-05 ($15,000)", "$1,000 behind");
+    assertThat(offset.estimate()).isTrue();
+  }
+
+  @Test void anEstimateOlderThanThirtyDaysIsCalledOldNotIgnored() {
+    var desk = check(Scenario.UNAVAILABLE);
+    recorded(List.of(estimate("carfax", "Carfax", 1_400_000, 1_600_000L, "2026-09-09")), MoneyOwed.NO, null, null, false);
+    var result = desk.check("case", "token", terms("TRADE_ALLOWANCE", 1_150_000), null);
+    assertThat(result.valuation().old()).isTrue();
+    var finding = result.leading().stream().filter(item -> item.code().equals("BELOW_VALUATION_RANGE")).findFirst().orElseThrow();
+    assertThat(finding.severity()).isEqualTo("WARNING");
+    assertThat(finding.summary()).contains("That estimate is old", "2026-09-09");
+    // Thirty days ago exactly is not yet old.
+    recorded(List.of(estimate("carfax", "Carfax", 1_400_000, 1_600_000L, "2026-09-10")), MoneyOwed.NO, null, null, false);
+    assertThat(desk.check("case", "token", terms("TRADE_ALLOWANCE", 1_150_000), null).valuation().old()).isFalse();
+  }
+
+  @Test void aLicensedRangeTakesPrecedenceOverTheBuyersEstimate() {
+    var estimates = List.of(estimate("carfax", "Carfax", 1_000_000, null, "2026-10-05"));
+    var licensed = new com.dealanalyzer.trade.valuation.TradeValuationAdapter.Provider("LICENSED_TEST", "v1", "TEST", false);
+    var range = new com.dealanalyzer.trade.valuation.TradeValuationAdapter.Range(1_400_000, 1_600_000, 1_800_000, "USD");
+    when(valuations.value(anyString(), any(TradeVehicle.class), anyString())).thenReturn(
+        new com.dealanalyzer.trade.valuation.TradeValuationAdapter.Result(
+            com.dealanalyzer.trade.valuation.TradeValuationAdapter.Availability.AVAILABLE, null, licensed, CLOCK.instant(),
+            CLOCK.instant(), Condition.GOOD, range, BigDecimal.ZERO));
+    when(policies.hasPolicy("US-NC")).thenReturn(true);
+    when(policies.requirePolicy("US-NC")).thenReturn(policy("US-NC.cash.v1", "US-NC", "0.03"));
+    var desk = new TradeDeskCheck(trades, valuations, policies, null, CLOCK) {
+      @Override CaseFacts facts(String caseId) { return new CaseFacts(jurisdiction, "27604"); }
+    };
+    recorded(estimates, MoneyOwed.NO, null, null, false);
+    var result = desk.check("case", "token", terms("TRADE_ALLOWANCE", 1_150_000), null);
+    assertThat(result.valuation().basis()).isEqualTo("PROVIDER");
+    assertThat(result.valuation().source()).isEqualTo("LICENSED_TEST");
+    assertThat(result.findings().stream().map(TradeDeskCheck.Finding::summary)).noneMatch(text -> text.contains("Carfax"));
+
+    // Without an estimate, the development range is still shown as before.
+    recorded(MoneyOwed.NO, null, null, false);
+    var fake = check(Scenario.NORMAL).check("case", "token", terms("TRADE_ALLOWANCE", 1_150_000), null);
+    assertThat(fake.valuation().basis()).isEqualTo("PROVIDER");
+    assertThat(fake.valuation().synthetic()).isTrue();
+  }
+
   @Test void aShortfallIsNeverADiscountAndAnAllowanceAboveValueIsShownNextToThePriceIncrease() {
     var desk = check(Scenario.NORMAL);
     recorded(MoneyOwed.NO, null, null, false, offer("best", 1_400_000, "Synthetic Car Exchange", false));
@@ -283,6 +368,13 @@ class TradeDeskCheckTest {
     recorded(MoneyOwed.NO, null, null, false);
     all.addAll(desk.check("case", "token", terms("TRADE_ALLOWANCE", 1_150_000, "TRADE_PAYOFF", 1_000), null).findings());
     all.addAll(check(Scenario.UNAVAILABLE).check("case", "token", terms("TRADE_ALLOWANCE", 1_150_000), null).findings());
+    var noRange = check(Scenario.UNAVAILABLE);
+    for (var estimates : List.of(List.of(estimate("range", "Carfax", 1_400_000, 1_600_000L, "2026-08-01")),
+        List.of(estimate("single", "Carfax", 1_500_000, null, "2026-10-05")))) {
+      recorded(estimates, MoneyOwed.NO, null, null, false);
+      for (long allowance : new long[] {1_150_000, 1_500_000, 1_900_000})
+        all.addAll(noRange.check("case", "token", terms("TRADE_ALLOWANCE", allowance, "SELLING_PRICE", 2_650_000), agreed).findings());
+    }
     jurisdiction = "US-FL";
     recorded(MoneyOwed.NO, null, null, false, offer);
     all.addAll(desk.check("case", "token", terms("TRADE_ALLOWANCE", 1_150_000, "SELLING_PRICE", 2_500_000), null).findings());

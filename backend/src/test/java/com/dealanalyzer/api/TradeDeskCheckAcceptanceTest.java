@@ -143,6 +143,21 @@ class TradeDeskCheckAcceptanceTest {
       assertThat(other.at("/trade/findings").findValuesAsText("code")).containsExactly("TRADE_VIN_DIFFERENT");
       assertThat(other.at("/trade/equityMinor").isNull()).isTrue();
 
+      // Ticket 106: without a licensed range, the Buyer's own estimate stands in, named by where and when it was
+      // looked up; the written offer is still the only offer.
+      paperwork = "TRADE";
+      upload(app, base, token, "desk-trade-estimate");
+      String checkedOn = TradeVehicleAcceptanceTest.today().minusDays(1).toString();
+      assertThat(TradeVehicleAcceptanceTest.addEstimate(client, caseId, token, "carfax", Map.of("source", "Carfax",
+          "lowMinor", 1_300_000, "highMinor", 1_500_000, "checkedOn", checkedOn)).status()).isEqualTo(201);
+      var estimated = get(client, desk, token).path("trade");
+      assertThat(estimated.at("/valuation/basis").asText()).isEqualTo("BUYER_ESTIMATE");
+      assertThat(estimated.at("/valuation/label").asText()).isEqualTo("your Carfax estimate from " + checkedOn);
+      assertThat(estimated.path("policyVersion").asText()).isEqualTo("trade-desk-check.v2");
+      assertThat(find(estimated.path("findings"), "code", "BELOW_VALUATION_RANGE").path("summary").asText())
+          .contains("$1,500 below the low end of your Carfax estimate from " + checkedOn, "$13,000 to $15,000");
+      assertThat(estimated.at("/bestOffer/source").asText()).isEqualTo("Synthetic Car Exchange");
+
       // A fresh desk case without a journey holds its own trade, and its report leads with the trade.
       paperwork = "TRADE";
       var fresh = post(client, "/api/v1/cases", validCase(), "fresh-case");

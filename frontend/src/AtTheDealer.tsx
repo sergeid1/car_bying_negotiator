@@ -3,6 +3,7 @@ import { AccountSignedInContext } from "./BuyerAccount";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import type { FreshDeskCase } from "./DeskCheck";
 import { toMinor, vehicleName, type Trade, type TradeView } from "./TradeVehicle";
+import { TradeValueLinks } from "./TradeValueChecks";
 import type { DeskTacticFinding } from "./DeskTactics";
 
 type Credentials = { caseId: string; token: string };
@@ -454,6 +455,8 @@ function Questions({ credentials, ask, recorded, financing, busy, error, onDone 
   const [owed, setOwed] = useState<string>("");
   const [unknownPayoff, setUnknownPayoff] = useState(false);
   const [hasOwn, setHasOwn] = useState<"YES" | "NO">();
+  const [typedVin, setTypedVin] = useState("");
+  const [typedMileage, setTypedMileage] = useState("");
   const [conditions, setConditions] = useState(CONDITIONS);
   const [problem, setProblem] = useState<{ field: string; message: string }>();
   useEffect(() => {
@@ -512,8 +515,10 @@ function Questions({ credentials, ask, recorded, financing, busy, error, onDone 
     {ask === "DETAILS" && <p>This paperwork shows a trade-in. Tell us about the car, once; it stays with your journey.</p>}
     {ask === "OWED" && recorded && <p>Your trade-in: {vehicleName(recorded)}.</p>}
     {(ask === "DETAILS" || ask === "WHETHER") && trading === "YES" && <>
-      <label>Trade-in VIN<input name="tradeVin" autoComplete="off" required /></label>{field("vin")}
-      <label>Mileage<input name="mileage" inputMode="numeric" required /></label>{field("mileage")}
+      <label>Trade-in VIN<input name="tradeVin" autoComplete="off" required value={typedVin}
+        onChange={event => setTypedVin(event.target.value)} /></label>{field("vin")}
+      <label>Mileage<input name="mileage" inputMode="numeric" required value={typedMileage}
+        onChange={event => setTypedMileage(event.target.value)} /></label>{field("mileage")}
       <label>Condition<select name="condition" required defaultValue="">
         <option value="" disabled>Choose one</option>
         {conditions.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>{field("condition")}
@@ -529,6 +534,9 @@ function Questions({ credentials, ask, recorded, financing, busy, error, onDone 
         </>}
       </>}
     </>}
+    {(recorded && ask !== "WHETHER" && ask !== "DETAILS" ? <TradeValueLinks headingLevel={4} vin={recorded.vehicle.vin} mileage={recorded.mileage} />
+      : (ask === "DETAILS" || ask === "WHETHER") && trading === "YES" ? <TradeValueLinks headingLevel={4} vin={typedVin.trim() || null}
+        mileage={/^\d+$/.test(typedMileage.replace(/[,\s]/g, "")) ? Number(typedMileage.replace(/[,\s]/g, "")) : null} /> : null)}
     {financing && <fieldset><legend>The worksheet shows a loan. Do you have your own loan offer from a bank or credit union?</legend>
       <div className="segmented">
         <label><input type="radio" name="hasOwn" required checked={hasOwn === "YES"} onChange={() => setHasOwn("YES")} />Yes</label>

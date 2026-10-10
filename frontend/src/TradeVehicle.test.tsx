@@ -157,3 +157,83 @@ test("an unreachable trade endpoint shows nothing", async () => {
   await new Promise(resolve => setTimeout(resolve, 20));
   expect(container).toBeEmptyDOMElement();
 });
+
+// Ticket 106: free value checks the Buyer runs themselves, and the estimates they type back.
+const ESTIMATES: Trade["estimates"] = [
+  { id: "kbb", source: "Kelley Blue Book", lowMinor: 1300000, highMinor: null, checkedOn: "2026-08-01", old: true, createdAt: "2026-08-01T12:00:00Z" },
+  { id: "carfax", source: "Carfax", lowMinor: 1400000, highMinor: 1600000, checkedOn: "2026-10-05", old: false, createdAt: "2026-10-05T12:00:00Z" },
+];
+
+test("a recorded trade links to the Carfax and CarMax checks with no tracking, and offers the VIN and mileage to copy", async () => {
+  const user = userEvent.setup();
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(respond(tradeView(tradeFixture())));
+  render(<TradeVehicle caseId="case" token="token" />);
+  const section = (await screen.findByRole("heading", { name: "Check what your car is worth" })).closest("section")!;
+  const links = within(section).getAllByRole("link");
+  expect(links.map(link => link.getAttribute("href"))).toEqual(["https://www.carfax.com/value/", "https://www.carmax.com/sell-my-car"]);
+  for (const link of links) {
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link.getAttribute("href")).not.toMatch(/[?#]/);
+    expect(link).toHaveAccessibleName(/opens in a new tab/);
+  }
+  expect(section).toHaveTextContent("It is not an offer.");
+  expect(section).toHaveTextContent("A written offer to buy the car, good for a set number of days");
+  expect(section).toHaveTextContent("About 2 minutes.");
+  expect(section).toHaveTextContent("does not look them up, check them or vouch for them");
+  await user.click(within(section).getByRole("button", { name: "Copy VIN" }));
+  expect(writeText).toHaveBeenCalledWith("5J6RW2H52ML000002");
+  await user.click(within(section).getByRole("button", { name: "Copy mileage" }));
+  expect(writeText).toHaveBeenLastCalledWith("61000");
+  expect(within(section).getAllByRole("status").some(status => status.textContent === "Copied.")).toBe(true);
+  // A CarMax or Carvana offer is steered to the written offers.
+  expect(screen.getByText(/such as a CarMax or Carvana instant offer/)).toBeInTheDocument();
+});
+
+test("estimates are listed as estimates, never offers, with the old one called old", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(respond(tradeView(tradeFixture({ estimates: ESTIMATES, estimateInUseId: "carfax" }))));
+  render(<TradeVehicle caseId="case" token="token" />);
+  const items = within(await screen.findByRole("list", { name: "Your trade-in estimates" })).getAllByRole("listitem");
+  expect(items[0]).toHaveTextContent("$13,000.00");
+  expect(items[0]).toHaveTextContent("Your Kelley Blue Book estimate from Aug 1, 2026.");
+  expect(items[0]).toHaveTextContent("Old: looked up more than 30 days ago");
+  expect(items[1]).toHaveTextContent("$14,000.00 to $16,000.00");
+  expect(items[1]).toHaveTextContent("Estimate, not an offer");
+  expect(items[1]).toHaveTextContent("The most recent one.");
+  const offers = within(screen.getByRole("list", { name: "Your written trade offers" })).getAllByRole("listitem");
+  expect(offers.map(offer => offer.textContent).join(" ")).not.toContain("Carfax");
+});
+
+test("an estimate is recorded with its source, range and date, and a CarMax entry is steered to the written offers", async () => {
+  const user = userEvent.setup();
+  const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    if (String(input).endsWith("/trade/estimates") && init?.method === "POST") {
+      const body = JSON.parse(String(init.body));
+      if (!body.source) return respond({ detail: "Check the highlighted trade-in details.", errors: [
+        { field: "source", message: "Enter where you looked up the value, such as Carfax, up to 120 characters." }] }, 400);
+      return respond(tradeView(tradeFixture({ estimates: ESTIMATES.slice(1), estimateInUseId: "carfax" })), 201);
+    }
+    return respond(tradeView(tradeFixture()));
+  });
+  render(<TradeVehicle caseId="case" token="token" />);
+  await user.click(await screen.findByRole("button", { name: "Add an estimate I looked up" }));
+  await user.click(screen.getByRole("radio", { name: "Another site" }));
+  await user.type(screen.getByLabelText("Site name"), "CarMax");
+  expect(screen.getByText(/is a written offer, not an estimate/)).toHaveTextContent("Add a written offer");
+  await user.clear(screen.getByLabelText("Site name"));
+  await user.type(screen.getByLabelText("Value, or the low end of its range ($)"), "14,000");
+  await user.click(screen.getByRole("button", { name: "Add estimate" }));
+  expect(await screen.findByText(/Enter where you looked up the value/)).toBeInTheDocument();
+  expect(screen.getByLabelText("Site name")).toHaveAttribute("aria-invalid", "true");
+  await user.click(screen.getByRole("radio", { name: "Carfax" }));
+  await user.type(screen.getByLabelText("High end of the range, if it showed one ($)"), "16000");
+  await user.clear(screen.getByLabelText("Date you looked it up"));
+  await user.type(screen.getByLabelText("Date you looked it up"), "2026-10-05");
+  await user.click(screen.getByRole("button", { name: "Add estimate" }));
+  expect(await screen.findByRole("list", { name: "Your trade-in estimates" })).toHaveTextContent("Your Carfax estimate from Oct 5, 2026.");
+  const posts = fetch.mock.calls.filter(([url, init]) => String(url).endsWith("/trade/estimates") && init?.method === "POST");
+  expect(JSON.parse(String(posts.at(-1)![1]!.body))).toEqual({ source: "Carfax", lowMinor: 1400000, highMinor: 1600000, checkedOn: "2026-10-05" });
+  expect((posts.at(-1)![1]!.headers as Record<string, string>)["Idempotency-Key"]).toBeTruthy();
+});

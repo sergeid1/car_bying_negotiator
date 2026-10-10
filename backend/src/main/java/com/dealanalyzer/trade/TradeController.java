@@ -58,6 +58,21 @@ public class TradeController {
     return trades.removeOffer(caseId, token, offerId);
   }
 
+  /** A trade value the Buyer looked up themselves; nothing is fetched from the site they name. */
+  @PostMapping("/estimates") @ResponseStatus(HttpStatus.CREATED)
+  public TradeService.View addEstimate(@PathVariable String caseId,
+      @RequestHeader(value = "Case-Access-Token", required = false) String token,
+      @RequestHeader(value = "Idempotency-Key", required = false) String key,
+      @RequestBody(required = false) TradeService.EstimateInput input) {
+    return trades.addEstimate(caseId, token, key, input);
+  }
+
+  @DeleteMapping("/estimates/{estimateId}")
+  public TradeService.View removeEstimate(@PathVariable String caseId, @PathVariable String estimateId,
+      @RequestHeader(value = "Case-Access-Token", required = false) String token) {
+    return trades.removeEstimate(caseId, token, estimateId);
+  }
+
   @GetMapping("/offers/{offerId}/pages/{pageNumber}/image")
   public ResponseEntity<byte[]> evidencePage(@PathVariable String caseId, @PathVariable String offerId,
       @PathVariable int pageNumber, @RequestHeader(value = "Case-Access-Token", required = false) String token) {

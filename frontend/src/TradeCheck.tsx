@@ -20,7 +20,9 @@ export type TradeCheckResult = {
     policyVersion: string | null; creditMinor: number | null };
   offerGapAfterTaxMinor: number | null;
   valuation: null | { availability: string; notice: string | null; source: string | null; synthetic: boolean; retrievedAt: string | null;
-    conditionAssumption: string | null; lowMinor: number | null; typicalMinor: number | null; highMinor: number | null; position: string | null };
+    conditionAssumption: string | null; lowMinor: number | null; typicalMinor: number | null; highMinor: number | null; position: string | null;
+    /** trade-desk-check.v2: BUYER_ESTIMATE when the Buyer's own looked-up value stood in (ticket 106); absent on v1 results. */
+    basis?: "PROVIDER" | "BUYER_ESTIMATE"; checkedOn?: string | null; old?: boolean | null; label?: string | null };
   vinMatch: null | { status: "SAME" | "DIFFERENT" | "NOT_ON_PAPERWORK" | "NO_TRADE_RECORDED"; paperworkVin: string | null; recordedVin: string | null };
   findings: TradeCheckFinding[];
 };
@@ -65,7 +67,12 @@ export function TradeCheckPanel({ result, heading = "Trade-in check", tactics = 
       {result.allowanceMinor !== null && <div><dt>Trade-in allowance on the paperwork</dt><dd>{money(result.allowanceMinor)}</dd></div>}
       {result.status === "CHECKED" && <div><dt>Best unexpired written offer</dt>
         <dd>{result.bestOffer ? `${money(result.bestOffer.amountMinor)} from ${result.bestOffer.source}, dated ${result.bestOffer.offerDate}, expires ${result.bestOffer.expiresOn}` : "None recorded"}</dd></div>}
-      {valuation && <div><dt>Trade-in range{valuation.source ? `, an estimate from ${valuation.source}` : ""}</dt>
+      {valuation?.basis === "BUYER_ESTIMATE" && valuation.lowMinor !== null && valuation.highMinor !== null && <div>
+        <dt>{valuation.label ? valuation.label.charAt(0).toUpperCase() + valuation.label.slice(1) : "Your estimate"}</dt>
+        <dd>{valuation.lowMinor === valuation.highMinor ? money(valuation.lowMinor) : `${money(valuation.lowMinor)} to ${money(valuation.highMinor)}`}.
+          {" "}An outside estimate you looked up; otdog did not check it, and it is not an offer.
+          {valuation.old && <> <span className="badge badge-warn">Old</span> Looked up more than 30 days ago; look it up again before relying on it.</>}</dd></div>}
+      {valuation && valuation.basis !== "BUYER_ESTIMATE" && <div><dt>Trade-in range{valuation.source ? `, an estimate from ${valuation.source}` : ""}</dt>
         <dd>{valuation.availability === "AVAILABLE" && valuation.lowMinor !== null && valuation.highMinor !== null
           ? `${money(valuation.lowMinor)} to ${money(valuation.highMinor)}${valuation.conditionAssumption ? `, assuming ${valuation.conditionAssumption.toLowerCase()} condition` : ""}${valuation.retrievedAt ? `, retrieved ${valuation.retrievedAt.slice(0, 10)}` : ""}${valuation.notice ? `. ${valuation.notice}` : ""}`
           : `Unavailable. ${valuation.notice ?? ""}`}</dd></div>}

@@ -282,13 +282,124 @@ class TradeVehicleAcceptanceTest {
       String caseId = opened.at("/case/id").asText(), token = opened.path("accessToken").asText();
       put(client, "/api/v1/cases/" + caseId + "/trade", input(null, "YES", "Gulf Bank", 1800000L, today().plusDays(10).toString(), false), token);
       addOffer(client, caseId, token, "offer", 1400000, "Sunshine Car Exchange", today(), today().plusDays(7));
+      assertThat(addEstimate(client, caseId, token, "estimate", Map.of("source", "Carfax", "lowMinor", 1500000,
+          "checkedOn", today().toString())).status()).isEqualTo(201);
       assertThat(account(client, "POST", "/api/v1/account/deletion", Map.of(), session, null).status()).isEqualTo(202);
       app.context().getBean(AccountDeletionWorker.class).runOnce();
       app.context().getBean(CaseDeletionWorker.class).runOnce();
       app.context().getBean(AccountDeletionWorker.class).runOnce();
-      for (String table : List.of("trade_vehicles", "trade_offers", "trade_case_journeys"))
+      for (String table : List.of("trade_vehicles", "trade_offers", "trade_estimates", "trade_case_journeys"))
         assertThat(jdbc(app).queryForObject("select count(*) from " + table, Long.class)).as(table).isZero();
     }
+  }
+
+  /** Ticket 106: a value the Buyer looked up is stored with the Trade Vehicle as an estimate, never as an offer. */
+  @Test void aBuyerEnteredEstimateIsStoredWithTheTradeCarriedLikeOffersAndExportedAndDeleted() throws Exception {
+    try (var app = start("trade-estimates")) {
+      var client = app.client();
+      var created = post(client, "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase());
+      String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+      String trade = "/api/v1/cases/" + id + "/trade";
+      var carfax = Map.<String, Object>of("source", "Carfax", "lowMinor", 1400000, "highMinor", 1600000,
+          "checkedOn", today().minusDays(2).toString());
+      var early = addEstimate(client, id, token, "early", carfax);
+      assertThat(early.status()).isEqualTo(409);
+      assertThat(early.body().path("code").asText()).isEqualTo("TRADE_NOT_RECORDED");
+      put(client, trade, Map.of("vin", TRADE_VIN, "mileage", 61000, "condition", "GOOD", "moneyOwed", "NO"), token);
+
+      var refused = addEstimate(client, id, token, "bad", Map.of("source", " ", "lowMinor", 1600000, "highMinor", 1400000,
+          "checkedOn", today().plusDays(1).toString()));
+      assertThat(refused.status()).isEqualTo(400);
+      assertThat(refused.body().path("errors").findValuesAsText("field")).containsExactly("source", "highMinor", "checkedOn");
+      var missingKey = client.post().uri(trade + "/estimates").header("Case-Access-Token", token)
+          .contentType(MediaType.APPLICATION_JSON).body(carfax).exchange((ignored, response) -> response.getStatusCode().value());
+      assertThat(missingKey).isEqualTo(400);
+
+      var added = addEstimate(client, id, token, "carfax", carfax);
+      assertThat(added.status()).isEqualTo(201);
+      var estimate = added.body().at("/trade/estimates/0");
+      assertThat(estimate.path("source").asText()).isEqualTo("Carfax");
+      assertThat(estimate.path("lowMinor").asLong()).isEqualTo(1400000);
+      assertThat(estimate.path("highMinor").asLong()).isEqualTo(1600000);
+      assertThat(estimate.path("old").asBoolean()).isFalse();
+      // It is never an offer: nothing joins the offers or the best-offer comparison.
+      assertThat(added.body().at("/trade/offers")).isEmpty();
+      assertThat(added.body().at("/trade/bestOfferId").isNull()).isTrue();
+      assertThat(addEstimate(client, id, token, "carfax", carfax).body().at("/trade/estimates")).as("a retry adds nothing").hasSize(1);
+      // A single value, looked up over 30 days ago, is old; the most recently looked up one is in use.
+      var old = addEstimate(client, id, token, "old", Map.of("source", "Kelley Blue Book", "lowMinor", 1500000,
+          "highMinor", 1500000, "checkedOn", today().minusDays(31).toString())).body();
+      var oldEstimate = old.at("/trade/estimates/0");
+      assertThat(oldEstimate.path("source").asText()).isEqualTo("Kelley Blue Book");
+      assertThat(oldEstimate.path("highMinor").isNull()).as("equal ends are a single value").isTrue();
+      assertThat(oldEstimate.path("old").asBoolean()).isTrue();
+      assertThat(old.at("/trade/estimateInUseId").asText()).isEqualTo(estimate.path("id").asText());
+
+      // A fresh desk case from this case without a journey gets a copy of the estimates with the vehicle.
+      var fresh = post(client, "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase(), "fresh");
+      var copied = call(client, "POST", "/api/v1/cases/" + fresh.at("/case/id").asText() + "/trade/carry-over",
+          Map.of("sourceCaseId", id), fresh.path("accessToken").asText(), token).body();
+      assertThat(copied.at("/trade/estimates").findValuesAsText("source")).containsExactly("Kelley Blue Book", "Carfax");
+
+      String oldId = oldEstimate.path("id").asText();
+      assertThat(call(client, "DELETE", trade + "/estimates/" + oldId, null, token, null).body().at("/trade/estimates")).hasSize(1);
+      assertThat(call(client, "DELETE", trade + "/estimates/" + oldId, null, token, null).status()).isEqualTo(404);
+      // Another case's estimate cannot be removed through this case.
+      String copiedId = copied.at("/trade/estimates/0/id").asText();
+      assertThat(call(client, "DELETE", trade + "/estimates/" + copiedId, null, token, null).status()).isEqualTo(404);
+
+      var job = post(client, "/api/v1/cases/" + id + "/exports", Map.of("format", "ZIP", "reportVersion", 0), "export", token);
+      byte[] archive = client.get().uri("/api/v1/cases/" + id + "/exports/" + job.path("id").asText())
+          .header("Case-Access-Token", token).retrieve().body(byte[].class);
+      var data = JSON.readTree(zipEntries(archive).get("case-data.json"));
+      assertThat(data.path("trade_estimates")).hasSize(1);
+      assertThat(data.at("/trade_estimates/0/source").asText()).isEqualTo("Carfax");
+      post(client, "/api/v1/cases/" + id + "/deletion", Map.of(), "delete", token);
+      app.context().getBean(CaseDeletionWorker.class).runOnce();
+      assertThat(jdbc(app).queryForObject("select count(*) from trade_estimates where trade_id = ?", Long.class,
+          added.body().at("/trade/id").asText())).isZero();
+    }
+  }
+
+  @Test void aJourneyEstimateShowsInEveryCaseAndIsExportedAndDeletedWithTheJourney() throws Exception {
+    try (var app = start("journey-estimates")) {
+      var client = app.client();
+      String session = signIn(client, "estimates@example.com");
+      String journeyId = journey(client, session, "journey"), base = "/api/v1/journeys/" + journeyId;
+      var candidates = account(client, "POST", base + "/candidates", null, session, null).body().path("candidates");
+      var first = openCase(client, base, candidates.get(0).path("candidateId").asText(), session, "first");
+      var second = openCase(client, base, candidates.get(1).path("candidateId").asText(), session, "second");
+      String firstId = first.at("/case/id").asText(), firstToken = first.path("accessToken").asText();
+      put(client, "/api/v1/cases/" + firstId + "/trade", input(null, "NO", null, null, null, false), firstToken);
+      assertThat(addEstimate(client, second.at("/case/id").asText(), second.path("accessToken").asText(), "journey-estimate",
+          Map.of("source", "Carfax", "lowMinor", 1500000, "checkedOn", today().toString())).status()).isEqualTo(201);
+      var seen = call(client, "GET", "/api/v1/cases/" + firstId + "/trade", null, firstToken, null).body();
+      assertThat(seen.at("/trade/estimates").findValuesAsText("source")).containsExactly("Carfax");
+
+      byte[] archive = client.post().uri("/api/v1/account/export").header("Cookie", AccountSessionTestSupport.cookie(session))
+          .header("Account-Request", "1").retrieve().body(byte[].class);
+      var exported = JSON.readTree(zipEntries(archive).get("account.json")).at("/buyingJourneys/0/tradeVehicle");
+      assertThat(exported.path("estimates").findValuesAsText("source")).containsExactly("Carfax");
+      assertThat(account(client, "DELETE", base, null, session, null).status()).isEqualTo(200);
+      assertThat(jdbc(app).queryForObject("select count(*) from trade_estimates", Long.class)).isZero();
+    }
+  }
+
+  /** For the case isolation inventory: adds a Buyer-entered estimate to the case's recorded trade; returns its ID. */
+  static String addEstimate(RunningApplication app, String caseId, String token, String label) {
+    var added = addEstimate(app.client(), caseId, token, label + "-trade-estimate", Map.of("source", "Carfax",
+        "lowMinor", 1500000, "checkedOn", today().toString()));
+    assertThat(added.status()).as(added.toString()).isEqualTo(201);
+    return added.body().at("/trade/estimates/0/id").asText();
+  }
+
+  static Result addEstimate(RestClient client, String caseId, String token, String key, Map<String, Object> body) {
+    return client.post().uri("/api/v1/cases/" + caseId + "/trade/estimates").header("Case-Access-Token", token)
+        .header("Idempotency-Key", key).contentType(MediaType.APPLICATION_JSON).body(body)
+        .exchange((ignored, response) -> {
+          byte[] bytes = response.getBody().readAllBytes();
+          return new Result(response.getStatusCode().value(), bytes.length == 0 ? JSON.nullNode() : JSON.readTree(bytes));
+        });
   }
 
   /** For the case isolation inventory: a case-held trade with one written offer; returns the offer ID. */

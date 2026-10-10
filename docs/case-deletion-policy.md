@@ -235,3 +235,10 @@ their absence, and bring the offers' evidence retention deadline forward so the 
 sweep erases the files; removing a single offer or the whole trade-in does the same. The case export
 holds the trade the case uses, its offers and its link; the account export holds each journey's
 trade-in. Nothing is kept in any anonymous total.
+
+V52 `trade_estimates` (ticket 106) holds trade values the Buyer looked up themselves, such as a Carfax
+value: source, a single value or low-high range, and the date checked. They belong to the Trade Vehicle
+and have no evidence document. CaseGraphDeletionPlan erases a case-held trade's estimates; journey and
+account deletion erase the journey trade's estimates and verify their absence; removing the trade-in
+removes them. Carrying a trade from a case without a journey copies its estimates. The case export and
+the account export (`estimates` on each journey's trade-in) hold them.

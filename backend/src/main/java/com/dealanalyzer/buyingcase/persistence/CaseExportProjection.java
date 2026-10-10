@@ -23,6 +23,7 @@ class CaseExportProjection {
         + "union select journey_id from trade_case_journeys where case_id = :caseId)";
     result.set("trade_vehicles", rows("trade_vehicles", "id, journey_id, case_id, vin, decode_outcome, decoder_source, decoder_version, decoded_at, model_year, make, model, trim_name, mileage, condition, money_owed, lender, payoff_minor, payoff_good_through, revision, changed_at, created_at", trades, caseId));
     result.set("trade_offers", rows("trade_offers", "id, trade_id, evidence_document_id, amount_minor, source, offer_date, expires_on, created_at", "trade_id in (select id from trade_vehicles where " + trades + ")", caseId));
+    result.set("trade_estimates", rows("trade_estimates", "id, trade_id, source, low_minor, high_minor, checked_on, created_at", "trade_id in (select id from trade_vehicles where " + trades + ")", caseId));
     result.set("trade_case_journeys", rows("trade_case_journeys", "case_id, journey_id, created_at", "case_id = :caseId", caseId));
     result.set("agreed_prices", rows("agreed_prices", "id, case_id, acceptance_request_id, dealer_offer_id, offer_version, baseline_id, baseline_version, actor, accepted_at, evidence_message_id, evidence_document_id, journey_result_json", "case_id = :caseId", caseId));
     result.set("quote_acceptance_requests", rows("quote_acceptance_requests", "id, case_id, quote_request_id, draft_id, offer_version, plan_version, evidence_message_id, evidence_document_id, kind, state, message_id, created_at", "case_id = :caseId", caseId));

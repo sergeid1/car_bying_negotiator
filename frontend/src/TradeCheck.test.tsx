@@ -124,3 +124,21 @@ test("trade tactics label the existing report lines and keep one question per li
   expect(screen.queryByRole("region", { name: "Worksheet tactics" })).not.toBeInTheDocument();
   expect(screen.queryByText(/Monthly effect:/)).not.toBeInTheDocument();
 });
+
+test("a Buyer estimate standing in for the range is named by where and when it was looked up, and an old one is called old", () => {
+  const base = tradeCheckFixture();
+  const result: TradeCheckResult = { ...base, valuation: { availability: "AVAILABLE", notice: null, source: "Carfax", synthetic: false,
+    retrievedAt: null, conditionAssumption: null, lowMinor: 1400000, typicalMinor: null, highMinor: 1600000, position: "BELOW",
+    basis: "BUYER_ESTIMATE", checkedOn: "2026-09-01", old: true, label: "your Carfax estimate from 2026-09-01" } };
+  render(<TradeCheckPanel result={result} />);
+  const figure = screen.getByText("Your Carfax estimate from 2026-09-01").closest("div")!;
+  expect(figure).toHaveTextContent("$14,000.00 to $16,000.00.");
+  expect(figure).toHaveTextContent("otdog did not check it, and it is not an offer");
+  expect(figure).toHaveTextContent("Looked up more than 30 days ago");
+  expect(screen.queryByText(/Trade-in range/)).not.toBeInTheDocument();
+});
+
+test("a stored v1 result without a basis renders its range as before", () => {
+  render(<TradeCheckPanel result={tradeCheckFixture()} />);
+  expect(screen.getByText("Trade-in range, an estimate from SYNTHETIC_TRADE_VALUATION")).toBeInTheDocument();
+});
