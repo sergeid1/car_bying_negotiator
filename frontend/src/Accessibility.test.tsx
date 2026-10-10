@@ -30,7 +30,15 @@ import { JourneyCandidates, ShortlistEntry } from "./JourneyCandidates";
 import { QuoteComparison } from "./QuoteComparison";
 import { Passkeys } from "./Passkeys";
 import { Passwords, PasswordSignIn } from "./Passwords";
+import { DeskTactics } from "./DeskTactics";
+import { syntheticTactic } from "./DeskTactics.fixture";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+test("worksheet tactics and pending questions have no automated AA violations", async () => {
+  const { container } = render(<main><h1>Desk Check</h1><DeskTactics findings={[syntheticTactic]} /></main>);
+  await userEvent.click(screen.getByText("Calculation and evidence"));
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
 
 test.each([false, true])("password management and sign-in have no automated AA violations (%s)", async configured => {
   const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ configured })));

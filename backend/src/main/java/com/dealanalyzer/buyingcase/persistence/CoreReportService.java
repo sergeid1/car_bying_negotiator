@@ -41,13 +41,16 @@ public class CoreReportService {
   private final FinancingService financing;
   private final com.dealanalyzer.review.DealReviewService reviews;
   private final com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence extractions;
+  private final com.dealanalyzer.desk.tactic.DeskTacticService tactics;
 
   public CoreReportService(EphemeralBuyingCaseService access, AnalysisCaseRepository cases,
       OperationRepository operations, AnalysisReportRepository reports, BuyingCaseStore store,
       DealerOfferPersistence offers, CashEconomicsPersistence economics, MarketAssessmentPersistence market,
       PricePlanService plans, VehicleEvidenceService vehicles, ObjectMapper json, FinancingService financing, com.dealanalyzer.review.DealReviewService reviews, NegotiationService negotiation, com.dealanalyzer.pilot.PilotEvents pilotEvents,
-      com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence extractions) {
+      com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence extractions,
+      com.dealanalyzer.desk.tactic.DeskTacticService tactics) {
     this.extractions = extractions;
+    this.tactics = tactics;
     this.pilotEvents = pilotEvents;
     this.negotiation = negotiation;
     this.reviews = reviews;
@@ -135,6 +138,12 @@ public class CoreReportService {
     evidence.put("caseStatusAtAnalysis", buyingCase.status);
     evidence.put("buyerJurisdiction", buyingCase.buyerJurisdiction);
     ObjectNode analysis = json.createObjectNode();
+    JsonNode tacticTerms = worksheet != null && (offer == null || !worksheet.id().equals(offer.extractionId()) || !dealerCurrent)
+        ? tactics.asRead(worksheet) : offer == null ? tactics.asRead(null) : offer.terms();
+    var tacticFindings = tactics.findings(caseId, tacticTerms, null);
+    analysis.set("tacticFindings", json.valueToTree(tacticFindings));
+    evidence.set("deskTacticInputs", tacticTerms);
+    if (!tacticFindings.isEmpty() && worksheet != null) evidence.set("deskTacticWorksheet", json.valueToTree(worksheet));
     if (offer != null && offer.version() > 1) {
       JsonNode review = reviews.append(caseId, offer, baseline, status, now);
       analysis.set("dealReview", review);
@@ -208,6 +217,7 @@ public class CoreReportService {
     amounts.replaceAll(amount -> amount.explainedBy(explained));
     analysis.set("materialAmounts", json.valueToTree(amounts));
     analysis.set("policyVersions", json.valueToTree(Map.of("review", CoreReviewPolicy.VERSION,
+        "deskTactics", com.dealanalyzer.desk.tactic.DeskTacticPolicy.VERSION,
         "revisedReview", com.dealanalyzer.review.RevisedOfferPolicy.VERSION,
         "materiality", "core-materiality.v1: zero term/calculation delta; quoted-total tolerance is recorded in cash economics",
         "rating", "selling-price-rating.v1", "cashEconomics", cash == null ? "UNAVAILABLE" : cash.policyVersion(),

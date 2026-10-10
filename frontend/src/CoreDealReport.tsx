@@ -9,6 +9,7 @@ import { Arithmetic, DocumentSourceView, type Calculation, type DocumentSource }
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { ReportExplanationLoader } from "./ReportExplanation";
 import { AnimatedAmount } from "./AnimatedAmount";
+import { DeskTactics, type DeskTacticFinding } from "./DeskTactics";
 
 export type MaterialAmount = {
   label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string;
@@ -18,6 +19,7 @@ export type MaterialAmount = {
 export type CoreReport = {
   version: number; asOf: string; status: string;
   analysis: {
+    tacticFindings?: DeskTacticFinding[];
     dealReview?: DealReview;
     financingAvailability?: string; financing?: FinancingResult | null; financingTerms?: { aprPercent: number | null; termMonths: number | null } | null;
     reviewLabel: string; dealRating: string; ratingBasis: string; nextAction: string;
@@ -137,6 +139,9 @@ export function CoreDealReport({ report, caseId, token, redacted, children }: { 
       </ReportSection>
       {showFinancing && <ReportSection id="core-financing" title="Dealer financing">
         <DealerFinancingResult result={analysis.financing ?? null} availability={analysis.financingAvailability!} terms={analysis.financingTerms} headless />
+      </ReportSection>}
+      {!!analysis.tacticFindings?.length && <ReportSection id="core-tactics" title="Worksheet tactics">
+        <DeskTactics findings={analysis.tacticFindings} />
       </ReportSection>}
       <ReportSection id="core-market" title="Market evidence" headingId="market-evidence-heading">
         <MarketEvidenceParagraphs evidence={analysis.marketEvidence} />

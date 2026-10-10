@@ -44,17 +44,19 @@ public class DeskCheckService {
   private final JdbcTemplate jdbc;
   private final ObjectMapper json;
   private final com.dealanalyzer.purchase.PurchaseService purchases;
+  private final com.dealanalyzer.desk.tactic.DeskTacticService tactics;
 
   public DeskCheckService(EphemeralBuyingCaseService cases, PricePlanService plans, DealerOfferPersistence offers,
       DocumentExtractionPersistence extractions, JdbcTemplate jdbc, ObjectMapper json,
-      com.dealanalyzer.purchase.PurchaseService purchases) {
+      com.dealanalyzer.purchase.PurchaseService purchases, com.dealanalyzer.desk.tactic.DeskTacticService tactics) {
     this.cases = cases; this.plans = plans; this.offers = offers; this.extractions = extractions;
     this.jdbc = jdbc; this.json = json; this.purchases = purchases;
+    this.tactics = tactics;
   }
 
   public record View(String policyVersion, String status, String source, Agreed agreedPrice, Paperwork paperwork,
       List<Finding> findings, List<Finding> otherDifferences, int unchangedTerms, TotalEffect totalEffect,
-      FreshCase freshCase, Integer dealReviewVersion) {}
+      FreshCase freshCase, Integer dealReviewVersion, List<com.dealanalyzer.desk.tactic.DeskTacticPolicy.Finding> tacticFindings) {}
   public record Agreed(int offerVersion, int baselineVersion, String vin, Long sellingPriceMinor,
       Long outTheDoorMinor, Instant acceptedAt) {}
   public record Paperwork(String documentId, Instant uploadedAt, String extractionId, Integer offerVersion, String vin) {}
@@ -111,7 +113,7 @@ public class DeskCheckService {
     try { extraction = extractions.requireLatest(caseId, document.id()); }
     catch (com.dealanalyzer.buyingcase.ResourceNotFoundException reading) {
       return new View(VERSION, "READING", null, agreed, new Paperwork(document.id(), document.createdAt(), null, null, null),
-          List.of(), List.of(), 0, unavailable(), null, null);
+          List.of(), List.of(), 0, unavailable(), null, null, List.of());
     }
     String deskVin = extraction.candidates().stream().filter(c -> c.field().equals("VEHICLE_VIN")).findFirst()
         .map(c -> c.currentCorrection() == null ? c.normalizedValue() : c.currentCorrection().normalizedValue()).orElse(null);
@@ -130,7 +132,7 @@ public class DeskCheckService {
           null, "VIN", "BLOCKING", false, evidence(extraction, "VEHICLE_VIN"),
           "Start a separate case for this car. Nothing on this paperwork is compared with or added to the agreed car.");
       return new View(VERSION, "DIFFERENT_VIN", "READ_FROM_PAPERWORK", agreed, paperwork, List.of(vin), List.of(), 0,
-          unavailable(), new FreshCase(deskVin, place.dealerLocation(), place.purchaseMethod()), null);
+          unavailable(), new FreshCase(deskVin, place.dealerLocation(), place.purchaseMethod()), null, List.of());
     }
     String source;
     List<JsonNode> discrepancies = new ArrayList<>();
@@ -205,7 +207,8 @@ public class DeskCheckService {
           : new TotalEffect("QUOTED", "USD", Math.subtractExact(desk, agreed.outTheDoorMinor()), null, null, addedCharges);
     }
     return new View(VERSION, lead.isEmpty() ? "NO_DIFFERENCES" : "DIFFERENCES", source, agreed, paperwork,
-        List.copyOf(lead), List.copyOf(other), Math.max(0, count(agreedTerms) - differing), effect, null, reviewVersion);
+        List.copyOf(lead), List.copyOf(other), Math.max(0, count(agreedTerms) - differing), effect, null, reviewVersion,
+        tactics.findings(caseId, deskTerms, agreedTerms));
   }
 
   /** The extraction in the verified-offer term shape, every value marked as not yet verified by the Buyer. */
@@ -241,7 +244,7 @@ public class DeskCheckService {
   }
 
   private View empty(String status, Agreed agreed) {
-    return new View(VERSION, status, null, agreed, null, List.of(), List.of(), 0, unavailable(), null, null);
+    return new View(VERSION, status, null, agreed, null, List.of(), List.of(), 0, unavailable(), null, null, List.of());
   }
   private static TotalEffect unavailable() { return new TotalEffect("UNAVAILABLE", "USD", null, null, null, null); }
   private JsonNode evidence(ExtractionView extraction, String field) {

@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { CoreDealReport, CoreReport } from "./CoreDealReport";
+import { syntheticTactic } from "./DeskTactics.fixture";
 
 afterEach(() => cleanup());
 
@@ -8,6 +9,7 @@ it("focuses the outcome and exposes partial status, unavailable money and eviden
   const report: CoreReport = {
     version: 1, asOf: "2026-09-05T12:00:00Z", status: "PARTIAL",
     analysis: {
+      tacticFindings: [syntheticTactic],
       reviewLabel: "Unable to verify", dealRating: "INSUFFICIENT_DATA", ratingBasis: "Selling price only",
       nextAction: "Resolve evidence", topReasons: ["Unknown charge", "Missing market", "Check quote"],
       marketAvailability: "UNAVAILABLE", cashAvailability: "AVAILABLE",
@@ -21,6 +23,8 @@ it("focuses the outcome and exposes partial status, unavailable money and eviden
   expect(screen.getByRole("navigation", { name: "Report sections" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Source and calculation 1" })).toHaveAttribute("href", "#amount-evidence-0");
   expect(screen.queryByText("$0.00")).not.toBeInTheDocument();
+  expect(screen.getByText("Possible payment packing")).toBeInTheDocument();
+  expect(screen.getByText(/Full-term effect: \$2,400.00/)).toBeInTheDocument();
 });
 
 

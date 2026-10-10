@@ -51,6 +51,17 @@ public class StoredReportRenderer {
       for (var paragraph : analysis.path("marketEvidence").path("paragraphs"))
         lines.add(new Line(paragraph.asText(), false));
     } else lines.add(new Line("Market evidence details are unavailable in this saved report.", false));
+    if (!analysis.path("tacticFindings").isEmpty()) {
+      lines.add(new Line("Worksheet tactics", true));
+      for (var finding : analysis.path("tacticFindings")) {
+        lines.add(new Line(finding.path("label").asText() + ": " + finding.path("summary").asText(), false));
+        if (finding.path("monthlyEffectMinor").isNumber()) lines.add(new Line("Monthly effect: " + tacticMoney(finding.path("monthlyEffectMinor").asLong()), false));
+        if (finding.path("totalEffectMinor").isNumber()) lines.add(new Line("Full-term effect: " + tacticMoney(finding.path("totalEffectMinor").asLong()), false));
+        lines.add(new Line("Draft desk question (" + finding.path("questionReview").asText() + "): " + finding.path("deskQuestion").asText(), false));
+        lines.add(new Line("Calculation: " + finding.path("effectBasis").asText(), false));
+        if (!finding.path("noDollarEffectReason").isNull()) lines.add(new Line(finding.path("noDollarEffectReason").asText(), false));
+      }
+    }
     lines.add(new Line("Limitations",true));
     for(var limitation:analysis.path("limitations")) lines.add(new Line(limitation.asText(),false));
     lines.add(new Line("Complete saved payload and evidence",true));
@@ -68,6 +79,9 @@ public class StoredReportRenderer {
       if (node.isEmpty()) lines.add(new Line(path + ": none recorded", false));
       for (int i=0;i<node.size();i++) walk(node.get(i), path + "/" + i, lines);
     } else lines.add(new Line(path + ": " + (node.isNull() ? "Unavailable" : node.asText()), false));
+  }
+  private String tacticMoney(long minor) {
+    return (minor < 0 ? "-$" : "$") + java.math.BigDecimal.valueOf(minor, 2).abs().toPlainString();
   }
   public byte[] html(JsonNode payload) {
     var out=new StringBuilder("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Saved Deal Analysis Report</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:72ch;margin:2rem auto;padding:0 1rem;color:#172b3a}p{overflow-wrap:anywhere}h1,h2{break-after:avoid}@media print{body{font-size:10pt;margin:0}p{orphans:3;widows:3}}</style><main>");
