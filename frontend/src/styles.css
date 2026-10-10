@@ -1771,3 +1771,33 @@ fieldset.reference-attributes { grid-template-columns: repeat(auto-fit, minmax(m
 .account-cases li > button { justify-self: start; max-width: 100%; }
 .account-save-note { overflow-wrap: anywhere; }
 /* End ticket 88. */
+
+/* Ticket 100: the trade-in, its payoff and the Buyer's written trade offers. */
+.trade-vehicle, .trade-vehicle .facts, .trade-offers { min-width: 0; overflow-wrap: anywhere; }
+.trade-vehicle .vin { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.trade-vehicle button { max-width: 100%; white-space: normal; min-height: 44px; }
+.trade-vehicle input[name="vin"] { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
+.trade-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.trade-form .field-error { margin-top: -6px; }
+.trade-hint { margin: 0; }
+fieldset.trade-choices { grid-template-columns: 1fr; gap: 8px; }
+fieldset.trade-owed { grid-template-columns: repeat(auto-fit, minmax(min(8rem, 100%), 1fr)); }
+fieldset.trade-choices > legend { grid-column: 1 / -1; margin-bottom: 4px; }
+fieldset.trade-choices > label:has(> input[type="radio"]) {
+  flex-direction: row; align-items: flex-start; gap: 12px; min-height: 44px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--card-sunk); color: var(--ink); font-weight: 500;
+}
+fieldset.trade-choices > label:has(> input:checked) { border-color: var(--focus); }
+fieldset.trade-choices input[type="radio"] { flex: none; width: 20px; height: 20px; min-height: 0; margin: 1px 0 0; padding: 0;
+  accent-color: var(--brand-ink); }
+.trade-choices label > span { display: grid; gap: 2px; min-width: 0; }
+.trade-choice-detail { color: var(--ink-muted); font-size: 0.85rem; font-weight: 400; }
+.trade-offers { display: grid; gap: 12px; }
+.trade-offers h3 { margin: 0; }
+.trade-offer-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.trade-offer-list > li { display: grid; gap: 6px; min-width: 0; padding: 14px 16px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--card); }
+.trade-offer-list p { margin: 0; }
+.trade-offer-amount { font-weight: 600; }
+.trade-offer-page { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+/* End ticket 100. */

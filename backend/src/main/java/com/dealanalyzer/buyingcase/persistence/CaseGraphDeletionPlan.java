@@ -15,6 +15,9 @@ class CaseGraphDeletionPlan {
       new Step("negotiation_draft_revisions", "case_id = :caseId"),
       new Step("negotiation_drafts", "case_id = :caseId"),
       new Step("journey_candidate_cases", "case_id = :caseId"),
+      new Step("trade_offers", "evidence_case_id = :caseId or trade_id in (select id from trade_vehicles where case_id = :caseId)"),
+      new Step("trade_case_journeys", "case_id = :caseId"),
+      new Step("trade_vehicles", "case_id = :caseId"),
       new Step("agreed_prices", "case_id = :caseId"),
       new Step("quote_acceptance_requests", "case_id = :caseId"),
       new Step("quote_requests", "case_id = :caseId"),
@@ -118,7 +121,7 @@ class CaseGraphDeletionPlan {
             where a.case_id = :caseId and a.qualified = true and exists (select 1 from jurisdiction_policies p where p.jurisdiction = c.buyer_jurisdiction)),
           removed_qualified_uploads = removed_qualified_uploads + (select count(*) from experiment_assignments a join analysis_cases c on c.id = a.case_id
             where a.case_id = :caseId and a.qualified = true and exists (select 1 from jurisdiction_policies p where p.jurisdiction = c.buyer_jurisdiction)
-            and exists (select 1 from source_documents d where d.case_id = a.case_id))
+            and exists (select 1 from source_documents d where d.case_id = a.case_id and d.purpose = 'DEALER_PAPERWORK'))
         where channel_key = (select coalesce(c.acquisition_channel, '') from analysis_cases c where c.id = :caseId)
         """).setParameter("caseId", caseId).executeUpdate();
     long removed = 0;

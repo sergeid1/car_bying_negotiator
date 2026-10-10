@@ -87,7 +87,7 @@ public class DeskCheckService {
         amount(agreedTerms, "SELLING_PRICE"), amount(agreedTerms, "OUT_THE_DOOR_TOTAL"), agreedRow.acceptedAt());
     // Desk paperwork is whatever the Buyer adds after accepting; the accepted quote itself never counts.
     var document = jdbc.query("""
-        select id, created_at from source_documents where case_id = ? and created_at > ?
+        select id, created_at from source_documents where case_id = ? and purpose = 'DEALER_PAPERWORK' and created_at > ?
         order by created_at desc, id desc fetch first 1 rows only
         """, (r, n) -> new Document(r.getString(1), r.getTimestamp(2).toInstant()), caseId,
         java.sql.Timestamp.from(agreedRow.acceptedAt())).stream().findFirst().orElse(null);

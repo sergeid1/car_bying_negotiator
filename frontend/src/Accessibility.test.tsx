@@ -703,3 +703,42 @@ test("the fresh desk case label has no automated AA violations", async () => {
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 // End ticket 66.
+
+// Ticket 100: the trade-in panel recorded, being recorded with field errors, and with written offers.
+import { TradeVehicle } from "./TradeVehicle";
+function tradeA11yView(state: string) {
+  const conditions = [{ value: "GOOD", label: "Good", description: "Light wear such as small scratches or chips." },
+    { value: "FAIR", label: "Fair", description: "Clear wear or cosmetic damage, or it needs a repair soon." }];
+  const trade = { id: "trade-1", revision: 2, vehicle: { vin: "5J6RW2H52ML000002", decodeOutcome: "DECODED", source: "Decoder",
+    decoderVersion: "v1", decodedAt: "2026-10-01T12:00:00Z", year: "2021", make: "Honda", model: "CR-V", trim: "EX" },
+    mileage: 61000, condition: "GOOD", moneyOwed: "YES", lender: "First Coast Credit Union", payoffMinor: 1825000,
+    payoffGoodThrough: "2026-10-01", payoffUnknown: false, payoffStale: true, complete: true, changedAt: "2026-10-05T12:00:00Z",
+    offers: [{ id: "old", amountMinor: 1500000, source: "Coastal Auto Buyers", offerDate: "2026-09-10", expiresOn: "2026-09-17", expired: true,
+      usedForComparison: false, evidence: { documentId: "d1", state: "READY", pageCount: 1 }, createdAt: "2026-09-10T12:00:00Z" },
+    { id: "new", amountMinor: 1400000, source: "Sunshine Car Exchange", offerDate: "2026-10-04", expiresOn: "2026-10-11", expired: false,
+      usedForComparison: true, evidence: { documentId: "d2", state: "PROCESSING", pageCount: 1 }, createdAt: "2026-10-04T12:00:00Z" }],
+    bestOfferId: "new" };
+  return { holder: "JOURNEY", trade: state === "EMPTY" ? null : trade, conditions,
+    analysis: { analyzedAt: "2026-10-03T12:00:00Z", outdated: state !== "EMPTY" } };
+}
+test.each(["RECORDED", "EDITING", "EMPTY"])("the trade-in panel (%s) has no automated AA violations", async state => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => init?.method === "PUT"
+    ? new Response(JSON.stringify({ detail: "Check the highlighted trade-in details.", errors: [
+      { field: "mileage", message: "Enter the mileage on the odometer, from 0 to 999,999 miles." },
+      { field: "lender", message: "Enter the lender you make payments to, up to 120 characters." }] }), { status: 400 })
+    : new Response(JSON.stringify(tradeA11yView(state))));
+  const { container } = render(<main><h1>Buying Case</h1><TradeVehicle caseId="case" token="token" /></main>);
+  await screen.findByRole("heading", { name: "Your trade-in" });
+  if (state === "EDITING") {
+    await userEvent.click(await screen.findByRole("button", { name: "Edit trade-in" }));
+    await userEvent.clear(screen.getByLabelText("Lender"));
+    await userEvent.click(screen.getByRole("button", { name: "Save trade-in" }));
+    await screen.findByText("Enter the lender you make payments to, up to 120 characters.");
+  }
+  if (state === "RECORDED") {
+    await userEvent.click(screen.getByRole("button", { name: "Add a written offer" }));
+    await screen.findByLabelText("Photo or PDF of the offer");
+  }
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+// End ticket 100.
