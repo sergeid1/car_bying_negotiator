@@ -163,6 +163,35 @@ class AcquisitionChannelAcceptanceTest {
     }
   }
 
+  @Test void tradeOfferEvidenceAloneIsNotCountedAsAnUpload() throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).start("channel-trade-evidence", false, settings())) {
+      var client = app.client();
+      put(client, CHANNELS + "/fee-guide", Map.of("kind", "EXPLAINER_CONTENT", "active", true), SUPPORT);
+      opPost(client, "/api/v1/operator/pilot/freeze", PilotFeedbackAcceptanceTest.protocol(), SUPPORT);
+      var created = post(client, "/api/v1/cases", buyingCase("fee-guide"));
+      String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+      opPost(client, "/api/v1/operator/pilot/cases/" + id + "/enrollment", Map.of("qualified", true), SUPPORT);
+      TradeVehicleAcceptanceTest.recordTradeWithOffer(app, id, token, "metrics");
+      var manager = app.context().getBean(EntityManager.class);
+      assertThat(count(manager, "select count(*) from source_documents where case_id = '" + id + "' and purpose = 'TRADE_OFFER_EVIDENCE'"))
+          .isEqualTo(1);
+
+      var metrics = opGet(client, "/api/v1/operator/pilot/metrics", SUPPORT);
+      assertThat(metrics.at("/uploadToVerifiedExtraction/denominator").asLong()).isZero();
+      var feeGuide = channel(metrics.path("acquisitionChannels"), "fee-guide");
+      assertThat(feeGuide.path("qualifiedUploads").asLong()).isZero();
+      assertThat(feeGuide.at("/qualifiedUploadRate/denominator").asLong()).isEqualTo(1);
+
+      // The anonymous totals kept on deletion count no upload for it either.
+      post(client, "/api/v1/cases/" + id + "/deletion", Map.of(), "delete-trade-evidence-case", token);
+      app.context().getBean(com.dealanalyzer.buyingcase.persistence.CaseDeletionWorker.class).runOnce();
+      assertThat(count(manager, "select count(*) from analysis_cases where id = '" + id + "'")).isZero();
+      assertThat(count(manager, "select removed_qualified_count from acquisition_channel_totals where channel_key = 'fee-guide'")).isEqualTo(1);
+      assertThat(count(manager, "select removed_qualified_uploads from acquisition_channel_totals where channel_key = 'fee-guide'")).isZero();
+      assertThat(channel(opGet(client, CHANNELS + "/metrics", SUPPORT), "fee-guide").path("qualifiedUploads").asLong()).isZero();
+    }
+  }
+
   @Test void analysisAndReportAreIdenticalWhateverTheChannel() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).start("channel-isolation", false, settings())) {
       var client = app.client();

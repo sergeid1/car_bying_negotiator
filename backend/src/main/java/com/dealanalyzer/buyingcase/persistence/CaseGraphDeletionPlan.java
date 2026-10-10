@@ -121,7 +121,7 @@ class CaseGraphDeletionPlan {
             where a.case_id = :caseId and a.qualified = true and exists (select 1 from jurisdiction_policies p where p.jurisdiction = c.buyer_jurisdiction)),
           removed_qualified_uploads = removed_qualified_uploads + (select count(*) from experiment_assignments a join analysis_cases c on c.id = a.case_id
             where a.case_id = :caseId and a.qualified = true and exists (select 1 from jurisdiction_policies p where p.jurisdiction = c.buyer_jurisdiction)
-            and exists (select 1 from source_documents d where d.case_id = a.case_id))
+            and exists (select 1 from source_documents d where d.case_id = a.case_id and d.purpose = 'DEALER_PAPERWORK'))
         where channel_key = (select coalesce(c.acquisition_channel, '') from analysis_cases c where c.id = :caseId)
         """).setParameter("caseId", caseId).executeUpdate();
     long removed = 0;
