@@ -10,22 +10,29 @@ question. Spec DESK-04, acceptance scenario 31.
 (for the trade tactics); 12 — Analyze dealer financing and financed add-ons; 13 — Compare one outside
 financing scenario.
 
-**Status:** open — the first five rules are agent-ready; the operator's list may add more before the
-ticket closes.
+**Status:** open — all five rules implemented, no migration (V53 unused), as of 2026-10-10; operator review of the
+desk questions pending. `desk.tactic.DeskTacticPolicy` (`desk-tactics.v2`) names payment packing (tolerance $1 a
+month), stretched term and APR above the Buyer's own offer through `FinancingCalculator`, and names negative equity
+folded in and an allowance paid for by the price from ticket 103's `TradeDeskCheck.Result` without recomputing it.
+The two trade tactics label their existing `TRADE` line (`tradeFindingCode`) instead of repeating its dollar
+figure. Findings appear in the Desk Check (`tacticFindings`), the "I'm at the dealer" result (which now uses this
+APR rule in place of ticket 105's, firing on any difference rather than 0.1 points) and frozen reports; saved v1
+reports render unchanged. All five desk questions are stored as `PENDING_OPERATOR_REVIEW` and the Buyer sees a
+pending-review note until they are approved. The operator may add tactics before this closes.
 
-- [ ] **Payment packing:** a quoted payment above the payment calculated from the worksheet's own price,
+- [x] **Payment packing:** a quoted payment above the payment calculated from the worksheet's own price,
       APR, term and down payment, beyond tolerance, is named as possibly including products not shown, with
       the monthly and total difference.
-- [ ] **Stretched term:** a term longer than the Buyer's stated term, or a payment lowered mainly by
+- [x] **Stretched term:** a term longer than the Buyer's stated term, or a payment lowered mainly by
       lengthening the term, shows the extra interest compared with the shorter term.
-- [ ] **Negative equity folded in:** negative equity added to the amount financed is named even when the
+- [x] **Negative equity folded in:** negative equity added to the amount financed is named even when the
       worksheet does not label it (from ticket 103).
-- [ ] **Allowance paid for by the price:** a trade allowance above the valuation range or best offer while
+- [x] **Allowance paid for by the price:** a trade allowance above the valuation range or best offer while
       the price is above the Agreed Price or market range is shown as its net effect.
-- [ ] **APR above the Buyer's own offer:** a dealer APR above the Buyer's outside financing offer shows the
+- [x] **APR above the Buyer's own offer:** a dealer APR above the Buyer's outside financing offer shows the
       interest difference over the term.
 - [ ] Each finding has a stable code, its evidence regions, a dollar effect or a stated reason there is
       none, and a desk question the operator approved, stored with its policy version.
 - [ ] Wording is neutral about intent ("the payment is $40 higher than its own numbers produce") and
       passes `PilotCopyClaimsTest`; the operator's review is recorded in the ticket.
-- [ ] Labelled synthetic fixtures cover each tactic and a clean worksheet with no findings.
+- [x] Labelled synthetic fixtures cover each tactic and a clean worksheet with no findings.
