@@ -95,6 +95,27 @@ public class DocumentIntakeService {
     return intake(caseId, accessToken, idempotencyKey, originalFilename, bytes, null);
   }
 
+  /**
+   * A written trade offer's photo or PDF. It takes the same inspection, malware scan, consent check,
+   * encrypted storage, page normalization and retention as dealer paperwork, but it is never read for
+   * Deal Terms and never listed or compared as dealer paperwork. The caller has authorized the case.
+   */
+  public StartedDocumentUpload intakeTradeOfferEvidence(
+      String caseId, String accessToken, String idempotencyKey, MultipartFile upload) {
+    requireServiceProcessingConsent(caseId, accessToken);
+    return intake(caseId, accessToken, idempotencyKey, upload.getOriginalFilename(), read(upload), null,
+        DocumentIntakePersistence.TRADE_OFFER_EVIDENCE);
+  }
+
+  /** A normalized page of trade offer evidence, for a caller that has authorized the trade offer. */
+  public byte[] tradeOfferEvidencePage(String caseId, String documentId, int pageNumber) {
+    if (!persistence.isTradeOfferEvidence(documentId))
+      throw new com.dealanalyzer.buyingcase.ResourceNotFoundException("Source page not found");
+    String objectKey = persistence.normalizedPageKey(caseId, documentId, pageNumber)
+        .orElseThrow(() -> new com.dealanalyzer.buyingcase.ResourceNotFoundException("Source page not found"));
+    return objectStorage.readNormalized(caseId, documentId, pageNumber, objectKey);
+  }
+
   /** A quoted dealer body, kept as text and routed through the normal extraction/review pipeline. */
   public StartedDocumentUpload intakeRelayBody(String caseId, String messageId, String body) {
     if (body == null || body.isBlank() || body.length() > 40000)
@@ -108,6 +129,12 @@ public class DocumentIntakeService {
 
   private StartedDocumentUpload intake(String caseId, String accessToken, String idempotencyKey,
       String originalFilename, byte[] bytes, InspectedDocument trustedText) {
+    return intake(caseId, accessToken, idempotencyKey, originalFilename, bytes, trustedText,
+        DocumentIntakePersistence.DEALER_PAPERWORK);
+  }
+
+  private StartedDocumentUpload intake(String caseId, String accessToken, String idempotencyKey,
+      String originalFilename, byte[] bytes, InspectedDocument trustedText, String purpose) {
     String checksum = sha256(bytes);
     Optional<UploadRecords> existing = persistence.findByIdempotencyKey(caseId, idempotencyKey);
     if (existing.isPresent()) {
@@ -155,7 +182,8 @@ public class DocumentIntakeService {
               inspected.likelyCropped()),
           operationId,
           idempotencyKey,
-          now);
+          now,
+          purpose);
     } catch (DataIntegrityViolationException duplicate) {
       objectStorage.delete(stored.objectKey());
       records = persistence.findByIdempotencyKey(caseId, idempotencyKey)
@@ -168,7 +196,9 @@ public class DocumentIntakeService {
       objectStorage.delete(stored.objectKey());
       throw failure;
     }
-    casePersistence.updateStatus(caseId, "DOCUMENT_PROCESSING", now);
+    // Trade offer evidence is not dealer paperwork, so it leaves the case's review status as it was.
+    if (purpose.equals(DocumentIntakePersistence.DEALER_PAPERWORK))
+      casePersistence.updateStatus(caseId, "DOCUMENT_PROCESSING", now);
     dispatch(operationId);
     return started(records);
   }
@@ -210,7 +240,8 @@ public class DocumentIntakeService {
     requireServiceProcessingConsent(operation.caseId(), accessToken);
     RetryDecision retry = persistence.retry(operationId, idempotencyKey, Instant.now());
     if (retry.dispatch()) {
-      casePersistence.updateStatus(operation.caseId(), "DOCUMENT_PROCESSING", Instant.now());
+      if (!persistence.isTradeOfferEvidence(operation.documentId()))
+        casePersistence.updateStatus(operation.caseId(), "DOCUMENT_PROCESSING", Instant.now());
       dispatch(operationId);
     }
     return retry.operation();
@@ -255,6 +286,10 @@ public class DocumentIntakeService {
         pageNormalizer.normalize(persistence.requireProcessingDocument(operation.documentId()));
         persistence.completeNormalization(operationId, Instant.now());
       }
+      if (persistence.isTradeOfferEvidence(operation.documentId())) {
+        persistence.completeEvidence(operationId, Instant.now());
+        return;
+      }
       if (!persistence.claimExtraction(operationId, Instant.now())) {
         return;
       }
@@ -276,7 +311,8 @@ public class DocumentIntakeService {
               ? "Deal Terms extraction could not be completed. Retry this stage without uploading again."
               : "Document page normalization could not be completed. Retry this stage without uploading again.",
           Instant.now());
-      casePersistence.updateStatus(operation.caseId(), "FAILED", Instant.now());
+      if (!persistence.isTradeOfferEvidence(operation.documentId()))
+        casePersistence.updateStatus(operation.caseId(), "FAILED", Instant.now());
     }
   }
 

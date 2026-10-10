@@ -22,6 +22,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class AccountDeletionWorker {
   /** Child-before-parent, all keyed by account ID. No broad ORM cascades. */
   private static final List<String> ACCOUNT_GRAPH = List.of(
+      "trade_offers", "trade_case_journeys", "trade_vehicles",
       "journey_candidate_cases", "journey_candidates",
       "reference_vehicles", "provider_usage", "shopping_brief_versions", "buying_journeys",
       "buyer_notification_preferences", "buyer_notification_deliveries",
@@ -94,6 +95,10 @@ public class AccountDeletionWorker {
 
   private void removeAndVerify(String accountId) {
     manager.flush();
+    // Journey trade offer evidence lives in a case; bring its retention forward so the ordinary sweep erases it.
+    manager.createNativeQuery("update source_documents set retention_deadline = current_timestamp where purpose = 'TRADE_OFFER_EVIDENCE' "
+        + "and retention_deadline > current_timestamp and id in (select evidence_document_id from trade_offers where account_id = :id)")
+        .setParameter("id", accountId).executeUpdate();
     for (String table : ACCOUNT_GRAPH) delete(table, "account_id = :id", accountId);
     delete("buyer_accounts", "id = :id", accountId);
   }

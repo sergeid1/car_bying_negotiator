@@ -13,6 +13,7 @@ import { ReferralDisclosure } from "./AcquisitionChannel";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { OfferVerification } from "./OfferVerification";
 import { DeskCheck, DeskFreshCase, type FreshDeskCase } from "./DeskCheck";
+import { TradeVehicle } from "./TradeVehicle";
 import { ThemeMenu } from "./ThemeMenu";
 import { OfferTerms } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
@@ -303,6 +304,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               }} />}
             {caseCredentials && !caseRevoked && <DealerDocumentUpload key={`documents-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
               initialFiles={deskFresh?.caseId === caseCredentials.caseId ? deskFresh.files : undefined} />}
+            {caseCredentials && !caseRevoked && <TradeVehicle key={`trade-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
+              carryFrom={deskFresh?.caseId === caseCredentials.caseId ? deskFresh.agreed : undefined} />}
             {caseCredentials && !caseRevoked && <OfferVerification key={`verify-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
               onOfferFrozen={offer => { setFrozenOffer({ caseId: caseCredentials.caseId, version: offer.version }); setDeskRefresh(value => value + 1); }} />}
             {caseCredentials && !caseRevoked && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}

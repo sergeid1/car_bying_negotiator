@@ -159,7 +159,14 @@ class CaseIsolationInventoryAcceptanceTest {
       caseRow("POST", C + "/handoffs/{messageId}/discard", "{}"),
       caseRow("POST", C + "/handoffs/{messageId}/own-email-app", "{}"),
       caseRow("POST", C + "/handoffs/{messageId}/mailbox-send", "{}"),
-      caseRow("POST", C + "/quote-requests/{id}/replies", MULTIPART, "id=quoteId"));
+      caseRow("POST", C + "/quote-requests/{id}/replies", MULTIPART, "id=quoteId"),
+      caseRow("GET", C + "/trade", null),
+      caseRow("PUT", C + "/trade", "{\"vin\":\"2T3P1RFV5MW000001\",\"mileage\":1,\"condition\":\"GOOD\"}"),
+      caseRow("DELETE", C + "/trade", null),
+      caseRow("POST", C + "/trade/offers", MULTIPART),
+      caseRow("DELETE", C + "/trade/offers/{offerId}", null, "offerId=tradeOfferId"),
+      caseRow("GET", C + "/trade/offers/{offerId}/pages/{pageNumber}/image", null, "offerId=tradeOfferId"),
+      caseRow("POST", C + "/trade/carry-over", "{\"sourceCaseId\":\"{otherCaseId}\"}"));
 
   /** Buyer Account endpoints: the account_session cookie, plus Account-Request: 1 on writes. */
   static final List<Endpoint> ACCOUNT_ENDPOINTS = List.of(
@@ -452,6 +459,7 @@ class CaseIsolationInventoryAcceptanceTest {
     objects.put("bookingMessageId", booking);
     objects.put("exportId", post(client, base + "/exports", Map.of("format", "ZIP", "reportVersion", 0), label + "-export", token).path("id").asText());
     objects.put("reportTotalId", post(client, base + "/feedback/report-total", Map.of("reportVersion", 1), label + "-total", token).path("id").asText());
+    objects.put("tradeOfferId", TradeVehicleAcceptanceTest.recordTradeWithOffer(app, id, token, label));
 
     // The owning account, with a journey, a candidate and a reference vehicle.
     post(client, V + "/account/sign-in-requests", Map.of("email", email), label + "-sign-in");
