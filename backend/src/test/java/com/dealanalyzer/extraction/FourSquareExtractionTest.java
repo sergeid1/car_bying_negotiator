@@ -37,6 +37,20 @@ class FourSquareExtractionTest {
     }
   }
 
+  @Test void theTradeVinIsReadSeparatelyFromTheVehicleVinAndChecksumValidated() {
+    var pages = new ObjectMapper().createArrayNode().add(
+        "FOUR-SQUARE\nVIN: 1HGCM82633A004352\nTrade VIN: 5J6RW2H52ML000002\nTrade Allowance: $11,500\nTrade Payoff: $19,200");
+    var extracted = DeterministicDealerDocumentTestSupport.extract(pages);
+    assertThat(extracted.candidates()).filteredOn(c -> c.field().equals("VEHICLE_VIN")).singleElement()
+        .satisfies(c -> assertThat(c.normalizedValue()).isEqualTo("1HGCM82633A004352"));
+    assertThat(extracted.candidates()).filteredOn(c -> c.field().equals("TRADE_VIN")).singleElement()
+        .satisfies(c -> assertThat(c.normalizedValue()).isEqualTo("5J6RW2H52ML000002"));
+    assertThat(new DealTermsValidator(0.85).validate(extracted, 1, false).issueCodes()).doesNotContain("INVALID_VIN");
+    pages.set(0, new ObjectMapper().getNodeFactory().textNode("FOUR-SQUARE\nTrade VIN: 5J6RW2H52ML000003"));
+    assertThat(new DealTermsValidator(0.85).validate(DeterministicDealerDocumentTestSupport.extract(pages), 1, false)
+        .issueCodes()).contains("INVALID_VIN");
+  }
+
   @Test void handwrittenProviderOutputCannotBypassReviewEvenAtALowConfiguredThreshold() {
     var candidate = new Candidate("MONTHLY_PAYMENT", "Payment: $399 [handwritten]", "39900", "USD_MINOR",
         new EvidenceRegion(1, 0, 0, 1, 1), 0.99, false);

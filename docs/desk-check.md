@@ -56,3 +56,32 @@ deterministic read, which `DeskCheckAcceptanceTest` holds under the 500 ms recal
 
 The header's "I'm at the dealer" routes photographed paperwork here or to a fresh case by its VIN,
 after the Buyer confirms which car it is for. See [desk-start.md](desk-start.md).
+
+## Trade-in check (ticket 103)
+
+When the paperwork shows a trade allowance (`TRADE_ALLOWANCE`, or `TRADE` lines), `trade.desk.TradeDeskCheck`
+(`trade-desk-check.v1`) compares it with the Buyer's Trade Vehicle (ticket 100) and returns `trade` on the Desk
+Check, on the "I'm at the dealer" first result, and as `analysis.tradeCheck` in the report. Its warning and
+blocking findings lead the `TRADE` group, ahead of totals, and the first one leads the report's reasons.
+
+- **Trade VIN.** `TRADE_VIN` is a deal-terms field (checksum-validated, read by the deterministic provider from
+  "Trade VIN"). A different VIN is one `BLOCKING` finding and nothing else about the trade is compared.
+- **Written offer.** The best unexpired written offer (`bestOfferId`); a shortfall is shown in dollars with the
+  offer it is measured against. Expired offers are never used.
+- **Sales tax.** The trade-in tax credit comes from the case's jurisdiction policy pack (`tradeTaxCreditEnabled`,
+  `taxRate`, rounding), capped at the paperwork's selling price, and is added to the offer comparison
+  (`offerGapAfterTaxMinor`). Without a pack for the jurisdiction it is `UNAVAILABLE`, never estimated. No US-FL
+  pack exists yet, so Florida cases show it as unavailable until the jurisdiction pack is sourced.
+- **Valuation range.** From `TradeValuationService` (ticket 101) for the dealer ZIP, labelled as an estimate
+  from the named source; unavailability is stated and nothing is substituted. One available result per trade
+  revision is reused in memory for ten minutes so repeated reads do not meter repeated calls; nothing is stored.
+- **Payoff.** The paperwork's payoff against the Buyer's: a difference is flagged with its amount; a stale or
+  unknown Buyer payoff is said and never treated as the same.
+- **Equity.** Allowance less the paperwork's payoff (else the Buyer's). Negative equity on paperwork with a loan
+  is priced through `FinancingCalculator` as a financed add-on (payment, scheduled payments, interest).
+- **DEAL-09 / TRADE-05.** Nothing here touches price, discount or the out-the-door total. An allowance above the
+  trade's value (the best offer, else the top of the range) is shown next to the price increase over the Agreed
+  Price as a net effect, never netted silently.
+
+The report computes the check before it locks the case row, because the valuation meter commits on its own
+and references the case.

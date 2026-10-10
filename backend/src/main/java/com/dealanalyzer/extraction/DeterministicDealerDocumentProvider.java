@@ -161,6 +161,7 @@ class DeterministicDealerDocumentProvider implements DealTermsExtractionProvider
     add(labels, "DOCUMENT_NUMBER", "TEXT", false, null, false, "UNKNOWN",
         "ORDER NUMBER", "QUOTE NUMBER", "DOCUMENT NUMBER");
     add(labels, "VEHICLE_VIN", "VIN", true, null, false, "UNKNOWN", "VIN", "VEHICLE VIN");
+    add(labels, "TRADE_VIN", "VIN", true, null, false, "UNKNOWN", "TRADE VIN", "TRADE IN VIN");
     add(labels, "VEHICLE_YEAR", "YEAR", false, null, false, "UNKNOWN", "YEAR", "MODEL YEAR");
     add(labels, "VEHICLE_MAKE", "TEXT", false, null, false, "UNKNOWN", "MAKE");
     add(labels, "VEHICLE_MODEL", "TEXT", false, null, false, "UNKNOWN", "MODEL");

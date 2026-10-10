@@ -18,7 +18,7 @@ import java.util.Set;
 public final class DealTermsValidator {
   static final Set<String> FIELDS = Set.of(
       "DOCUMENT_TYPE", "DOCUMENT_NUMBER",
-      "VEHICLE_VIN", "VEHICLE_YEAR", "VEHICLE_MAKE", "VEHICLE_MODEL", "VEHICLE_TRIM",
+      "VEHICLE_VIN", "VEHICLE_YEAR", "VEHICLE_MAKE", "VEHICLE_MODEL", "VEHICLE_TRIM", "TRADE_VIN",
       "BUYER_NAME", "DEALER_NAME", "OFFER_DATE", "EXPIRATION_DATE",
       "SELLING_PRICE", "DISCOUNT_TOTAL", "REBATE_TOTAL", "SUBTOTAL", "TAX_TOTAL",
       "DEALER_CHARGES_TOTAL", "GOVERNMENT_CHARGES_TOTAL", "ADD_ON_TOTAL",
@@ -32,7 +32,7 @@ public final class DealTermsValidator {
       "AMOUNT_FINANCED", "MONTHLY_PAYMENT", "FINANCE_CHARGE", "TOTAL_OF_PAYMENTS");
   private static final Set<String> DATE_FIELDS = Set.of("OFFER_DATE", "EXPIRATION_DATE");
   private static final Set<String> MATERIAL_FIELDS = Set.of(
-      "VEHICLE_VIN", "SELLING_PRICE", "DISCOUNT_TOTAL", "REBATE_TOTAL", "SUBTOTAL",
+      "VEHICLE_VIN", "TRADE_VIN", "SELLING_PRICE", "DISCOUNT_TOTAL", "REBATE_TOTAL", "SUBTOTAL",
       "TAX_TOTAL", "DEALER_CHARGES_TOTAL", "GOVERNMENT_CHARGES_TOTAL", "ADD_ON_TOTAL",
       "TRADE_ALLOWANCE", "TRADE_PAYOFF", "CASH_DOWN", "OUT_THE_DOOR_TOTAL",
       "AMOUNT_FINANCED", "APR", "TERM_MONTHS", "MONTHLY_PAYMENT",
@@ -217,7 +217,7 @@ public final class DealTermsValidator {
       } catch (DateTimeParseException exception) {
         issues.add(issue("INVALID_DATE", candidate.field(), "The normalized date is invalid."));
       }
-    } else if (candidate.field().equals("VEHICLE_VIN")) {
+    } else if (candidate.field().equals("VEHICLE_VIN") || candidate.field().equals("TRADE_VIN")) {
       requireUnit(candidate, "VIN", issues);
       if (!validVin(candidate.normalizedValue())) {
         issues.add(issue("INVALID_VIN", candidate.field(), "The normalized VIN is invalid."));
