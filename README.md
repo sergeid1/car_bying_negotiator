@@ -67,32 +67,38 @@ tracked as numbered tickets in [docs/tickets](docs/tickets).
 
 ## Run locally
 
-Requirements: Java 21, Maven, Node.js 22 and Docker.
+Requirements: Java 21, Maven, Node.js 22, Docker and OpenSSL.
 
-Start the database:
-
-```bash
-docker compose up -d database
-```
-
-Start the backend on port 8080:
+Start everything with one command from the repository root:
 
 ```bash
-cd backend
-CASE_ACCESS_PEPPER="replace-with-a-long-random-secret" \
-DOCUMENT_STORAGE_ENCRYPTION_KEY="replace-with-an-independent-32-byte-secret" \
-mvn spring-boot:run
+scripts/dev-start.sh
 ```
 
-Start the frontend in another terminal:
+Open <http://localhost:5173>. Vite proxies `/api` to the backend. Press Ctrl+C to stop both servers.
 
-```bash
-cd frontend
-npm ci
-npm run dev
-```
+What the script does:
 
-Open <http://localhost:5173>. Vite proxies `/api` to the backend.
+1. **Generates the two backend secrets on the first run.** The backend needs `CASE_ACCESS_PEPPER`,
+   which protects the private links that open a Buying Case, and `DOCUMENT_STORAGE_ENCRYPTION_KEY`,
+   which encrypts uploaded dealer documents at rest. The script creates each one as 32
+   cryptographically random bytes, base64-encoded (`openssl rand -base64 32`), and saves them in
+   `backend/var/local-secrets.env`, a file only you can read, which Git ignores.
+2. **Reuses the same secrets on every later run.** They must not change: a new pepper breaks the
+   links of existing cases, and a new key makes documents already uploaded unreadable. To start over
+   from nothing, delete `backend/var/local-secrets.env`, `backend/var/document-objects` and the
+   database volume (`docker compose down -v`) together.
+3. **Loads the secrets into the environment** for the backend.
+4. **Starts PostgreSQL** with `docker compose up -d --wait database` and waits until it is healthy.
+5. **Installs the frontend dependencies** with `npm ci` if `frontend/node_modules` is missing.
+6. **Starts the backend on port 8080** (`mvn spring-boot:run`) and **the frontend on port 5173**
+   (`npm run dev`), with both logs in the same terminal.
+7. **Stops both servers** on Ctrl+C, or as soon as either one exits. The database container keeps
+   running; stop it with `docker compose stop database`.
+
+To run the pieces by hand instead, start the database with `docker compose up -d database`, run
+`mvn spring-boot:run` in `backend` with both secrets set in the environment, and run `npm ci` and
+`npm run dev` in `frontend` in another terminal.
 
 Configuration notes:
 
