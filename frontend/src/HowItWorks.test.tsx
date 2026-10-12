@@ -83,7 +83,7 @@ test("the walkthrough opens without a case at its own address and title, and rep
   expect(screen.queryByRole("heading", { name: "New here? See how it works" })).toBeNull();
   const next = screen.getByRole("navigation", { name: "Get started" });
   expect(within(next).getByRole("link", { name: "Start with your quote" })).toHaveAttribute("href", "./");
-  expect(within(next).getByRole("link", { name: "See a sample report" })).toHaveAttribute("href", "./#sample-report");
+  expect(within(next).getByRole("link", { name: "See a sample report" })).toHaveAttribute("href", "?page=example-report");
 });
 
 test("the steps are an ordered list with described scenes and labelled example screens from the sample report", async () => {

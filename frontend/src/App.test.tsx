@@ -2,9 +2,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import App from "./App";
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); window.history.replaceState(null, "", "/"); });
 
 test("buyer can start a synthetic cash analysis and reach the rendered report", async () => {
+  // The development fixture shows only when the address asks for it.
+  window.history.replaceState(null, "", "/?fixture");
   const responses = [
     {
       case: { id: "case-1", status: "ANALYZING" },

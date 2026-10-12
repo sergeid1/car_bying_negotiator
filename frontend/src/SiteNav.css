@@ -1,0 +1,104 @@
+/* The header's tabs, drawn like an iOS segmented control: a grey track, four equal segments and a raised
+   pill that glides between them. Selectors start at .masthead so they outrank the header's general nav rules. */
+:root {
+  --segment-track: rgba(118, 118, 128, 0.12);
+  --segment-thumb: #ffffff;
+  --segment-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 3px 1px rgba(0, 0, 0, 0.04);
+}
+:root[data-theme="dark"] {
+  --segment-track: rgba(118, 118, 128, 0.24);
+  --segment-thumb: #636366;
+  --segment-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --segment-track: rgba(118, 118, 128, 0.24);
+    --segment-thumb: #636366;
+    --segment-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.masthead .site-switch {
+  --segment-pad: 4px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  flex: none;
+  gap: 0;
+  width: 540px;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: var(--segment-pad);
+  border-radius: var(--radius-pill);
+  background: var(--segment-track);
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.masthead-inner > .wordmark:has(+ .site-switch) { margin-right: 0; }
+.site-switch-thumb {
+  position: absolute;
+  top: var(--segment-pad);
+  bottom: var(--segment-pad);
+  left: var(--segment-pad);
+  width: calc((100% - 2 * var(--segment-pad)) / 4);
+  border: 0.5px solid rgba(0, 0, 0, 0.04);
+  border-radius: var(--radius-pill);
+  background: var(--segment-thumb);
+  box-shadow: var(--segment-shadow);
+  pointer-events: none;
+  /* A slight overshoot, like the iOS spring. */
+  transition: transform 0.38s cubic-bezier(0.32, 1.25, 0.5, 1), scale 0.2s ease;
+}
+.site-switch[data-pressed] .site-switch-thumb { scale: 0.95; }
+.site-switch[data-dragging] .site-switch-thumb { transition: scale 0.2s ease; }
+.masthead .site-switch .site-switch-item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  -webkit-user-drag: none;
+}
+.masthead .site-switch .site-switch-item:hover { background: transparent; color: var(--ink); }
+.masthead .site-switch .site-switch-item:not(.is-shown):active { opacity: 0.55; }
+.masthead .site-switch .site-switch-item.is-shown { color: var(--ink-strong); font-weight: 600; cursor: grab; }
+.site-switch[data-dragging] .site-switch-item.is-shown { cursor: grabbing; }
+.masthead .site-switch .site-switch-item:active { transform: none; }
+
+.site-switch-short { display: none; }
+
+/* Between phone and desktop widths the header cannot hold the tabs beside its buttons, so they take a centred row. */
+@media (min-width: 601px) and (max-width: 1080px) {
+  .masthead-inner:has(.site-switch) { flex-wrap: wrap; }
+  .masthead-inner > .wordmark:has(+ .site-switch) { margin-right: auto; }
+  .masthead-inner:has(.site-switch)::before { content: ""; order: 9; flex-basis: 100%; height: 0; }
+  .masthead .site-switch { order: 10; margin: 0 auto 2px; }
+}
+
+/* On a phone the switch takes its own full-width row under the logo and the header's buttons. */
+@media (max-width: 600px) {
+  .masthead .site-switch { order: 10; width: 100%; margin: 2px 0 0; }
+  /* The appearance menu drops over this row; the tabs step aside rather than sit half-covered beneath it. */
+  .masthead:has(.theme-options) .site-switch { visibility: hidden; }
+  .masthead .site-switch .site-switch-item { padding: 4px 2px; font-size: 0.82rem; letter-spacing: -0.01em; }
+  .site-switch-full { display: none; }
+  .site-switch-short { display: inline; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-switch-thumb { transition: none; }
+}

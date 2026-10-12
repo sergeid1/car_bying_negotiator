@@ -21,7 +21,7 @@ const SAMPLE = {
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState(null, "", "/"); });
 
 function stub(sample: () => Response) {
   const fetcher = vi.fn(async (path: string) => path === "/api/v1/sample-report" ? sample()
@@ -32,11 +32,21 @@ function stub(sample: () => Response) {
   return fetcher;
 }
 
-test("the example report opens from the start of the flow without a case, labelled and with removals shown as removed", async () => {
-  const fetcher = stub(() => json(SAMPLE));
+test("the home page keeps the example report on its own page, behind the header's Example report tab", async () => {
+  stub(() => json(SAMPLE));
   render(<App />);
-  fireEvent.click(await screen.findByRole("link", { name: "See an example report" }));
-  const panel = screen.getByRole("region", { name: "See an example report" });
+  expect(await screen.findByRole("link", { name: "See an example report" })).toHaveAttribute("href", "?page=example-report");
+  expect(screen.queryByRole("article", { name: "See an example report" })).toBeNull();
+  expect(screen.queryByRole("note", { name: "About this example" })).toBeNull();
+});
+
+test("the example report page opens without a case, labelled and with removals shown as removed", async () => {
+  const fetcher = stub(() => json(SAMPLE));
+  window.history.replaceState(null, "", "/?page=example-report");
+  render(<App />);
+  const panel = screen.getByRole("article", { name: "See an example report" });
+  expect(document.title).toBe("Example report · otdog");
+  expect(screen.queryByRole("heading", { name: "Start your Buying Case" })).toBeNull();
   expect(await within(panel).findByRole("heading", { name: "Deal Analysis Report" })).toBeVisible();
 
   const about = within(panel).getByRole("note", { name: "About this example" });
@@ -58,10 +68,10 @@ test("the example report opens from the start of the flow without a case, labell
   expect(fetcher.mock.calls.some(([path]) => path.startsWith("/api/v1/cases"))).toBe(false);
 });
 
-test("an unavailable example report says so without blocking the case start", async () => {
+test("an unavailable example report says so and still offers the case start", async () => {
   stub(() => json({}, 503));
+  window.history.replaceState(null, "", "/?page=example-report");
   render(<App />);
-  fireEvent.click(await screen.findByRole("link", { name: "See an example report" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("The example report is unavailable right now.");
-  expect(screen.getByRole("heading", { name: "Start your Buying Case" })).toBeVisible();
+  expect(screen.getByRole("link", { name: "Check my own deal" })).toHaveAttribute("href", "./#start");
 });

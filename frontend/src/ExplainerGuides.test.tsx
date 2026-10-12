@@ -45,12 +45,19 @@ const GUIDES = [
   { slug: "dealer-fees", title: "Which dealer fees to ask about", channel: "guide-dealer-fees" },
 ];
 
-test("the start screen links to both guides at their stable addresses", async () => {
+test("the start screen keeps the guides off the start form and the Guides tab links to both at their stable addresses", async () => {
   stubApi();
-  const App = await freshApp("/");
+  let App = await freshApp("/");
+  const { unmount } = render(<App />);
+  expect(screen.queryByRole("article", { name: "Guides to reading your quote" })).toBeNull();
+  expect(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: "Guides" })).toHaveAttribute("href", "?page=guides");
+  unmount();
+  App = await freshApp("/?page=guides");
   render(<App />);
-  const links = within(screen.getByRole("region", { name: "Guides to reading your quote" })).getAllByRole("link");
-  expect(links.map(link => [link.textContent, link.getAttribute("href")])).toEqual(
+  expect(document.title).toBe("Guides · otdog");
+  expect(screen.queryByRole("heading", { name: "Start your Buying Case" })).toBeNull();
+  const links = within(screen.getByRole("article", { name: "Guides to reading your quote" })).getAllByRole("link");
+  expect(links.map(link => [link.querySelector(".guide-card-title")!.textContent, link.getAttribute("href")])).toEqual(
     GUIDES.map(guide => [guide.title, `?guide=${guide.slug}`]));
 });
 
@@ -97,9 +104,9 @@ test("the start screen states the Buyer's side of the deal and the credo", async
   render(<App />);
   const hero = screen.getByRole("heading", { level: 1 }).parentElement!.textContent!.replace(/\s+/g, " ");
   expect(hero).toContain("Check your dealer's quote");
-  expect(hero).toContain("Check my deal");
   expect(hero).toContain("We never work for dealers");
   expect(hero).not.toMatch(/gmail|outlook|mailbox/i);
+  expect(screen.getByRole("navigation", { name: "Main" })).toHaveTextContent("Check my deal");
 });
 
 test("an unknown guide name shows the usual start screen", async () => {

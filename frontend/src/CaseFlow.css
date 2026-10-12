@@ -19,6 +19,7 @@
 .case-flow-details { margin: 0; color: var(--ink-muted); font-size: 0.9rem; }
 .case-flow-header > button { flex: none; min-height: 44px; }
 
+.case-progress { position: relative; }
 .case-progress ol {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -27,42 +28,58 @@
   padding: 0;
   list-style: none;
 }
-.case-progress li { min-width: 0; }
+.case-progress li { display: flex; min-width: 0; padding: 0; }
 .case-progress button {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 44px;
-  padding: 6px 8px;
+  min-height: 52px;
+  padding: 6px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--card);
   color: var(--ink);
   font: inherit;
   font-size: 0.9rem;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
 }
 .case-progress button:hover { background: var(--card-sunk); }
-.case-progress button[aria-expanded="true"] { border-color: var(--line-strong); }
+.case-progress button[aria-expanded="true"] { font-weight: 600; color: var(--ink-strong); }
+/* Every step's number sits in the same ringed circle, so the four boxes line up whatever their state. */
 .case-progress-number {
   display: inline-grid;
   place-items: center;
   flex: none;
   width: 26px;
   height: 26px;
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-pill);
-  background: var(--card-sunk);
+  background: var(--card);
   color: var(--ink-muted);
   font-weight: 600;
   font-size: 0.82rem;
 }
 .case-progress-name { min-width: 0; overflow-wrap: anywhere; line-height: 1.2; }
-.case-progress [data-state="current"] button { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
-.case-progress [data-state="current"] .case-progress-number { background: var(--brand); color: var(--on-brand); }
-.case-progress [data-state="done"] .case-progress-number { background: var(--ok-tint); color: var(--ok-ink); }
-.case-progress [data-state="later"] button { color: var(--ink-muted); background: var(--card-sunk); }
+/* Where the case has reached: a filled number. Which step is open: the sliding outline below. */
+.case-progress [data-state="current"] .case-progress-number { border-color: var(--brand); background: var(--brand); color: var(--on-brand); }
+.case-progress [data-state="done"] .case-progress-number { border-color: transparent; background: var(--ok-tint); color: var(--ok-ink); }
+.case-progress [data-state="later"] button { color: var(--ink-muted); }
+.case-progress-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  border: 2px solid var(--brand);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  transition: transform 0.32s cubic-bezier(0.3, 0.7, 0.2, 1), width 0.32s cubic-bezier(0.3, 0.7, 0.2, 1), height 0.32s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .case-progress-thumb { transition: none; }
+}
 
 .case-step { display: grid; gap: 12px; scroll-margin-top: 88px; }
 .case-flow > .case-step[data-open="false"] + .case-step[data-open="false"] { margin-top: -8px; }

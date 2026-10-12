@@ -20,7 +20,7 @@ import { DealerReplyAssistant } from "./NegotiationDraft";
 import { ReportExplanationLoader } from "./ReportExplanation";
 import { ReferralDisclosure } from "./AcquisitionChannel";
 import { OfferTerms, PurchasePoint } from "./OneTimeOffer";
-import { SampleReportEntry } from "./SampleReport";
+import { ExampleReportPage } from "./SampleReport";
 import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 import { ReferralPartnerKit } from "./ReferralPartnerKit";
 import { HowItWorks, HowItWorksCard } from "./HowItWorks";
@@ -506,9 +506,8 @@ test("offer terms, the example report and the payment point have no automated AA
     const body = url.endsWith("/api/v1/offer") ? offer : url.endsWith("/sample-report") ? sample : {};
     return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
   });
-  const { container } = render(<main><h1>otdog</h1><SampleReportEntry /><OfferTerms />
+  const { container } = render(<main><ExampleReportPage /><OfferTerms />
     <PurchasePoint caseId="case" token="token" onPurchased={() => {}} /></main>);
-  await userEvent.setup().click(screen.getByRole("link", { name: "See an example report" }));
   await screen.findByRole("note", { name: "About this example" });
   await screen.findByRole("region", { name: "What is free and what you pay for" });
   await userEvent.setup().click(await screen.findByText("Price terms, refunds, and scope"));

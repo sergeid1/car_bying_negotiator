@@ -355,8 +355,8 @@ main > * + * { margin-top: 22px; }
 .hero h1 .hero-quiet { color: var(--ink-muted); }
 .hero-credo { margin: 14px 0 0; color: var(--ink-strong); font-weight: 600; }
 
-/* One centred workflow column; case access and the account open in side panels. */
-.workspace { width: min(780px, 100%); margin-inline: auto; }
+/* One workflow column spanning the header, from the logo's edge to the account button's; case access and the account open in side panels. */
+.workspace { width: 100%; }
 .column { display: grid; gap: 18px; align-content: start; min-width: 0; }
 .column:focus { outline: none; }
 
@@ -1556,9 +1556,6 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
   font-size: 0.97rem; text-decoration: none;
 }
 .actions > a.button-link:hover { background: var(--brand-hover); color: var(--on-brand); }
-.guide-links { margin: 0; padding: 0; list-style: none; }
-.guide-links li { display: grid; gap: 4px; }
-.guide-links li + li { margin-top: 12px; }
 
 /* Ticket 49: the referral partner kit's links wrap inside a 360 px column. */
 .partner-kit .guide-example .panel { margin-top: 10px; box-shadow: none; }
@@ -1898,7 +1895,6 @@ fieldset.trade-choices input[type="radio"] { flex: none; width: 20px; height: 20
 
 /* Ticket 107: the how-it-works walkthrough and the start screen's card. Without pinning it is an
    ordered list of scenes and example screens; pinning needs motion and room for two columns. */
-.workspace:has(.how-it-works) { width: min(1080px, 100%); }
 .how-it-works { min-width: 0; }
 .walkthrough-index { display: grid; gap: 4px; }
 .walkthrough { display: grid; gap: 40px; margin: 28px 0 0; padding: 0; list-style: none; counter-reset: walkthrough; }
@@ -1962,3 +1958,37 @@ fieldset.trade-choices input[type="radio"] { flex: none; width: 20px; height: 20
 .how-it-works-card p { margin: 0; color: var(--ink-muted); }
 .how-it-works-card > * + * { margin-top: 0; }
 /* End ticket 107. */
+
+/* The Guides tab: a modest heading over raised cards that lift on hover, one per guide. */
+.guides-page { display: grid; gap: 10px; }
+.guides-page h1 { font-size: clamp(1.9rem, 3.6vw, 2.6rem); line-height: 1.1; letter-spacing: -0.04em; }
+.guides-page .lede { margin-bottom: 14px; }
+.guide-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+.guide-cards li { display: flex; padding: 0; max-width: none; }
+.guide-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  text-decoration: none;
+  transition: transform 0.2s cubic-bezier(0.3, 0.7, 0.2, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.guide-card:hover { transform: translateY(-3px); border-color: var(--line-strong); box-shadow: var(--shadow-lg); color: var(--ink); }
+.guide-card-title { color: var(--ink-strong); font-size: 1.2rem; font-weight: 700; line-height: 1.25; letter-spacing: -0.02em; }
+.guide-card-summary { color: var(--ink-muted); line-height: 1.5; }
+.guide-card-cta { margin-top: auto; padding-top: 8px; color: var(--ink-strong); font-weight: 600; font-size: 0.92rem; }
+.guide-card-arrow { display: inline-block; transition: transform 0.2s ease; }
+.guide-card:hover .guide-card-arrow { transform: translateX(4px); }
+@media (prefers-reduced-motion: reduce) {
+  .guide-card, .guide-card-arrow { transition: none; }
+  .guide-card:hover, .guide-card:hover .guide-card-arrow { transform: none; }
+}
+
+/* The Example report tab's page: a modest heading like the other tabs' pages. */
+.sample-report > h1 { font-size: clamp(1.9rem, 3.6vw, 2.6rem); line-height: 1.1; letter-spacing: -0.04em; }

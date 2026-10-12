@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import "./styles.css";
 import "./Masthead.css";
 import { CaseLinkAccess, RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess } from "./CasePortability";
@@ -11,11 +11,12 @@ import { CaseFlow } from "./CaseFlow";
 import { AtTheDealer, DealerCameraEntry } from "./AtTheDealer";
 import { ThemeMenu } from "./ThemeMenu";
 import { OfferTerms } from "./OneTimeOffer";
-import { SampleReportEntry } from "./SampleReport";
-import { ExplainerGuide, GuideLinks, requestedGuide } from "./ExplainerGuides";
+import { ExampleReportPage, requestedExampleReport } from "./SampleReport";
+import { ExplainerGuide, GuideLinks, requestedGuide, requestedGuideIndex } from "./ExplainerGuides";
 import { partnerKitLink, ReferralPartnerKit, requestedPartnerKit } from "./ReferralPartnerKit";
 import { HowItWorks, requestedHowItWorks } from "./HowItWorks";
 import { HomeHero } from "./HomeHero";
+import { SiteNav } from "./SiteNav";
 import logo from "./assets/otdog-logo.png";
 import logoDark from "./assets/otdog-logo-dark.png";
 import { SidePanel, type SidePanelView, useSidePanelRequests } from "./SidePanel";
@@ -140,11 +141,21 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   const [caseLinkExpand, setCaseLinkExpand] = useState(0);
   useSidePanelRequests(setSidePanel);
   const closeSidePanel = () => setSidePanel(undefined);
-  const [guide] = useState(requestedGuide);
-  const [partnerKit] = useState(requestedPartnerKit);
-  const [howItWorks] = useState(requestedHowItWorks);
+  // The header's tabs change the address without reloading, so the page is read again on every history move.
+  const [address, setAddress] = useState(0);
+  useEffect(() => {
+    const moved = () => setAddress(value => value + 1);
+    window.addEventListener("popstate", moved);
+    return () => window.removeEventListener("popstate", moved);
+  }, []);
+  const { guide, guideIndex, partnerKit, howItWorks, exampleReport } = useMemo(() => {
+    const guide = requestedGuide();
+    return { guide, guideIndex: !guide && requestedGuideIndex(), partnerKit: requestedPartnerKit(),
+      howItWorks: requestedHowItWorks(), exampleReport: !guide && requestedExampleReport() };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address]);
   // A guide, the partner kit or the walkthrough replaces the start screen at its own shareable address.
-  const standalone = Boolean(guide || partnerKit || howItWorks);
+  const standalone = Boolean(guide || guideIndex || partnerKit || howItWorks || exampleReport);
   // A case opened from the Buyer Account closes when the sign-in ends; its private case link is unaffected.
   const openedFromAccount = Boolean(caseCredentials && isAccountPass(caseCredentials.token));
   useEffect(() => {
@@ -210,9 +221,10 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             <img className="wordmark-light" src={logo} alt="" width="114" height="40" />
             <img className="wordmark-dark" src={logoDark} alt="" width="114" height="40" />
           </a>
-          {!standalone && <DealerCameraEntry onPhotos={files => setAtDealer({ files, started: Date.now() })} />}
+          {!caseOpen && !partnerKit && <SiteNav page={howItWorks ? "how-it-works" : exampleReport ? "example-report" : guide || guideIndex ? "guides" : standalone ? "other" : "home"} />}
+          {!partnerKit && <DealerCameraEntry onPhotos={files => setAtDealer({ files, started: Date.now() })} />}
           <ThemeMenu />
-          {!standalone && <AccountHeader controls={accountControls} onOpen={() => setSidePanel("account")} />}
+          {!partnerKit && <AccountHeader controls={accountControls} onOpen={() => setSidePanel("account")} />}
         </div>
       </header>
 
@@ -222,8 +234,10 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         <div className="workspace">
           <AccountSignedInContext.Provider value={accountSignedIn}>
           <div className="column" id="case-workflow" tabIndex={-1}>
-            {guide && <ExplainerGuide slug={guide} />}
-            {!standalone && atDealer && <AtTheDealer key={atDealer.started} files={atDealer.files}
+            {guide && !atDealer && !caseOpen && <ExplainerGuide slug={guide} />}
+            {guideIndex && !atDealer && !caseOpen && <GuideLinks />}
+            {exampleReport && !atDealer && !caseOpen && <ExampleReportPage />}
+            {!partnerKit && atDealer && <AtTheDealer key={atDealer.started} files={atDealer.files}
               open={caseCredentials && !caseRevoked ? caseCredentials : undefined}
               onCaseOpened={value => {
                 setReferral(undefined); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId);
@@ -234,7 +248,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               }}
               onDeskCheck={() => { setAtDealer(undefined); setDealerRequest(value => value + 1); }} onClose={() => setAtDealer(undefined)} />}
             {!guide && partnerKit && <ReferralPartnerKit />}
-            {!guide && !partnerKit && howItWorks && <HowItWorks />}
+            {!guide && !partnerKit && howItWorks && !atDealer && !caseOpen && <HowItWorks />}
             {!standalone && accountSignedIn && <BuyingJourneys
               onSessionEnded={() => { setAccountSignedIn(false); setAccountRecheck(value => value + 1); }}
               onCaseOpened={(value, disclosure) => {
@@ -253,11 +267,9 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               />
             )}
 
-            {!standalone && !report && !caseCredentials && !atDealer && <SampleReportEntry entryLink={false} />}
             {!standalone && !report && !caseCredentials && !atDealer && <OfferTerms />}
-            {!standalone && !report && !caseCredentials && !atDealer && <GuideLinks />}
 
-            {!standalone && !report && !caseOpen && import.meta.env.DEV && (
+            {!standalone && !report && !caseOpen && import.meta.env.DEV && new URLSearchParams(window.location.search).has("fixture") && (
               <section className="panel" aria-labelledby="case-heading">
                 <div className="section-heading">
                   <div>
@@ -350,7 +362,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
           onRevoked={() => { setCaseRevoked(true); setReport(undefined); setStage(undefined); setError(undefined); }} />}
       </SidePanel>
-      {!standalone && <SidePanel id="account-panel" title={accountSignedIn ? "Your account" : "Sign in"}
+      {!partnerKit && <SidePanel id="account-panel" title={accountSignedIn ? "Your account" : "Sign in"}
         open={sidePanel === "account"} onClose={closeSidePanel}>
         <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined}
           onSignedIn={setAccountSignedIn} onControls={setAccountControls} recheck={accountRecheck} showing={sidePanel === "account"}
