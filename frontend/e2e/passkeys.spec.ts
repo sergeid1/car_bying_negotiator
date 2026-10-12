@@ -73,6 +73,8 @@ for (const width of [360, 1280]) {
     await page.context().addCookies([{ name: "account_session", value: "browser-session", domain: "localhost",
       path: "/api/v1", httpOnly: true, secure: true, sameSite: "Strict" }]);
     await page.goto(origin.href);
+    const openAccount = () => page.getByRole("banner").getByRole("button", { name: account.contact.email }).click();
+    await openAccount();
     const panel = page.getByRole("region", { name: "Buyer Account" });
     const nickname = "My very long device name with a roaming authenticator and a useful reminder";
     await panel.getByLabel("Passkey nickname").fill(nickname);
@@ -81,12 +83,15 @@ for (const width of [360, 1280]) {
     expect((await cdp.send("WebAuthn.getCredentials", { authenticatorId })).credentials).toHaveLength(1);
     await panel.getByRole("button", { name: "Sign out", exact: true }).click();
     await panel.getByRole("button", { name: "Sign in with a passkey" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await openAccount();
     await expect(panel.getByRole("status")).toHaveText("Signed in with a passkey.");
     expect(signIns).toBe(1);
     await expect(panel.getByRole("list", { name: "Your passkeys" })).toContainText("Last used");
     const cookie = (await page.context().cookies()).find(value => value.name === "account_session");
     expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: "Strict", path: "/api/v1" });
     await page.reload();
+    await openAccount();
     await expect(panel.getByRole("list", { name: "Your passkeys" })).toContainText(nickname);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     expect((await new AxeBuilder({ page }).include("[aria-label='Buyer Account']").withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze()).violations).toEqual([]);

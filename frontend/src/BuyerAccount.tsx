@@ -3,6 +3,7 @@ import type { Credentials } from "./CasePortability";
 import { MailboxConnection } from "./MailboxConnection";
 import { Passkeys, passkeysSupported, signInWithPasskey } from "./Passkeys";
 import { Passwords, PasswordSignIn } from "./Passwords";
+import { openSidePanel } from "./SidePanel";
 
 type Contact = { email: string; firstName: string | null; lastName: string | null; phone: string | null };
 type AttachedCase = {
@@ -15,17 +16,12 @@ type Problem = { status: number; code?: string; detail?: string };
 export const AccountSignedInContext = createContext<boolean | undefined>(undefined);
 
 export type AccountControls = { email?: string; busy: boolean; signOut: () => void };
-export function AccountHeader({ controls }: { controls?: AccountControls }) {
-  function openAccount() {
-    const panel = document.getElementById("buyer-account");
-    panel?.scrollIntoView({ block: "start" });
-    panel?.focus();
-  }
+export function AccountHeader({ controls, onOpen }: { controls?: AccountControls; onOpen: () => void }) {
   return <div className="header-account" aria-label="Account controls">
     {controls?.email ? <>
-      <button className="btn-ghost header-email" title={controls.email} onClick={openAccount}>{controls.email}</button>
+      <button className="btn-ghost header-email" title={controls.email} aria-haspopup="dialog" onClick={onOpen}>{controls.email}</button>
       <button className="btn-ghost" disabled={controls.busy} onClick={controls.signOut}>Sign out</button>
-    </> : <button className="btn-ghost" onClick={openAccount}>Sign in</button>}
+    </> : <button className="btn-ghost" aria-haspopup="dialog" onClick={onOpen}>Sign in</button>}
   </div>;
 }
 
@@ -71,8 +67,10 @@ function startedOn(value?: string | null) {
  * `onSignedIn` reports whether the account has loaded successfully.
  * Changing `recheck` re-reads the account, so a panel that saw the session end can sign it out here.
  */
-export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOpened, recheck = 0 }: {
+export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOpened, onSignInComplete, recheck = 0 }: {
   caseCredentials?: Credentials; onSignedIn?: (signedIn: boolean) => void; recheck?: number;
+  /** The Buyer finished signing in here, by email link, password or passkey. */
+  onSignInComplete?: () => void;
   onControls?: (controls: AccountControls) => void;
   /** Opens an attached case with access that ends when this sign-in ends. */
   onCaseOpened?: (value: Credentials) => void;
@@ -94,7 +92,7 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
       if (!secret) return;
       setLinkSecret(secret);
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
-      document.getElementById("buyer-account")?.focus();
+      openSidePanel("account");
     }
     window.addEventListener("hashchange", receiveLink);
     return () => window.removeEventListener("hashchange", receiveLink);
@@ -138,7 +136,7 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
   const finishLink = linkSecret && <button disabled={busy} onClick={() => run(async () => {
     try {
       await call("/api/v1/account/sign-in/verify", { method: "POST", body: JSON.stringify({ token: linkSecret }) });
-      setLinkSecret(""); setLoads(value => value + 1);
+      setLinkSecret(""); setLoads(value => value + 1); onSignInComplete?.();
     } catch (problem) {
       const code = (problem as Problem)?.code;
       if (code && LINK_MESSAGES[code]) { setLinkSecret(""); throw { status: 0, detail: LINK_MESSAGES[code] }; }
@@ -173,11 +171,11 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
     {error && <button className="btn-secondary" onClick={() => { setError(""); setLoads(loads + 1); }}>Retry loading account</button>}
     {!loading && <><SignInRequest busy={busy} run={run} setMessage={setMessage} />
       <PasswordSignIn request={call} onSignedIn={async () => {
-        setAccount(await (await call("/api/v1/account")).json()); setMessage("Signed in with a password.");
+        setAccount(await (await call("/api/v1/account")).json()); setMessage("Signed in with a password."); onSignInComplete?.();
       }} />
       <button className="btn-secondary" disabled={busy || !passkeysSupported()} onClick={() => void run(async () => {
         await signInWithPasskey(call);
-        setAccount(await (await call("/api/v1/account")).json()); setMessage("Signed in with a passkey.");
+        setAccount(await (await call("/api/v1/account")).json()); setMessage("Signed in with a passkey."); onSignInComplete?.();
       }, "Passkey sign-in could not be completed. Try again or use an email link.")}>Sign in with a passkey</button>
       {!passkeysSupported() && <p>This browser does not support passkeys. Use an email sign-in link.</p>}
     </>}

@@ -57,7 +57,17 @@ test.each([{ keys: [] }, { keys: [{ id: "key", nickname: "My device", createdAt:
   });
 
 test.each([undefined, "a.long.buyer.address@example.com"])("header account controls for %s have no automated AA violations", async email => {
-  const { container } = render(<header><AccountHeader controls={{ email, busy: false, signOut: () => {} }} /></header>);
+  const { container } = render(<header><AccountHeader controls={{ email, busy: false, signOut: () => {} }} onOpen={() => {}} /></header>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+test.each([["Sign in", "Sign in"], ["Your case", "Your Buying Case"]])("the %s side panel has no automated AA violations", async (button, title) => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => String(input) === "/api/v1/account"
+    ? new Response(JSON.stringify({ code: "SESSION_ENDED" }), { status: 401 })
+    : new Response(JSON.stringify({}), { status: 404 }));
+  const { container } = render(<App />);
+  await userEvent.click(within(screen.getByRole("banner")).getByRole("button", { name: button }));
+  await screen.findByRole("dialog", { name: title });
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 
@@ -323,7 +333,7 @@ test("keyboard users can skip to the case workflow", async () => {
   await user.tab();
   expect(screen.getByRole("link", { name: "Skip to case workflow" })).toHaveFocus();
   await user.keyboard("{Enter}");
-  expect(screen.getByRole("region", { name: "Open an existing Buying Case" })).toHaveFocus();
+  expect(document.getElementById("case-workflow")).toHaveFocus();
 });
 
 test("term verification with source pages, trade terms, corrections and version changes has no automated AA violations", async () => {

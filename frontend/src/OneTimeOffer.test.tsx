@@ -142,8 +142,9 @@ test("case recovery, export and deletion stay reachable while the report is unpa
   try {
     render(<App pollDelayMs={0} />);
     await screen.findByRole("button", { name: "Pay $49.00 and open the report" });
-    expect(screen.getByRole("button", { name: "Export retained case data" })).toBeEnabled();
     expect(screen.getByRole("region", { name: "Private return link" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Your case" }));
+    expect(screen.getByRole("button", { name: "Export retained case data" })).toBeEnabled();
     expect(screen.getByRole("region", { name: "Optional email recovery" })).toBeVisible();
     fireEvent.click(screen.getByRole("checkbox", { name: /permanently delete/i }));
     expect(screen.getByRole("button", { name: "Delete Buying Case" })).toBeEnabled();

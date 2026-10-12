@@ -26,7 +26,10 @@ test("a case opened from the Buyer Account shows the workspace without a case li
 
   // Signed-out copy shows until the account loads; then the intake says the case will be saved.
   expect(await screen.findByText(/this case will be saved to your Buyer Account/)).toBeVisible();
+  await user.click(within(screen.getByRole("banner")).getByRole("button", { name: "buyer@example.com" }));
   await user.click(await screen.findByRole("button", { name: "Open 2021 Honda Accord, started Oct 4, 2026" }));
+  // Opening a case closes the account panel so the case is in view.
+  expect(screen.queryByRole("dialog", { name: "Your account" })).toBeNull();
 
   const notice = await screen.findByRole("region", { name: "Opened from your Buyer Account" });
   expect(within(notice).getByText(/Signing out closes it here/)).toBeVisible();

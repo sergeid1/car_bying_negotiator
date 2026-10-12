@@ -42,7 +42,7 @@ export function SavedCaseAccess({ onOpened, onUnavailable }: { onOpened: (value:
       void open(initial);
     }
   }, [initial]);
-  return <section id="case-workflow" tabIndex={-1} className="panel" aria-label="Open an existing Buying Case">
+  return <section className="panel" aria-label="Open an existing Buying Case">
     <h2>Open a saved case</h2>
     <p>Open your private saved case link, or paste it here. Anyone with the link can access the case.</p>
     <form onSubmit={event => { event.preventDefault(); void open(link); }}>
