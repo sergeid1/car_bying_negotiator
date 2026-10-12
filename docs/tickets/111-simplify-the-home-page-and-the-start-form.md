@@ -11,8 +11,15 @@ Operator request on 2026-10-12, from a design review of the running client.
 `App.tsx`, `styles.css` and `Accessibility.test.tsx`, so each keeps to the file ownership in its coordinator
 assignment.
 
-**Status:** open — agent-ready. Client plus a small intake API change; no migration is expected, because
-`analysis_cases.dealer_location` is already `VARCHAR(200)`.
+**Status:** complete — no migration, as of 2026-10-12. `HomeHero.tsx` has one headline, one sentence, **Check my
+deal** and text links to the example report and how it works; the hero points are "You make every decision", "No
+account needed" and "We never work for dealers" ("Free for Buyers" was left out because the one-time offer is
+paid). The form asks for the dealer's name (optional), city and state (`DealerFields.tsx`, shared with At the dealer
+and the journey candidate search); the intake API takes `dealerCity`, `dealerState` and `dealerName` and still
+accepts `dealerPostalCode` from older clients. `dealer_location` stores "City, ST", or a ZIP typed into the city
+box. The Buyer's ZIP is now kept in `buyer_zip`, and the market search and trade valuation use it when there is no
+dealer ZIP. `GET /intake-options?buyerPostalCode=` returns `buyerState` to default the dealer's state. Trim is
+optional; listing URL, the out-the-door limit and the optional permissions sit under "Add more (optional)".
 
 ## The hero
 

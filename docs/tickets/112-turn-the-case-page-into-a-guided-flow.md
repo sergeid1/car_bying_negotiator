@@ -11,9 +11,16 @@ from a design review of the running client; the operator approved the progress b
 `App.tsx`, `styles.css` and `Accessibility.test.tsx`, so each keeps to the file ownership in its coordinator
 assignment.
 
-**Status:** open — agent-ready. The step names below are placeholders until the operator confirms them. Client only; if a step's
-"done" state cannot be read from the existing case endpoints, raise it with the coordinator before adding an
-endpoint.
+**Status:** complete — client only, as of 2026-10-12; the step names are still placeholders for the operator to
+confirm. `CaseFlow.tsx` replaces the stacked case sections: a header with the car, the dealer's location and how
+the Buyer pays, a **This case** button for the case options, and a four-step bar (Get quotes, Compare & negotiate,
+At the dealer, Final check; names in `CASE_STEPS`). The current step comes from `quote-requests`,
+`dealer-offers/latest` and `desk-check`; only it is open, finished steps fold into one line and later steps show
+an "Unlocks when…" sentence but can still be opened. Final check summarizes the Desk Check comparison and links to
+its details. The hero is hidden while a case is open. The private case link stays on the page below the steps,
+not in the This case menu, because for a Buyer without an account it is the only way back. Open: the bar moves
+on load, after an offer is frozen and after the at-the-dealer hand-over, not yet after every change inside a
+section; button-level wording such as "Freeze this Dealer Offer" and "current mandate" is unchanged.
 
 ## The page
 

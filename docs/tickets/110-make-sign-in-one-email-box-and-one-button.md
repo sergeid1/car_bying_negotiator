@@ -11,7 +11,15 @@ has two buttons that both mean "get back to my stuff": "Your case" and "Sign in"
 `App.tsx`, `styles.css` and `Accessibility.test.tsx`, so each keeps to the file ownership in its coordinator
 assignment.
 
-**Status:** open — agent-ready. Client only; no API or migration change is expected.
+**Status:** complete — client only, no API or migration change, as of 2026-10-12. The signed-out panel is one
+line, one **Email** box and **Continue** (`SignIn.tsx`). Continue always emails a sign-in link and shows fixed text,
+so no lookup reveals whether an account exists; "Sign in with a password" and "Sign in with a passkey" are one tap
+further, and a saved passkey is offered in the email box's autofill (conditional mediation) while the panel is
+open. A background passkey request that fails before the Buyer picks a passkey shows nothing. "Forgot password?"
+sends the link. Private case links and email recovery sit in a collapsed "Have a private case link?" disclosure in
+the panel (`CaseLinkAccess`); "Your case" and "Scope" left the header. Open for the operator: password users also
+receive a sign-in email they do not need; the alternative is a choice screen after Continue that costs link users a
+tap. `#case=` and `#recover=` links on a standalone page (guide, partner kit, how it works) no longer have a panel.
 
 **Decision (operator, 2026-10-12):** keep the private case link and email recovery. They stay so that no
 account is required, but they leave the header and sit behind a "Have a private case link?" disclosure in this
