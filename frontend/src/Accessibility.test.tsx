@@ -23,6 +23,7 @@ import { OfferTerms, PurchasePoint } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 import { ReferralPartnerKit } from "./ReferralPartnerKit";
+import { HowItWorks, HowItWorksCard } from "./HowItWorks";
 import { AccountHeader, AccountSignedInContext, BuyerAccount } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 import { NegotiationConversation } from "./NegotiationConversation";
@@ -508,6 +509,17 @@ test("the referral partner kit, its example disclosure, and its built links have
   await user.click(screen.getByRole("button", { name: "Build links" }));
   await screen.findByRole("list", { name: "Referral links for inspector-1" });
   result = await axe.run(container, AA);
+  expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
+});
+
+test("the how-it-works walkthrough, its example screens and the start screen's card have no automated AA violations", async () => {
+  const sample = { report: { analysis: { nextAction: "Ask the dealer to itemize the fees.", topReasons: ["Dealer fees are above the recorded range."],
+    economics: { sellingPrice: { minorUnits: 2500000, currency: "USD" }, dealerFees: { minorUnits: 79900, currency: "USD" },
+      addOns: { minorUnits: 50000, currency: "USD" }, outTheDoorTotal: { minorUnits: 2847500, currency: "USD" } } } } };
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(sample)));
+  const { container } = render(<main><HowItWorksCard /><HowItWorks /></main>);
+  await screen.findByText("Ask the dealer to itemize the fees.", { exact: false });
+  const result = await axe.run(container, AA);
   expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
 });
 

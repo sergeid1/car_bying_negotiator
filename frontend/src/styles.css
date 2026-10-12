@@ -1896,3 +1896,70 @@ fieldset.trade-choices input[type="radio"] { flex: none; width: 20px; height: 20
   .masthead-inner > nav { order: 4; }
   .masthead-inner > .header-camera { order: 5; margin-left: auto; }
 }
+
+/* Ticket 107: the how-it-works walkthrough and the start screen's card. Without pinning it is an
+   ordered list of scenes and example screens; pinning needs motion and room for two columns. */
+.workspace:has(.how-it-works) { width: min(1080px, 100%); }
+.how-it-works { min-width: 0; }
+.walkthrough-index { display: grid; gap: 4px; }
+.walkthrough { display: grid; gap: 40px; margin: 28px 0 0; padding: 0; list-style: none; counter-reset: walkthrough; }
+.walkthrough-step { display: grid; gap: 14px; min-width: 0; counter-increment: walkthrough; scroll-margin-top: 96px; }
+.walkthrough-step:focus { outline: none; }
+.walkthrough-step:focus-visible .walkthrough-caption { outline: 3px solid var(--focus); outline-offset: 4px; border-radius: var(--radius-sm); }
+.walkthrough-caption h2 { margin: 0 0 6px; font-size: clamp(1.3rem, 3vw, 1.7rem); letter-spacing: -0.02em; }
+.walkthrough-caption h2::before { content: counter(walkthrough) ". "; color: var(--ink-muted); }
+.walkthrough-caption p { margin: 0; max-width: 46ch; font-size: 1.05rem; line-height: 1.55; }
+.walkthrough-frame { display: grid; gap: 12px; min-width: 0; }
+.walkthrough-scene { overflow: hidden; border-radius: var(--radius); aspect-ratio: 16 / 9; background: #e9dccb; }
+.walkthrough-scene svg, .walkthrough-scene img, .walkthrough-scene video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.scene-wall { fill: #eadbc6; }
+.scene-table { fill: #c9a882; }
+.scene-device { fill: #4a4440; }
+.scene-glow { fill: #fbf3e4; }
+.scene-object { fill: #a8836a; }
+.scene-hand { fill: #d9b59a; }
+.scene-paper { fill: #fbf8f2; }
+.scene-line { fill: #e0a35a; }
+.scene-stroke { stroke: #b8a58f; stroke-width: 1; fill: none; }
+.scene-blur { fill: #b9a998; opacity: 0.6; }
+.walkthrough-screen { margin: 0; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); overflow-wrap: anywhere; }
+.walkthrough-screen > * + * { margin-top: 10px; }
+.walkthrough-screen figcaption { color: var(--ink-muted); font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.walkthrough-screen-title { font-weight: 700; font-size: 1.05rem; }
+.walkthrough-screen-note { color: var(--ink-muted); font-size: 0.9rem; }
+.walkthrough-draft { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--card-sunk); font-size: 0.92rem; line-height: 1.5; }
+.walkthrough-total { font-size: clamp(1.8rem, 6vw, 2.6rem); font-weight: 700; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; line-height: 1; }
+.walkthrough-reasons { padding-left: 1.2em; font-size: 0.92rem; }
+.walkthrough-rows { display: grid; gap: 8px; margin: 0; }
+.walkthrough-rows > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.walkthrough-rows dt { color: var(--ink-muted); }
+.walkthrough-rows dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.walkthrough-badge { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--ok-tint); color: var(--ok-ink); font-size: 0.75rem; font-weight: 600; }
+.walkthrough-badge-open { background: var(--warn-tint); color: var(--warn-ink); }
+.walkthrough-outline { display: grid; gap: 6px; padding: 10px; border-radius: var(--radius-sm); background: var(--card-sunk); }
+.walkthrough-outline span { height: 6px; border-radius: 3px; background: var(--line-strong); }
+.walkthrough-outline .walkthrough-outline-mark { height: 10px; outline: 2px solid var(--accent-bright); outline-offset: 3px; background: var(--ink-faint); }
+.walkthrough-next { margin-top: 36px; }
+.walkthrough-next .walkthrough-primary { display: inline-flex; align-items: center; min-height: 48px; padding: 12px 24px; border-radius: var(--radius-pill); background: var(--brand); color: var(--on-brand); text-decoration: none; }
+.walkthrough-next .walkthrough-primary:hover { background: var(--brand-hover); color: var(--on-brand); }
+
+/* Pinned: the captions scroll on the left while one stage stays put on the right. Every step's stage
+   covers the whole list, so its frame can stay sticky; only the active one is shown. */
+@media (prefers-reduced-motion: no-preference) and (min-width: 760px) {
+  .walkthrough-pinned { position: relative; gap: 0; }
+  .walkthrough-pinned .walkthrough-step { width: 38%; min-height: 78vh; align-content: center; }
+  .walkthrough-pinned .walkthrough-stage { position: absolute; inset: 0 0 0 auto; width: 58%; pointer-events: none; }
+  .walkthrough-pinned .walkthrough-frame { position: sticky; top: 96px; opacity: 0; transition: opacity 0.35s ease; }
+  .walkthrough-pinned .is-active .walkthrough-stage { pointer-events: auto; }
+  .walkthrough-pinned .is-active .walkthrough-frame { opacity: 1; }
+  .walkthrough-pinned .walkthrough-scene { max-height: 44vh; }
+  .walkthrough-pinned .walkthrough-screen { width: 78%; margin-top: -72px; font-size: 0.92rem; }
+  .walkthrough-pinned .walkthrough-calm-right .walkthrough-screen { justify-self: end; margin-right: 16px; }
+  .walkthrough-pinned .walkthrough-calm-left .walkthrough-screen { justify-self: start; margin-left: 16px; }
+}
+
+.how-it-works-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; }
+.how-it-works-card h2 { margin: 0 0 4px; font-size: 1.15rem; }
+.how-it-works-card p { margin: 0; color: var(--ink-muted); }
+.how-it-works-card > * + * { margin-top: 0; }
+/* End ticket 107. */
