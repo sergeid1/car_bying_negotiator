@@ -85,6 +85,28 @@ class TradeDeskCheckTest {
     return result.findings().stream().map(TradeDeskCheck.Finding::code).toList();
   }
 
+  @Test void syntheticFloridaOutsideOfferComparisonUsesTheDifferenceInCappedTaxes() {
+    var desk = check(Scenario.UNAVAILABLE);
+    jurisdiction = "US-FL:Broward";
+    when(policies.hasPolicy(jurisdiction)).thenReturn(true);
+    var flat = policy("synthetic-florida-components", jurisdiction, ".06");
+    var componentPolicy = new Policy(flat.version(), flat.jurisdiction(), flat.currency(), flat.taxRate(),
+        flat.taxableLineTypes(), true, 2, RoundingMode.HALF_UP, BigDecimal.ONE, List.of(
+        new com.dealanalyzer.economics.CashDealEconomics.TaxComponent("Synthetic state", new BigDecimal(".06"),
+            com.dealanalyzer.economics.CashDealEconomics.TaxBase.TAXABLE_PRICE_AFTER_TRADE, null, "synthetic", TODAY),
+        new com.dealanalyzer.economics.CashDealEconomics.TaxComponent("Synthetic county", new BigDecimal(".01"),
+            com.dealanalyzer.economics.CashDealEconomics.TaxBase.TAXABLE_PRICE_AFTER_TRADE, new BigDecimal("5000"), "synthetic", TODAY)));
+    when(policies.requirePolicy(jurisdiction)).thenReturn(componentPolicy);
+    recorded(MoneyOwed.NO, null, null, false, offer("synthetic-written", 500_000, "Synthetic outside buyer", false));
+    var belowCap = desk.check("case", "token", terms("TRADE_ALLOWANCE", 400_000, "SELLING_PRICE", 800_000), null);
+    assertThat(belowCap.taxCredit().creditMinor()).isEqualTo(25_000); // $530 without trade minus $280 with trade
+    assertThat(belowCap.offerGapAfterTaxMinor()).isEqualTo(75_000);
+    assertThat(belowCap.taxCredit().reason()).contains("Broward County", "$5,000");
+    var aboveCap = desk.check("case", "token", terms("TRADE_ALLOWANCE", 400_000, "SELLING_PRICE", 3_500_000), null);
+    assertThat(aboveCap.taxCredit().creditMinor()).isEqualTo(24_000); // both county bases capped: no county credit
+    assertThat(aboveCap.offerGapAfterTaxMinor()).isEqualTo(76_000);
+  }
+
   @Test void scenario28AnAllowanceBelowTheBestUnexpiredOfferLeadsWithTheShortfallAndNamesTheOffer() {
     var desk = check(Scenario.WIDE_RANGE);
     recorded(MoneyOwed.NO, null, null, false, offer("expired", 1_500_000, "Synthetic Expired Buyer", true),

@@ -18,10 +18,12 @@ public class SupportedJurisdictions {
   }
 
   public boolean supports(String jurisdiction) {
-    return jurisdiction != null && persistence.hasPolicy(jurisdiction);
+    return jurisdiction != null && (persistence.hasPolicy(jurisdiction)
+        || all().contains(jurisdiction));
   }
 
   public List<String> all() {
-    return persistence.policyJurisdictions();
+    return persistence.policyJurisdictions().stream().map(value -> value.split(":", 2)[0])
+        .distinct().sorted().toList();
   }
 }

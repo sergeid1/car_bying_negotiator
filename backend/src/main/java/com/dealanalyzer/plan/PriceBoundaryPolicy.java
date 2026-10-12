@@ -54,7 +54,7 @@ public final class PriceBoundaryPolicy {
     var tax = deal.taxCalculation();
     BigDecimal basis = tax.taxableCharges().add(BigDecimal.valueOf(delta, 2))
         .subtract(tax.tradeCreditAvailable()).max(BigDecimal.ZERO);
-    long taxes = basis.multiply(tax.rate()).setScale(deal.rounding().currencyScale(), deal.rounding().mode())
+    long taxes = tax.taxAt(basis).setScale(deal.rounding().currencyScale(), deal.rounding().mode())
         .movePointRight(2).longValueExact();
     return Math.addExact(Math.addExact(deal.outTheDoorTotal().minorUnits(), delta),
         Math.subtractExact(taxes, deal.taxes().minorUnits()));

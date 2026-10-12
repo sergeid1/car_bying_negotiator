@@ -86,7 +86,8 @@ export function TradeCheckPanel({ result, heading = "Trade-in check", tactics = 
           : cost?.reason ? `. ${cost.reason}` : ""}</dd></div>}
       {tax && <div><dt>Sales tax a trade-in removes</dt>
         <dd>{tax.status === "AVAILABLE" && tax.creditMinor !== null ? `About ${money(tax.creditMinor)} under ${tax.jurisdiction} rules (${tax.policyVersion})`
-          : tax.status === "NOT_APPLICABLE" ? `None under ${tax.jurisdiction} rules` : tax.reason}</dd></div>}
+          : tax.status === "NOT_APPLICABLE" ? `None under ${tax.jurisdiction} rules` : tax.reason}
+          {tax.status === "AVAILABLE" && tax.reason && <>. {tax.reason}</>}</dd></div>}
       {result.vinMatch?.paperworkVin && <div><dt>Trade-in VIN on the paperwork</dt><dd>{result.vinMatch.paperworkVin}</dd></div>}
     </dl>
     <p className="muted">A trade-in shortfall is a trade figure, never a discount on the car. otdog does not buy cars or send your trade anywhere.</p>

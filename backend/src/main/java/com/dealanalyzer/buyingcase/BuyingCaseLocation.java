@@ -14,10 +14,13 @@ import org.springframework.stereotype.Service;
 class BuyingCaseLocation {
   private final PostalJurisdictionResolver postalCodes;
   private final SupportedJurisdictions supported;
+  private final com.dealanalyzer.buyingcase.location.PostalCountyResolver counties;
 
-  BuyingCaseLocation(PostalJurisdictionResolver postalCodes, SupportedJurisdictions supported) {
+  BuyingCaseLocation(PostalJurisdictionResolver postalCodes, SupportedJurisdictions supported,
+      com.dealanalyzer.buyingcase.location.PostalCountyResolver counties) {
     this.postalCodes = postalCodes;
     this.supported = supported;
+    this.counties = counties;
   }
 
   record Resolved(String buyerJurisdiction, String dealerLocation) {}
@@ -33,7 +36,23 @@ class BuyingCaseLocation {
               + "Nothing you entered has been stored.",
           supported.all());
     }
+    if ("US-FL".equals(jurisdiction)) jurisdiction = floridaCounty(buyerPostalCode, request.buyerCounty());
     return new Resolved(jurisdiction, dealerPostalCode);
+  }
+
+  private String floridaCounty(String postalCode, String stated) {
+    List<String> candidates = counties.floridaCounties(postalCode);
+    if (candidates.isEmpty()) throw new UnsupportedLocationException("buyerPostalCode",
+        UnsupportedLocationException.Reason.UNRECOGNIZED_POSTAL_CODE,
+        "That ZIP code has no registration county in the reference data. Nothing has been stored.", List.of());
+    if (stated != null && !stated.isBlank() && !candidates.contains(stated))
+      throw new InvalidBuyingCaseIntakeException("buyerCounty", "Select a county touched by the registration ZIP code.");
+    if (candidates.size() > 1 && (stated == null || stated.isBlank()))
+      throw new UnsupportedLocationException("buyerCounty",
+          UnsupportedLocationException.Reason.POSTAL_CODE_CROSSES_COUNTY_LINE,
+          "That registration ZIP code spans counties. Select the county on your registration address. Nothing has been stored.",
+          candidates);
+    return "US-FL:" + (candidates.size() == 1 ? candidates.getFirst() : stated);
   }
 
   private String buyerJurisdiction(String buyerPostalCode, String stated) {

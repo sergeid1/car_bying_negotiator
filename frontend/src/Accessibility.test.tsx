@@ -912,3 +912,21 @@ test.each(["START", "AGREED_CAR", "FRESH_CASE", "TYPED", "QUESTIONS", "RESULT"])
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 // End ticket 105.
+
+// Ticket 108: the registration-county chooser, including its tax explanation.
+test("the Florida county chooser has no automated AA violations", async () => {
+  const { BuyingCaseIntake } = await import("./BuyingCaseIntake");
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => new Response(JSON.stringify(
+    String(input).endsWith("intake-options") ? { supported: ["US-FL"], consentPolicies: {} }
+      : { detail: "Choose the registration county.", field: "buyerCounty",
+        reason: "POSTAL_CODE_CROSSES_COUNTY_LINE", candidateJurisdictions: ["Columbia", "Suwannee"] }),
+    { status: String(input).endsWith("intake-options") ? 200 : 422 }));
+  const { container } = render(<main><h1>Synthetic Florida intake</h1><BuyingCaseIntake onCaseOpened={() => {}} /></main>);
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText(/your ZIP code/i), "32024");
+  await user.type(screen.getByLabelText(/dealer ZIP code/i), "32003");
+  await user.type(screen.getByLabelText(/^VIN$/), "1HGCM82633A004352");
+  await user.click(screen.getByRole("button", { name: "Start my case" }));
+  await user.selectOptions(await screen.findByLabelText(/Florida county where/), "Suwannee");
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
