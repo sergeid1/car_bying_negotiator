@@ -19,7 +19,7 @@
 }
 
 .masthead .site-switch {
-  --segment-pad: 3px;
+  --segment-pad: 4px;
   position: relative;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -29,7 +29,7 @@
   max-width: 100%;
   margin-inline: auto;
   padding: var(--segment-pad);
-  border-radius: 11px;
+  border-radius: var(--radius-pill);
   background: var(--segment-track);
   touch-action: pan-y;
   user-select: none;
@@ -44,7 +44,7 @@
   left: var(--segment-pad);
   width: calc((100% - 2 * var(--segment-pad)) / 4);
   border: 0.5px solid rgba(0, 0, 0, 0.04);
-  border-radius: 8px;
+  border-radius: var(--radius-pill);
   background: var(--segment-thumb);
   box-shadow: var(--segment-shadow);
   pointer-events: none;
@@ -60,10 +60,10 @@
   align-items: center;
   justify-content: center;
   min-width: 0;
-  min-height: 34px;
-  padding: 4px 10px;
+  min-height: 36px;
+  padding: 4px 12px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--ink);
   font-size: 0.9rem;
