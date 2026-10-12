@@ -28,6 +28,8 @@ for (const width of [360, 1280]) {
       return route.fulfill({ json: {} });
     });
     await page.goto("/");
+    const openAccount = () => page.getByRole("banner").getByRole("button", { name: account.contact.email }).click();
+    await openAccount();
     const panel = page.getByRole("region", { name: "Buyer Account" });
     await panel.getByLabel("New password", { exact: true }).fill("a sufficiently long phrase");
     await panel.getByRole("button", { name: "Set password", exact: true }).click();
@@ -36,6 +38,9 @@ for (const width of [360, 1280]) {
     await panel.getByLabel("Email for password sign-in", { exact: true }).fill(account.contact.email);
     await panel.getByLabel("Password", { exact: true }).fill(password);
     await panel.getByRole("button", { name: "Sign in with a password" }).click();
+    // Signing in closes the panel, as a sign-in window does; the Buyer's email reopens the account.
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await openAccount();
     await expect(panel.getByText("A password is set.")).toBeVisible();
     const cookie = (await page.context().cookies()).find(value => value.name === "account_session");
     expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: "Strict", path: "/api/v1" });

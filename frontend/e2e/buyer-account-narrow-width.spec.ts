@@ -48,7 +48,16 @@ async function stubAccountApi(page: Page) {
     json: { state: "DELETION_PENDING", failureCode: null, cases: [{ caseId: ACCOUNT.cases[0].caseId, state: "DELETION_PENDING" }] } }));
 }
 
+/** The account lives in a side panel opened from the header: "Sign in", or the Buyer's email once signed in. */
+async function openAccountPanel(page: Page, name: string = "Sign in") {
+  await page.getByRole("banner").getByRole("button", { name, exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+}
+
 async function expectNoOverflowOrViolations(page: Page) {
+  // A side panel slides in from the right; measure once it has arrived.
+  await page.evaluate(() => Promise.all(Array.from(document.querySelectorAll(".side-panel, .side-panel-backdrop"))
+    .flatMap(element => element.getAnimations()).map(animation => animation.finished)));
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   const overflow = await page.evaluate(() => ({
     documentWidth: document.documentElement.scrollWidth,
@@ -71,6 +80,7 @@ async function expectNoOverflowOrViolations(page: Page) {
 test("the signed-out account panel requests a link at 360 px without storing anything", async ({ page }) => {
   await stubAccountApi(page);
   await page.goto("/");
+  await openAccountPanel(page);
   const panel = page.getByRole("region", { name: "Buyer Account" });
   await expect(panel.getByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
   await expectNoOverflowOrViolations(page);
@@ -93,17 +103,21 @@ for (const width of [360, 1280]) {
       const header = page.getByRole("banner");
       const panel = page.getByRole("region", { name: "Buyer Account" });
       await header.getByRole("button", { name: "Sign in", exact: true }).click();
-      await expect(panel).toBeFocused();
+      await expect(page.getByRole("dialog", { name: "Sign in" })).toBeFocused();
       await panel.getByLabel("Email for sign-in").fill(ACCOUNT.contact.email);
       await panel.getByRole("button", { name: "Email me a sign-in link" }).click();
       await expect(panel.getByRole("status")).toContainText("Check your email");
       expect(mailbox).toHaveLength(1);
+      // The emailed link opens the account panel; it closes once the Buyer is signed in.
       await page.goto(mailbox.pop()!);
       await panel.getByRole("button", { name: "Finish signing in" }).click();
       await expect(header.getByRole("button", { name: ACCOUNT.contact.email })).toBeVisible();
+      await expect(page.getByRole("dialog")).toHaveCount(0);
       await expectNoOverflowOrViolations(page);
+      if (signOutLocation === "region") await openAccountPanel(page, ACCOUNT.contact.email);
       await (signOutLocation === "banner" ? header : panel).getByRole("button", { name: "Sign out", exact: true }).click();
-      await expect(header.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
+      if (signOutLocation === "banner") await openAccountPanel(page);
+      await expect(page.getByRole("dialog", { name: "Sign in" })).toBeVisible();
       await expect(panel.getByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
       await expectNoOverflowOrViolations(page);
     }
@@ -118,6 +132,7 @@ test("signing in, the account screen and the deletion receipt fit 360 px", async
   // The single-use secret leaves the address bar before anything else happens.
   await expect.poll(() => new URL(page.url()).hash).toBe("");
   await panel.getByRole("button", { name: "Finish signing in" }).click();
+  await openAccountPanel(page, ACCOUNT.contact.email);
   await expect(panel.getByText(ACCOUNT.contact.email)).toBeVisible();
   const cookie = (await page.context().cookies()).find(cookie => cookie.name === "account_session");
   expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: "Strict", path: "/api/v1" });
@@ -139,6 +154,7 @@ test("signing in, the account screen and the deletion receipt fit 360 px", async
 
   // The session survives a page reload.
   await page.reload();
+  await openAccountPanel(page, ACCOUNT.contact.email);
   await expect(panel.getByText(ACCOUNT.contact.email)).toBeVisible();
   await expect(panel.getByLabel("Dealer replies")).not.toBeChecked();
 
@@ -156,6 +172,7 @@ test("a case opens from the account list at 360 px without showing a case link",
   await page.goto("/");
   const panel = page.getByRole("region", { name: "Buyer Account" });
   await expect(page.getByText(/this case will be saved to your Buyer Account/)).toBeVisible();
+  await openAccountPanel(page, ACCOUNT.contact.email);
   await panel.getByRole("button", { name: /^Open 2023 Mercedes-Benz/ }).click();
   await expect(page.getByRole("region", { name: "Opened from your Buyer Account" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Private return link" })).toHaveCount(0);

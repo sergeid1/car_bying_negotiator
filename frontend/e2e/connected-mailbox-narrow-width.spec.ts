@@ -69,6 +69,9 @@ async function stubApi(page: Page) {
 }
 
 async function expectFits(page: Page) {
+  // A side panel slides in from the right; measure once it has arrived.
+  await page.evaluate(() => Promise.all(Array.from(document.querySelectorAll(".side-panel, .side-panel-backdrop"))
+    .flatMap(element => element.getAnimations()).map(animation => animation.finished)));
   const overflow = await page.evaluate(() => ({
     documentWidth: document.documentElement.scrollWidth,
     viewportWidth: document.documentElement.clientWidth,
@@ -89,6 +92,8 @@ async function expectAccessible(page: Page, selector: string) {
 test("connect Gmail, send from it with an unclear first outcome, then disconnect, at 360 px", async ({ page }) => {
   const state = await stubApi(page);
   await page.goto("/");
+  // The mailbox connection is part of the Buyer Account, opened from the Buyer's email in the header.
+  await page.getByRole("banner").getByRole("button", { name: "buyer@example.com" }).click();
   const account = page.locator("section[aria-label='Buyer Account']");
   const mailbox = account.locator(".mailbox-connection");
 
@@ -103,6 +108,7 @@ test("connect Gmail, send from it with an unclear first outcome, then disconnect
   await expect(mailbox.getByText(ADDRESS, { exact: true })).toBeVisible();
   await expectFits(page);
   await expectAccessible(page, "section[aria-label='Buyer Account']");
+  await page.getByRole("button", { name: "Close Your account" }).click();
 
   // Send from my email sits next to the own-email-app path; an unclear outcome waits for the Buyer.
   await page.getByLabel(/your zip code/i).fill("27601");
@@ -128,6 +134,7 @@ test("connect Gmail, send from it with an unclear first outcome, then disconnect
   await expectFits(page);
 
   // Disconnecting deletes the access and points back to the own-email-app path.
+  await page.getByRole("banner").getByRole("button", { name: "buyer@example.com" }).click();
   await mailbox.getByRole("button", { name: "Disconnect Gmail" }).click();
   await expect(mailbox.getByText(/Gmail is disconnected/)).toBeVisible();
   await expect(mailbox.getByRole("button", { name: "Connect Gmail" })).toBeVisible();

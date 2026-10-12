@@ -103,7 +103,7 @@ test("a signed-out Buyer is told no account is required and the case is not save
     <BuyingCaseIntake onCaseOpened={vi.fn()} onSavedToAccount={saved} />
   </AccountSignedInContext.Provider>);
   expect(screen.getByRole("note")).toHaveTextContent("No account is required");
-  expect(screen.getByRole("link", { name: "sign in with a Buyer Account" })).toHaveAttribute("href", "#buyer-account");
+  expect(screen.getByRole("link", { name: "sign in with a Buyer Account" })).toHaveAttribute("href", "#account-panel");
   const user = userEvent.setup();
   await waitFor(() => expect(screen.getByText(/north carolina/i)).toBeInTheDocument());
   await fillRequiredFields(user);

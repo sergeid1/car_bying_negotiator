@@ -21,6 +21,9 @@ import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks, requestedGuide } from "./ExplainerGuides";
 import { partnerKitLink, ReferralPartnerKit, requestedPartnerKit } from "./ReferralPartnerKit";
 import { XrayIllustration } from "./XrayIllustration";
+import logo from "./assets/otdog-logo.png";
+import logoDark from "./assets/otdog-logo-dark.png";
+import { SidePanel, type SidePanelView, useSidePanelRequests } from "./SidePanel";
 
 type MoneyAmount = {
   minorUnits: number;
@@ -133,6 +136,14 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   const [accountSignedIn, setAccountSignedIn] = useState(false);
   const [accountControls, setAccountControls] = useState<AccountControls>();
   const [accountRecheck, setAccountRecheck] = useState(0);
+  // A sign-in or recovery link, or a return from a mailbox provider's consent page, opens the panel that finishes it.
+  const [sidePanel, setSidePanel] = useState<SidePanelView | undefined>(() => {
+    const query = new URLSearchParams(window.location.search);
+    if (window.location.hash.startsWith("#sign-in=") || (query.has("state") && (query.has("code") || query.has("error")))) return "account";
+    return window.location.hash.startsWith("#recover=") ? "case" : undefined;
+  });
+  useSidePanelRequests(setSidePanel);
+  const closeSidePanel = () => setSidePanel(undefined);
   const [guide] = useState(requestedGuide);
   const [partnerKit] = useState(requestedPartnerKit);
   // A guide or the partner kit replaces the start screen at its own shareable address.
@@ -190,20 +201,24 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 
   return (
     <>
+      <div className="page" inert={sidePanel ? true : undefined}>
       <a className="skip-link" href="#case-workflow" onClick={event => {
         event.preventDefault(); document.getElementById("case-workflow")?.focus();
       }}>Skip to case workflow</a>
 
       <header className="masthead">
         <div className="masthead-inner">
-          <span className="wordmark"><span className="mark" aria-hidden="true" />otdog</span>
+          <a className="wordmark" href="/" aria-label="otdog home">
+            <img className="wordmark-light" src={logo} alt="" width="114" height="40" />
+            <img className="wordmark-dark" src={logoDark} alt="" width="114" height="40" />
+          </a>
           <nav aria-label="Page sections">
-            <a href="#case-workflow">Your case</a>
+            <button type="button" className="btn-ghost" aria-haspopup="dialog" onClick={() => setSidePanel("case")}>Your case</button>
             <a href="#scope">Scope</a>
           </nav>
           {!standalone && <DealerCameraEntry onPhotos={files => setAtDealer({ files, started: Date.now() })} />}
           <ThemeMenu />
-          {!standalone && <AccountHeader controls={accountControls} />}
+          {!standalone && <AccountHeader controls={accountControls} onOpen={() => setSidePanel("account")} />}
         </div>
       </header>
 
@@ -230,7 +245,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 
         <div className="workspace">
           <AccountSignedInContext.Provider value={accountSignedIn}>
-          <div className="column">
+          <div className="column" id="case-workflow" tabIndex={-1}>
             {guide && <ExplainerGuide slug={guide} />}
             {!standalone && atDealer && <AtTheDealer key={atDealer.started} files={atDealer.files}
               open={caseCredentials && !caseRevoked ? caseCredentials : undefined}
@@ -309,6 +324,12 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 
             {report && <DealReport report={report} />}
 
+            {caseCredentials && !caseRevoked && !openedFromAccount && <SaveCaseLink {...caseCredentials} />}
+            {caseCredentials && !caseRevoked && openedFromAccount && <section className="panel" aria-label="Opened from your Buyer Account">
+              <h2>Opened from your Buyer Account</h2>
+              <p>This case stays open while you are signed in. Signing out closes it here; the private case link you saved
+                still opens it.</p>
+            </section>}
             {caseCredentials && !caseRevoked && referral?.caseId === caseCredentials.caseId && <ReferralDisclosure text={referral.text} />}
             {caseCredentials && !caseRevoked && deskFresh?.caseId === caseCredentials.caseId && <DeskFreshCase value={deskFresh}
               onBack={() => { setCaseRevoked(false); setCaseCredentials(deskFresh.agreed); setRecoveryCaseId(deskFresh.agreed.caseId); setDeskFresh(undefined); }} />}
@@ -330,30 +351,6 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               offerVersion={frozenOffer?.caseId === caseCredentials.caseId ? frozenOffer.version : undefined} pollDelayMs={pollDelayMs} />}
           </div>
           </AccountSignedInContext.Provider>
-
-          <aside className="rail" aria-label="Case access and retention">
-            <p className="rail-title">Your Buying Case</p>
-
-            <SavedCaseAccess onOpened={value => { setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }}
-              onUnavailable={caseId => { setCaseCredentials(undefined); setRecoveryCaseId(caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
-            <RecoveryAccess caseId={recoveryCaseId ?? caseCredentials?.caseId} onRecovered={value => { setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
-            {caseCredentials && !caseRevoked && !openedFromAccount && <SaveCaseLink {...caseCredentials} />}
-            {caseCredentials && !caseRevoked && openedFromAccount && <section className="panel" aria-label="Opened from your Buyer Account">
-              <h2>Opened from your Buyer Account</h2>
-              <p>This case stays open while you are signed in. Signing out closes it here; the private case link you saved
-                still opens it.</p>
-            </section>}
-            {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
-            {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
-            {!standalone && <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined}
-              onSignedIn={setAccountSignedIn} onControls={setAccountControls} recheck={accountRecheck}
-              onCaseOpened={value => {
-                setReferral(undefined); setDeskFresh(undefined); setCaseRevoked(false); setCaseCredentials(value);
-                setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined);
-              }} />}
-            {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
-              onRevoked={() => { setCaseRevoked(true); setReport(undefined); setStage(undefined); setError(undefined); }} />}
-          </aside>
         </div>
       </main>
 
@@ -383,6 +380,28 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
           </section>
         </div>
       </footer>
+      </div>
+
+      <SidePanel id="case-panel" title="Your Buying Case" open={sidePanel === "case"} onClose={closeSidePanel}>
+        <SavedCaseAccess onOpened={value => { closeSidePanel(); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }}
+          onUnavailable={caseId => { setSidePanel("case"); setCaseCredentials(undefined); setRecoveryCaseId(caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
+        <RecoveryAccess caseId={recoveryCaseId ?? caseCredentials?.caseId} onRecovered={value => { closeSidePanel(); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
+        {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
+        {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
+        {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
+          onRevoked={() => { setCaseRevoked(true); setReport(undefined); setStage(undefined); setError(undefined); }} />}
+      </SidePanel>
+      {!standalone && <SidePanel id="account-panel" title={accountSignedIn ? "Your account" : "Sign in"}
+        open={sidePanel === "account"} onClose={closeSidePanel}>
+        <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined}
+          onSignedIn={setAccountSignedIn} onControls={setAccountControls} recheck={accountRecheck}
+          onSignInComplete={closeSidePanel}
+          onCaseOpened={value => {
+            closeSidePanel();
+            setReferral(undefined); setDeskFresh(undefined); setCaseRevoked(false); setCaseCredentials(value);
+            setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined);
+          }} />
+      </SidePanel>}
     </>
   );
 }

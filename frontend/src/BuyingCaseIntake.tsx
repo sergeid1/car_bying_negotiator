@@ -1,5 +1,6 @@
 import { FormEvent, useContext, useEffect, useState } from "react";
 import { arrivalChannel, forgetArrivalChannel } from "./AcquisitionChannel";
+import { openSidePanel } from "./SidePanel";
 import { AccountSignedInContext } from "./BuyerAccount";
 
 type CaseCredentials = { caseId: string; token: string };
@@ -269,8 +270,8 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
       {!openCase && signedIn === false && (
         <p className="account-save-note" role="note">
           No account is required. To keep your cases in one place, you can{" "}
-          <a href="#buyer-account" onClick={event => {
-            event.preventDefault(); document.getElementById("buyer-account")?.focus();
+          <a href="#account-panel" onClick={event => {
+            event.preventDefault(); openSidePanel("account");
           }}>sign in with a Buyer Account</a> first.
         </p>
       )}

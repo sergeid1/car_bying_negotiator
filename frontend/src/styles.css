@@ -276,7 +276,7 @@ code { font-family: var(--font-mono); font-size: 0.87em; }
 }
 
 /* ==========================================================================
-   Shell: masthead, main column, side rail, footer
+   Shell: masthead, main column, side panels, footer
    ========================================================================== */
 
 .masthead {
@@ -299,15 +299,15 @@ code { font-family: var(--font-mono); font-size: 0.87em; }
   padding: 8px var(--gutter);
 }
 
-.wordmark {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 1.02rem;
-  letter-spacing: -0.02em;
-  color: var(--ink-strong);
+/* The otdog wordmark; its letters turn light in the dark theme. */
+.wordmark { display: flex; flex: none; align-items: center; border-radius: 8px; }
+.wordmark img { display: block; width: auto; height: 40px; }
+.wordmark .wordmark-dark { display: none; }
+:root[data-theme="dark"] .wordmark .wordmark-light { display: none; }
+:root[data-theme="dark"] .wordmark .wordmark-dark { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .wordmark .wordmark-light { display: none; }
+  :root:not([data-theme="light"]) .wordmark .wordmark-dark { display: block; }
 }
 
 .header-account { display: flex; align-items: center; min-width: 0; gap: 4px; }
@@ -319,52 +319,21 @@ code { font-family: var(--font-mono); font-size: 0.87em; }
   .header-email { max-width: 210px; }
 }
 
-/* The mark: a lens reading a line of a document. */
-.mark {
-  position: relative;
-  flex: none;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: var(--ink-strong);
-}
-.mark::before {
-  content: "";
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--paper);
-  border-radius: 50%;
-}
-.mark::after {
-  content: "";
-  position: absolute;
-  right: 6px;
-  bottom: 7px;
-  width: 7px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--paper);
-  transform: rotate(45deg);
-  transform-origin: right center;
-}
-
 .masthead nav {
   display: flex;
   gap: 4px;
   margin-left: auto;
   font-size: 0.88rem;
 }
-.masthead nav a {
+.masthead nav a, .masthead nav button {
+  min-height: 0;
   padding: 7px 12px;
   border-radius: var(--radius-pill);
   color: var(--ink-muted);
   font-weight: 500;
   text-decoration: none;
 }
-.masthead nav a:hover { background: var(--card-sunk); color: var(--ink-strong); }
+.masthead nav a:hover, .masthead nav button:hover { background: var(--card-sunk); color: var(--ink-strong); }
 
 main {
   position: relative;
@@ -386,27 +355,60 @@ main > * + * { margin-top: 22px; }
 .hero h1 .hero-quiet { color: var(--ink-muted); }
 .hero-credo { margin: 14px 0 0; color: var(--ink-strong); font-weight: 600; }
 
-/* Wide screens split the workflow from the case-administration rail. */
-.workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-  gap: 22px;
-  align-items: start;
-}
-.workspace > * { min-width: 0; }
-.column, .rail { display: grid; gap: 18px; align-content: start; }
-.rail { position: sticky; top: 74px; }
+/* One centred workflow column; case access and the account open in side panels. */
+.workspace { width: min(780px, 100%); margin-inline: auto; }
+.column { display: grid; gap: 18px; align-content: start; min-width: 0; }
+.column:focus { outline: none; }
 
-.rail-title {
-  margin: 0;
-  padding: 0 4px;
-  color: var(--ink-faint);
-  font-family: var(--font-text);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
+/* Side panels slide over the page from the right. */
+.side-panel-open { overflow: hidden; }
+.side-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(10, 10, 20, 0.38);
+  animation: side-panel-fade 0.2s ease-out;
 }
+.side-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 21;
+  display: flex;
+  flex-direction: column;
+  width: min(460px, 100%);
+  background: var(--paper);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+  animation: side-panel-slide 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.side-panel[hidden], .side-panel-backdrop[hidden] { display: none; }
+.side-panel:focus { outline: none; }
+.side-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 60px;
+  padding: 8px 12px 8px var(--gutter);
+  border-bottom: 1px solid var(--line);
+}
+.side-panel-title { margin: 0; font-size: 1.15rem; }
+.side-panel-close { display: grid; place-items: center; width: 38px; padding: 0; }
+.side-panel-body {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px var(--gutter) 32px;
+}
+.side-panel-body .panel { box-shadow: none; }
+.side-panel-body .panel > h2 { font-size: 1.3rem; }
+@keyframes side-panel-slide { from { transform: translateX(100%); } }
+@keyframes side-panel-fade { from { opacity: 0; } }
 
 .page-footer {
   background: var(--paper-sunk);
@@ -1101,16 +1103,12 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
    Responsive
    ========================================================================== */
 
-@media (max-width: 960px) {
-  .workspace { grid-template-columns: 1fr; }
-  .rail { position: static; }
-}
-
 @media (max-width: 640px) {
   body { font-size: 15.5px; }
   .section-heading { flex-direction: column; }
   .money-list > div { gap: 14px; }
-  .masthead nav { display: none; }
+  .masthead nav { margin-left: 0; }
+  .masthead nav a { display: none; }
   .report-meta { flex-direction: column; gap: 2px; }
 }
 
@@ -1123,7 +1121,7 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
 }
 
 @media print {
-  .masthead, .hero-visual, .skip-link, button, .rail { display: none; }
+  .masthead, .hero-visual, .skip-link, button, .side-panel, .side-panel-backdrop { display: none; }
   main { width: 100%; padding: 0; }
   .panel, .outcome, .total-card, .market-card { box-shadow: none; break-inside: avoid; }
   .outcome { background: #fff; color: #000; border: 1px solid #000; backdrop-filter: none; }
@@ -1888,3 +1886,13 @@ fieldset.trade-choices input[type="radio"] { flex: none; width: 20px; height: 20
 .desk-tactics h4 { margin-bottom: 8px; }
 .desk-tactics summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
 /* End ticket 104. */
+
+/* Phones: the logo, theme and account on the first row; case access and the dealer camera on the second. */
+@media (max-width: 600px) {
+  .masthead-inner > .wordmark { order: 0; }
+  .masthead-inner > .theme-menu { order: 1; margin-left: auto; }
+  .masthead-inner > .header-account { order: 2; width: auto; }
+  .masthead-inner::after { content: ""; order: 3; flex-basis: 100%; height: 0; }
+  .masthead-inner > nav { order: 4; }
+  .masthead-inner > .header-camera { order: 5; margin-left: auto; }
+}
