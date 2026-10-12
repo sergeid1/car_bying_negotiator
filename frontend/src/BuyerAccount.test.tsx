@@ -378,3 +378,20 @@ test("the email box offers a saved passkey through autofill while the panel show
   const [, init] = fetcher.mock.calls.find(([path]) => String(path).endsWith("/passkeys/sign-in"))!;
   expect(JSON.parse(String(init?.body)).attemptId).toBe("attempt");
 });
+
+test("a passkey autofill request that fails before the Buyer picks a passkey shows no error", async () => {
+  const get = stubPasskeyBrowser();
+  const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+    const path = String(input);
+    if (path.endsWith("/sign-in/options")) return json({}, 503);
+    if (path === "/api/v1/account") return json({}, 401);
+    return json(path.endsWith("/password") ? { configured: false } : []);
+  });
+  vi.stubGlobal("fetch", fetcher);
+  render(<BuyerAccount showing />);
+  await screen.findByLabelText("Email");
+  await waitFor(() => expect(fetcher.mock.calls.some(([path]) => String(path).endsWith("/sign-in/options"))).toBe(true));
+  await new Promise(resolve => setTimeout(resolve, 50));
+  expect(get).not.toHaveBeenCalled();
+  expect(screen.queryByText(/Passkey sign-in could not be completed/)).toBeNull();
+});

@@ -257,7 +257,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             {!standalone && !report && !caseCredentials && !atDealer && <OfferTerms />}
             {!standalone && !report && !caseCredentials && !atDealer && <GuideLinks />}
 
-            {!standalone && !report && import.meta.env.DEV && (
+            {!standalone && !report && !caseOpen && import.meta.env.DEV && (
               <section className="panel" aria-labelledby="case-heading">
                 <div className="section-heading">
                   <div>

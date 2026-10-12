@@ -32,12 +32,13 @@ export function SignIn({ request, onSignedIn, offerPasskeys = true }: {
     const waiting = new AbortController();
     void (async () => {
       if (!await passkeyAutofillAvailable() || waiting.signal.aborted) return;
+      let chosen = false;
       try {
-        await signInWithPasskey(request, { autofill: true, signal: waiting.signal });
+        await signInWithPasskey(request, { autofill: true, signal: waiting.signal, onChosen: () => { chosen = true; } });
         await onSignedIn("passkey");
       } catch (problem) {
-        // Leaving the email step or closing the browser's passkey list is not a failure.
-        if (!waiting.signal.aborted && (problem as { status?: number })?.status)
+        // Only a passkey the Buyer picked can fail; a background request that fails first stays quiet.
+        if (chosen && !waiting.signal.aborted && (problem as { status?: number })?.status)
           setError("Passkey sign-in could not be completed. Try again or continue with your email.");
       }
     })();
