@@ -40,10 +40,11 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(overflow.documentWidth).toBeLessThanOrEqual(overflow.viewportWidth);
 }
 
-test("the start screen links to both guides at 360 px", async ({ page }) => {
+test("the header's Guides tab links to both guides at 360 px", async ({ page }) => {
   await stubCaseApi(page, () => {});
   await page.goto("/");
-  const links = page.getByRole("region", { name: "Guides to reading your quote" });
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Guides" }).click();
+  const links = page.getByRole("article", { name: "Guides to reading your quote" });
   await expect(links).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await links.getByRole("link", { name: GUIDES[1].title }).click();

@@ -1,0 +1,62 @@
+/* The header's pill switch: a sunk track with a dark thumb that slides to whichever option is hovered, focused,
+   dragged to, or current. Selectors start at .masthead so they outrank the header's general nav rules. */
+.masthead .site-switch {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  gap: 0;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--card-sunk);
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.masthead-inner > .wordmark:has(+ .site-switch) { margin-right: 0; }
+.site-switch-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  transition: transform 0.32s cubic-bezier(0.3, 0.7, 0.2, 1), width 0.32s cubic-bezier(0.3, 0.7, 0.2, 1);
+  pointer-events: none;
+}
+.site-switch[data-dragging] .site-switch-thumb { transition: none; }
+.masthead .site-switch .site-switch-item {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 6px 18px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  -webkit-user-drag: none;
+}
+.masthead .site-switch .site-switch-item:hover { background: transparent; color: var(--ink-strong); }
+.masthead .site-switch .site-switch-item.is-shown { color: var(--on-brand); }
+.masthead .site-switch .site-switch-item:active { transform: none; }
+
+/* On a phone the switch takes its own full-width row under the logo and the header's buttons. */
+@media (max-width: 600px) {
+  .masthead .site-switch { display: flex; order: 10; width: 100%; margin: 2px 0 0; }
+  /* The appearance menu drops over this row; the tabs step aside rather than sit half-covered beneath it. */
+  .masthead:has(.theme-options) .site-switch { visibility: hidden; }
+  .masthead .site-switch .site-switch-item { flex: 1 1 auto; min-width: 0; padding: 6px 4px; font-size: 0.8rem; letter-spacing: -0.015em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-switch-thumb { transition: none; }
+}

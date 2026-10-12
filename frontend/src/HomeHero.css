@@ -1,6 +1,16 @@
-.home-hero { max-width: 760px; padding: clamp(16px, 3vw, 40px) 0; }
+.home-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: clamp(32px, 6vw, 64px);
+  padding: clamp(8px, 2vw, 24px) 0 clamp(16px, 3vw, 40px);
+}
+.home-hero .hero-copy { max-width: 760px; }
 .home-hero h1 { font-size: clamp(2rem, 4.2vw, 3.5rem); line-height: 1.1; margin: 0 0 16px; }
-.home-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px 24px; }
 .home-points { display: flex; flex-wrap: wrap; gap: 8px 24px; list-style: none; padding: 0; margin: 24px 0 0; }
 .home-points li { font-size: .9rem; }
 .dealer-location-fields { min-width: 0; }
+
+@media (max-width: 760px) {
+  .home-hero .hero-visual { display: none; }
+}

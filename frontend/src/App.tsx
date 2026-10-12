@@ -12,10 +12,11 @@ import { AtTheDealer, DealerCameraEntry } from "./AtTheDealer";
 import { ThemeMenu } from "./ThemeMenu";
 import { OfferTerms } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
-import { ExplainerGuide, GuideLinks, requestedGuide } from "./ExplainerGuides";
+import { ExplainerGuide, GuideLinks, requestedGuide, requestedGuideIndex } from "./ExplainerGuides";
 import { partnerKitLink, ReferralPartnerKit, requestedPartnerKit } from "./ReferralPartnerKit";
 import { HowItWorks, requestedHowItWorks } from "./HowItWorks";
 import { HomeHero } from "./HomeHero";
+import { SiteNav } from "./SiteNav";
 import logo from "./assets/otdog-logo.png";
 import logoDark from "./assets/otdog-logo-dark.png";
 import { SidePanel, type SidePanelView, useSidePanelRequests } from "./SidePanel";
@@ -141,10 +142,11 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   useSidePanelRequests(setSidePanel);
   const closeSidePanel = () => setSidePanel(undefined);
   const [guide] = useState(requestedGuide);
+  const [guideIndex] = useState(() => !requestedGuide() && requestedGuideIndex());
   const [partnerKit] = useState(requestedPartnerKit);
   const [howItWorks] = useState(requestedHowItWorks);
   // A guide, the partner kit or the walkthrough replaces the start screen at its own shareable address.
-  const standalone = Boolean(guide || partnerKit || howItWorks);
+  const standalone = Boolean(guide || guideIndex || partnerKit || howItWorks);
   // A case opened from the Buyer Account closes when the sign-in ends; its private case link is unaffected.
   const openedFromAccount = Boolean(caseCredentials && isAccountPass(caseCredentials.token));
   useEffect(() => {
@@ -210,6 +212,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             <img className="wordmark-light" src={logo} alt="" width="114" height="40" />
             <img className="wordmark-dark" src={logoDark} alt="" width="114" height="40" />
           </a>
+          {!caseOpen && !partnerKit && <SiteNav page={howItWorks ? "how-it-works" : guide || guideIndex ? "guides" : standalone ? "other" : "home"} />}
           {!standalone && <DealerCameraEntry onPhotos={files => setAtDealer({ files, started: Date.now() })} />}
           <ThemeMenu />
           {!standalone && <AccountHeader controls={accountControls} onOpen={() => setSidePanel("account")} />}
@@ -223,6 +226,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
           <AccountSignedInContext.Provider value={accountSignedIn}>
           <div className="column" id="case-workflow" tabIndex={-1}>
             {guide && <ExplainerGuide slug={guide} />}
+            {guideIndex && <GuideLinks />}
             {!standalone && atDealer && <AtTheDealer key={atDealer.started} files={atDealer.files}
               open={caseCredentials && !caseRevoked ? caseCredentials : undefined}
               onCaseOpened={value => {
@@ -255,7 +259,6 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 
             {!standalone && !report && !caseCredentials && !atDealer && <SampleReportEntry entryLink={false} />}
             {!standalone && !report && !caseCredentials && !atDealer && <OfferTerms />}
-            {!standalone && !report && !caseCredentials && !atDealer && <GuideLinks />}
 
             {!standalone && !report && !caseOpen && import.meta.env.DEV && (
               <section className="panel" aria-labelledby="case-heading">

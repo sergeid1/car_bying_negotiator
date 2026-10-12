@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { arrivalChannel } from "./AcquisitionChannel";
 
 /**
@@ -47,22 +47,35 @@ const startLink = (channel: string) => `?channel=${channel}#intake-heading`;
 /** Every guide, for pages that link to them. */
 export const GUIDE_LIST = (Object.keys(GUIDES) as GuideSlug[]).map(slug => ({ slug, title: GUIDES[slug].title }));
 
-/** Shown on the start screen so the guides can be found without a shared link. */
+/** The guides page, reachable from the header's Guides tab at `?page=guides`. */
+export const guidesLink = "?page=guides";
+const GUIDES_TITLE = "Guides · otdog";
+
+export function requestedGuideIndex(): boolean {
+  return new URL(window.location.href).searchParams.get("page") === "guides";
+}
+
+/** Lists every guide on its own page, so the guides stay out of the start form's way. */
 export function GuideLinks() {
-  return <section className="panel" aria-labelledby="guide-links-heading">
-    <div className="section-heading">
-      <div>
-        <p className="step">Holding a dealer quote?</p>
-        <h2 id="guide-links-heading">Guides to reading your quote</h2>
-      </div>
-    </div>
-    <ul className="guide-links">
+  useEffect(() => {
+    const previous = document.title;
+    document.title = GUIDES_TITLE;
+    return () => { document.title = previous; };
+  }, []);
+  return <article className="guides-page" aria-labelledby="guide-links-heading">
+    <p className="step">Holding a dealer quote?</p>
+    <h1 id="guide-links-heading">Guides to reading your quote</h1>
+    <p className="lede">Short reads to have open beside the dealer's numbers.</p>
+    <ul className="guide-cards">
       {(Object.keys(GUIDES) as GuideSlug[]).map(slug => <li key={slug}>
-        <a href={guideLink(slug)}>{GUIDES[slug].title}</a>
-        <span className="muted">{GUIDES[slug].summary}</span>
+        <a className="guide-card" href={guideLink(slug)} aria-describedby={`guide-card-${slug}`}>
+          <span className="guide-card-title">{GUIDES[slug].title}</span>
+          <span className="guide-card-summary" id={`guide-card-${slug}`}>{GUIDES[slug].summary}</span>
+          <span className="guide-card-cta" aria-hidden="true">Read the guide <span className="guide-card-arrow">→</span></span>
+        </a>
       </li>)}
     </ul>
-  </section>;
+  </article>;
 }
 
 export function ExplainerGuide({ slug }: { slug: GuideSlug }) {
@@ -97,6 +110,7 @@ export function ExplainerGuide({ slug }: { slug: GuideSlug }) {
     </section>
     <nav className="actions" aria-label="More guides">
       {other.map(each => <a key={each} href={guideLink(each)}>{GUIDES[each].title}</a>)}
+      <a href={guidesLink}>All guides</a>
       <a href="./">Back to the start</a>
     </nav>
   </article>;
