@@ -95,7 +95,8 @@ test("the offer terms are stated on the intake screen at 360 px", async ({ page 
 test("the example report opens before any case at 360 px", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "See an example report" }).click();
-  const example = page.getByRole("region", { name: "See an example report" });
+  await expect(page).toHaveURL(/\?page=example-report$/);
+  const example = page.getByRole("article", { name: "See an example report" });
   await expect(example.getByRole("heading", { name: "Deal Analysis Report", exact: true })).toBeFocused();
   await expect(example.getByRole("note", { name: "About this example" })).toContainText("Built from a synthetic case");
   await expect(example.getByRole("note", { name: "About this example" })).toContainText("Redaction method: named categories of fields are removed; generated wording and amounts are kept (version sample-redaction.v2).");

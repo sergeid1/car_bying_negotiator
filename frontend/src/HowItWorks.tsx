@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { exampleReportLink } from "./SampleReport";
 
 /**
  * The how-it-works walkthrough, reachable without a case at `?page=how-it-works`. It is an ordered list
@@ -275,7 +276,7 @@ export function HowItWorks({ steps = STEPS }: { steps?: WalkthroughStep[] }) {
 
     <nav className="actions walkthrough-next" aria-label="Get started">
       <a className="walkthrough-primary" href="./">Start with your quote</a>
-      <a href="./#sample-report">See a sample report</a>
+      <a href={exampleReportLink}>See a sample report</a>
     </nav>
   </article>;
 }

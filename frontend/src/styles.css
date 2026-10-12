@@ -1990,3 +1990,6 @@ fieldset.trade-choices input[type="radio"] { flex: none; width: 20px; height: 20
   .guide-card, .guide-card-arrow { transition: none; }
   .guide-card:hover, .guide-card:hover .guide-card-arrow { transform: none; }
 }
+
+/* The Example report tab's page: a modest heading like the other tabs' pages. */
+.sample-report > h1 { font-size: clamp(1.9rem, 3.6vw, 2.6rem); line-height: 1.1; letter-spacing: -0.04em; }

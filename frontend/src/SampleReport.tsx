@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { CoreDealReport, type CoreReport } from "./CoreDealReport";
 
 /** `GET /api/v1/sample-report`: a report from a synthetic case with identifying fields set to null. */
@@ -33,31 +33,29 @@ function removedName(code: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/** The example report's own page, reached from the header's Example report tab. */
+export const exampleReportLink = "?page=example-report";
+const TITLE = "Example report · otdog";
+
+/** Whether the address names the example report; the older `#sample-report` links still arrive here. */
+export function requestedExampleReport(): boolean {
+  return new URL(window.location.href).searchParams.get("page") === "example-report" || window.location.hash === "#sample-report";
+}
+
 /** Reachable before any case exists: the Buyer can see what the product returns before uploading. */
-export function SampleReportEntry({ entryLink = true }: { entryLink?: boolean }) {
-  const [open, setOpen] = useState(false);
+export function ExampleReportPage() {
   const [sample, setSample] = useState<SampleReport>();
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
-  const section = useRef<HTMLElement>(null);
-  // The walkthrough's "See a sample report" arrives at #sample-report and opens the example straight away.
   useEffect(() => {
-    const show = () => { section.current?.scrollIntoView?.(); section.current?.focus(); void load(); };
-    window.addEventListener("open-sample-report", show);
-    return () => window.removeEventListener("open-sample-report", show);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  useEffect(() => {
-    if (window.location.hash !== "#sample-report") return;
-    section.current?.scrollIntoView?.();
-    section.current?.focus();
+    const previous = document.title;
+    document.title = TITLE;
     void load();
+    return () => { document.title = previous; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function load() {
-    setOpen(true);
-    if (sample) return;
     setLoading(true); setFailed(false);
     try {
       const response = await fetch("/api/v1/sample-report");
@@ -72,27 +70,16 @@ export function SampleReportEntry({ entryLink = true }: { entryLink?: boolean })
     }
   }
 
-  return <section className={open ? "panel sample-report" : "sample-report"} id="sample-report" tabIndex={-1} ref={section} aria-label="See an example report">
-    {open && <>
-    <div className="section-heading">
-      <div>
-        <p className="step">Before you upload</p>
-        <h2 id="sample-report-heading">See an example report</h2>
-      </div>
-    </div>
-    <p>An example Deal Analysis Report built from a synthetic case, so you can see what you receive before starting your own.</p>
-    </>}
-    <div className="actions">
-      {open
-        ? <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Close the example report</button>
-        : entryLink && <a href="#sample-report" onClick={event => { event.preventDefault(); void load(); }}>See an example report</a>}
-    </div>
-    {open && loading && <p role="status">Loading the example report…</p>}
-    {open && failed && <>
+  return <article className="panel sample-report" id="sample-report" aria-labelledby="sample-report-heading">
+    <p className="step">Before you upload</p>
+    <h1 id="sample-report-heading">See an example report</h1>
+    <p className="lede">An example Deal Analysis Report built from a synthetic case, so you can see what you receive before starting your own.</p>
+    {loading && <p role="status">Loading the example report…</p>}
+    {failed && <>
       <p role="alert">The example report is unavailable right now. Starting your own case is not affected.</p>
-      <button type="button" onClick={() => void load()}>Retry</button>
+      <button type="button" className="btn-secondary" onClick={() => void load()}>Retry</button>
     </>}
-    {open && sample && <div className="stack">
+    {sample && <div className="stack">
       <div className="notice sample-about" role="note" aria-label="About this example">
         <p><strong>Example report.</strong> {sample.source === "SYNTHETIC_CASE"
           ? "Built from a synthetic case, not a real Buyer's deal."
@@ -105,5 +92,8 @@ export function SampleReportEntry({ entryLink = true }: { entryLink?: boolean })
       </div>
       <CoreDealReport report={sample.report} redacted />
     </div>}
-  </section>;
+    <div className="actions">
+      <a className="button-link" href="./#start">Check my own deal</a>
+    </div>
+  </article>;
 }

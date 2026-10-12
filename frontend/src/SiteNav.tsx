@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { guidesLink } from "./ExplainerGuides";
 import { howItWorksLink } from "./HowItWorks";
+import { exampleReportLink } from "./SampleReport";
 import "./SiteNav.css";
 
-export type SitePage = "home" | "how-it-works" | "guides" | "other";
+export type SitePage = "home" | "example-report" | "how-it-works" | "guides" | "other";
 
 function focusStartForm() {
   const field = document.querySelector<HTMLInputElement>("#buying-case-intake input[name=buyerPostalCode]");
@@ -19,7 +20,7 @@ export function SiteNav({ page }: { page: SitePage }) {
   const track = useRef<HTMLElement>(null);
   const items = useRef<(HTMLElement | null)[]>([]);
   const drag = useRef<{ startX: number; moved: boolean; offset: number } | undefined>(undefined);
-  const [active, setActive] = useState<number | undefined>({ home: 0, "how-it-works": 2, guides: 3, other: undefined }[page]);
+  const [active, setActive] = useState<number | undefined>({ home: 0, "example-report": 1, "how-it-works": 2, guides: 3, other: undefined }[page]);
   const [hovered, setHovered] = useState<number>();
   const [dragging, setDragging] = useState(false);
   const [thumb, setThumb] = useState<{ left: number; width: number }>();
@@ -102,10 +103,8 @@ export function SiteNav({ page }: { page: SitePage }) {
       setActive(0);
       if (page === "home") focusStartForm(); else window.location.assign("./#start");
     }}>Check my deal</button>
-    <a href={page === "home" ? "#sample-report" : "./#sample-report"} aria-label="See an example report" {...itemProps(1)} onClick={() => {
-      setActive(1);
-      if (page === "home") window.dispatchEvent(new Event("open-sample-report"));
-    }}>Example report</a>
+    <a href={exampleReportLink} aria-label="See an example report" aria-current={page === "example-report" ? "page" : undefined}
+      {...itemProps(1)} onClick={() => setActive(1)}>Example report</a>
     <a href={howItWorksLink} aria-current={page === "how-it-works" ? "page" : undefined} {...itemProps(2)} onClick={() => setActive(2)}>How it works</a>
     <a href={guidesLink} aria-current={page === "guides" ? "page" : undefined} {...itemProps(3)} onClick={() => setActive(3)}>Guides</a>
   </nav>;
