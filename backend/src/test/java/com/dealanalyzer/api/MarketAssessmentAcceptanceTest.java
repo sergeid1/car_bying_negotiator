@@ -20,6 +20,26 @@ class MarketAssessmentAcceptanceTest {
   Path temporaryDirectory;
 
   @Test
+  void marketSearchUsesDealerZipOrBuyerZipWhenOnlyTheCityIsKnown() throws Exception {
+    try (var app = new HttpAcceptanceHarness(temporaryDirectory).start("market-location")) {
+      for (boolean city : new boolean[] {true, false}) {
+        var request = new java.util.HashMap<String, Object>(validCase());
+        if (city) {
+          request.remove("dealerPostalCode"); request.put("dealerCity", "Raleigh"); request.put("dealerState", "NC");
+        }
+        var created = HttpAcceptanceHarness.post(app.client(), "/api/v1/cases", request, "market-place-" + city);
+        String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+        HttpAcceptanceHarness.post(app.client(), "/api/v1/cases/" + id + "/vehicle-evidence",
+            Map.of("manualFacts", Map.of("year", 2021, "make", "Honda", "model", "Accord", "trim", "EX-L", "mileage", 38000),
+                "confirmed", true), "vehicle-place-" + city, token);
+        var assessment = HttpAcceptanceHarness.post(app.client(), "/api/v1/cases/" + id + "/market-assessments",
+            Map.of(), "market-place-" + city, token);
+        assertThat(assessment.path("geography").asText()).isEqualTo(city ? "27601" : "27604");
+      }
+    }
+  }
+
+  @Test
   void buyerReceivesADurableVersionedAssessmentWithTransparentComparableDecisions()
       throws Exception {
     var harness = new HttpAcceptanceHarness(temporaryDirectory);

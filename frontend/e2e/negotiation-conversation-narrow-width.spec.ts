@@ -58,7 +58,8 @@ for (const state of ["AWAITING_BUYER", "PAUSED", "TARGET_REACHED"]) {
     await page.route("**/api/v1/cases/case-1/negotiation-conversation", route => route.fulfill({ json: conversation(state) }));
     await page.goto("/");
     await page.getByLabel(/your zip code/i).fill("27601");
-    await page.getByLabel(/dealer zip code/i).fill("27604");
+    await page.getByLabel(/dealer city/i).fill("27604");
+    await page.getByLabel("Dealer state").selectOption("NC");
     await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
     await page.getByRole("button", { name: /start my case/i }).click();
     const panel = page.locator(".negotiation-conversation");

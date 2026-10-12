@@ -39,6 +39,23 @@ class TradeDeskCheckTest {
   private final CashEconomicsPersistence policies = mock(CashEconomicsPersistence.class);
   private String jurisdiction = "US-NC";
 
+  @Test
+  void valuationUsesBuyerZipForDealerCityAndKeepsOlderDealerZips() {
+    var data = new org.springframework.jdbc.datasource.DriverManagerDataSource(
+        "jdbc:h2:mem:trade-location-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
+    var jdbc = new org.springframework.jdbc.core.JdbcTemplate(data);
+    jdbc.execute("create table analysis_cases(id varchar, buyer_jurisdiction varchar, dealer_location varchar, buyer_zip varchar)");
+    jdbc.update("insert into analysis_cases values ('city', 'US-NC', 'Raleigh, NC', '27601'), ('zip', 'US-NC', '27604', '27601')");
+    recorded(MoneyOwed.NO, null, null, false);
+    when(valuations.value(anyString(), any(TradeVehicle.class), anyString()))
+        .thenAnswer(call -> new DeterministicFakeTradeValuationAdapter(CLOCK, Scenario.NORMAL).value(call.getArgument(1), call.getArgument(2)));
+    var check = new TradeDeskCheck(trades, valuations, policies, jdbc, CLOCK);
+    check.check("city", "token", terms("TRADE_ALLOWANCE", "1500000"), null);
+    check.check("zip", "token", terms("TRADE_ALLOWANCE", "1500000"), null);
+    verify(valuations).value(eq("city"), any(TradeVehicle.class), eq("27601"));
+    verify(valuations).value(eq("zip"), any(TradeVehicle.class), eq("27604"));
+  }
+
   private TradeDeskCheck check(Scenario valuation) {
     var adapter = new DeterministicFakeTradeValuationAdapter(CLOCK, valuation);
     when(valuations.value(anyString(), any(TradeVehicle.class), anyString()))

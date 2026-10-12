@@ -78,6 +78,14 @@ public class EphemeralBuyingCaseService {
         StoredEphemeralCase::accessExpiresAt));
   }
 
+  public String buyerState(String postalCode) { return location.buyerState(postalCode); }
+
+  public String marketPostalCode(String caseId, String accessToken) {
+    var buyingCase = reopen(caseId, accessToken);
+    String dealer = buyingCase.dealerLocation();
+    return dealer != null && dealer.matches("[0-9]{5}") ? dealer : persistence.buyerPostalCode(caseId);
+  }
+
   public boolean isEphemeralCase(String caseId) {
     return persistence.findById(caseId)
         .map(stored -> stored.buyerJurisdiction() != null)

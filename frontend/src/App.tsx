@@ -21,8 +21,8 @@ import { OfferTerms } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks, requestedGuide } from "./ExplainerGuides";
 import { partnerKitLink, ReferralPartnerKit, requestedPartnerKit } from "./ReferralPartnerKit";
-import { HowItWorks, HowItWorksCard, requestedHowItWorks } from "./HowItWorks";
-import { XrayIllustration } from "./XrayIllustration";
+import { HowItWorks, requestedHowItWorks } from "./HowItWorks";
+import { HomeHero } from "./HomeHero";
 import logo from "./assets/otdog-logo.png";
 import logoDark from "./assets/otdog-logo-dark.png";
 import { SidePanel, type SidePanelView, useSidePanelRequests } from "./SidePanel";
@@ -228,25 +228,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       </header>
 
       <main>
-        {!standalone && <div className="hero">
-          <div className="hero-copy">
-            <p className="eyebrow">The Buyer's side of the deal</p>
-            <h1>See the whole deal <span className="hero-quiet">before you decide.</span></h1>
-            <p className="lede">
-              otdog helps you find cars, check dealer quotes, draft your emails to dealers, and
-              check the paperwork at the desk. You send every email from your own email and make every
-              decision. Every dollar stays connected to its input or calculation.
-            </p>
-            <p className="hero-credo">We don't work with dealers. We help people.</p>
-            <ul className="trust-strip">
-              <li>Every amount linked to its source</li>
-              <li>Deterministic, versioned math</li>
-              <li>No account required</li>
-              <li>Ephemeral by default</li>
-            </ul>
-          </div>
-          {!caseCredentials && !report && <XrayIllustration />}
-        </div>}
+        {!standalone && <HomeHero />}
 
         <div className="workspace">
           <AccountSignedInContext.Provider value={accountSignedIn}>
@@ -270,9 +252,6 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
                 setReferral(disclosure ? { caseId: value.caseId, text: disclosure } : undefined);
                 setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId);
               }} />}
-            {!standalone && !report && !caseCredentials && !atDealer && <HowItWorksCard />}
-            {!standalone && !report && !caseCredentials && !atDealer && <SampleReportEntry />}
-            {!standalone && !report && !caseCredentials && !atDealer && <OfferTerms />}
             {!standalone && !report && !caseCredentials && !atDealer && (
               <BuyingCaseIntake
                 onSavedToAccount={() => setAccountRecheck(value => value + 1)}
@@ -285,6 +264,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               />
             )}
 
+            {!standalone && !report && !caseCredentials && !atDealer && <SampleReportEntry entryLink={false} />}
+            {!standalone && !report && !caseCredentials && !atDealer && <OfferTerms />}
             {!standalone && !report && !caseCredentials && !atDealer && <GuideLinks />}
 
             {!standalone && !report && import.meta.env.DEV && (

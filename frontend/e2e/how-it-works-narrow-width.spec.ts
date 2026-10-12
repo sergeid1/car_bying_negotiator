@@ -107,25 +107,22 @@ test("on a wide screen the scene stays pinned and swaps as each caption reaches 
   await expectNoAxeViolations(page, "article.how-it-works");
 });
 
-test("the start screen invites a new visitor without covering the start form, and remembers a dismissal", async ({ page }) => {
+test("the start screen links to the walkthrough beside the main action", async ({ page }) => {
   await api(page);
   await page.goto("/");
-  const card = page.getByRole("region", { name: "New here? See how it works" });
-  await expect(card).toBeVisible();
+  const link = page.getByRole("link", { name: "How it works", exact: true });
+  await expect(link).toBeInViewport();
+  await expect(page.getByRole("button", { name: "Check my deal" })).toBeInViewport();
   await expect(page.getByRole("heading", { name: "Start your Buying Case" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
-  await expectNoAxeViolations(page, "section.how-it-works-card");
-  await card.getByRole("button", { name: "Dismiss the how it works card" }).click();
-  await expect(card).toHaveCount(0);
-  await page.reload();
-  await expect(page.getByRole("heading", { name: "Start your Buying Case" })).toBeVisible();
-  await expect(card).toHaveCount(0);
+  await expectNoAxeViolations(page, ".home-hero");
+  await expect(page.locator(".how-it-works-card")).toHaveCount(0);
 });
 
 test("the walkthrough's closing actions reach the start form and the opened example report", async ({ page }) => {
   await api(page);
   await page.goto("/");
-  await page.getByRole("region", { name: "New here? See how it works" }).getByRole("link", { name: "See how it works" }).click();
+  await page.getByRole("link", { name: "How it works", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Buying a car with otdog, step by step" })).toBeVisible();
   await page.getByRole("link", { name: "See a sample report" }).click();
   await expect(page.getByRole("note", { name: "About this example" })).toBeVisible();

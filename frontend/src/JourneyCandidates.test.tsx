@@ -24,7 +24,7 @@ test("stored candidate identifiers preserve Buyer order through changes and remo
     }
     return rows;
   });
-  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ supported: ["US-NC"],
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify({ supported: ["US-NC"], buyerState: "US-NC",
     consentPolicies: { serviceProcessing: "p1", humanReview: "p2", anonymizedResearch: "p3" } })));
   const mount = () => render(<JourneyCandidates journeyId="j1" briefVersion={1} postalCode="27601"
     request={request as never} onSessionEnded={() => {}} onCaseOpened={opened} />);
@@ -41,19 +41,20 @@ test("stored candidate identifiers preserve Buyer order through changes and remo
   await user.click(within(shortlist).getAllByRole("button", { name: "Open a Buying Case" })[0]);
   const form = screen.getByRole("region", { name: "Confirm your Buying Case" });
   expect(within(form).getByLabelText("Your ZIP code")).toHaveValue("27601");
-  await user.type(within(form).getByLabelText("Dealer ZIP code"), "27602");
+  await user.type(within(form).getByLabelText("Dealer city"), "Raleigh");
+  await user.selectOptions(within(form).getByLabelText("Dealer state"), "NC");
   await user.selectOptions(within(form).getByLabelText("How you are paying"), "FINANCE");
   await user.click(within(form).getByRole("button", { name: "Confirm and open case" }));
   await vi.waitFor(() => expect(opened).toHaveBeenCalledWith({ caseId: "case-1", token: "case-token" }, undefined));
   const creation = request.mock.calls.find(([path]) => path.endsWith("/case"));
   expect(creation?.[0]).toBe("/api/v1/journeys/j1/candidates/second/case");
-  expect(JSON.parse(String(creation?.[1]?.body))).toMatchObject({ buyerPostalCode: "27601", dealerPostalCode: "27602",
+  expect(JSON.parse(String(creation?.[1]?.body))).toMatchObject({ buyerPostalCode: "27601", dealerCity: "Raleigh", dealerState: "NC",
     purchaseMethod: "FINANCE", consents: { serviceProcessing: { granted: true, policyVersion: "p1" }, humanReview: { granted: false } } });
   opened.mockClear();
   await user.click(screen.getByRole("button", { name: "Open linked Buying Case" }));
   await vi.waitFor(() => expect(opened).toHaveBeenCalledWith({ caseId: "case-1", token: "case-token" }, undefined));
   expect(request.mock.calls.at(-1)?.[1]).toEqual({ method: "GET" });
-  expect(screen.queryByLabelText("Dealer ZIP code")).toBeNull();
+  expect(screen.queryByLabelText("Dealer city")).toBeNull();
   await user.click(screen.getByRole("button", { name: "Remove 2024 Honda first from shortlist" }));
   expect(rows.map(row => row.candidateId)).toEqual(["second"]);
 });

@@ -51,7 +51,8 @@ async function api(page: Page, mode: "upload" | "verify" | "report" | "expired")
 async function start(page: Page) {
   await page.goto("/");
   await page.getByLabel(/your zip code/i).fill("27601");
-  await page.getByLabel(/dealer zip code/i).fill("27604");
+  await page.getByLabel(/dealer city/i).fill("27604");
+  await page.getByLabel("Dealer state").selectOption("NC");
   await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
   await page.getByRole("button", { name: /start my case/i }).click();
 }

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import { BuyingCaseIntake } from "./BuyingCaseIntake";
@@ -28,7 +28,7 @@ function stubApi(replies: { cases?: Reply[]; evidence?: Reply[]; resolution?: Re
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     calls.push({ url, body, headers: init?.headers as Record<string, string> | undefined });
     let reply: Reply | undefined;
-    if (url.endsWith("/intake-options")) reply = { body: OPTIONS };
+    if (url.includes("/intake-options")) reply = { body: { ...OPTIONS, buyerState: "US-NC" } };
     else if (url.includes("/resolution")) reply = queues.resolution.shift();
     else if (url.includes("/vehicle-evidence")) reply = queues.evidence.shift();
     else if (url.endsWith("/api/v1/cases")) reply = queues.cases.shift();
@@ -46,7 +46,8 @@ const CLEAN_EVIDENCE = { identityConflicts: [], reliableForAnalysis: true };
 
 async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/your zip code/i), "27601");
-  await user.type(screen.getByLabelText(/dealer zip code/i), "27604");
+  await user.type(screen.getByLabelText(/dealer city/i), "27604");
+  await user.selectOptions(screen.getByLabelText(/dealer state/i), "NC");
   await user.type(screen.getByLabelText(/^vin$/i), "1HGCM82633A004352");
 }
 
@@ -103,7 +104,8 @@ test("a case is created from entered location and vehicle, with service processi
 
   const creation = calls.find(call => call.url.endsWith("/api/v1/cases"))?.body as Record<string, any>;
   expect(creation.buyerPostalCode).toBe("27601");
-  expect(creation.dealerPostalCode).toBe("27604");
+  expect(creation.dealerCity).toBe("27604");
+  expect(creation.dealerState).toBe("NC");
   expect(creation.consents.serviceProcessing).toEqual({
     granted: true,
     policyVersion: "service-processing.v1",
@@ -147,18 +149,18 @@ test("a signed-out Buyer is told no account is required and the case is not save
   expect(saved).not.toHaveBeenCalled();
 });
 
-test("manual vehicle details are sent when the Buyer has no VIN", async () => {
+test("manual vehicle details can start a case without a trim", async () => {
   const calls = stubApi({ cases: [{ body: CREATED }], evidence: [{ body: CLEAN_EVIDENCE }] });
   render(<BuyingCaseIntake onCaseOpened={vi.fn()} />);
   const user = userEvent.setup();
 
   await user.type(screen.getByLabelText(/your zip code/i), "27601");
-  await user.type(screen.getByLabelText(/dealer zip code/i), "27604");
+  await user.type(screen.getByLabelText(/dealer city/i), "27604");
+  await user.selectOptions(screen.getByLabelText(/dealer state/i), "NC");
   await user.click(screen.getByRole("radio", { name: /enter the vehicle details/i }));
   await user.type(screen.getByLabelText(/^year$/i), "2021");
   await user.type(screen.getByLabelText(/^make$/i), "Honda");
   await user.type(screen.getByLabelText(/^model$/i), "Accord");
-  await user.type(screen.getByLabelText(/^trim$/i), "EX-L");
   await user.type(screen.getByLabelText(/^mileage$/i), "38000");
   await user.click(screen.getByRole("button", { name: /start my case/i }));
 
@@ -169,7 +171,7 @@ test("manual vehicle details are sent when the Buyer has no VIN", async () => {
     year: 2021,
     make: "Honda",
     model: "Accord",
-    trim: "EX-L",
+    trim: "",
     mileage: 38000,
   });
 });
@@ -244,7 +246,7 @@ test("a postal code crossing a state line asks for the state and then proceeds",
   await user.click(screen.getByRole("button", { name: /start my case/i }));
 
   const selector = await screen.findByLabelText(/state where the vehicle will be registered/i);
-  expect(screen.getByRole("option", { name: "Virginia" })).toBeInTheDocument();
+  expect(within(selector).getByRole("option", { name: "Virginia" })).toBeInTheDocument();
   await user.selectOptions(selector, "US-NC");
   await user.click(screen.getByRole("button", { name: /start my case/i }));
 
@@ -293,7 +295,9 @@ test("every intake control is reachable by keyboard in a single forward traversa
 
   const order = [
     screen.getByLabelText(/your zip code/i),
-    screen.getByLabelText(/dealer zip code/i),
+    screen.getByLabelText(/dealer name/i),
+    screen.getByLabelText(/dealer city/i),
+    screen.getByLabelText(/dealer state/i),
     screen.getByLabelText(/how you are paying/i),
     screen.getByRole("radio", { name: /i have the vin/i }),
   ];
@@ -306,13 +310,16 @@ test("every intake control is reachable by keyboard in a single forward traversa
   await user.tab();
   expect(screen.getByLabelText(/^vin$/i)).toHaveFocus();
   await user.tab();
+  expect(screen.getByText("Add more (optional)")).toHaveFocus();
+  await user.keyboard("{Enter}");
+  await user.tab();
   expect(screen.getByLabelText(/listing url/i)).toHaveFocus();
   await user.tab();
   expect(screen.getByLabelText(/most you will pay out the door/i)).toHaveFocus();
   await user.tab();
-  expect(screen.getByRole("checkbox", { name: /let a reviewer look/i })).toHaveFocus();
+  expect(screen.getByRole("checkbox", { name: /let a person check/i })).toHaveFocus();
   await user.tab();
-  expect(screen.getByRole("checkbox", { name: /anonymized use/i })).toHaveFocus();
+  expect(screen.getByRole("checkbox", { name: /identifying details removed/i })).toHaveFocus();
   await user.tab();
   expect(screen.getByRole("button", { name: /start my case/i })).toHaveFocus();
 });

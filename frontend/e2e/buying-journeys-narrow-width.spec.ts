@@ -186,7 +186,8 @@ test("populated shortlist and case confirmation fit 360 px", async ({ page }) =>
   await expect(shortlist.getByText(/Confidence: medium/)).toBeVisible();
   await expectNoOverflowOrViolations(page);
   await shortlist.getByRole("button", { name: "Open a Buying Case" }).click();
-  await expect(shortlist.getByLabel("Dealer ZIP code")).toBeVisible();
+  await expect(shortlist.getByLabel("Dealer city")).toBeVisible();
+  await expect(shortlist.getByLabel("Dealer state")).toBeVisible();
   await expectNoOverflowOrViolations(page);
 });
 // End ticket 56.

@@ -4,7 +4,7 @@ import axe from "axe-core";
 import { readFileSync } from "node:fs";
 import { afterEach, expect, test, vi } from "vitest";
 
-const OPTIONS = { supported: ["US-NC"], consentPolicies: { serviceProcessing: "service-processing.v1" } };
+const OPTIONS = { buyerState: "US-NC", supported: ["US-NC"], consentPolicies: { serviceProcessing: "service-processing.v1" } };
 const DISCLOSURE = "Example Inspections refers Buyers here. It is not paid for referrals.";
 
 function stubApi(created: unknown) {
@@ -12,7 +12,7 @@ function stubApi(created: unknown) {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
     calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
-    const body = url.endsWith("/intake-options") ? OPTIONS
+    const body = url.includes("/intake-options") ? OPTIONS
       : url.endsWith("/api/v1/cases") ? created
       : url.endsWith("/vehicle-evidence") ? { identityConflicts: [], reliableForAnalysis: true }
       : url.endsWith("/document-limits") ? { acceptedMediaTypes: ["image/png"], maxFileBytes: 1, maxPages: 1, maxPixels: 1, minWidth: 1, minHeight: 1 }
@@ -25,7 +25,8 @@ function stubApi(created: unknown) {
 async function startCase() {
   const user = userEvent.setup();
   await user.type(screen.getByLabelText(/your zip code/i), "27601");
-  await user.type(screen.getByLabelText(/dealer zip code/i), "27604");
+  await user.type(screen.getByLabelText(/dealer city/i), "27604");
+  await user.selectOptions(screen.getByLabelText(/dealer state/i), "NC");
   await user.type(screen.getByLabelText(/^vin$/i), "1HGCM82633A004352");
   await user.click(screen.getByRole("button", { name: /start my case/i }));
 }

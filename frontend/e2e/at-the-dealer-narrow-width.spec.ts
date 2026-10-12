@@ -6,7 +6,7 @@ function routing(state: string) {
   return { status: state === "TYPED" ? "UNREADABLE" : "READ", documentId: "d1", documentType: "FOUR_SQUARE_WORKSHEET",
     vin: state === "TYPED" ? null : state === "FRESH_CASE" ? "1M8GDM9AXKP042788" : VIN,
     route: state === "FRESH_CASE" ? "FRESH_CASE" : "THIS_CASE", agreedVin: null, caseVin: state === "FRESH_CASE" ? VIN : null,
-    freshCase: state === "FRESH_CASE" ? { vin: "1M8GDM9AXKP042788", dealerPostalCode: "27604", purchaseMethod: "CASH" } : null,
+    freshCase: state === "FRESH_CASE" ? { vin: "1M8GDM9AXKP042788", dealerLocation: "Raleigh, NC", purchaseMethod: "CASH" } : null,
     questions: { trade: { ask: "WHETHER", paperworkShowsTrade: false, recorded: null },
       financing: { ask: true, paperworkShowsLoan: true, ownAprPercent: null, ownTermMonths: null } } };
 }
@@ -49,7 +49,8 @@ for (const state of ["RESULT", "TYPED", "FRESH_CASE"]) {
     const flow = page.locator(".at-the-dealer");
     await expect(flow.getByRole("heading", { name: "Check the paperwork in front of you" })).toBeInViewport();
     await flow.getByLabel("Your ZIP code").fill("27601");
-    await flow.getByLabel("Dealer ZIP code").fill("27604");
+    await flow.getByLabel("Dealer city").fill("27604");
+    await flow.getByLabel("Dealer state").selectOption("NC");
     await flow.getByRole("button", { name: "Read my paperwork" }).click();
     if (state === "RESULT") {
       await flow.getByRole("button", { name: "Yes, check this car" }).click();
@@ -82,7 +83,8 @@ for (const state of ["RESULT", "TYPED", "FRESH_CASE"]) {
     if (state === "FRESH_CASE") {
       await expect(flow.getByRole("alert").first()).toContainText("It shows VIN 1M8GDM9AXKP042788");
       await flow.getByRole("button", { name: "Start a separate case for this car" }).click();
-      await expect(flow.getByLabel("Dealer ZIP code")).toHaveValue("27604");
+      await expect(flow.getByLabel("Dealer city")).toHaveValue("Raleigh");
+      await expect(flow.getByLabel("Dealer state")).toHaveValue("NC");
     }
     // Let the theme cross-fade and entrance animation settle before measuring colours and layout.
     await page.waitForTimeout(600);

@@ -66,7 +66,8 @@ public class AccountCaseLifecycle {
     if (caseIds.isEmpty()) return result;
     @SuppressWarnings("unchecked")
     var rows = (java.util.List<Object[]>) manager.createNativeQuery("""
-        select c.id, c.created_at, v.model_year, v.make, v.model, v.trim_name, v.vin, d.name, c.dealer_location
+        select c.id, c.created_at, v.model_year, v.make, v.model, v.trim_name, v.vin,
+          coalesce(d.name, (select i.name from dealers i where i.case_id = c.id and i.source = 'BUYER_INTAKE' limit 1)), c.dealer_location
         from analysis_cases c
         left join vehicles v on v.case_id = c.id
         left join listing_snapshots l on l.id = (select s.id from listing_snapshots s where s.case_id = c.id

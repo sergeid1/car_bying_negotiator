@@ -8,7 +8,7 @@ import jakarta.validation.constraints.AssertTrue;
 
 public record CreateBuyingCaseRequest(
     @NotBlank String buyerPostalCode,
-    @NotBlank String dealerPostalCode,
+    String dealerPostalCode,
     /** Only needed when the Buyer's postal code spans a state line and must be disambiguated. */
     String buyerJurisdiction,
     @NotNull PurchaseMethod purchaseMethod,
@@ -20,7 +20,17 @@ public record CreateBuyingCaseRequest(
      */
     String channel,
     /** Florida registration county, needed only when the ZIP area spans counties. */
-    String buyerCounty) {
+    String buyerCounty,
+    String dealerCity,
+    String dealerState,
+    @jakarta.validation.constraints.Size(max = 200) String dealerName) {
+
+  public CreateBuyingCaseRequest(String buyerPostalCode, String dealerPostalCode,
+      String buyerJurisdiction, PurchaseMethod purchaseMethod, BuyerLimits buyerLimits,
+      InitialConsents consents, String channel, String buyerCounty) {
+    this(buyerPostalCode, dealerPostalCode, buyerJurisdiction, purchaseMethod, buyerLimits,
+        consents, channel, buyerCounty, null, null, null);
+  }
 
   public CreateBuyingCaseRequest(String buyerPostalCode, String dealerPostalCode,
       String buyerJurisdiction, PurchaseMethod purchaseMethod, BuyerLimits buyerLimits,
