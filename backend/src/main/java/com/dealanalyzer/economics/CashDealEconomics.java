@@ -68,9 +68,35 @@ public final class CashDealEconomics {
       boolean tradeTaxCreditEnabled,
       int currencyScale,
       RoundingMode roundingMode,
-      BigDecimal reconciliationTolerance) {
+      BigDecimal reconciliationTolerance,
+      List<TaxComponent> taxComponents) {
     public Policy {
       taxableLineTypes = Set.copyOf(taxableLineTypes);
+      taxComponents = taxComponents == null ? List.of() : List.copyOf(taxComponents);
+    }
+
+    public Policy(String version, String jurisdiction, Currency currency, BigDecimal taxRate,
+        Set<LineType> taxableLineTypes, boolean tradeTaxCreditEnabled, int currencyScale,
+        RoundingMode roundingMode, BigDecimal reconciliationTolerance) {
+      this(version, jurisdiction, currency, taxRate, taxableLineTypes, tradeTaxCreditEnabled,
+          currencyScale, roundingMode, reconciliationTolerance, List.of());
+    }
+  }
+
+  public enum TaxBase { TAXABLE_PRICE_AFTER_TRADE }
+
+  /** A sourced component; baseCap limits the base after the trade deduction, never the allowance. */
+  public record TaxComponent(String name, BigDecimal rate, TaxBase base, BigDecimal baseCap,
+      String citation, String checkedOn) {
+    public TaxComponent {
+      if (name == null || rate == null || rate.signum() < 0 || base == null
+          || baseCap != null && baseCap.signum() < 0)
+        throw new IllegalArgumentException("Invalid tax component");
+    }
+
+    public BigDecimal tax(BigDecimal taxableBasis) {
+      BigDecimal basis = taxableBasis.max(BigDecimal.ZERO);
+      return (baseCap == null ? basis : basis.min(baseCap)).multiply(rate);
     }
   }
 
@@ -88,7 +114,22 @@ public final class CashDealEconomics {
       BigDecimal tradeCreditApplied,
       BigDecimal taxableBasis,
       BigDecimal rate,
-      BigDecimal unrounded) {}
+      BigDecimal unrounded,
+      List<TaxComponent> components) {
+    public TaxCalculation {
+      components = components == null ? List.of() : List.copyOf(components);
+    }
+    public TaxCalculation(BigDecimal taxableCharges, BigDecimal tradeCreditAvailable,
+        BigDecimal tradeCreditApplied, BigDecimal taxableBasis, BigDecimal rate, BigDecimal unrounded) {
+      this(taxableCharges, tradeCreditAvailable, tradeCreditApplied, taxableBasis, rate, unrounded, List.of());
+    }
+
+    public BigDecimal taxAt(BigDecimal basis) {
+      return components.isEmpty() ? basis.max(BigDecimal.ZERO).multiply(rate)
+          : components.stream().map(component -> component.tax(basis))
+              .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+  }
 
   public record RoundingDisclosure(
       int currencyScale, RoundingMode mode, String appliedAt) {}

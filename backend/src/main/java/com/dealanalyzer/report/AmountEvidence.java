@@ -235,6 +235,28 @@ public final class AmountEvidence {
     if (!tax.isObject()) return null;
     BigDecimal rate = tax.path("rate").decimalValue();
     String currency = result.at("/outTheDoorTotal/currency").asText("USD");
+    if (tax.path("components").isArray() && !tax.path("components").isEmpty()) {
+      List<Operand> operands = new ArrayList<>();
+      List<String> notes = new ArrayList<>();
+      BigDecimal basis = tax.path("taxableBasis").decimalValue();
+      for (JsonNode component : tax.path("components")) {
+        BigDecimal componentBasis = component.path("baseCap").isNumber()
+            ? basis.min(component.path("baseCap").decimalValue()) : basis;
+        BigDecimal componentRate = component.path("rate").decimalValue();
+        String name = component.path("name").asText();
+        String arithmetic = componentBasis.toPlainString() + " " + currency + " × "
+            + componentRate.movePointRight(2).stripTrailingZeros().toPlainString() + "%";
+        operands.add(new Operand(operands.isEmpty() ? null : "+", name + ": " + arithmetic, null,
+            componentBasis.multiply(componentRate).stripTrailingZeros().toPlainString() + " " + currency));
+        notes.add(name + ": " + component.path("citation").asText().split(" https://", 2)[0]
+            + " (checked " + component.path("checkedOn").asText() + ").");
+      }
+      notes.add("Each component uses the taxable price after the trade-in allowance, limited by its recorded base cap when present.");
+      notes.add("Unrounded tax " + tax.path("unrounded").decimalValue().toPlainString() + " " + currency
+          + ", rounded " + result.at("/rounding/mode").asText("HALF_UP").replace('_', ' ').toLowerCase()
+          + " to " + result.at("/rounding/currencyScale").asInt(2) + " decimal places.");
+      return new Calculation(operands, notes);
+    }
     return new Calculation(List.of(
         major(null, "Taxable basis", tax.path("taxableBasis")),
         new Operand("×", "Tax rate", null, rate.movePointRight(2).stripTrailingZeros().toPlainString() + "%")), List.of(

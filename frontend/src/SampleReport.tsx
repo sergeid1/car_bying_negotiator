@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CoreDealReport, type CoreReport } from "./CoreDealReport";
 
 /** `GET /api/v1/sample-report`: a report from a synthetic case with identifying fields set to null. */
@@ -39,6 +39,15 @@ export function SampleReportEntry() {
   const [sample, setSample] = useState<SampleReport>();
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const section = useRef<HTMLElement>(null);
+  // The walkthrough's "See a sample report" arrives at #sample-report and opens the example straight away.
+  useEffect(() => {
+    if (window.location.hash !== "#sample-report") return;
+    section.current?.scrollIntoView?.();
+    section.current?.focus();
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function load() {
     setOpen(true);
@@ -57,7 +66,7 @@ export function SampleReportEntry() {
     }
   }
 
-  return <section className="panel sample-report" aria-labelledby="sample-report-heading">
+  return <section className="panel sample-report" id="sample-report" tabIndex={-1} ref={section} aria-labelledby="sample-report-heading">
     <div className="section-heading">
       <div>
         <p className="step">Before you upload</p>

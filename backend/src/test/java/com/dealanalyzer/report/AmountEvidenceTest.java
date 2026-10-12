@@ -26,6 +26,25 @@ class AmountEvidenceTest {
   private static final Currency USD = Currency.getInstance("USD");
   private final ObjectMapper json = new ObjectMapper();
 
+  @Test void syntheticFloridaTaxExplanationNamesTheCountyAndShowsTheCappedArithmetic() {
+    var offer = new Offer("synthetic-florida", 1, USD, List.of(
+        line("synthetic-price", "Synthetic vehicle", "35000", LineType.SELLING_PRICE, TaxTreatment.TAXABLE)), null, null);
+    var policy = new Policy("synthetic-components", "US-FL:Broward", USD, new BigDecimal(".06"),
+        Set.of(LineType.SELLING_PRICE), true, 2, RoundingMode.HALF_UP, BigDecimal.ONE, List.of(
+        new com.dealanalyzer.economics.CashDealEconomics.TaxComponent("Florida state sales tax", new BigDecimal(".06"),
+            com.dealanalyzer.economics.CashDealEconomics.TaxBase.TAXABLE_PRICE_AFTER_TRADE, null, "synthetic state citation", "2026-10-12"),
+        new com.dealanalyzer.economics.CashDealEconomics.TaxComponent("Broward County surtax (first $5,000 after trade-in)", new BigDecimal(".01"),
+            com.dealanalyzer.economics.CashDealEconomics.TaxBase.TAXABLE_PRICE_AFTER_TRADE, new BigDecimal("5000"), "synthetic county citation", "2026-10-12")));
+    var result = json.valueToTree(new CashDealEconomicsCalculator().calculate(offer, policy));
+    var calculation = new AmountEvidence().cash(result, null, null, 1).find("cashEconomics", "/result/taxes").calculation();
+    assertThat(calculation.operands()).extracting(AmountEvidence.Operand::value).containsExactly("2100 USD", "50 USD");
+    assertThat(calculation.operands().getFirst().label()).contains("35000 USD × 6%");
+    assertThat(calculation.operands().get(1).label()).contains("5000 USD × 1%");
+    assertThat(calculation.operands().get(1).label()).contains("Broward County", "$5,000");
+    assertThat(calculation.notes()).anySatisfy(note -> assertThat(note).contains("synthetic county citation", "2026-10-12"));
+    assertThat(result.at("/taxes/minorUnits").asLong()).isEqualTo(215_000);
+  }
+
   @Test
   void documentAmountsResolveToTheirPageAndRegionAndCalculatedAmountsAddUpByHand() {
     Offer offer = new Offer("offer-1", 2, USD, List.of(

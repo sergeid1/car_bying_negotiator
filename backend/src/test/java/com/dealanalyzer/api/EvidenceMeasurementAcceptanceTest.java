@@ -54,7 +54,7 @@ class EvidenceMeasurementAcceptanceTest {
       assertThat(report.at("/observed/costComparison").asText()).isEqualTo("WITHIN");
       assertThat(report.path("providers").findValuesAsText("operation")).contains("MARKET_RETRIEVAL", "LISTING_RETRIEVAL");
       assertThat(report.path("providers").findValuesAsText("status")).contains("SUCCESS", "PROVIDER_UNAVAILABLE");
-      var jurisdiction = report.at("/jurisdictions/0");
+      var jurisdiction = jurisdiction(report, "US-NC");
       assertThat(jurisdiction.path("jurisdiction").asText()).isEqualTo("US-NC");
       assertThat(jurisdiction.path("casesAttempted").asInt()).isEqualTo(3);
       assertThat(jurisdiction.path("casesWithAssessment").asInt()).isEqualTo(3);
@@ -116,13 +116,13 @@ class EvidenceMeasurementAcceptanceTest {
       events.record(noAssessment.at("/case/id").asText(), PilotEvents.Type.MARKET_COVERAGE, PilotEvents.Category.UNAVAILABLE, null);
       post(app.client(), "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase()); // No attempt, excluded.
       report = operator(app, PATH, ServiceOperationsAcceptanceTest.SUPPORT);
-      assertThat(report.path("jurisdictions")).hasSize(2);
-      assertThat(report.at("/jurisdictions/0/casesAttempted").asInt()).isEqualTo(4);
-      assertThat(report.at("/jurisdictions/0/casesWithAssessment").asInt()).isEqualTo(3);
-      assertThat(report.at("/jurisdictions/0/casesWithoutAssessment").asInt()).isEqualTo(1);
-      assertThat(report.at("/jurisdictions/0/casesWithCoverageEvent").asInt()).isEqualTo(3);
-      assertThat(report.at("/jurisdictions/1/jurisdiction").asText()).isEqualTo("US-VA");
-      assertThat(report.at("/jurisdictions/1/casesAttempted").asInt()).isZero();
+      assertThat(report.path("jurisdictions").findValuesAsText("jurisdiction")).containsExactly("US-FL", "US-NC", "US-VA");
+      assertThat(jurisdiction(report, "US-NC").at("/casesAttempted").asInt()).isEqualTo(4);
+      assertThat(jurisdiction(report, "US-NC").at("/casesWithAssessment").asInt()).isEqualTo(3);
+      assertThat(jurisdiction(report, "US-NC").at("/casesWithoutAssessment").asInt()).isEqualTo(1);
+      assertThat(jurisdiction(report, "US-NC").at("/casesWithCoverageEvent").asInt()).isEqualTo(3);
+      assertThat(jurisdiction(report, "US-VA").path("jurisdiction").asText()).isEqualTo("US-VA");
+      assertThat(jurisdiction(report, "US-VA").at("/casesAttempted").asInt()).isZero();
     }
   }
 
@@ -136,8 +136,8 @@ class EvidenceMeasurementAcceptanceTest {
       assertThat(report.at("/observed/p95LatencyMillis").isNull()).isTrue();
       assertThat(report.at("/observed/costComparison").asText()).isEqualTo("NOT_MEASURABLE");
       assertThat(report.at("/observed/latencyComparison").asText()).isEqualTo("NOT_MEASURABLE");
-      assertThat(report.at("/jurisdictions/0/casesAttempted").asInt()).isZero();
-      assertThat(report.at("/jurisdictions/0/comparablesEvaluated").asInt()).isZero();
+      assertThat(jurisdiction(report, "US-NC").at("/casesAttempted").asInt()).isZero();
+      assertThat(jurisdiction(report, "US-NC").at("/comparablesEvaluated").asInt()).isZero();
       create(app, "Accord", 2021);
       assertThat(operator(app, PATH, ServiceOperationsAcceptanceTest.SUPPORT).at("/observed/costComparison").asText())
           .isEqualTo("NOT_MEASURABLE");
@@ -149,7 +149,7 @@ class EvidenceMeasurementAcceptanceTest {
       assertThat(excluded.at("/jurisdictions/0/casesAttempted").asInt()).isZero();
       var included = operator(app, PATH.replace("2020-01-01", "2020-01-02"), ServiceOperationsAcceptanceTest.SUPPORT);
       assertThat(included.at("/observed/calls").asInt()).isEqualTo(1);
-      assertThat(included.at("/jurisdictions/0/casesAttempted").asInt()).isEqualTo(1);
+      assertThat(jurisdiction(included, "US-NC").at("/casesAttempted").asInt()).isEqualTo(1);
     }
   }
 
@@ -161,6 +161,12 @@ class EvidenceMeasurementAcceptanceTest {
         Map.of("year", year, "make", "Honda", "model", model, "trim", "EX-L", "mileage", 38000)), "vehicle", token);
     post(app.client(), path + "/market-assessments", Map.of(), "market", token);
     return created;
+  }
+
+  /** Report rows are per state; county-scoped packs such as US-FL:<county> roll up into their state. */
+  private static JsonNode jurisdiction(JsonNode report, String code) {
+    for (JsonNode row : report.path("jurisdictions")) if (code.equals(row.path("jurisdiction").asText())) return row;
+    throw new AssertionError("No jurisdiction row " + code + " in " + report.path("jurisdictions"));
   }
 
   private JsonNode operator(RunningApplication app, String path, String token) throws Exception {

@@ -20,6 +20,7 @@ import { OfferTerms } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks, requestedGuide } from "./ExplainerGuides";
 import { partnerKitLink, ReferralPartnerKit, requestedPartnerKit } from "./ReferralPartnerKit";
+import { HowItWorks, HowItWorksCard, requestedHowItWorks } from "./HowItWorks";
 import { XrayIllustration } from "./XrayIllustration";
 import logo from "./assets/otdog-logo.png";
 import logoDark from "./assets/otdog-logo-dark.png";
@@ -146,8 +147,9 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   const closeSidePanel = () => setSidePanel(undefined);
   const [guide] = useState(requestedGuide);
   const [partnerKit] = useState(requestedPartnerKit);
-  // A guide or the partner kit replaces the start screen at its own shareable address.
-  const standalone = Boolean(guide || partnerKit);
+  const [howItWorks] = useState(requestedHowItWorks);
+  // A guide, the partner kit or the walkthrough replaces the start screen at its own shareable address.
+  const standalone = Boolean(guide || partnerKit || howItWorks);
   // A case opened from the Buyer Account closes when the sign-in ends; its private case link is unaffected.
   const openedFromAccount = Boolean(caseCredentials && isAccountPass(caseCredentials.token));
   useEffect(() => {
@@ -258,12 +260,14 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               }}
               onDeskCheck={() => setAtDealer(undefined)} onClose={() => setAtDealer(undefined)} />}
             {!guide && partnerKit && <ReferralPartnerKit />}
+            {!guide && !partnerKit && howItWorks && <HowItWorks />}
             {!standalone && accountSignedIn && <BuyingJourneys
               onSessionEnded={() => { setAccountSignedIn(false); setAccountRecheck(value => value + 1); }}
               onCaseOpened={(value, disclosure) => {
                 setReferral(disclosure ? { caseId: value.caseId, text: disclosure } : undefined);
                 setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId);
               }} />}
+            {!standalone && !report && !caseCredentials && !atDealer && <HowItWorksCard />}
             {!standalone && !report && !caseCredentials && !atDealer && <SampleReportEntry />}
             {!standalone && !report && !caseCredentials && !atDealer && <OfferTerms />}
             {!standalone && !report && !caseCredentials && !atDealer && (

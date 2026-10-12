@@ -138,7 +138,7 @@ class BuyingCaseIntakeAcceptanceTest {
           .retrieve()
           .body(JsonNode.class);
 
-      assertThat(view.get("supported").toString()).isEqualTo("[\"US-NC\"]");
+      assertThat(view.get("supported").toString()).isEqualTo("[\"US-FL\",\"US-NC\"]");
       assertThat(view.at("/consentPolicies/serviceProcessing").asText())
           .isEqualTo("service-processing.v1");
     }

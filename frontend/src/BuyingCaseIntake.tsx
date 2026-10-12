@@ -85,6 +85,8 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
   const [identifyBy, setIdentifyBy] = useState<"vin" | "details">("vin");
   const [statedJurisdiction, setStatedJurisdiction] = useState("");
   const [crossingCandidates, setCrossingCandidates] = useState<string[]>();
+  const [countyCandidates, setCountyCandidates] = useState<string[]>();
+  const [statedCounty, setStatedCounty] = useState("");
   const [problem, setProblem] = useState<Problem>();
   const [submitting, setSubmitting] = useState(false);
   // Kept across a vehicle-evidence failure so a correction never restarts the case.
@@ -142,6 +144,7 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
             buyerPostalCode: String(values.get("buyerPostalCode") ?? "").trim(),
             dealerPostalCode: String(values.get("dealerPostalCode") ?? "").trim(),
             buyerJurisdiction: statedJurisdiction || undefined,
+            buyerCounty: statedCounty || undefined,
             purchaseMethod: String(values.get("purchaseMethod") ?? "CASH"),
             buyerLimits: values.get("maxOutTheDoorPrice")
               ? {
@@ -210,6 +213,9 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
         if (caught.problem.reason === "POSTAL_CODE_CROSSES_STATE_LINE") {
           setCrossingCandidates(caught.problem.candidateJurisdictions ?? []);
         }
+        if (caught.problem.reason === "POSTAL_CODE_CROSSES_COUNTY_LINE") {
+          setCountyCandidates(caught.problem.candidateJurisdictions ?? []);
+        }
       } else {
         setProblem({ detail: "That request could not be completed." });
       }
@@ -258,7 +264,8 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
 
       <p className="muted">
         {supported.length > 0
-          ? `Supported during the pilot: ${supported.map(stateName).join(", ")}.`
+          ? `Supported during the pilot: ${supported.map(value => value === "US-NC"
+              ? "North Carolina (synthetic development fixture)" : stateName(value)).join(", ")}.`
           : "Enter the vehicle you are negotiating for."}
       </p>
 
@@ -329,6 +336,10 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
               inputMode="numeric"
               autoComplete="postal-code"
               required
+              onChange={() => {
+                setStatedCounty(""); setCountyCandidates(undefined);
+                setStatedJurisdiction(""); setCrossingCandidates(undefined);
+              }}
               aria-describedby={fieldProblem("buyerPostalCode") ? "buyer-postal-error" : undefined}
             />
           </label>
@@ -377,6 +388,25 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
                   {fieldProblem("buyerJurisdiction")}
                 </p>
               )}
+            </>
+          )}
+
+          {countyCandidates && (
+            <>
+              <label>
+                Florida county where the vehicle will be registered
+                <select name="buyerCounty" value={statedCounty} required
+                  aria-describedby="county-tax-explanation"
+                  onChange={event => setStatedCounty(event.target.value)}>
+                  <option value="">Select a county</option>
+                  {countyCandidates.map(county => <option key={county} value={county}>{county} County</option>)}
+                </select>
+              </label>
+              <p id="county-tax-explanation" className="muted">
+                {statedCounty ? `${statedCounty} County` : "Your registration county"} sets the county surtax rate.
+                The surtax applies to the first $5,000 of the taxable price after the trade-in.
+              </p>
+              {fieldProblem("buyerCounty") && <p className="error" role="alert">{fieldProblem("buyerCounty")}</p>}
             </>
           )}
 

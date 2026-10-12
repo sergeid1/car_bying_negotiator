@@ -23,6 +23,7 @@ import { OfferTerms, PurchasePoint } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 import { ReferralPartnerKit } from "./ReferralPartnerKit";
+import { HowItWorks, HowItWorksCard } from "./HowItWorks";
 import { AccountHeader, AccountSignedInContext, BuyerAccount } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 import { NegotiationConversation } from "./NegotiationConversation";
@@ -511,6 +512,17 @@ test("the referral partner kit, its example disclosure, and its built links have
   expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
 });
 
+test("the how-it-works walkthrough, its example screens and the start screen's card have no automated AA violations", async () => {
+  const sample = { report: { analysis: { nextAction: "Ask the dealer to itemize the fees.", topReasons: ["Dealer fees are above the recorded range."],
+    economics: { sellingPrice: { minorUnits: 2500000, currency: "USD" }, dealerFees: { minorUnits: 79900, currency: "USD" },
+      addOns: { minorUnits: 50000, currency: "USD" }, outTheDoorTotal: { minorUnits: 2847500, currency: "USD" } } } } };
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(sample)));
+  const { container } = render(<main><HowItWorksCard /><HowItWorks /></main>);
+  await screen.findByText("Ask the dealer to itemize the fees.", { exact: false });
+  const result = await axe.run(container, AA);
+  expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
+});
+
 test("the Negotiation Mandate with its limits, disclosures, current version and history has no automated AA violations", async () => {
   const mandate = { version: 2, status: "ACTIVE", currency: "USD", targetMinor: 2250000, ceilingMinor: 2350000, planCeilingMinor: 2400000,
     disclosures: ["PAYING_CASH", "FIRST_NAME"], expiresAt: "2026-10-17T12:00:00Z",
@@ -900,3 +912,21 @@ test.each(["START", "AGREED_CAR", "FRESH_CASE", "TYPED", "QUESTIONS", "RESULT"])
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 // End ticket 105.
+
+// Ticket 108: the registration-county chooser, including its tax explanation.
+test("the Florida county chooser has no automated AA violations", async () => {
+  const { BuyingCaseIntake } = await import("./BuyingCaseIntake");
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => new Response(JSON.stringify(
+    String(input).endsWith("intake-options") ? { supported: ["US-FL"], consentPolicies: {} }
+      : { detail: "Choose the registration county.", field: "buyerCounty",
+        reason: "POSTAL_CODE_CROSSES_COUNTY_LINE", candidateJurisdictions: ["Columbia", "Suwannee"] }),
+    { status: String(input).endsWith("intake-options") ? 200 : 422 }));
+  const { container } = render(<main><h1>Synthetic Florida intake</h1><BuyingCaseIntake onCaseOpened={() => {}} /></main>);
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText(/your ZIP code/i), "32024");
+  await user.type(screen.getByLabelText(/dealer ZIP code/i), "32003");
+  await user.type(screen.getByLabelText(/^VIN$/), "1HGCM82633A004352");
+  await user.click(screen.getByRole("button", { name: "Start my case" }));
+  await user.selectOptions(await screen.findByLabelText(/Florida county where/), "Suwannee");
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});

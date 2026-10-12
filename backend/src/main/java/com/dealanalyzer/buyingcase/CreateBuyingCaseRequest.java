@@ -18,7 +18,16 @@ public record CreateBuyingCaseRequest(
      * Optional first-party acquisition channel code read once from the arrival link. It is never
      * validated here: an unknown or malformed code is stored as no channel and never fails creation.
      */
-    String channel) {
+    String channel,
+    /** Florida registration county, needed only when the ZIP area spans counties. */
+    String buyerCounty) {
+
+  public CreateBuyingCaseRequest(String buyerPostalCode, String dealerPostalCode,
+      String buyerJurisdiction, PurchaseMethod purchaseMethod, BuyerLimits buyerLimits,
+      InitialConsents consents, String channel) {
+    this(buyerPostalCode, dealerPostalCode, buyerJurisdiction, purchaseMethod, buyerLimits,
+        consents, channel, null);
+  }
 
   public enum PurchaseMethod { CASH, FINANCE }
 

@@ -17,7 +17,7 @@ CI runs `clean verify` so results cannot be inherited from an earlier build.
 
 | # | Prerequisite | Status | Evidence or blocker |
 | --- | --- | --- | --- |
-| 1 | `jurisdiction-pack` | **BLOCKED** | No pilot state selected; no counsel-reviewed pack |
+| 1 | `jurisdiction-pack` | **BLOCKED** | Florida `US-FL.cash.2026.v1` county packs, effective 2026-01-01, checked 2026-10-12, review 2027-01-01: 2026 F.S. 212.05/212.054/212.09, DOR DR-15DSS 2026 R.11/25, GT-800019 R.10/25 and GT-800030 R.08/22; [pack format and source URLs](jurisdiction-tax-packs.md). Operator status decision remains pending. |
 | 2 | `provider-terms` | **BLOCKED** | No provider terms executed |
 | 3 | `document-corpus` | **BLOCKED** | No permissioned Dealer documents acquired |
 | 4 | `expert-policy-validation` | **BLOCKED** | No automotive-expert review of boundary policy |

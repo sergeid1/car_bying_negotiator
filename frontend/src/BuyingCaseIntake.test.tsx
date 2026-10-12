@@ -55,6 +55,40 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+test("a synthetic Florida case asks for the registration county and explains the surtax cap", async () => {
+  const calls = stubApi({ cases: [
+    { status: 422, body: { detail: "Select the registration county.", field: "buyerCounty",
+      reason: "POSTAL_CODE_CROSSES_COUNTY_LINE", candidateJurisdictions: ["Columbia", "Suwannee"] } },
+    { body: CREATED },
+  ], evidence: [{ body: CLEAN_EVIDENCE }] });
+  const opened = vi.fn();
+  render(<BuyingCaseIntake onCaseOpened={opened} />);
+  const user = userEvent.setup();
+  await fillRequiredFields(user);
+  await user.clear(screen.getByLabelText(/your zip code/i));
+  await user.type(screen.getByLabelText(/your zip code/i), "32024");
+  await user.click(screen.getByRole("button", { name: /start my case/i }));
+  const selector = await screen.findByLabelText(/Florida county where/i);
+  await user.selectOptions(selector, "Suwannee");
+  expect(selector).toHaveAccessibleDescription(/Suwannee County.*first \$5,000.*after the trade-in/);
+  await user.click(screen.getByRole("button", { name: /start my case/i }));
+  await waitFor(() => expect(opened).toHaveBeenCalled());
+  const retry = calls.filter(call => call.url.endsWith("/api/v1/cases"))[1].body as Record<string, unknown>;
+  expect(retry.buyerCounty).toBe("Suwannee");
+});
+
+test("changing a registration ZIP clears the previous county choice", async () => {
+  stubApi({ cases: [{ status: 422, body: { detail: "Choose your county.", field: "buyerCounty",
+    reason: "POSTAL_CODE_CROSSES_COUNTY_LINE", candidateJurisdictions: ["Columbia", "Suwannee"] } }] });
+  render(<BuyingCaseIntake onCaseOpened={vi.fn()} />);
+  const user = userEvent.setup();
+  await fillRequiredFields(user);
+  await user.click(screen.getByRole("button", { name: /start my case/i }));
+  await user.selectOptions(await screen.findByLabelText(/Florida county where/i), "Suwannee");
+  await user.clear(screen.getByLabelText(/your zip code/i));
+  expect(screen.queryByLabelText(/Florida county where/i)).not.toBeInTheDocument();
+});
+
 test("a case is created from entered location and vehicle, with service processing consent recorded", async () => {
   const calls = stubApi({ cases: [{ body: CREATED }], evidence: [{ body: CLEAN_EVIDENCE }] });
   const opened = vi.fn();

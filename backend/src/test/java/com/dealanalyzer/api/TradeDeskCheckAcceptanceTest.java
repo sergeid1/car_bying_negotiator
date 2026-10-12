@@ -65,13 +65,21 @@ class TradeDeskCheckAcceptanceTest {
   @TempDir Path directory;
 
   @Test void deskPaperworkLeadsTheTradeFindingsWithTheShortfallFlagsThePayoffAndReachesAFreshCaseReport() throws Exception {
+    checkDeskWorkflow(false);
+  }
+
+  @Test void syntheticFloridaAgreedPriceAndFreshDeskCasesUseTheCountyPackForTheTradeAndCashEconomics() throws Exception {
+    checkDeskWorkflow(true);
+  }
+
+  private void checkDeskWorkflow(boolean florida) throws Exception {
     paperwork = "AGREED";
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("tradedesk", true,
         Configuration.class, "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();
-      var created = post(client, "/api/v1/cases", validCase(), "case");
+      var created = post(client, "/api/v1/cases", caseRequest(florida), "case");
       String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
       String base = "/api/v1/cases/" + caseId, desk = base + "/desk-check";
       TestDriveAcceptanceTest.agree(app, client, base, caseId, token);
@@ -97,8 +105,10 @@ class TradeDeskCheckAcceptanceTest {
       assertThat(trade.path("payoffDifferenceMinor").asLong()).isEqualTo(120_000);
       assertThat(find(trade.path("findings"), "code", "PAYOFF_DIFFERS").path("summary").asText()).contains("$1,200 more");
       assertThat(trade.path("equityMinor").asLong()).isEqualTo(1_150_000 - 1_920_000);
-      assertThat(trade.at("/taxCredit/jurisdiction").asText()).isEqualTo("US-NC");
-      assertThat(trade.at("/taxCredit/creditMinor").asLong()).as("NC pack, 3% of the allowance").isEqualTo(34_500);
+      assertThat(trade.at("/taxCredit/jurisdiction").asText()).isEqualTo(florida ? "US-FL:Broward" : "US-NC");
+      assertThat(trade.at("/taxCredit/creditMinor").asLong()).as("trade credit: both Florida surtax bases exceed the cap")
+          .isEqualTo(florida ? 69_000 : 34_500);
+      if (florida) assertThat(trade.at("/taxCredit/reason").asText()).contains("Broward County", "$5,000");
       assertThat(trade.at("/valuation/source").asText()).isEqualTo("SYNTHETIC_TRADE_VALUATION");
       // The trade group sits ahead of totals, and the trade never reduces the price findings (DEAL-09).
       List<String> groups = new ArrayList<>();
@@ -160,14 +170,19 @@ class TradeDeskCheckAcceptanceTest {
 
       // A fresh desk case without a journey holds its own trade, and its report leads with the trade.
       paperwork = "TRADE";
-      var fresh = post(client, "/api/v1/cases", validCase(), "fresh-case");
+      var fresh = post(client, "/api/v1/cases", caseRequest(florida), "fresh-case");
       String freshId = fresh.at("/case/id").asText(), freshToken = fresh.path("accessToken").asText();
       String freshBase = "/api/v1/cases/" + freshId;
       recordTrade(client, freshId, freshToken, "fresh");
       post(client, freshBase + "/vehicle-evidence", Map.of("vin", "1HGCM82633A004352", "confirmed", true), "fresh-vehicle", freshToken);
       String freshDocument = upload(app, freshBase, freshToken, "fresh-paperwork");
       verify(client, freshBase, freshToken, freshDocument, "fresh");
-      post(client, freshBase + "/cash-economics", Map.of(), "fresh-cash", freshToken);
+      var cash = post(client, freshBase + "/cash-economics", Map.of(), "fresh-cash", freshToken);
+      if (florida) {
+        assertThat(cash.path("policyVersion").asText()).isEqualTo("US-FL.cash.2026.v1:Broward");
+        assertThat(cash.at("/result/taxCalculation/components/1/baseCap").decimalValue()).isEqualByComparingTo("5000");
+        assertThat(cash.at("/result/taxCalculation/components/1/name").asText()).contains("Broward County", "$5,000");
+      }
       post(client, freshBase + "/market-assessments", Map.of(), "fresh-market", freshToken);
       post(client, freshBase + "/analyses", Map.of(), "fresh-analysis", freshToken);
       var report = get(client, freshBase + "/reports/latest", freshToken);
@@ -209,6 +224,15 @@ class TradeDeskCheckAcceptanceTest {
         .header("Idempotency-Key", key).header("Case-Access-Token", token).body(parts).retrieve().body(String.class));
     assertThat(awaitExtraction(app, started.at("/operation/id").asText(), token).path("stage").asText()).isEqualTo("EXTRACTION_COMPLETE");
     return started.at("/document/id").asText();
+  }
+
+  private static Map<String, Object> caseRequest(boolean florida) {
+    var request = new HashMap<>(validCase());
+    if (florida) {
+      request.put("buyerPostalCode", "33301"); request.put("dealerPostalCode", "33301");
+      request.put("buyerCounty", "Broward");
+    }
+    return request;
   }
 
   private static JsonNode verify(RestClient client, String base, String token, String documentId, String key) throws Exception {
