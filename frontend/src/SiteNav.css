@@ -50,6 +50,14 @@
 .masthead .site-switch .site-switch-item.is-shown { color: var(--on-brand); }
 .masthead .site-switch .site-switch-item:active { transform: none; }
 
+/* Between phone and desktop widths the header cannot hold the tabs beside its buttons, so they take a centred row. */
+@media (min-width: 601px) and (max-width: 1080px) {
+  .masthead-inner:has(.site-switch) { flex-wrap: wrap; }
+  .masthead-inner > .wordmark:has(+ .site-switch) { margin-right: auto; }
+  .masthead-inner:has(.site-switch)::before { content: ""; order: 9; flex-basis: 100%; height: 0; }
+  .masthead .site-switch { order: 10; margin: 0 auto 2px; }
+}
+
 /* On a phone the switch takes its own full-width row under the logo and the header's buttons. */
 @media (max-width: 600px) {
   .masthead .site-switch { display: flex; order: 10; width: 100%; margin: 2px 0 0; }

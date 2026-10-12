@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import "./CaseFlow.css";
 import { SaveCaseLink } from "./CasePortability";
 import { ReferralDisclosure } from "./AcquisitionChannel";
@@ -148,6 +148,19 @@ export function CaseFlow({ caseId, token, openedFromAccount, referral, deskFresh
     }
   }, [open]);
 
+  // The progress bar's outline slides to whichever step is open, so the bar follows the Buyer's choice.
+  const progressNav = useRef<HTMLElement>(null);
+  const [thumb, setThumb] = useState<{ left: number; top: number; width: number; height: number }>();
+  useLayoutEffect(() => {
+    const place = () => {
+      const button = progressNav.current?.querySelector<HTMLElement>(`[aria-controls="case-step-${open}-body"]`);
+      setThumb(button ? { left: button.offsetLeft, top: button.offsetTop, width: button.offsetWidth, height: button.offsetHeight } : undefined);
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open, progress]);
+
   function choose(step: CaseStepId) {
     scrollTo.current = step; setOpen(step);
     if (open === step) document.getElementById(`case-step-${step}`)?.scrollIntoView?.({ block: "start" });
@@ -191,7 +204,9 @@ export function CaseFlow({ caseId, token, openedFromAccount, referral, deskFresh
     {/* A referral is disclosed before any step asks for the Buyer's paperwork. */}
     {referral && <ReferralDisclosure text={referral} />}
 
-    <nav className="case-progress" aria-label="Case progress">
+    <nav className="case-progress" aria-label="Case progress" ref={progressNav}>
+      {thumb && <span className="case-progress-thumb" aria-hidden="true"
+        style={{ transform: `translate(${thumb.left}px, ${thumb.top}px)`, width: thumb.width, height: thumb.height }} />}
       <ol>
         {CASE_STEPS.map((step, index) => <li key={step.id} data-state={stateOf(index)}>
           <button type="button" aria-current={step.id === current ? "step" : undefined}

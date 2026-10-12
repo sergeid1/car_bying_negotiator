@@ -213,9 +213,9 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             <img className="wordmark-dark" src={logoDark} alt="" width="114" height="40" />
           </a>
           {!caseOpen && !partnerKit && <SiteNav page={howItWorks ? "how-it-works" : guide || guideIndex ? "guides" : standalone ? "other" : "home"} />}
-          {!standalone && <DealerCameraEntry onPhotos={files => setAtDealer({ files, started: Date.now() })} />}
+          {!partnerKit && <DealerCameraEntry onPhotos={files => setAtDealer({ files, started: Date.now() })} />}
           <ThemeMenu />
-          {!standalone && <AccountHeader controls={accountControls} onOpen={() => setSidePanel("account")} />}
+          {!partnerKit && <AccountHeader controls={accountControls} onOpen={() => setSidePanel("account")} />}
         </div>
       </header>
 
@@ -225,9 +225,9 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         <div className="workspace">
           <AccountSignedInContext.Provider value={accountSignedIn}>
           <div className="column" id="case-workflow" tabIndex={-1}>
-            {guide && <ExplainerGuide slug={guide} />}
-            {guideIndex && <GuideLinks />}
-            {!standalone && atDealer && <AtTheDealer key={atDealer.started} files={atDealer.files}
+            {guide && !atDealer && !caseOpen && <ExplainerGuide slug={guide} />}
+            {guideIndex && !atDealer && !caseOpen && <GuideLinks />}
+            {!partnerKit && atDealer && <AtTheDealer key={atDealer.started} files={atDealer.files}
               open={caseCredentials && !caseRevoked ? caseCredentials : undefined}
               onCaseOpened={value => {
                 setReferral(undefined); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId);
@@ -238,7 +238,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               }}
               onDeskCheck={() => { setAtDealer(undefined); setDealerRequest(value => value + 1); }} onClose={() => setAtDealer(undefined)} />}
             {!guide && partnerKit && <ReferralPartnerKit />}
-            {!guide && !partnerKit && howItWorks && <HowItWorks />}
+            {!guide && !partnerKit && howItWorks && !atDealer && !caseOpen && <HowItWorks />}
             {!standalone && accountSignedIn && <BuyingJourneys
               onSessionEnded={() => { setAccountSignedIn(false); setAccountRecheck(value => value + 1); }}
               onCaseOpened={(value, disclosure) => {
@@ -353,7 +353,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
           onRevoked={() => { setCaseRevoked(true); setReport(undefined); setStage(undefined); setError(undefined); }} />}
       </SidePanel>
-      {!standalone && <SidePanel id="account-panel" title={accountSignedIn ? "Your account" : "Sign in"}
+      {!partnerKit && <SidePanel id="account-panel" title={accountSignedIn ? "Your account" : "Sign in"}
         open={sidePanel === "account"} onClose={closeSidePanel}>
         <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined}
           onSignedIn={setAccountSignedIn} onControls={setAccountControls} recheck={accountRecheck} showing={sidePanel === "account"}
