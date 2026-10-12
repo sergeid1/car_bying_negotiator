@@ -35,6 +35,11 @@ endpoint.
   "freeze your dealer offer", "Buying Case". The operator approves the new wording, and it must pass
   `PilotCopyClaimsTest` and `docs/grounded-language-policy.md`.
 
+## Afterwards
+
+Ticket 107's how-it-works walkthrough shows product screens from before 110–112. Once this ticket lands, recapture
+those screens and check its step captions against the new flow and step names.
+
 ## Done when
 
 - [ ] With a case open, the first screen at 1440 px and 360 px shows the car, the progress bar and the current
