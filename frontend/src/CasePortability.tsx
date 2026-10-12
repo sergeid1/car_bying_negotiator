@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 export type Credentials = { caseId: string; token: string };
 async function post(path: string, body: unknown, key: string, token?: string) {
   const response = await fetch(path, { method: "POST", headers: {
@@ -43,7 +43,7 @@ export function SavedCaseAccess({ onOpened, onUnavailable }: { onOpened: (value:
     }
   }, [initial]);
   return <section className="panel" aria-label="Open an existing Buying Case">
-    <h2>Open a saved case</h2>
+    <h3>Open a saved case</h3>
     <p>Open your private saved case link, or paste it here. Anyone with the link can access the case.</p>
     <form onSubmit={event => { event.preventDefault(); void open(link); }}>
       <label>Saved case link<input type="password" autoComplete="off" required value={link} onChange={event => setLink(event.target.value)} /></label>
@@ -51,6 +51,18 @@ export function SavedCaseAccess({ onOpened, onUnavailable }: { onOpened: (value:
     </form>
     {error && <p role="alert">This link cannot be opened. It may have expired, been revoked, or be unrecognized. Use email recovery below if you enabled it, or start a new case.</p>}
   </section>;
+}
+/**
+ * Opening a case by its private link and recovering a lost link, collapsed under the sign-in form. It opens by
+ * itself for an emailed recovery link and whenever `expand` changes, such as after a case link fails to open.
+ */
+export function CaseLinkAccess({ expand, children }: { expand: number; children: ReactNode }) {
+  const [open, setOpen] = useState(() => window.location.hash.startsWith("#recover="));
+  useEffect(() => { if (expand) setOpen(true); }, [expand]);
+  return <details className="case-link-access" open={open} onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary>Have a private case link?</summary>
+    {children}
+  </details>;
 }
 export function SaveCaseLink(credentials: Credentials) {
   const [copied, setCopied] = useState(false);
@@ -75,7 +87,7 @@ export function RecoveryAccess({ onRecovered, caseId }: { onRecovered: (value: C
     if (window.location.hash.startsWith("#recover=")) window.history.replaceState(null, "", window.location.pathname + window.location.search);
   }, []);
   return <section className="panel" aria-label="Recover Buying Case access">
-    <h2>Recover case access</h2>
+    <h3>Lost the link?</h3>
     <p>If you previously opted into email recovery, request a new access link. Email is optional for analysis.</p>
     {secret ? <button disabled={busy} onClick={async () => {
       setBusy(true); setError("");

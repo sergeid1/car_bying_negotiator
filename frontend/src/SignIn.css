@@ -1,0 +1,19 @@
+/* Ticket 110: the one-box sign-in panel and its private case link disclosure. */
+.sign-in-lede { color: var(--ink-muted); }
+.sign-in, .sign-in-step, .sign-in form { display: grid; gap: 14px; min-width: 0; }
+.sign-in > *, .sign-in-step > * { margin: 0; }
+.sign-in form > button { justify-self: start; }
+.sign-in-email { font-weight: 600; color: var(--ink-strong); overflow-wrap: anywhere; }
+.sign-in [role="status"]:focus { outline: none; }
+.sign-in [role="status"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.sign-in-links { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.sign-in .btn-link, .case-link-access .btn-link {
+  min-height: 44px; padding: 0 2px; background: transparent; border: 0; border-radius: var(--radius-sm);
+  color: var(--focus); font-weight: 600; text-decoration: underline; text-underline-offset: 3px;
+  white-space: normal; text-align: left;
+}
+.sign-in .btn-link:hover { background: transparent; color: var(--ink-strong); }
+.case-link-access { min-width: 0; overflow-wrap: anywhere; }
+.case-link-access > summary { min-height: 44px; display: flex; align-items: center; }
+.case-link-access .panel { padding: 0; border: 0; background: transparent; }
+.case-link-access .panel > h3 { font-size: 1rem; }

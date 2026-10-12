@@ -71,21 +71,37 @@ async function expectNoOverflowOrViolations(page: Page) {
   expect(overflow.documentWidth).toBeLessThanOrEqual(overflow.viewportWidth);
   const results = await new AxeBuilder({ page })
     .include("[aria-label='Buyer Account']")
+    .include(".case-link-access")
     .include(".masthead")
     .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
     .analyze();
   expect(results.violations).toEqual([]);
 }
 
-test("the signed-out account panel requests a link at 360 px without storing anything", async ({ page }) => {
-  await stubAccountApi(page);
-  await page.goto("/");
-  await openAccountPanel(page);
-  const panel = page.getByRole("region", { name: "Buyer Account" });
-  await expect(panel.getByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
-  await expectNoOverflowOrViolations(page);
-  expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
-});
+for (const colorScheme of ["light", "dark"] as const) {
+  test(`the signed-out panel shows one email box and a collapsed case-link disclosure at 360 px in the ${colorScheme} theme`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme });
+    await stubAccountApi(page);
+    await page.goto("/");
+    const header = page.getByRole("banner");
+    await expect(header.getByRole("button", { name: "This case" })).toHaveCount(0);
+    await expect(header.getByRole("button", { name: "Your case" })).toHaveCount(0);
+    await openAccountPanel(page);
+    const dialog = page.getByRole("dialog", { name: "Sign in" });
+    const panel = page.getByRole("region", { name: "Buyer Account" });
+    await expect(panel.getByText("Optional. Keeps your cases in one place.")).toBeVisible();
+    await expect(panel.getByRole("button", { name: "Continue" })).toBeVisible();
+    await expect(dialog.getByRole("textbox")).toHaveCount(1);
+    await expect(dialog.getByRole("button", { name: /^(?!Close)/ })).toHaveCount(1);
+    await expect(dialog.getByRole("region", { name: "Open an existing Buying Case" })).toBeHidden();
+    await expectNoOverflowOrViolations(page);
+    await dialog.getByText("Have a private case link?").click();
+    await expect(dialog.getByRole("region", { name: "Open an existing Buying Case" })).toBeVisible();
+    await expect(dialog.getByRole("region", { name: "Recover Buying Case access" })).toContainText("Lost the link?");
+    await expectNoOverflowOrViolations(page);
+    expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
+  });
+}
 
 for (const width of [360, 1280]) {
   test(`requesting an emailed link and signing out from either place at ${width} px`, async ({ page }) => {
@@ -104,9 +120,11 @@ for (const width of [360, 1280]) {
       const panel = page.getByRole("region", { name: "Buyer Account" });
       await header.getByRole("button", { name: "Sign in", exact: true }).click();
       await expect(page.getByRole("dialog", { name: "Sign in" })).toBeFocused();
-      await panel.getByLabel("Email for sign-in").fill(ACCOUNT.contact.email);
-      await panel.getByRole("button", { name: "Email me a sign-in link" }).click();
-      await expect(panel.getByRole("status")).toContainText("Check your email");
+      await panel.getByLabel("Email", { exact: true }).fill(ACCOUNT.contact.email);
+      await panel.getByRole("button", { name: "Continue" }).click();
+      await expect(panel.getByRole("status")).toHaveText("Check your email. The link works for 15 minutes.");
+      await expect(panel.getByRole("button", { name: "Send again" })).toBeVisible();
+      await expectNoOverflowOrViolations(page);
       expect(mailbox).toHaveLength(1);
       // The emailed link opens the account panel; it closes once the Buyer is signed in.
       await page.goto(mailbox.pop()!);
@@ -118,7 +136,7 @@ for (const width of [360, 1280]) {
       await (signOutLocation === "banner" ? header : panel).getByRole("button", { name: "Sign out", exact: true }).click();
       if (signOutLocation === "banner") await openAccountPanel(page);
       await expect(page.getByRole("dialog", { name: "Sign in" })).toBeVisible();
-      await expect(panel.getByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
+      await expect(panel.getByRole("button", { name: "Continue" })).toBeVisible();
       await expectNoOverflowOrViolations(page);
     }
   });

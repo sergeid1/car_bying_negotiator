@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import "./styles.css";
-import { RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess, SaveCaseLink } from "./CasePortability";
+import "./Masthead.css";
+import { CaseLinkAccess, RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess, SaveCaseLink } from "./CasePortability";
 import { CaseLifecycle } from "./CaseLifecycle";
 import { AccountControls, AccountHeader, AccountSignedInContext, BuyerAccount, isAccountPass } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
@@ -140,9 +141,11 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   // A sign-in or recovery link, or a return from a mailbox provider's consent page, opens the panel that finishes it.
   const [sidePanel, setSidePanel] = useState<SidePanelView | undefined>(() => {
     const query = new URLSearchParams(window.location.search);
-    if (window.location.hash.startsWith("#sign-in=") || (query.has("state") && (query.has("code") || query.has("error")))) return "account";
-    return window.location.hash.startsWith("#recover=") ? "case" : undefined;
+    return window.location.hash.startsWith("#sign-in=") || window.location.hash.startsWith("#recover=")
+      || (query.has("state") && (query.has("code") || query.has("error"))) ? "account" : undefined;
   });
+  // Opens the sign-in panel's private case link disclosure, such as after a case link fails to open.
+  const [caseLinkExpand, setCaseLinkExpand] = useState(0);
   useSidePanelRequests(setSidePanel);
   const closeSidePanel = () => setSidePanel(undefined);
   const [guide] = useState(requestedGuide);
@@ -214,10 +217,10 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             <img className="wordmark-light" src={logo} alt="" width="114" height="40" />
             <img className="wordmark-dark" src={logoDark} alt="" width="114" height="40" />
           </a>
-          <nav aria-label="Page sections">
-            <button type="button" className="btn-ghost" aria-haspopup="dialog" onClick={() => setSidePanel("case")}>Your case</button>
-            <a href="#scope">Scope</a>
-          </nav>
+          {/* The case's own options; ticket 112 moves them onto the case page. */}
+          {caseCredentials && <nav aria-label="Case options">
+            <button type="button" className="btn-ghost" aria-haspopup="dialog" onClick={() => setSidePanel("case")}>This case</button>
+          </nav>}
           {!standalone && <DealerCameraEntry onPhotos={files => setAtDealer({ files, started: Date.now() })} />}
           <ThemeMenu />
           {!standalone && <AccountHeader controls={accountControls} onOpen={() => setSidePanel("account")} />}
@@ -386,10 +389,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       </footer>
       </div>
 
-      <SidePanel id="case-panel" title="Your Buying Case" open={sidePanel === "case"} onClose={closeSidePanel}>
-        <SavedCaseAccess onOpened={value => { closeSidePanel(); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }}
-          onUnavailable={caseId => { setSidePanel("case"); setCaseCredentials(undefined); setRecoveryCaseId(caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
-        <RecoveryAccess caseId={recoveryCaseId ?? caseCredentials?.caseId} onRecovered={value => { closeSidePanel(); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
+      <SidePanel id="case-panel" title="This case" open={sidePanel === "case" && Boolean(caseCredentials)} onClose={closeSidePanel}>
         {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
         {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
         {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
@@ -398,13 +398,18 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       {!standalone && <SidePanel id="account-panel" title={accountSignedIn ? "Your account" : "Sign in"}
         open={sidePanel === "account"} onClose={closeSidePanel}>
         <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined}
-          onSignedIn={setAccountSignedIn} onControls={setAccountControls} recheck={accountRecheck}
+          onSignedIn={setAccountSignedIn} onControls={setAccountControls} recheck={accountRecheck} showing={sidePanel === "account"}
           onSignInComplete={closeSidePanel}
           onCaseOpened={value => {
             closeSidePanel();
             setReferral(undefined); setDeskFresh(undefined); setCaseRevoked(false); setCaseCredentials(value);
             setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined);
           }} />
+        <CaseLinkAccess expand={caseLinkExpand}>
+          <SavedCaseAccess onOpened={value => { closeSidePanel(); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }}
+            onUnavailable={caseId => { setSidePanel("account"); setCaseLinkExpand(value => value + 1); setCaseCredentials(undefined); setRecoveryCaseId(caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
+          <RecoveryAccess caseId={recoveryCaseId ?? caseCredentials?.caseId} onRecovered={value => { closeSidePanel(); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
+        </CaseLinkAccess>
       </SidePanel>}
     </>
   );
