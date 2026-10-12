@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import "./styles.css";
 import "./Masthead.css";
 import { CaseLinkAccess, RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess } from "./CasePortability";
@@ -141,11 +141,19 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   const [caseLinkExpand, setCaseLinkExpand] = useState(0);
   useSidePanelRequests(setSidePanel);
   const closeSidePanel = () => setSidePanel(undefined);
-  const [guide] = useState(requestedGuide);
-  const [guideIndex] = useState(() => !requestedGuide() && requestedGuideIndex());
-  const [partnerKit] = useState(requestedPartnerKit);
-  const [howItWorks] = useState(requestedHowItWorks);
-  const [exampleReport] = useState(() => !requestedGuide() && requestedExampleReport());
+  // The header's tabs change the address without reloading, so the page is read again on every history move.
+  const [address, setAddress] = useState(0);
+  useEffect(() => {
+    const moved = () => setAddress(value => value + 1);
+    window.addEventListener("popstate", moved);
+    return () => window.removeEventListener("popstate", moved);
+  }, []);
+  const { guide, guideIndex, partnerKit, howItWorks, exampleReport } = useMemo(() => {
+    const guide = requestedGuide();
+    return { guide, guideIndex: !guide && requestedGuideIndex(), partnerKit: requestedPartnerKit(),
+      howItWorks: requestedHowItWorks(), exampleReport: !guide && requestedExampleReport() };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address]);
   // A guide, the partner kit or the walkthrough replaces the start screen at its own shareable address.
   const standalone = Boolean(guide || guideIndex || partnerKit || howItWorks || exampleReport);
   // A case opened from the Buyer Account closes when the sign-in ends; its private case link is unaffected.
