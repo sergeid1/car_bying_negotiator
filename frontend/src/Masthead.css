@@ -1,0 +1,6 @@
+/* Ticket 110: the header's case options appear only while a case is open, so on wider screens the logo, not
+   that menu, pushes the header's controls to the right. Narrow screens already align them from styles.css. */
+@media (min-width: 641px) {
+  .masthead-inner > .wordmark { margin-right: auto; }
+  .masthead-inner > nav { margin-left: 0; }
+}

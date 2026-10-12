@@ -35,7 +35,9 @@ test("freezing the Dealer Offer runs analysis on that version and opens the repo
   window.history.replaceState(null, "", "/#case=case-1&access=secret");
 
   render(<App pollDelayMs={0} />);
-  expect(await screen.findByText(/verify and freeze your dealer offer to continue/i)).toBeVisible();
+  // A new case opens on Get quotes; the Buyer opens Compare & negotiate by hand.
+  fireEvent.click(await screen.findByRole("button", { name: /open this step: compare & negotiate/i }));
+  expect(await screen.findByText(/your report appears here once you check the dealer's offer/i)).toBeVisible();
   expect(fetcher.mock.calls.some(([path]) => path.endsWith("/analyses"))).toBe(false);
 
   frozen = true;

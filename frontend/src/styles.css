@@ -1108,7 +1108,6 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
   .section-heading { flex-direction: column; }
   .money-list > div { gap: 14px; }
   .masthead nav { margin-left: 0; }
-  .masthead nav a { display: none; }
   .report-meta { flex-direction: column; gap: 2px; }
 }
 

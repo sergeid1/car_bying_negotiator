@@ -23,11 +23,21 @@ function credentialJSON(value: Credential | null) {
   return JSON.stringify({ id: key.id, rawId: encoded(key.rawId), type: key.type, response: data,
     clientExtensionResults: key.getClientExtensionResults(), authenticatorAttachment: key.authenticatorAttachment });
 }
-export async function signInWithPasskey(request: Request) {
-  const options: Options = await (await request(`${ROOT}/sign-in/options`, { method: "POST" })).json();
+/** Whether the browser can offer saved passkeys in the email box's autofill, without a separate button. */
+export async function passkeyAutofillAvailable() {
+  try {
+    return passkeysSupported() && typeof PublicKeyCredential.isConditionalMediationAvailable === "function"
+      && await PublicKeyCredential.isConditionalMediationAvailable();
+  } catch { return false; }
+}
+/** With `autofill`, the browser waits for the Buyer to pick a passkey from the email box; `signal` cancels the wait. */
+export async function signInWithPasskey(request: Request, { autofill = false, signal, onChosen }: { autofill?: boolean; signal?: AbortSignal; onChosen?: () => void } = {}) {
+  const options: Options = await (await request(`${ROOT}/sign-in/options`, { method: "POST", signal })).json();
   const publicKey = { ...options.publicKey, challenge: bytes(options.publicKey.challenge),
     allowCredentials: options.publicKey.allowCredentials?.map((key: any) => ({ ...key, id: bytes(key.id) })) };
-  const credential = credentialJSON(await navigator.credentials.get({ publicKey: publicKey as PublicKeyCredentialRequestOptions }));
+  const credential = credentialJSON(await navigator.credentials.get({ publicKey: publicKey as PublicKeyCredentialRequestOptions,
+    signal, ...(autofill ? { mediation: "conditional" as CredentialMediationRequirement } : {}) }));
+  onChosen?.();
   await request(`${ROOT}/sign-in`, { method: "POST", body: JSON.stringify({ attemptId: options.attemptId, credential }) });
 }
 export function Passkeys({ request, onSessionEnded }: { request: Request; onSessionEnded: () => void }) {

@@ -38,8 +38,8 @@ export function PricePlan({ caseId, token }: { caseId: string; token: string }) 
   }
   const money = (minor: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: plan?.payload.plan.currency ?? "USD" }).format(minor / 100);
   return <section className="panel" aria-labelledby="plan-heading">
-    <h2 id="plan-heading">Review price boundaries</h2>
-    <p>Requires a verified offer, calculated cash economics, and an available market assessment.</p>
+    <h2 id="plan-heading">Set your price limits</h2>
+    <p>Suggested limits come from the dealer offer you checked against the paperwork and the market range for this car. Check the offer first if you have not yet.</p>
     <form onSubmit={propose}>
       <label>Maximum selling price ($)<input name="selling" type="number" min="0.01" step="0.01" /></label>
       <label>Maximum out-the-door price ($)<input name="otd" type="number" min="0.01" step="0.01" /></label>

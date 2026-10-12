@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
@@ -34,16 +34,50 @@ test("sign in opens a panel over the page that Escape closes, returning focus to
   expect(signIn).toHaveFocus();
 });
 
-test("case access lives in its own panel, closed with its close button", async () => {
+test("with no case open the header has no case button, and case links live in the sign-in panel's disclosure", async () => {
   render(<App />);
   const user = userEvent.setup();
-  expect(screen.queryByRole("region", { name: "Open an existing Buying Case" })).toBeNull();
-  await user.click(screen.getByRole("button", { name: "Your case" }));
-  const panel = screen.getByRole("dialog", { name: "Your Buying Case" });
+  const header = within(screen.getByRole("banner"));
+  expect(header.queryByRole("button", { name: "This case" })).toBeNull();
+  expect(header.queryByRole("button", { name: "Your case" })).toBeNull();
+  expect(header.queryByRole("link", { name: "Scope" })).toBeNull();
+  await user.click(header.getByRole("button", { name: "Sign in" }));
+  const panel = screen.getByRole("dialog", { name: "Sign in" });
+  const disclosure = within(panel).getByText("Have a private case link?").closest("details")!;
+  expect(disclosure).not.toHaveAttribute("open");
+  await user.click(within(panel).getByText("Have a private case link?"));
+  expect(disclosure).toHaveAttribute("open");
   expect(within(panel).getByRole("region", { name: "Open an existing Buying Case" })).toBeVisible();
-  expect(within(panel).getByRole("region", { name: "Recover Buying Case access" })).toBeVisible();
-  await user.click(within(panel).getByRole("button", { name: "Close Your Buying Case" }));
+  expect(within(panel).getByRole("region", { name: "Recover Buying Case access" })).toHaveTextContent("Lost the link?");
+});
+
+test("an open case shows a This case button on the case page whose panel holds the case's options", async () => {
+  window.history.replaceState(null, "", "/#case=case-1&access=token");
+  vi.mocked(fetch).mockImplementation(async input => String(input) === "/api/v1/cases/case-1"
+    ? new Response(JSON.stringify({ id: "case-1" })) : new Response(JSON.stringify({}), { status: 401 }));
+  render(<App />);
+  const user = userEvent.setup();
+  await user.click(await within(screen.getByRole("main")).findByRole("button", { name: "This case" }));
+  const panel = screen.getByRole("dialog", { name: "This case" });
+  expect(within(panel).getByRole("region", { name: "Optional email recovery" })).toBeVisible();
+  await user.click(within(panel).getByRole("button", { name: "Close This case" }));
   expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("a case link that cannot be opened shows the sign-in panel with the disclosure open", async () => {
+  window.history.replaceState(null, "", "/#case=gone&access=token");
+  render(<App />);
+  const panel = await screen.findByRole("dialog", { name: "Sign in" }, { timeout: 3000 });
+  await waitFor(() => expect(within(panel).getByText("Have a private case link?").closest("details")).toHaveAttribute("open"));
+  expect(await within(panel).findByRole("alert")).toHaveTextContent("This link cannot be opened");
+});
+
+test("an emailed recovery link opens the sign-in panel at its verify button", () => {
+  window.history.replaceState(null, "", "/#recover=secret");
+  render(<App />);
+  const panel = screen.getByRole("dialog", { name: "Sign in" });
+  expect(within(panel).getByText("Have a private case link?").closest("details")).toHaveAttribute("open");
+  expect(within(panel).getByRole("button", { name: "Verify recovery link" })).toBeVisible();
 });
 
 test("the intake's sign-in link opens the account panel", async () => {

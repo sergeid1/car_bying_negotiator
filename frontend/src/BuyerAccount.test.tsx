@@ -19,7 +19,7 @@ beforeEach(() => {
   Object.defineProperty(window, "localStorage", { value: storage, configurable: true });
   window.history.replaceState(null, "", "/");
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); Reflect.deleteProperty(navigator, "credentials"); });
 
 type Listed = { caseId: string; attachedAt: string; state: string; startedAt?: string; vehicle?: string | null; dealer?: string | null };
 const account = (cases: Listed[] = []) => ({
@@ -28,22 +28,111 @@ const account = (cases: Listed[] = []) => ({
 });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
-test("requests a sign-in link without storing anything in the browser", async () => {
+test("requests a sign-in link from one email box without storing anything in the browser", async () => {
   const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => String(input) === "/api/v1/account"
     ? json({}, 401) : json({ status: "Check your email for a single-use sign-in link. It expires in 15 minutes." }, 202));
   vi.stubGlobal("fetch", fetcher);
-  render(<BuyerAccount />);
+  const { container } = render(<BuyerAccount />);
   const user = userEvent.setup();
-  expect(screen.getByText(/Analysis works without an account/)).toBeVisible();
-  expect(await screen.findByRole("form", { name: "Password sign-in" })).toBeVisible();
-  await user.type(await screen.findByLabelText("Email for sign-in"), "buyer@example.com");
-  await user.click(screen.getByRole("button", { name: "Email me a sign-in link" }));
-  expect(await screen.findByRole("status")).toHaveTextContent("single-use sign-in link");
+  expect(screen.getByText("Optional. Keeps your cases in one place.")).toBeVisible();
+  const email = await screen.findByLabelText("Email");
+  expect(screen.getAllByRole("textbox")).toEqual([email]);
+  expect(screen.getAllByRole("button")).toEqual([screen.getByRole("button", { name: "Continue" })]);
+  expect(container.querySelector("input[type=password]")).toBeNull();
+  expect(container.querySelectorAll("p")).toHaveLength(1);
+  await user.type(email, "buyer@example.com");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("Check your email. The link works for 15 minutes.");
+  expect(screen.getByRole("status")).toHaveFocus();
   const [path, init] = fetcher.mock.calls.find(([path]) => String(path).endsWith("/sign-in-requests"))!;
   expect(path).toBe("/api/v1/account/sign-in-requests");
   expect(JSON.parse(String(init?.body))).toEqual({ email: "buyer@example.com" });
   expect((init?.headers as Record<string, string>)["Idempotency-Key"]).toBeTruthy();
+
+  await user.click(screen.getByRole("button", { name: "Send again" }));
+  await waitFor(() => expect(fetcher.mock.calls.filter(([path]) => String(path).endsWith("/sign-in-requests"))).toHaveLength(2));
+  const keys = fetcher.mock.calls.filter(([path]) => String(path).endsWith("/sign-in-requests"))
+    .map(([, init]) => (init?.headers as Record<string, string>)["Idempotency-Key"]);
+  expect(new Set(keys).size).toBe(2);
+  await user.click(screen.getByRole("button", { name: "Use a different email" }));
+  expect(screen.getByLabelText("Email")).toHaveValue("buyer@example.com");
   expect(storage.size).toBe(0);
+});
+
+test("an unknown email gets the same answer as a known one", async () => {
+  const views: string[] = [];
+  for (const known of [true, false]) {
+    // The panel shows its own fixed answer, so even a server wording difference could not reach the Buyer.
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => String(input) === "/api/v1/account"
+      ? json({}, 401) : json({ status: known ? "known wording" : "other wording" }, 202)));
+    const { container } = render(<BuyerAccount />);
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Email"), "buyer@example.com");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByRole("status");
+    views.push(container.innerHTML);
+    cleanup();
+  }
+  expect(views[0]).toBe(views[1]);
+});
+
+test("forgot password sends the sign-in link directly", async () => {
+  const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => String(input) === "/api/v1/account"
+    ? json({}, 401) : json({ status: "sent" }, 202));
+  vi.stubGlobal("fetch", fetcher);
+  render(<BuyerAccount />);
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText("Email"), "buyer@example.com");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(await screen.findByRole("button", { name: "Sign in with a password" }));
+  expect(screen.getByLabelText("Password")).toHaveFocus();
+  await user.click(screen.getByRole("button", { name: "Forgot password?" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("After you sign in, you can set a new password.");
+  expect(fetcher.mock.calls.filter(([path]) => String(path).endsWith("/sign-in-requests"))).toHaveLength(2);
+  expect(screen.queryByLabelText("Password")).toBeNull();
+});
+
+test("signs in with a password from the same email box", async () => {
+  let signedIn = false;
+  const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+    const path = String(input);
+    if (path === "/api/v1/account/password/sign-in") { signedIn = true; return json({ expiresAt: "2026-10-17T00:00:00Z" }); }
+    if (path.endsWith("/sign-in-requests")) return json({ status: "sent" }, 202);
+    if (path === "/api/v1/account") return signedIn ? json(account()) : json({}, 401);
+    return json(path.endsWith("/password") ? { configured: true } : []);
+  });
+  vi.stubGlobal("fetch", fetcher);
+  const complete = vi.fn();
+  render(<BuyerAccount onSignInComplete={complete} />);
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText("Email"), "buyer@example.com");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(await screen.findByRole("button", { name: "Sign in with a password" }));
+  await user.type(screen.getByLabelText("Password"), "a long private phrase");
+  await user.click(screen.getByRole("button", { name: "Sign in" }));
+  expect(await screen.findByText("Signed in with a password.")).toBeVisible();
+  const [, init] = fetcher.mock.calls.find(([path]) => path === "/api/v1/account/password/sign-in")!;
+  expect(JSON.parse(String(init?.body))).toEqual({ email: "buyer@example.com", password: "a long private phrase" });
+  expect(complete).toHaveBeenCalled();
+});
+
+test("a failed password sign-in stays on the form, clears the password and offers the emailed link", async () => {
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    const path = String(input);
+    if (path === "/api/v1/account/password/sign-in") return json({ detail: "Sign-in could not be completed. Check your details or use an email link." }, 401);
+    return path === "/api/v1/account" ? json({}, 401) : json({ status: "sent" }, 202);
+  }));
+  render(<BuyerAccount />);
+  const user = userEvent.setup();
+  await user.type(await screen.findByLabelText("Email"), "buyer@example.com");
+  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(await screen.findByRole("button", { name: "Sign in with a password" }));
+  await user.type(screen.getByLabelText("Password"), "a long private phrase");
+  await user.click(screen.getByRole("button", { name: "Sign in" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("use an email link");
+  expect(screen.getByLabelText("Password")).toHaveValue("");
+  await user.click(screen.getByRole("button", { name: "Email me a link instead" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("Check your email.");
 });
 
 test("finishes sign-in from the emailed link, clears it from the address, and survives a reload", async () => {
@@ -81,7 +170,7 @@ test.each([
   await userEvent.setup().click(screen.getByRole("button", { name: "Finish signing in" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(text);
   expect(screen.queryByRole("button", { name: "Finish signing in" })).toBeNull();
-  expect(screen.getByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Continue" })).toBeVisible();
   expect(storage.size).toBe(0);
 });
 
@@ -108,7 +197,7 @@ test("attaches the open case with its case link and signs out server-side", asyn
   expect((attach[1]?.headers as Record<string, string>)["Case-Access-Token"]).toBe("case-token");
   expect(screen.queryByRole("button", { name: "Attach this Buying Case" })).toBeNull();
   await user.click(screen.getByRole("button", { name: "Sign out" }));
-  expect(await screen.findByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
+  expect(await screen.findByRole("button", { name: "Continue" })).toBeVisible();
   expect(fetcher.mock.calls.some(([path, init]) => path === "/api/v1/account/sign-out" && init?.method === "POST")).toBe(true);
   expect(storage.size).toBe(0);
 });
@@ -194,7 +283,7 @@ test("saves optional contact details and deletes the account only after confirma
 });
 
 test("contact details never reach the console or analytics-style calls", () => {
-  const source = readFileSync("src/BuyerAccount.tsx", "utf8");
+  const source = readFileSync("src/BuyerAccount.tsx", "utf8") + readFileSync("src/SignIn.tsx", "utf8");
   for (const api of ["console.", "sendBeacon", "document.cookie", "localStorage.getItem", "localStorage.setItem", "sessionStorage", "indexedDB"]) expect(source).not.toContain(api);
 });
 
@@ -203,7 +292,7 @@ test("removes a legacy browser credential without using it to sign in", async ()
   const fetcher = vi.fn(async () => json({}, 401));
   vi.stubGlobal("fetch", fetcher);
   render(<BuyerAccount />);
-  expect(await screen.findByRole("button", { name: "Email me a sign-in link" })).toBeVisible();
+  expect(await screen.findByRole("button", { name: "Continue" })).toBeVisible();
   expect(storage.size).toBe(0);
   expect(fetcher).toHaveBeenCalledWith("/api/v1/account", { headers: {} });
 });
@@ -252,4 +341,57 @@ test("failed email preference saves retain the saved value and can be retried", 
   fail = false;
   await user.click(screen.getByLabelText("Dealer replies"));
   await waitFor(() => expect(screen.getByLabelText("Dealer replies")).not.toBeChecked());
+});
+
+function stubPasskeyBrowser() {
+  const bytes = new Uint8Array([1, 2, 3]).buffer;
+  vi.stubGlobal("AuthenticatorAttestationResponse", class {});
+  vi.stubGlobal("PublicKeyCredential", { isConditionalMediationAvailable: async () => true });
+  const get = vi.fn(async (_options: CredentialRequestOptions) => ({
+    id: "credential", rawId: bytes, type: "public-key", authenticatorAttachment: "platform",
+    response: { clientDataJSON: bytes, authenticatorData: bytes, signature: bytes, userHandle: bytes },
+    getClientExtensionResults: () => ({}),
+  }));
+  Object.defineProperty(navigator, "credentials", { value: { get }, configurable: true });
+  return get;
+}
+
+test("the email box offers a saved passkey through autofill while the panel shows, with no button", async () => {
+  const get = stubPasskeyBrowser();
+  let signedIn = false;
+  const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+    const path = String(input);
+    if (path.endsWith("/sign-in/options")) return json({ attemptId: "attempt", publicKey: { challenge: "AQID", rpId: "localhost" } });
+    if (path.endsWith("/passkeys/sign-in")) { signedIn = true; return json({ expiresAt: "2026-10-17T00:00:00Z" }); }
+    if (path === "/api/v1/account") return signedIn ? json(account()) : json({}, 401);
+    return json(path.endsWith("/password") ? { configured: false } : []);
+  });
+  vi.stubGlobal("fetch", fetcher);
+  const { rerender } = render(<BuyerAccount showing={false} />);
+  expect(await screen.findByLabelText("Email")).toHaveAttribute("autocomplete", "username webauthn");
+  expect(screen.queryByRole("button", { name: "Sign in with a passkey" })).toBeNull();
+  expect(fetcher.mock.calls.some(([path]) => String(path).endsWith("/sign-in/options"))).toBe(false);
+
+  rerender(<BuyerAccount showing />);
+  expect(await screen.findByText("Signed in with a passkey.")).toBeVisible();
+  expect(get.mock.calls[0][0]).toMatchObject({ mediation: "conditional" });
+  const [, init] = fetcher.mock.calls.find(([path]) => String(path).endsWith("/passkeys/sign-in"))!;
+  expect(JSON.parse(String(init?.body)).attemptId).toBe("attempt");
+});
+
+test("a passkey autofill request that fails before the Buyer picks a passkey shows no error", async () => {
+  const get = stubPasskeyBrowser();
+  const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+    const path = String(input);
+    if (path.endsWith("/sign-in/options")) return json({}, 503);
+    if (path === "/api/v1/account") return json({}, 401);
+    return json(path.endsWith("/password") ? { configured: false } : []);
+  });
+  vi.stubGlobal("fetch", fetcher);
+  render(<BuyerAccount showing />);
+  await screen.findByLabelText("Email");
+  await waitFor(() => expect(fetcher.mock.calls.some(([path]) => String(path).endsWith("/sign-in/options"))).toBe(true));
+  await new Promise(resolve => setTimeout(resolve, 50));
+  expect(get).not.toHaveBeenCalled();
+  expect(screen.queryByText(/Passkey sign-in could not be completed/)).toBeNull();
 });

@@ -19,7 +19,7 @@ const questions = (trade: "NONE" | "WHETHER" | "DETAILS" = "WHETHER", loan = fal
 const routing = (route: DeskRouting["route"], extra: Partial<DeskRouting> = {}): DeskRouting => ({
   status: "READ", documentId: "d1", documentType: "FOUR_SQUARE_WORKSHEET", vin: route === "FRESH_CASE" ? OTHER_VIN : AGREED_VIN, route,
   agreedVin: route === "AGREED_CAR" || route === "FRESH_CASE" ? AGREED_VIN : null, caseVin: null,
-  freshCase: route === "FRESH_CASE" ? { vin: OTHER_VIN, dealerPostalCode: "27604", purchaseMethod: "FINANCE" } : null,
+  freshCase: route === "FRESH_CASE" ? { vin: OTHER_VIN, dealerLocation: "Raleigh, NC", purchaseMethod: "FINANCE" } : null,
   questions: questions(), ...extra });
 const addOn: FirstResult = { route: "THIS_CASE", source: "READ_FROM_PAPERWORK",
   outTheDoor: { amountMinor: 2829500, agreedMinor: null, differenceMinor: null },
@@ -40,7 +40,7 @@ function stub({ routings = {}, result = addOn }: { routings?: Record<string, Des
     const caseId = url.match(/\/cases\/([^/?]+)/)?.[1] ?? "";
     if (url.endsWith("/document-limits")) return new Response(JSON.stringify({ acceptedMediaTypes: ["application/pdf", "image/jpeg"],
       maxFileBytes: 20971520, maxPages: 25, maxPixels: 40000000, minWidth: 2, minHeight: 2 }));
-    if (url.endsWith("/intake-options")) return new Response(JSON.stringify({ supported: ["US-NC"], consentPolicies: { serviceProcessing: "service.v1" } }));
+    if (url.includes("/intake-options")) return new Response(JSON.stringify({ buyerState: "US-NC", supported: ["US-NC"], consentPolicies: { serviceProcessing: "service.v1" } }));
     if (url === "/api/v1/cases" && method === "POST") {
       const id = "new";
       return new Response(JSON.stringify({ case: { id }, accessToken: `${id}-token` }), { status: 201 });
@@ -84,7 +84,7 @@ test("a Buyer with no case answers two ZIP codes, confirms the car, and gets the
   const opened = vi.fn();
   render(<AtTheDealer files={[photo()]} pollDelayMs={1} onCaseOpened={opened} onFreshCase={vi.fn()} onDeskCheck={vi.fn()} onClose={vi.fn()} />);
   await userEvent.type(screen.getByLabelText("Your ZIP code"), "27601");
-  await userEvent.type(screen.getByLabelText("Dealer ZIP code"), "27604");
+  await userEvent.type(screen.getByLabelText("Dealer city"), "27604");
   await userEvent.click(screen.getByRole("button", { name: "Read my paperwork" }));
   expect(opened).toHaveBeenCalledWith({ caseId: "new", token: "new-token" });
   expect(await screen.findByText(AGREED_VIN)).toBeInTheDocument();
@@ -128,12 +128,15 @@ test("another car's VIN starts a separate case with one question, carries the tr
     onCaseOpened={vi.fn()} onFreshCase={fresh} onDeskCheck={vi.fn()} onClose={vi.fn()} />);
   expect(await screen.findByRole("alert")).toHaveTextContent(`It shows VIN ${OTHER_VIN}, not your agreed car (VIN ${AGREED_VIN})`);
   await userEvent.click(screen.getByRole("button", { name: "Start a separate case for this car" }));
-  expect(screen.getByLabelText("Dealer ZIP code")).toHaveValue("27604");
+  expect(screen.getByLabelText("Dealer city")).toHaveValue("Raleigh");
+  expect(screen.getByLabelText("Dealer state")).toHaveValue("NC");
   expect(screen.getByLabelText("How you are paying")).toHaveValue("FINANCE");
   await userEvent.type(screen.getByLabelText("Your ZIP code"), "27601");
   await userEvent.click(screen.getByRole("button", { name: "Start the separate case" }));
   await waitFor(() => expect(fresh).toHaveBeenCalledWith(expect.objectContaining({ caseId: "new", vin: OTHER_VIN,
     agreed: { caseId: "case", token: "token" }, agreedVin: AGREED_VIN, files: [] })));
+  expect(JSON.parse(calls.find(call => call.url === "/api/v1/cases" && call.method === "POST")!.body!))
+    .toMatchObject({ dealerCity: "Raleigh", dealerState: "NC" });
   expect(JSON.parse(calls.find(call => call.url === "/api/v1/cases/new/vehicle-evidence")!.body!).vin).toBe(OTHER_VIN);
   const carry = calls.find(call => call.url.endsWith("/trade/carry-over"))!;
   expect(carry.headers["Source-Case-Access-Token"]).toBe("token");
@@ -203,7 +206,7 @@ test("saying yes to a trade-in links to the free value checks, with the VIN and 
   stub({ routings: { new: [routing("THIS_CASE")] } });
   render(<AtTheDealer files={[photo()]} pollDelayMs={1} onCaseOpened={vi.fn()} onFreshCase={vi.fn()} onDeskCheck={vi.fn()} onClose={vi.fn()} />);
   await userEvent.type(screen.getByLabelText("Your ZIP code"), "27601");
-  await userEvent.type(screen.getByLabelText("Dealer ZIP code"), "27604");
+  await userEvent.type(screen.getByLabelText("Dealer city"), "27604");
   await userEvent.click(screen.getByRole("button", { name: "Read my paperwork" }));
   await userEvent.click(await screen.findByRole("button", { name: "Yes, check this car" }));
   expect(screen.queryByRole("heading", { name: "Check what your car is worth" })).not.toBeInTheDocument();

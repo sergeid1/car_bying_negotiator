@@ -26,6 +26,28 @@ class AccountCaseOpeningAcceptanceTest {
 
   @BeforeEach void clear() { BuyerAccountAcceptanceTest.sent.clear(); }
 
+  @Test void accountListNamesTheDealerCityAndOptionalEnteredName() throws Exception {
+    try (var app = start("city-list")) {
+      var client = app.client();
+      String session = signIn(client, "city-buyer@example.com");
+      var body = new java.util.HashMap<String, Object>(CasePortabilityAcceptanceTest.buyingCase());
+      body.remove("dealerPostalCode"); body.put("dealerCity", "Raleigh"); body.put("dealerState", "NC");
+      for (boolean named : new boolean[] {false, true}) {
+        if (named) body.put("dealerName", "Buyer-entered dealer");
+        var created = client.post().uri("/api/v1/cases").contentType(MediaType.APPLICATION_JSON)
+            .header("Idempotency-Key", UUID.randomUUID().toString()).header("Account-Request", "1")
+            .header("Cookie", AccountSessionTestSupport.cookie(session)).body(body).retrieve().body(JsonNode.class);
+        String id = created.at("/case/id").asText();
+        var entry = account(client, session).path("cases");
+        assertThat(entry).anySatisfy(item -> {
+          if (item.path("caseId").asText().equals(id))
+            assertThat(item.path("dealer").asText()).isEqualTo(named ? "Buyer-entered dealer · Dealer city Raleigh, NC" : "Dealer city Raleigh, NC");
+          else throw new AssertionError("Other case");
+        });
+      }
+    }
+  }
+
   @Test void aCaseCreatedWhileSignedInIsSavedAndTheListNamesIt() throws Exception {
     try (var app = start("create")) {
       var client = app.client();

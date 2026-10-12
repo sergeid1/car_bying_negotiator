@@ -24,16 +24,24 @@ import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 import { ReferralPartnerKit } from "./ReferralPartnerKit";
 import { HowItWorks, HowItWorksCard } from "./HowItWorks";
+import { HomeHero } from "./HomeHero";
+
 import { AccountHeader, AccountSignedInContext, BuyerAccount } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 import { NegotiationConversation } from "./NegotiationConversation";
 import { JourneyCandidates, ShortlistEntry } from "./JourneyCandidates";
 import { QuoteComparison } from "./QuoteComparison";
 import { Passkeys } from "./Passkeys";
-import { Passwords, PasswordSignIn } from "./Passwords";
+import { Passwords } from "./Passwords";
+import { SignIn } from "./SignIn";
 import { DeskTactics } from "./DeskTactics";
 import { syntheticTactic, syntheticTradeTactics } from "./DeskTactics.fixture";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+test("the home hero has no automated AA violations", async () => {
+  const { container } = render(<main><HomeHero /></main>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
 
 test("worksheet tactics and pending questions have no automated AA violations", async () => {
   const { container } = render(<main><h1>Desk Check</h1><DeskTactics findings={[syntheticTactic]} /></main>);
@@ -44,7 +52,7 @@ test("worksheet tactics and pending questions have no automated AA violations", 
 test.each([false, true])("password management and sign-in have no automated AA violations (%s)", async configured => {
   const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ configured })));
   const { container } = render(<main><h1>Account</h1><Passwords request={request} onSessionEnded={() => {}} />
-    <PasswordSignIn request={request} onSignedIn={async () => {}} /></main>);
+    <SignIn request={request} onSignedIn={async () => {}} /></main>);
   await screen.findByRole("button", { name: configured ? "Change password" : "Set password" });
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
@@ -62,14 +70,30 @@ test.each([undefined, "a.long.buyer.address@example.com"])("header account contr
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 
-test.each([["Sign in", "Sign in"], ["Your case", "Your Buying Case"]])("the %s side panel has no automated AA violations", async (button, title) => {
+test("the Sign in side panel, with its private case link disclosure open, has no automated AA violations", async () => {
   vi.spyOn(globalThis, "fetch").mockImplementation(async input => String(input) === "/api/v1/account"
     ? new Response(JSON.stringify({ code: "SESSION_ENDED" }), { status: 401 })
     : new Response(JSON.stringify({}), { status: 404 }));
   const { container } = render(<App />);
-  await userEvent.click(within(screen.getByRole("banner")).getByRole("button", { name: button }));
-  await screen.findByRole("dialog", { name: title });
+  await userEvent.click(within(screen.getByRole("banner")).getByRole("button", { name: "Sign in" }));
+  const panel = await screen.findByRole("dialog", { name: "Sign in" });
+  await within(panel).findByRole("button", { name: "Continue" });
+  await userEvent.click(within(panel).getByText("Have a private case link?"));
   expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+test("the This case side panel has no automated AA violations", async () => {
+  window.history.replaceState(null, "", "/#case=case-1&access=token");
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => String(input) === "/api/v1/account"
+    ? new Response(JSON.stringify({ code: "SESSION_ENDED" }), { status: 401 })
+    : String(input) === "/api/v1/cases/case-1" ? new Response(JSON.stringify({ id: "case-1" }))
+      : new Response(JSON.stringify({}), { status: 404 }));
+  try {
+    const { container } = render(<App />);
+    await userEvent.click(await within(screen.getByRole("main")).findByRole("button", { name: "This case" }));
+    await screen.findByRole("dialog", { name: "This case" });
+    expect((await axe.run(container, AA)).violations).toEqual([]);
+  } finally { window.history.replaceState(null, "", "/"); }
 });
 
 // Ticket 63: acceptance, written confirmation and saved agreement states.
@@ -484,7 +508,7 @@ test("offer terms, the example report and the payment point have no automated AA
   });
   const { container } = render(<main><h1>otdog</h1><SampleReportEntry /><OfferTerms />
     <PurchasePoint caseId="case" token="token" onPurchased={() => {}} /></main>);
-  await userEvent.setup().click(screen.getByRole("button", { name: "Open the example report" }));
+  await userEvent.setup().click(screen.getByRole("link", { name: "See an example report" }));
   await screen.findByRole("note", { name: "About this example" });
   await screen.findByRole("region", { name: "What is free and what you pay for" });
   await userEvent.setup().click(await screen.findByText("Price terms, refunds, and scope"));
@@ -924,9 +948,31 @@ test("the Florida county chooser has no automated AA violations", async () => {
   const { container } = render(<main><h1>Synthetic Florida intake</h1><BuyingCaseIntake onCaseOpened={() => {}} /></main>);
   const user = userEvent.setup();
   await user.type(screen.getByLabelText(/your ZIP code/i), "32024");
-  await user.type(screen.getByLabelText(/dealer ZIP code/i), "32003");
+  await user.type(screen.getByLabelText(/dealer city/i), "32003");
+  await user.selectOptions(screen.getByLabelText(/dealer state/i), "FL");
   await user.type(screen.getByLabelText(/^VIN$/), "1HGCM82633A004352");
   await user.click(screen.getByRole("button", { name: "Start my case" }));
   await user.selectOptions(await screen.findByLabelText(/Florida county where/), "Suwannee");
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
+
+// Ticket 112: the guided case page, its progress bar and every step panel, at a new case and after the desk check.
+test.each(["NEW", "DESK_COMPARED"] as const)("every step of the guided case page at stage %s has no automated AA violations", async stage => {
+  const { CASE_STEPS } = await import("./CaseFlow");
+  const { caseFlowRecord } = await import("./CaseFlow.fixture");
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => {
+    const body = caseFlowRecord(stage, String(input));
+    return body === undefined ? new Response("{}", { status: 404 }) : new Response(JSON.stringify(body));
+  });
+  window.history.replaceState(null, "", "/#case=case-1&access=secret");
+  const { container } = render(<App pollDelayMs={0} />);
+  const progress = await screen.findByRole("navigation", { name: "Case progress" });
+  await within(progress).findByRole("button", { current: "step" });
+  for (const step of CASE_STEPS) {
+    await userEvent.click(within(progress).getByRole("button", { name: new RegExp(step.name) }));
+    expect(document.getElementById(`case-step-${step.id}-body`)).toBeVisible();
+    expect((await axe.run(container, AA)).violations).toEqual([]);
+  }
+  window.history.replaceState(null, "", "/");
+});
+// End ticket 112.

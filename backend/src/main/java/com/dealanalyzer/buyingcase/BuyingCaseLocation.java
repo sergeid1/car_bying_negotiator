@@ -27,7 +27,7 @@ class BuyingCaseLocation {
 
   Resolved resolve(CreateBuyingCaseRequest request) {
     String buyerPostalCode = requirePostalCode("buyerPostalCode", request.buyerPostalCode());
-    String dealerPostalCode = requirePostalCode("dealerPostalCode", request.dealerPostalCode());
+    String dealerLocation = dealerLocation(request);
     String jurisdiction = buyerJurisdiction(buyerPostalCode, request.buyerJurisdiction());
     if (!supported.supports(jurisdiction)) {
       throw new UnsupportedLocationException("buyerPostalCode",
@@ -37,7 +37,30 @@ class BuyingCaseLocation {
           supported.all());
     }
     if ("US-FL".equals(jurisdiction)) jurisdiction = floridaCounty(buyerPostalCode, request.buyerCounty());
-    return new Resolved(jurisdiction, dealerPostalCode);
+    return new Resolved(jurisdiction, dealerLocation);
+  }
+
+  String buyerState(String postalCode) {
+    if (postalCode == null || !postalCode.matches("[0-9]{5}")) return null;
+    var resolution = postalCodes.resolve(postalCode);
+    return resolution.status() == PostalResolution.Status.RESOLVED ? resolution.jurisdiction() : null;
+  }
+
+  private String dealerLocation(CreateBuyingCaseRequest request) {
+    // Older clients still send a ZIP. New clients send the city and state instead.
+    if (request.dealerCity() == null && request.dealerPostalCode() != null)
+      return requirePostalCode("dealerPostalCode", request.dealerPostalCode());
+    String city = request.dealerCity() == null ? "" : request.dealerCity().strip();
+    if (city.isEmpty() || city.length() > 100 || city.chars().anyMatch(Character::isISOControl))
+      throw new InvalidBuyingCaseIntakeException("dealerCity", "Enter the dealer's city.");
+    String state = request.dealerState() == null ? "" : request.dealerState().strip();
+    if (state.startsWith("US-")) state = state.substring(3);
+    if (!java.util.Set.of("AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI",
+        "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT",
+        "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD",
+        "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "AS", "GU", "MP", "PR", "VI").contains(state))
+      throw new InvalidBuyingCaseIntakeException("dealerState", "Select the dealer's state.");
+    return city.matches("[0-9]{5}") ? city : city + ", " + state;
   }
 
   private String floridaCounty(String postalCode, String stated) {

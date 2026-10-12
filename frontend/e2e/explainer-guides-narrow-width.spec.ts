@@ -73,10 +73,11 @@ for (const guide of GUIDES) {
     await expectNoHorizontalOverflow(page);
 
     await page.getByLabel(/your zip code/i).fill("27601");
-    await page.getByLabel(/dealer zip code/i).fill("27604");
+    await page.getByLabel(/dealer city/i).fill("27604");
+    await page.getByLabel("Dealer state").selectOption("NC");
     await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
     await page.getByRole("button", { name: /start my case/i }).click();
-    await expect(page.getByRole("heading", { name: /add the dealer's paperwork/i })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Case progress" })).toBeVisible();
     expect(creation.channel).toBe(guide.channel);
 
     // The channel code is the only tracking: no cookies, no storage, nothing from another site.

@@ -35,7 +35,7 @@ function stub(sample: () => Response) {
 test("the example report opens from the start of the flow without a case, labelled and with removals shown as removed", async () => {
   const fetcher = stub(() => json(SAMPLE));
   render(<App />);
-  fireEvent.click(await screen.findByRole("button", { name: "Open the example report" }));
+  fireEvent.click(await screen.findByRole("link", { name: "See an example report" }));
   const panel = screen.getByRole("region", { name: "See an example report" });
   expect(await within(panel).findByRole("heading", { name: "Deal Analysis Report" })).toBeVisible();
 
@@ -61,7 +61,7 @@ test("the example report opens from the start of the flow without a case, labell
 test("an unavailable example report says so without blocking the case start", async () => {
   stub(() => json({}, 503));
   render(<App />);
-  fireEvent.click(await screen.findByRole("button", { name: "Open the example report" }));
+  fireEvent.click(await screen.findByRole("link", { name: "See an example report" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("The example report is unavailable right now.");
   expect(screen.getByRole("heading", { name: "Start your Buying Case" })).toBeVisible();
 });

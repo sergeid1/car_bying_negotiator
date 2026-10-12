@@ -174,17 +174,13 @@ test.each([{ reducedMotion: true }, { saveData: true }])("no clip is downloaded 
   if (setting.reducedMotion) expect(container.querySelector("ol.walkthrough")).not.toHaveClass("walkthrough-pinned");
 });
 
-test("the start screen's card links to the walkthrough and stays dismissed", async () => {
+test("the start screen links to the walkthrough beside its main action", async () => {
   stubApi();
   const App = await freshApp("/");
-  const { unmount } = render(<App />);
-  const card = screen.getByRole("region", { name: "New here? See how it works" });
-  expect(within(card).getByRole("link", { name: "See how it works" })).toHaveAttribute("href", "?page=how-it-works");
-  expect(screen.getByRole("heading", { name: "Start your Buying Case" })).toBeTruthy();
-  await userEvent.setup().click(within(card).getByRole("button", { name: "Dismiss the how it works card" }));
-  expect(screen.queryByRole("region", { name: "New here? See how it works" })).toBeNull();
-  unmount();
   render(<App />);
+  expect(screen.getByRole("link", { name: /^How it works$/ })).toHaveAttribute("href", "?page=how-it-works");
+  expect(screen.getByRole("button", { name: "Check my deal" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Start your Buying Case" })).toBeTruthy();
   expect(screen.queryByRole("region", { name: "New here? See how it works" })).toBeNull();
 });
 

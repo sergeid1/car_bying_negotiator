@@ -163,6 +163,32 @@ class BuyingCaseIntakeAcceptanceTest {
     }
   }
 
+  @Test
+  void dealerCityAndStateAreStoredAndBlankTrimCanBeConfirmed() throws Exception {
+    try (var app = harness.start("city-intake")) {
+      var request = intake("27601", "27604", null);
+      request.remove("dealerPostalCode");
+      request.put("dealerCity", " Raleigh "); request.put("dealerState", "NC");
+      request.put("dealerName", "Buyer-entered dealer");
+      var created = create(app.client(), "city-case", request);
+      assertThat(created.at("/case/dealerLocation").asText()).isEqualTo("Raleigh, NC");
+      String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+      var jdbc = new org.springframework.jdbc.core.JdbcTemplate(app.context().getBean(javax.sql.DataSource.class));
+      assertThat(jdbc.queryForObject("select buyer_zip from analysis_cases where id = ?", String.class, id)).isEqualTo("27601");
+      assertThat(jdbc.queryForObject("select name from dealers where case_id = ?", String.class, id)).isEqualTo("Buyer-entered dealer");
+      assertThat(app.client().get().uri("/api/v1/intake-options?buyerPostalCode=27601").retrieve()
+          .body(JsonNode.class).path("buyerState").asText()).isEqualTo("US-NC");
+      var evidence = HttpAcceptanceHarness.post(app.client(), "/api/v1/cases/" + id + "/vehicle-evidence",
+          Map.of("confirmed", true, "manualFacts", Map.of("year", 2026, "make", "Honda", "model", "Accord", "trim", "", "mileage", 0)),
+          "blank-trim", token);
+      assertThat(evidence.path("reliableForAnalysis").asBoolean()).isTrue();
+      request.put("dealerCity", "27604");
+      assertThat(create(app.client(), "zip-in-city", request).at("/case/dealerLocation").asText()).isEqualTo("27604");
+      request.put("dealerState", "XX");
+      assertThat(capture(app.client(), "bad-state", request).status()).isEqualTo(400);
+    }
+  }
+
   private static Map<String, Object> intake(
       String buyerPostalCode, String dealerPostalCode, String statedJurisdiction) {
     Map<String, Object> request = new HashMap<>();

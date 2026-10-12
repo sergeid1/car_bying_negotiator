@@ -21,6 +21,11 @@ for (const width of [360, 1280]) {
     let signIns = 0;
     const violations: string[] = [];
     await page.exposeFunction("passkeyCspViolation", (directive: string) => violations.push(directive));
+    await page.addInitScript(() => {
+      const available = PublicKeyCredential.isConditionalMediationAvailable.bind(PublicKeyCredential);
+      PublicKeyCredential.isConditionalMediationAvailable = async () =>
+        !(window as unknown as { noPasskeyAutofill?: boolean }).noPasskeyAutofill && available();
+    });
     await page.addInitScript(() => document.addEventListener("securitypolicyviolation", event => {
       void (window as unknown as { passkeyCspViolation: (value: string) => void }).passkeyCspViolation(event.effectiveDirective);
     }));
@@ -67,6 +72,7 @@ for (const width of [360, 1280]) {
         keys = []; return route.fulfill({ json: keys });
       }
       if (path.endsWith("/notifications")) return route.fulfill({ json: [] });
+      if (path === "/api/v1/account/sign-in-requests") return route.fulfill({ status: 202, json: { status: "sent" } });
       if (path.endsWith("/intake-options")) return route.fulfill({ json: { supported: ["US-NC"], consentPolicies: {} } });
       return route.fulfill({ json: {} });
     });
@@ -81,12 +87,21 @@ for (const width of [360, 1280]) {
     await panel.getByRole("button", { name: "Add a passkey" }).click();
     await expect(panel.getByRole("list", { name: "Your passkeys" })).toContainText(nickname);
     expect((await cdp.send("WebAuthn.getCredentials", { authenticatorId })).credentials).toHaveLength(1);
+    // The email box offers the passkey through autofill; this authenticator picks it at once, so no button is pressed.
     await panel.getByRole("button", { name: "Sign out", exact: true }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(signIns).toBe(1);
+    // A browser without passkey autofill reaches the button after Continue.
+    await page.evaluate(() => { (window as unknown as { noPasskeyAutofill: boolean }).noPasskeyAutofill = true; });
+    await openAccount();
+    await panel.getByRole("button", { name: "Sign out", exact: true }).click();
+    await panel.getByLabel("Email", { exact: true }).fill(account.contact.email);
+    await panel.getByRole("button", { name: "Continue" }).click();
     await panel.getByRole("button", { name: "Sign in with a passkey" }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await openAccount();
     await expect(panel.getByRole("status")).toHaveText("Signed in with a passkey.");
-    expect(signIns).toBe(1);
+    expect(signIns).toBe(2);
     await expect(panel.getByRole("list", { name: "Your passkeys" })).toContainText("Last used");
     const cookie = (await page.context().cookies()).find(value => value.name === "account_session");
     expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: "Strict", path: "/api/v1" });

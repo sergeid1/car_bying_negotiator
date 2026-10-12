@@ -34,6 +34,10 @@ public class EphemeralCasePersistence {
     return cases.findById(caseId).map(this::stored);
   }
 
+  public String buyerPostalCode(String caseId) {
+    return cases.findById(caseId).map(value -> value.buyerZip).orElse(null);
+  }
+
   public boolean requiresEvidenceReview(String caseId) {
     return cases.findById(caseId).map(value -> value.coreReviewBlocked
         && !"READY_TO_ANALYZE".equals(value.status)).orElse(true);
@@ -83,7 +87,7 @@ public class EphemeralCasePersistence {
       String consentSchemaVersion,
       Instant now) {
     var limits = request.buyerLimits();
-    AnalysisCaseEntity saved = cases.saveAndFlush(AnalysisCaseEntity.ephemeral(
+    AnalysisCaseEntity entity = AnalysisCaseEntity.ephemeral(
         caseId,
         buyerJurisdiction,
         dealerLocation,
@@ -93,7 +97,17 @@ public class EphemeralCasePersistence {
         accessTokenHash,
         expiresAt,
         idempotencyKey,
-        now));
+        now);
+    entity.buyerZip = request.buyerPostalCode().strip();
+    AnalysisCaseEntity saved = cases.saveAndFlush(entity);
+    if (request.dealerName() != null && !request.dealerName().isBlank()) {
+      entities.createNativeQuery("""
+          insert into dealers(id, case_id, source, provider_dealer_id, name, city, state_code, created_at)
+          values (:id, :caseId, 'BUYER_INTAKE', 'buyer-entered', :name, :city, :state, :now)
+          """).setParameter("id", UUID.randomUUID().toString()).setParameter("caseId", caseId)
+          .setParameter("name", request.dealerName().strip()).setParameter("city", request.dealerCity())
+          .setParameter("state", request.dealerState()).setParameter("now", now).executeUpdate();
+    }
     if (acquisitionChannel != null) {
       // Written outside the entity so no case read path can reach the channel.
       entities.createNativeQuery("update analysis_cases set acquisition_channel = :channel where id = :id")

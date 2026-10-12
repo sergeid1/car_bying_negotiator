@@ -464,10 +464,10 @@ public class TradeDeskCheck {
   }
 
   CaseFacts facts(String caseId) {
-    return jdbc.query("select buyer_jurisdiction, dealer_location from analysis_cases where id = ?", (r, n) -> {
+    return jdbc.query("select buyer_jurisdiction, dealer_location, buyer_zip from analysis_cases where id = ?", (r, n) -> {
       String location = r.getString(2);
       String zip = location == null ? null : location.strip();
-      return new CaseFacts(r.getString(1), zip != null && zip.matches("[0-9]{5}") ? zip : null);
+      return new CaseFacts(r.getString(1), zip != null && zip.matches("[0-9]{5}") ? zip : r.getString(3));
     }, caseId).stream().findFirst().orElse(new CaseFacts(null, null));
   }
 

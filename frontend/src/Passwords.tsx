@@ -3,28 +3,6 @@ import { useEffect, useState } from "react";
 type Request = (path: string, init?: RequestInit) => Promise<Response>;
 const ROOT = "/api/v1/account/password";
 
-export function PasswordSignIn({ request, onSignedIn }: { request: Request; onSignedIn: () => Promise<void> }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  return <form aria-label="Password sign-in" onSubmit={event => {
-    event.preventDefault(); setBusy(true); setError("");
-    void request(`${ROOT}/sign-in`, { method: "POST", body: JSON.stringify({ email, password }) })
-      .then(async () => { setPassword(""); await onSignedIn(); })
-      .catch(problem => { setPassword(""); setError(problem?.detail ?? "Sign-in could not be completed. Try again or use an email link."); })
-      .finally(() => setBusy(false));
-  }}>
-    <label>Email for password sign-in<input type="email" autoComplete="username" required maxLength={254}
-      value={email} onChange={event => setEmail(event.target.value)} /></label>
-    <label>Password<input type="password" autoComplete="current-password" required maxLength={72}
-      value={password} onChange={event => setPassword(event.target.value)} /></label>
-    <button className="btn-secondary" disabled={busy}>Sign in with a password</button>
-    <p>Forgot password? Use “Email me a sign-in link” above. After signing in, set a new password.</p>
-    {error && <p role="alert">{error}</p>}
-  </form>;
-}
-
 export function Passwords({ request, onSessionEnded }: { request: Request; onSessionEnded: () => void }) {
   const [configured, setConfigured] = useState<boolean>();
   const [password, setPassword] = useState("");

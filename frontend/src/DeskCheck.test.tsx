@@ -50,7 +50,7 @@ function stub(views: DeskCheckView[]) {
     if (url.includes("/operations/")) return new Response(JSON.stringify({ id: "op2", documentId: "d2", stage: "EXTRACTION_COMPLETE",
       retryCount: 0, updatedAt: "2026-10-04T13:00:00Z" }));
     if (url.includes("/documents/")) return new Response(JSON.stringify({ pages: [] }));
-    if (url.endsWith("/intake-options")) return new Response(JSON.stringify({ supported: ["US-NC"], consentPolicies: {} }));
+    if (url.includes("/intake-options")) return new Response(JSON.stringify({ buyerState: "US-NC", supported: ["US-NC"], consentPolicies: {} }));
     if (url.endsWith("/api/v1/cases") && method === "POST") return new Response(JSON.stringify({ case: { id: "fresh" }, accessToken: "fresh-token" }), { status: 201 });
     if (url.endsWith("/vehicle-evidence")) return new Response(JSON.stringify({ identityConflicts: [], reliableForAnalysis: true }));
     throw new Error(`Unexpected ${method} ${url}`);
@@ -115,7 +115,7 @@ test("scenario 24: a different VIN blocks the check and starts a separate case w
   await userEvent.click(screen.getByRole("button", { name: "Start a fresh case for this car" }));
   expect(await screen.findByRole("heading", { name: "Start a fresh case for VIN 1M8GDM9AXKP042788" })).toBeInTheDocument();
   expect(screen.getByLabelText("VIN")).toHaveValue("1M8GDM9AXKP042788");
-  expect(screen.getByLabelText("Dealer ZIP code")).toHaveValue("27604");
+  expect(screen.getByLabelText("Dealer city")).toHaveValue("27604");
   await userEvent.type(screen.getByLabelText("Your ZIP code"), "27601");
   await userEvent.click(screen.getByRole("button", { name: /start my case/i }));
   await waitFor(() => expect(onFreshCase).toHaveBeenCalledWith({ caseId: "fresh", token: "fresh-token",
@@ -148,7 +148,7 @@ test("in the app, a different car opens a separate case with the paperwork and l
     const url = String(input), method = init?.method ?? "GET";
     if (method === "POST") posts.push(url);
     const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-    if (url.endsWith("/intake-options")) return json({ supported: ["US-NC"], consentPolicies: {} });
+    if (url.includes("/intake-options")) return json({ buyerState: "US-NC", supported: ["US-NC"], consentPolicies: {} });
     if (url === "/api/v1/cases" && method === "POST") { cases++; return json({ case: { id: cases === 1 ? "agreed" : "fresh" }, accessToken: `token-${cases}` }, 201); }
     if (url.endsWith("/vehicle-evidence")) return json({ identityConflicts: [], reliableForAnalysis: true });
     if (url === "/api/v1/cases/agreed/desk-check") return json(deskFixture("OTHER_CAR"));
@@ -160,7 +160,7 @@ test("in the app, a different car opens a separate case with the paperwork and l
   });
   render(<App pollDelayMs={0} />);
   await userEvent.type(await screen.findByLabelText("Your ZIP code"), "27601");
-  await userEvent.type(screen.getByLabelText("Dealer ZIP code"), "27604");
+  await userEvent.type(screen.getByLabelText("Dealer city"), "27604");
   await userEvent.type(screen.getByLabelText("VIN"), "1HGCM82633A004352");
   await userEvent.click(screen.getByRole("button", { name: /start my case/i }));
   const desk = within(await screen.findByRole("region", { name: "Desk Check" }));

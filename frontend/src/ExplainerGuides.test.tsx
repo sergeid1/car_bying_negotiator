@@ -3,14 +3,14 @@ import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { afterEach, expect, test, vi } from "vitest";
 
-const OPTIONS = { supported: ["US-NC"], consentPolicies: { serviceProcessing: "service-processing.v1" } };
+const OPTIONS = { buyerState: "US-NC", supported: ["US-NC"], consentPolicies: { serviceProcessing: "service-processing.v1" } };
 
 function stubApi() {
   const calls: { url: string; body?: Record<string, unknown> }[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
     calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
-    const body = url.endsWith("/intake-options") ? OPTIONS
+    const body = url.includes("/intake-options") ? OPTIONS
       : url.endsWith("/api/v1/cases") ? { case: { id: "case-1", referralDisclosure: null }, accessToken: "secret" }
       : url.endsWith("/vehicle-evidence") ? { identityConflicts: [], reliableForAnalysis: true }
       : url.endsWith("/document-limits") ? { acceptedMediaTypes: ["image/png"], maxFileBytes: 1, maxPages: 1, maxPixels: 1, minWidth: 1, minHeight: 1 }
@@ -73,7 +73,8 @@ test.each(GUIDES)("$slug opens without a case and its start action begins intake
   expect(window.location.search).toBe("");
   const user = userEvent.setup();
   await user.type(screen.getByLabelText(/your zip code/i), "27601");
-  await user.type(screen.getByLabelText(/dealer zip code/i), "27604");
+  await user.type(screen.getByLabelText(/dealer city/i), "27604");
+  await user.selectOptions(screen.getByLabelText(/dealer state/i), "NC");
   await user.type(screen.getByLabelText(/^vin$/i), "1HGCM82633A004352");
   await user.click(screen.getByRole("button", { name: /start my case/i }));
   await waitFor(() => expect(calls.some(call => call.url.endsWith("/vehicle-evidence"))).toBe(true));
@@ -95,10 +96,9 @@ test("the start screen states the Buyer's side of the deal and the credo", async
   const App = await freshApp("/");
   render(<App />);
   const hero = screen.getByRole("heading", { level: 1 }).parentElement!.textContent!.replace(/\s+/g, " ");
-  expect(hero).toContain("The Buyer's side of the deal");
-  expect(hero).toContain("helps you find cars, check dealer quotes, draft your emails to dealers, and check the paperwork at the desk");
-  expect(hero).toContain("You send every email from your own email and make every decision");
-  expect(hero).toContain("We don't work with dealers. We help people.");
+  expect(hero).toContain("Check your dealer's quote");
+  expect(hero).toContain("Check my deal");
+  expect(hero).toContain("We never work for dealers");
   expect(hero).not.toMatch(/gmail|outlook|mailbox/i);
 });
 

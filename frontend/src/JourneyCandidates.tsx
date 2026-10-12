@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { DealerFields } from "./DealerFields";
 import { CandidateCard, CandidateMarketCheck, CandidateResults, CandidateVehicle, CandidateVehicles } from "./CandidateVehicles";
 
 export type JourneyCaseCredentials = { caseId: string; token: string };
@@ -94,6 +95,7 @@ function CandidateCaseForm({ entry, postalCode, request, path, onCancel, onSessi
   onSessionEnded: () => void; onOpened: (created: CaseResponse) => void;
 }) {
   const [options, setOptions] = useState<Options>();
+  const [buyerPostalCode, setBuyerPostalCode] = useState(postalCode);
   const [problem, setProblem] = useState<Problem>();
   const [busy, setBusy] = useState(false);
   const key = useRef(crypto.randomUUID());
@@ -117,7 +119,9 @@ function CandidateCaseForm({ entry, postalCode, request, path, onCancel, onSessi
     try {
       const created = await request<CaseResponse>(`${path}/candidates/${encodeURIComponent(entry.candidateId)}/case`, {
         method: "POST", key: key.current, body: JSON.stringify({
-          buyerPostalCode: String(values.get("buyerPostalCode")).trim(), dealerPostalCode: String(values.get("dealerPostalCode")).trim(),
+          buyerPostalCode: String(values.get("buyerPostalCode")).trim(),
+          dealerCity: String(values.get("dealerCity")).trim(), dealerState: String(values.get("dealerState")),
+          dealerName: String(values.get("dealerName") ?? "").trim() || undefined,
           buyerJurisdiction: values.get("buyerJurisdiction") || undefined, purchaseMethod: values.get("purchaseMethod"),
           consents: { serviceProcessing: decision("serviceProcessing", true),
             humanReview: decision("humanReview", values.get("humanReview") === "on"),
@@ -135,8 +139,9 @@ function CandidateCaseForm({ entry, postalCode, request, path, onCancel, onSessi
     <p>{entry.candidate.title}. Its Vehicle and Listing Snapshot will stay with the case as evidence.</p>
     {problem && <p role="alert">{problem.detail}</p>}
     <form onSubmit={submit}>
-      <label>Your ZIP code<input name="buyerPostalCode" defaultValue={postalCode} inputMode="numeric" autoComplete="postal-code" required /></label>
-      <label>Dealer ZIP code<input name="dealerPostalCode" inputMode="numeric" required /></label>
+      <label>Your ZIP code<input name="buyerPostalCode" defaultValue={postalCode} inputMode="numeric" autoComplete="postal-code" required
+        onChange={event => setBuyerPostalCode(event.target.value)} /></label>
+      <DealerFields buyerPostalCode={buyerPostalCode} />
       {!!problem?.candidateJurisdictions?.length && <label>State where the vehicle will be registered
         <select name="buyerJurisdiction" required defaultValue=""><option value="">Choose your state</option>
           {problem.candidateJurisdictions.map(code => <option key={code} value={code}>{code}</option>)}</select>

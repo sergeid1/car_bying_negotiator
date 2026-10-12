@@ -77,7 +77,8 @@ test("approve, open or copy, mark sent and paste the dealer's reply for a quote 
   const state = await stubCaseApi(page);
   await page.goto("/");
   await page.getByLabel(/your zip code/i).fill("27601");
-  await page.getByLabel(/dealer zip code/i).fill("27604");
+  await page.getByLabel(/dealer city/i).fill("27604");
+  await page.getByLabel("Dealer state").selectOption("NC");
   await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
   await page.getByRole("button", { name: /start my case/i }).click();
   const panel = page.locator("[aria-label='Request a dealer quote'] > .panel").first();

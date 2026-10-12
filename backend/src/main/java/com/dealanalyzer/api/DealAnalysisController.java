@@ -313,15 +313,15 @@ public class DealAnalysisController {
   }
 
   @GetMapping("/intake-options")
-  public IntakeOptionsView intakeOptions() {
+  public IntakeOptionsView intakeOptions(@RequestParam(required = false) String buyerPostalCode) {
     return new IntakeOptionsView(
         supportedJurisdictions.all(),
-        com.dealanalyzer.buyingcase.ConsentPolicies.current());
+        com.dealanalyzer.buyingcase.ConsentPolicies.current(), ephemeralCases.buyerState(buyerPostalCode));
   }
 
   /** Lets the intake form state served jurisdictions and consent policy versions it was shown. */
   public record IntakeOptionsView(
-      java.util.List<String> supported, java.util.Map<String, String> consentPolicies) {}
+      java.util.List<String> supported, java.util.Map<String, String> consentPolicies, String buyerState) {}
 
   @PostMapping("/cases/{caseId}/analyses")
   @ResponseStatus(HttpStatus.ACCEPTED)

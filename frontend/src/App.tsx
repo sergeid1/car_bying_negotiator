@@ -1,27 +1,21 @@
 import { FormEvent, useEffect, useState } from "react";
 import "./styles.css";
-import { RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess, SaveCaseLink } from "./CasePortability";
+import "./Masthead.css";
+import { CaseLinkAccess, RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess } from "./CasePortability";
 import { CaseLifecycle } from "./CaseLifecycle";
 import { AccountControls, AccountHeader, AccountSignedInContext, BuyerAccount, isAccountPass } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
-import { PricePlan } from "./PricePlan";
-import { NegotiationMandate } from "./NegotiationMandate";
-import { QuoteRequest } from "./QuoteRequest";
-import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { BuyingCaseIntake } from "./BuyingCaseIntake";
-import { ReferralDisclosure } from "./AcquisitionChannel";
-import { DealerDocumentUpload } from "./DealerDocumentUpload";
-import { OfferVerification } from "./OfferVerification";
-import { DeskCheck, DeskFreshCase, type FreshDeskCase } from "./DeskCheck";
-import { TradeVehicle } from "./TradeVehicle";
+import { type FreshDeskCase } from "./DeskCheck";
+import { CaseFlow } from "./CaseFlow";
 import { AtTheDealer, DealerCameraEntry } from "./AtTheDealer";
 import { ThemeMenu } from "./ThemeMenu";
 import { OfferTerms } from "./OneTimeOffer";
 import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks, requestedGuide } from "./ExplainerGuides";
 import { partnerKitLink, ReferralPartnerKit, requestedPartnerKit } from "./ReferralPartnerKit";
-import { HowItWorks, HowItWorksCard, requestedHowItWorks } from "./HowItWorks";
-import { XrayIllustration } from "./XrayIllustration";
+import { HowItWorks, requestedHowItWorks } from "./HowItWorks";
+import { HomeHero } from "./HomeHero";
 import logo from "./assets/otdog-logo.png";
 import logoDark from "./assets/otdog-logo-dark.png";
 import { SidePanel, type SidePanelView, useSidePanelRequests } from "./SidePanel";
@@ -126,23 +120,24 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   const [report, setReport] = useState<Report>();
   const [error, setError] = useState<string>();
   const [caseCredentials, setCaseCredentials] = useState<{ caseId: string; token: string }>();
-  // Tied to its case so a version frozen in one case never reaches another.
-  const [frozenOffer, setFrozenOffer] = useState<{ caseId: string; version: number }>();
   const [referral, setReferral] = useState<{ caseId: string; text: string }>();
   // A case started at the desk for another car, remembered so it is shown apart from the agreed one.
   const [deskFresh, setDeskFresh] = useState<FreshDeskCase>();
-  const [deskRefresh, setDeskRefresh] = useState(0);
   // Photos taken from the header's "I'm at the dealer"; while set, that flow leads the page.
   const [atDealer, setAtDealer] = useState<{ files: File[]; started: number }>();
+  // Counts hand-overs from that flow; each one opens the case's At the dealer step.
+  const [dealerRequest, setDealerRequest] = useState(0);
   const [accountSignedIn, setAccountSignedIn] = useState(false);
   const [accountControls, setAccountControls] = useState<AccountControls>();
   const [accountRecheck, setAccountRecheck] = useState(0);
   // A sign-in or recovery link, or a return from a mailbox provider's consent page, opens the panel that finishes it.
   const [sidePanel, setSidePanel] = useState<SidePanelView | undefined>(() => {
     const query = new URLSearchParams(window.location.search);
-    if (window.location.hash.startsWith("#sign-in=") || (query.has("state") && (query.has("code") || query.has("error")))) return "account";
-    return window.location.hash.startsWith("#recover=") ? "case" : undefined;
+    return window.location.hash.startsWith("#sign-in=") || window.location.hash.startsWith("#recover=")
+      || (query.has("state") && (query.has("code") || query.has("error"))) ? "account" : undefined;
   });
+  // Opens the sign-in panel's private case link disclosure, such as after a case link fails to open.
+  const [caseLinkExpand, setCaseLinkExpand] = useState(0);
   useSidePanelRequests(setSidePanel);
   const closeSidePanel = () => setSidePanel(undefined);
   const [guide] = useState(requestedGuide);
@@ -200,6 +195,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   }
 
   const running = Boolean(stage && stage !== "COMPLETE");
+  const caseOpen = Boolean(caseCredentials && !caseRevoked);
 
   return (
     <>
@@ -214,10 +210,6 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
             <img className="wordmark-light" src={logo} alt="" width="114" height="40" />
             <img className="wordmark-dark" src={logoDark} alt="" width="114" height="40" />
           </a>
-          <nav aria-label="Page sections">
-            <button type="button" className="btn-ghost" aria-haspopup="dialog" onClick={() => setSidePanel("case")}>Your case</button>
-            <a href="#scope">Scope</a>
-          </nav>
           {!standalone && <DealerCameraEntry onPhotos={files => setAtDealer({ files, started: Date.now() })} />}
           <ThemeMenu />
           {!standalone && <AccountHeader controls={accountControls} onOpen={() => setSidePanel("account")} />}
@@ -225,25 +217,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       </header>
 
       <main>
-        {!standalone && <div className="hero">
-          <div className="hero-copy">
-            <p className="eyebrow">The Buyer's side of the deal</p>
-            <h1>See the whole deal <span className="hero-quiet">before you decide.</span></h1>
-            <p className="lede">
-              otdog helps you find cars, check dealer quotes, draft your emails to dealers, and
-              check the paperwork at the desk. You send every email from your own email and make every
-              decision. Every dollar stays connected to its input or calculation.
-            </p>
-            <p className="hero-credo">We don't work with dealers. We help people.</p>
-            <ul className="trust-strip">
-              <li>Every amount linked to its source</li>
-              <li>Deterministic, versioned math</li>
-              <li>No account required</li>
-              <li>Ephemeral by default</li>
-            </ul>
-          </div>
-          {!caseCredentials && !report && <XrayIllustration />}
-        </div>}
+        {!standalone && !caseOpen && <HomeHero />}
 
         <div className="workspace">
           <AccountSignedInContext.Provider value={accountSignedIn}>
@@ -258,7 +232,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               onFreshCase={value => {
                 setDeskFresh(value); setCaseRevoked(false); setCaseCredentials({ caseId: value.caseId, token: value.token }); setRecoveryCaseId(value.caseId);
               }}
-              onDeskCheck={() => setAtDealer(undefined)} onClose={() => setAtDealer(undefined)} />}
+              onDeskCheck={() => { setAtDealer(undefined); setDealerRequest(value => value + 1); }} onClose={() => setAtDealer(undefined)} />}
             {!guide && partnerKit && <ReferralPartnerKit />}
             {!guide && !partnerKit && howItWorks && <HowItWorks />}
             {!standalone && accountSignedIn && <BuyingJourneys
@@ -267,9 +241,6 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
                 setReferral(disclosure ? { caseId: value.caseId, text: disclosure } : undefined);
                 setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId);
               }} />}
-            {!standalone && !report && !caseCredentials && !atDealer && <HowItWorksCard />}
-            {!standalone && !report && !caseCredentials && !atDealer && <SampleReportEntry />}
-            {!standalone && !report && !caseCredentials && !atDealer && <OfferTerms />}
             {!standalone && !report && !caseCredentials && !atDealer && (
               <BuyingCaseIntake
                 onSavedToAccount={() => setAccountRecheck(value => value + 1)}
@@ -282,9 +253,11 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               />
             )}
 
+            {!standalone && !report && !caseCredentials && !atDealer && <SampleReportEntry entryLink={false} />}
+            {!standalone && !report && !caseCredentials && !atDealer && <OfferTerms />}
             {!standalone && !report && !caseCredentials && !atDealer && <GuideLinks />}
 
-            {!standalone && !report && import.meta.env.DEV && (
+            {!standalone && !report && !caseOpen && import.meta.env.DEV && (
               <section className="panel" aria-labelledby="case-heading">
                 <div className="section-heading">
                   <div>
@@ -328,31 +301,16 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 
             {report && <DealReport report={report} />}
 
-            {caseCredentials && !caseRevoked && !openedFromAccount && <SaveCaseLink {...caseCredentials} />}
-            {caseCredentials && !caseRevoked && openedFromAccount && <section className="panel" aria-label="Opened from your Buyer Account">
-              <h2>Opened from your Buyer Account</h2>
-              <p>This case stays open while you are signed in. Signing out closes it here; the private case link you saved
-                still opens it.</p>
-            </section>}
-            {caseCredentials && !caseRevoked && referral?.caseId === caseCredentials.caseId && <ReferralDisclosure text={referral.text} />}
-            {caseCredentials && !caseRevoked && deskFresh?.caseId === caseCredentials.caseId && <DeskFreshCase value={deskFresh}
-              onBack={() => { setCaseRevoked(false); setCaseCredentials(deskFresh.agreed); setRecoveryCaseId(deskFresh.agreed.caseId); setDeskFresh(undefined); }} />}
-            {/* The Buyer confirms which car the paperwork is for in the flow before the Desk Check compares it. */}
-            {caseCredentials && !caseRevoked && !atDealer && <DeskCheck key={`desk-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
-              refreshKey={deskRefresh} onFreshCase={value => {
+            {caseCredentials && !caseRevoked && <CaseFlow key={caseCredentials.caseId} {...caseCredentials} openedFromAccount={openedFromAccount}
+              referral={referral?.caseId === caseCredentials.caseId ? referral.text : undefined} deskFresh={deskFresh}
+              atDealer={Boolean(atDealer)} dealerRequest={dealerRequest} pollDelayMs={pollDelayMs}
+              onFreshCase={value => {
                 setDeskFresh(value); setCaseRevoked(false); setCaseCredentials({ caseId: value.caseId, token: value.token }); setRecoveryCaseId(value.caseId);
+              }}
+              onBackToAgreed={() => {
+                if (!deskFresh) return;
+                setCaseRevoked(false); setCaseCredentials(deskFresh.agreed); setRecoveryCaseId(deskFresh.agreed.caseId); setDeskFresh(undefined);
               }} />}
-            {caseCredentials && !caseRevoked && <DealerDocumentUpload key={`documents-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
-              initialFiles={deskFresh?.caseId === caseCredentials.caseId ? deskFresh.files : undefined} />}
-            {caseCredentials && !caseRevoked && <TradeVehicle key={`trade-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
-              carryFrom={deskFresh?.caseId === caseCredentials.caseId ? deskFresh.agreed : undefined} />}
-            {caseCredentials && !caseRevoked && <OfferVerification key={`verify-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
-              onOfferFrozen={offer => { setFrozenOffer({ caseId: caseCredentials.caseId, version: offer.version }); setDeskRefresh(value => value + 1); }} />}
-            {caseCredentials && !caseRevoked && <PricePlan key={caseCredentials.caseId + caseCredentials.token} {...caseCredentials} />}
-            {caseCredentials && !caseRevoked && <NegotiationMandate key={`mandate-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
-            {caseCredentials && !caseRevoked && <QuoteRequest key={`quote-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
-            {caseCredentials && !caseRevoked && <VerifiedOfferAnalysis key={`analysis-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
-              offerVersion={frozenOffer?.caseId === caseCredentials.caseId ? frozenOffer.version : undefined} pollDelayMs={pollDelayMs} />}
           </div>
           </AccountSignedInContext.Provider>
         </div>
@@ -386,10 +344,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       </footer>
       </div>
 
-      <SidePanel id="case-panel" title="Your Buying Case" open={sidePanel === "case"} onClose={closeSidePanel}>
-        <SavedCaseAccess onOpened={value => { closeSidePanel(); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }}
-          onUnavailable={caseId => { setSidePanel("case"); setCaseCredentials(undefined); setRecoveryCaseId(caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
-        <RecoveryAccess caseId={recoveryCaseId ?? caseCredentials?.caseId} onRecovered={value => { closeSidePanel(); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
+      <SidePanel id="case-panel" title="This case" open={sidePanel === "case" && Boolean(caseCredentials)} onClose={closeSidePanel}>
         {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
         {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
         {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
@@ -398,13 +353,18 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       {!standalone && <SidePanel id="account-panel" title={accountSignedIn ? "Your account" : "Sign in"}
         open={sidePanel === "account"} onClose={closeSidePanel}>
         <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined}
-          onSignedIn={setAccountSignedIn} onControls={setAccountControls} recheck={accountRecheck}
+          onSignedIn={setAccountSignedIn} onControls={setAccountControls} recheck={accountRecheck} showing={sidePanel === "account"}
           onSignInComplete={closeSidePanel}
           onCaseOpened={value => {
             closeSidePanel();
             setReferral(undefined); setDeskFresh(undefined); setCaseRevoked(false); setCaseCredentials(value);
             setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined);
           }} />
+        <CaseLinkAccess expand={caseLinkExpand}>
+          <SavedCaseAccess onOpened={value => { closeSidePanel(); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }}
+            onUnavailable={caseId => { setSidePanel("account"); setCaseLinkExpand(value => value + 1); setCaseCredentials(undefined); setRecoveryCaseId(caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
+          <RecoveryAccess caseId={recoveryCaseId ?? caseCredentials?.caseId} onRecovered={value => { closeSidePanel(); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
+        </CaseLinkAccess>
       </SidePanel>}
     </>
   );

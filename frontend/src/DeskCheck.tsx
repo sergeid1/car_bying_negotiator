@@ -20,7 +20,7 @@ export type DeskCheckView = {
   findings: DeskFinding[]; otherDifferences: DeskFinding[]; unchangedTerms: number;
   totalEffect: { basis: "CALCULATED" | "QUOTED" | "UNAVAILABLE"; currency: string; outTheDoorDeltaMinor: number | null;
     preTaxDeltaMinor: number | null; taxEffectMinor: number | null; addedChargesMinor: number | null };
-  freshCase: null | { vin: string; dealerPostalCode: string | null; purchaseMethod: string };
+  freshCase: null | { vin: string; dealerLocation?: string; dealerPostalCode?: string | null; purchaseMethod: string };
   dealReviewVersion: number | null;
   trade?: TradeCheckResult | null;
   tacticFindings?: DeskTacticFinding[];
@@ -199,7 +199,7 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
       {error && <p role="alert">{error}</p>}
     </div>
     {starting && view?.freshCase && <BuyingCaseIntake title={`Start a fresh case for VIN ${view.freshCase.vin}`}
-      initial={{ vin: view.freshCase.vin, dealerPostalCode: view.freshCase.dealerPostalCode ?? undefined, purchaseMethod: view.freshCase.purchaseMethod }}
+      initial={{ vin: view.freshCase.vin, dealerLocation: view.freshCase.dealerLocation ?? view.freshCase.dealerPostalCode ?? undefined, purchaseMethod: view.freshCase.purchaseMethod }}
       onCaseOpened={value => onFreshCase?.({ ...value, agreed: { caseId, token }, agreedVin: agreed?.vin ?? null,
         vin: view.freshCase!.vin, files: files.current })} />}
     {view && <DealerDocumentUpload caseId={caseId} token={token}

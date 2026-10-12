@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
-import { Passwords, PasswordSignIn } from "./Passwords";
+import { Passwords } from "./Passwords";
 import { BuyerAccount } from "./BuyerAccount";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); window.history.replaceState(null, "", "/"); });
@@ -18,19 +18,6 @@ test("breached passwords and recent-sign-in problems are actionable and clear th
     expect(await screen.findByRole("alert")).toHaveTextContent(detail);
     expect(input).toHaveValue("");
   }
-});
-
-test("password sign-in failures stay on the form and clear the password", async () => {
-  const request = vi.fn().mockRejectedValue({ status: 401, detail: "Check your details or use an email link." });
-  const signedIn = vi.fn();
-  render(<PasswordSignIn request={request} onSignedIn={signedIn} />);
-  const user = userEvent.setup();
-  await user.type(screen.getByLabelText("Email for password sign-in"), "buyer@example.com");
-  await user.type(screen.getByLabelText("Password", { exact: true }), "a long private phrase");
-  await user.click(screen.getByRole("button", { name: "Sign in with a password" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("use an email link");
-  expect(screen.getByLabelText("Password", { exact: true })).toHaveValue("");
-  expect(signedIn).not.toHaveBeenCalled();
 });
 
 test("an emailed recovery link can replace an already signed-in session", async () => {

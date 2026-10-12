@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, Page, test } from "@playwright/test";
+import { openCaseStep } from "./case-steps";
 
 const OPTIONS = {
   supported: ["US-NC"],
@@ -36,13 +37,18 @@ test("a referral arrival shows its disclosure before upload at 360 px without ho
   expect(new URL(page.url()).search).toBe("");
 
   await page.getByLabel(/your zip code/i).fill("27601");
-  await page.getByLabel(/dealer zip code/i).fill("27604");
+  await page.getByLabel(/dealer city/i).fill("27604");
+  await page.getByLabel("Dealer state").selectOption("NC");
   await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
   await page.getByRole("button", { name: /start my case/i }).click();
 
   const disclosure = page.getByRole("region", { name: "How you reached us" });
   await expect(disclosure).toContainText(DISCLOSURE);
-  await expect(page.getByRole("heading", { name: /add the dealer's paperwork/i })).toBeVisible();
+  await openCaseStep(page, "At the dealer");
+  const upload = page.getByRole("heading", { name: /add the dealer's paperwork/i });
+  await expect(upload).toBeVisible();
+  expect(await disclosure.evaluate((element, heading) => Boolean(element.compareDocumentPosition(heading!) & Node.DOCUMENT_POSITION_FOLLOWING),
+    await upload.elementHandle())).toBe(true);
   expect(creation.channel).toBe("inspector");
   expect(await page.context().cookies()).toEqual([]);
   expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);

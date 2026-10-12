@@ -13,7 +13,7 @@ type Quote = { id: string; dealerAddress: string; state: string; messageId?: str
 type View = { negotiationState: string; requests: Quote[]; dealers: { id: string; name: string }[];
   documents: { documentId: string | null; outcome: string; offerVersion: number | null; sourceKind: string; messageId: string }[] };
 const states: Record<string, string> = {
-  NO_MANDATE: "Approve a negotiation mandate to contact the dealer.",
+  NO_MANDATE: "Set your negotiating limits in Compare & negotiate before you contact the dealer.",
   MANDATE_ACTIVE: "Your mandate is active. Review a quote request, approve it, and send it from your own email.",
   AWAITING_DEALER: "Your request was sent. When the dealer replies, add the reply to the conversation.",
   AWAITING_BUYER: "The dealer replied. Review and verify the quote before analysis.",

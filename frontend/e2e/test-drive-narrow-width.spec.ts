@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { openCaseStep } from "./case-steps";
 
 const pass = { pass: true, gateVersion: "outbound-gate.v2", reasons: [] };
 const slot = { option: 1, startsAt: "2026-10-10T15:00:00Z", endsAt: "2026-10-10T16:00:00Z",
@@ -35,9 +36,11 @@ for (const state of ["PROPOSE", "CONFIRM", "BOOKED"]) {
     await page.route("**/api/v1/cases/case-1/appointment", route => route.fulfill({ json: fixture(state) }));
     await page.goto("/");
     await page.getByLabel(/your zip code/i).fill("27601");
-    await page.getByLabel(/dealer zip code/i).fill("27604");
+    await page.getByLabel(/dealer city/i).fill("27604");
+    await page.getByLabel("Dealer state").selectOption("NC");
     await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
     await page.getByRole("button", { name: /start my case/i }).click();
+    await openCaseStep(page, "Get quotes");
     const panel = page.locator(".test-drive-panel");
     await expect(panel.getByRole("heading", { name: "Schedule a test drive" })).toBeVisible();
     if (state === "PROPOSE") {

@@ -365,7 +365,7 @@ export function OfferVerification({
     <section className="panel verify-panel" aria-labelledby="verify-heading">
       <div className="section-heading">
         <div>
-          <p className="step">Step 3 of 3</p>
+          <p className="step">Dealer offer</p>
           <h2 id="verify-heading">Check the terms against the paperwork</h2>
         </div>
       </div>
@@ -439,7 +439,7 @@ export function OfferVerification({
 
       {offers.length > 0 && (
         <section className="verify-versions" aria-labelledby="versions-heading">
-          <h3 id="versions-heading">Frozen Dealer Offer versions</h3>
+          <h3 id="versions-heading">Saved versions of the dealer offer</h3>
           <p className="muted">Frozen versions never change. Each later freeze adds a new version.</p>
           {offers.length > 1 && (
             <label>

@@ -1,5 +1,6 @@
 import { expect, Page, test } from "@playwright/test";
 import headers from "../client-headers.json" with { type: "json" };
+import { openCaseStep } from "./case-steps";
 
 // Both Playwright projects run these Buyer journeys in light and dark themes.
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
@@ -51,7 +52,8 @@ async function api(page: Page, mode: "upload" | "verify" | "report" | "expired")
 async function start(page: Page) {
   await page.goto("/");
   await page.getByLabel(/your zip code/i).fill("27601");
-  await page.getByLabel(/dealer zip code/i).fill("27604");
+  await page.getByLabel(/dealer city/i).fill("27604");
+  await page.getByLabel("Dealer state").selectOption("NC");
   await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
   await page.getByRole("button", { name: /start my case/i }).click();
 }
@@ -89,6 +91,7 @@ test("the built client serves the deployment's complete response header set", as
 test("intake and document upload work under the policy", async ({ page }) => {
   await api(page, "upload");
   await start(page);
+  await openCaseStep(page, "At the dealer");
   await expect(page.getByRole("heading", { name: /add the dealer's paperwork/i })).toBeVisible();
   await page.getByLabel(/dealer paperwork/i).setInputFiles({ name: "order.png", mimeType: "image/png", buffer: PNG });
   await expect(page.getByText(/terms read/i)).toBeVisible();
@@ -97,6 +100,7 @@ test("intake and document upload work under the policy", async ({ page }) => {
 test("verification displays authenticated source pages and CSSOM region outlines", async ({ page }) => {
   await api(page, "verify");
   await start(page);
+  await openCaseStep(page, "Compare & negotiate");
   const image = page.getByRole("img", { name: /where selling price was read/i });
   await expect(image).toBeVisible();
   await expect(image).toHaveAttribute("src", /^blob:/);

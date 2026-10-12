@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { openCaseStep } from "./case-steps";
 
 const conditions = [
   { value: "EXCELLENT", label: "Excellent", description: "Looks and drives like new. No dents, warning lights or repairs needed, and a clean title." },
@@ -34,9 +35,11 @@ async function openCase(page: Page, view: unknown) {
   await page.route("**/api/v1/cases/case-1/trade", route => route.fulfill({ json: view }));
   await page.goto("/");
   await page.getByLabel(/your zip code/i).fill("27601");
-  await page.getByLabel(/dealer zip code/i).fill("27604");
+  await page.getByLabel(/dealer city/i).fill("27604");
+  await page.getByLabel("Dealer state").selectOption("NC");
   await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
   await page.getByRole("button", { name: /start my case/i }).click();
+    await openCaseStep(page, "At the dealer");
   const panel = page.locator(".trade-vehicle");
   await expect(panel.getByRole("heading", { name: "Your trade-in" })).toBeVisible();
   return panel;

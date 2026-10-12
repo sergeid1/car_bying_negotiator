@@ -1,5 +1,6 @@
 import { ChangeEvent, FormEvent, RefObject, useContext, useEffect, useRef, useState } from "react";
 import { AccountSignedInContext } from "./BuyerAccount";
+import { DealerFields } from "./DealerFields";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import type { FreshDeskCase } from "./DeskCheck";
 import { toMinor, vehicleName, type Trade, type TradeView } from "./TradeVehicle";
@@ -14,7 +15,7 @@ export type DeskRouting = {
   documentId: string | null; documentType: string | null; vin: string | null;
   route: "AGREED_CAR" | "THIS_CASE" | "FRESH_CASE" | "CHOOSE" | null;
   agreedVin: string | null; caseVin: string | null;
-  freshCase: { vin: string; dealerPostalCode: string | null; purchaseMethod: string } | null;
+  freshCase: { vin: string; dealerLocation?: string; dealerPostalCode?: string | null; purchaseMethod: string } | null;
   questions: null | {
     trade: { ask: TradeAsk; paperworkShowsTrade: boolean; recorded: Trade | null };
     financing: { ask: boolean; paperworkShowsLoan: boolean; ownAprPercent: number | null; ownTermMonths: number | null };
@@ -157,7 +158,9 @@ export function AtTheDealer({ files, open, onCaseOpened, onFreshCase, onDeskChec
       headers: { "Idempotency-Key": crypto.randomUUID(), ...(signedIn ? { "Account-Request": "1" } : {}) },
       body: JSON.stringify({
         buyerPostalCode: String(values.get("buyerPostalCode") ?? "").trim(),
-        dealerPostalCode: String(values.get("dealerPostalCode") ?? "").trim(),
+        dealerCity: String(values.get("dealerCity") ?? "").trim(),
+        dealerState: String(values.get("dealerState") ?? ""),
+        dealerName: String(values.get("dealerName") ?? "").trim() || undefined,
         purchaseMethod: String(values.get("purchaseMethod") ?? "CASH"),
         consents: { serviceProcessing: decision(true, policies.serviceProcessing),
           humanReview: decision(false, policies.humanReview), anonymizedResearch: decision(false, policies.anonymizedResearch) },
@@ -264,7 +267,7 @@ export function AtTheDealer({ files, open, onCaseOpened, onFreshCase, onDeskChec
         <h3>Start a separate case for VIN {freshVin}</h3>
         <p className="muted">It gets its own result, including your state's fees and taxes.
           {routing?.agreedVin ? " Your Agreed Price stays as it is." : ""} Your trade-in comes with it.</p>
-        <CaseFields dealerPostalCode={routing?.freshCase?.dealerPostalCode ?? undefined} purchaseMethod={routing?.freshCase?.purchaseMethod} />
+        <CaseFields dealerLocation={routing?.freshCase?.dealerLocation ?? routing?.freshCase?.dealerPostalCode ?? undefined} purchaseMethod={routing?.freshCase?.purchaseMethod} />
         <div className="actions">
           <button type="submit" disabled={busy}>{busy ? "Starting…" : "Start the separate case"}</button>
           <button type="button" className="btn-secondary" onClick={() => setPhase(routing ? "route" : "typed")}>Back</button>
@@ -323,10 +326,12 @@ function FieldError({ error, field }: { error?: { field?: string; message: strin
   return error?.field === field ? <p className="error" role="alert" id={`dealer-${field}-error`}>{error.message}</p> : null;
 }
 
-function CaseFields({ dealerPostalCode, purchaseMethod }: { dealerPostalCode?: string; purchaseMethod?: string }) {
+function CaseFields({ dealerLocation, purchaseMethod }: { dealerLocation?: string; purchaseMethod?: string }) {
+  const [buyerPostalCode, setBuyerPostalCode] = useState("");
   return <>
-    <label>Your ZIP code<input name="buyerPostalCode" inputMode="numeric" autoComplete="postal-code" required /></label>
-    <label>Dealer ZIP code<input name="dealerPostalCode" inputMode="numeric" required defaultValue={dealerPostalCode} /></label>
+    <label>Your ZIP code<input name="buyerPostalCode" inputMode="numeric" autoComplete="postal-code" required
+      onChange={event => setBuyerPostalCode(event.target.value)} /></label>
+    <DealerFields buyerPostalCode={buyerPostalCode} initialLocation={dealerLocation} />
     <label>How you are paying<select name="purchaseMethod" defaultValue={purchaseMethod ?? "CASH"}>
       <option value="CASH">Cash</option><option value="FINANCE">Dealer financing</option></select></label>
   </>;
@@ -338,7 +343,7 @@ function StartCase({ busy, error, onSubmit }: { busy: boolean; error?: { message
   return <form onSubmit={onSubmit}>
     {signedIn && <p className="notice">Is this for a car in your journey? Open its Buying Case from the journey first, then
       tap “I'm at the dealer”, and the paperwork is checked against its Agreed Price and your trade-in.</p>}
-    <p>Two ZIP codes set your state's taxes and fees. No account is needed, and the paperwork answers the rest.</p>
+    <p>Your ZIP code sets your state's taxes and fees. No account is needed, and the paperwork answers the rest.</p>
     <CaseFields />
     <p className="muted">Starting means otdog may process what you enter and photograph to produce your result.</p>
     {error && <p className="error" role="alert">{error.message}</p>}
