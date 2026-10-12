@@ -212,7 +212,7 @@ class BuyingJourneyAcceptanceTest {
       assertThat(refused.body().path("code").asText()).isEqualTo("LOCATION_NOT_SERVED");
       assertThat(refused.body().at("/errors/0/field").asText()).isEqualTo("postalCode");
       assertThat(refused.body().at("/errors/0/reason").asText()).isEqualTo("JURISDICTION_NOT_SUPPORTED");
-      assertThat(refused.body().at("/errors/0/candidateJurisdictions/0").asText()).isEqualTo("US-NC");
+      assertThat(refused.body().at("/errors/0/candidateJurisdictions").toString()).contains("US-FL", "US-NC").doesNotContain(":");
       assertThat(refused.body().path("detail").asText()).contains("does not support").doesNotContain("10001");
 
       var unknown = brief(); unknown.put("postalCode", "00000");

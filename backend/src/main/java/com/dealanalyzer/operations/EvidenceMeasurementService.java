@@ -85,8 +85,12 @@ public class EvidenceMeasurementService {
           sum(case when e.category = 'UNAVAILABLE' then 1 else 0 end),
           coalesce(sum(cc.evaluated), 0), coalesce(sum(cc.included), 0), coalesce(sum(cc.excluded), 0),
           coalesce(sum(m.sample_size), 0)
-        from (select distinct jurisdiction from jurisdiction_policies where effective_at < :to) j
-        left join analysis_cases c on c.buyer_jurisdiction = j.jurisdiction
+        from (select distinct jurisdiction as scope,
+            case when position(':' in jurisdiction) > 0
+              then substring(jurisdiction from 1 for position(':' in jurisdiction) - 1)
+              else jurisdiction end as jurisdiction
+          from jurisdiction_policies where effective_at < :to) j
+        left join analysis_cases c on c.buyer_jurisdiction = j.scope
         left join attempts a on a.case_id = c.id
         left join latest_assessment m on m.case_id = a.case_id
         left join latest_event e on e.case_id = a.case_id
