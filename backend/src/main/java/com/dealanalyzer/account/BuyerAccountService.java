@@ -275,8 +275,11 @@ public class BuyerAccountService {
 
   private static String dealer(AccountCaseLifecycle.CaseSummary summary) {
     if (summary == null) return null;
-    if (summary.dealerName() != null && !summary.dealerName().isBlank()) return summary.dealerName().strip();
-    return summary.dealerLocation() == null ? null : "Dealer ZIP " + summary.dealerLocation();
+    String location = summary.dealerLocation();
+    String label = location == null ? null : (location.matches("[0-9]{5}") ? "Dealer ZIP " : "Dealer city ") + location;
+    if (summary.dealerName() != null && !summary.dealerName().isBlank())
+      return summary.dealerName().strip() + (label == null ? "" : " · " + label);
+    return label;
   }
 
   private static String blankToNull(String value) { return value == null || value.isBlank() ? null : value.strip(); }

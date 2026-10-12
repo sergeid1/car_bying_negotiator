@@ -60,7 +60,9 @@ class DeskCheckAcceptanceTest {
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();
-      var created = post(client, "/api/v1/cases", validCase(), "case");
+      var cityCase = new java.util.HashMap<String, Object>(validCase());
+      cityCase.remove("dealerPostalCode"); cityCase.put("dealerCity", "Raleigh"); cityCase.put("dealerState", "NC");
+      var created = post(client, "/api/v1/cases", cityCase, "case");
       String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
       String base = "/api/v1/cases/" + caseId, desk = base + "/desk-check";
 
@@ -130,7 +132,8 @@ class DeskCheckAcceptanceTest {
       assertThat(other.at("/findings/0/severity").asText()).isEqualTo("BLOCKING");
       assertThat(other.path("findings")).hasSize(1);
       assertThat(other.at("/freshCase/vin").asText()).isEqualTo(OTHER_VIN);
-      assertThat(other.at("/freshCase/dealerPostalCode").asText()).isEqualTo("27604");
+      assertThat(other.at("/freshCase/dealerLocation").asText()).isEqualTo("Raleigh, NC");
+      assertThat(other.at("/freshCase/dealerPostalCode").isNull()).isTrue();
       assertThat(other.at("/freshCase/purchaseMethod").asText()).isEqualTo("CASH");
       int offersBefore = get(client, base + "/dealer-offers/latest", token).path("version").asInt();
       assertThatThrownBy(() -> verify(client, base, token, otherDocument, "other", 2_829_500))

@@ -94,7 +94,7 @@ test("the offer terms are stated on the intake screen at 360 px", async ({ page 
 
 test("the example report opens before any case at 360 px", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Open the example report" }).click();
+  await page.getByRole("link", { name: "See an example report" }).click();
   const example = page.getByRole("region", { name: "See an example report" });
   await expect(example.getByRole("heading", { name: "Deal Analysis Report", exact: true })).toBeFocused();
   await expect(example.getByRole("note", { name: "About this example" })).toContainText("Built from a synthetic case");

@@ -71,7 +71,12 @@ public class DeskCheckService {
   public record TotalEffect(String basis, String currency, Long outTheDoorDeltaMinor, Long preTaxDeltaMinor,
       Long taxEffectMinor, Long addedChargesMinor) {}
   /** The case-start details for the car on the paperwork, kept apart from the agreed car. */
-  public record FreshCase(String vin, String dealerPostalCode, String purchaseMethod) {}
+  public record FreshCase(String vin, String dealerLocation, String purchaseMethod) {
+    @com.fasterxml.jackson.annotation.JsonProperty("dealerPostalCode")
+    public String dealerPostalCode() {
+      return dealerLocation != null && dealerLocation.matches("[0-9]{5}") ? dealerLocation : null;
+    }
+  }
   private record AgreedRow(int offerVersion, int baselineVersion, String baselineId, Instant acceptedAt) {}
   private record CaseRow(String dealerLocation, String purchaseMethod) {}
   private record Document(String id, Instant createdAt) {}

@@ -24,6 +24,8 @@ import { SampleReportEntry } from "./SampleReport";
 import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 import { ReferralPartnerKit } from "./ReferralPartnerKit";
 import { HowItWorks, HowItWorksCard } from "./HowItWorks";
+import { HomeHero } from "./HomeHero";
+
 import { AccountHeader, AccountSignedInContext, BuyerAccount } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
 import { NegotiationConversation } from "./NegotiationConversation";
@@ -34,6 +36,11 @@ import { Passwords, PasswordSignIn } from "./Passwords";
 import { DeskTactics } from "./DeskTactics";
 import { syntheticTactic, syntheticTradeTactics } from "./DeskTactics.fixture";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+test("the home hero has no automated AA violations", async () => {
+  const { container } = render(<main><HomeHero /></main>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
 
 test("worksheet tactics and pending questions have no automated AA violations", async () => {
   const { container } = render(<main><h1>Desk Check</h1><DeskTactics findings={[syntheticTactic]} /></main>);
@@ -484,7 +491,7 @@ test("offer terms, the example report and the payment point have no automated AA
   });
   const { container } = render(<main><h1>otdog</h1><SampleReportEntry /><OfferTerms />
     <PurchasePoint caseId="case" token="token" onPurchased={() => {}} /></main>);
-  await userEvent.setup().click(screen.getByRole("button", { name: "Open the example report" }));
+  await userEvent.setup().click(screen.getByRole("link", { name: "See an example report" }));
   await screen.findByRole("note", { name: "About this example" });
   await screen.findByRole("region", { name: "What is free and what you pay for" });
   await userEvent.setup().click(await screen.findByText("Price terms, refunds, and scope"));
@@ -924,7 +931,8 @@ test("the Florida county chooser has no automated AA violations", async () => {
   const { container } = render(<main><h1>Synthetic Florida intake</h1><BuyingCaseIntake onCaseOpened={() => {}} /></main>);
   const user = userEvent.setup();
   await user.type(screen.getByLabelText(/your ZIP code/i), "32024");
-  await user.type(screen.getByLabelText(/dealer ZIP code/i), "32003");
+  await user.type(screen.getByLabelText(/dealer city/i), "32003");
+  await user.selectOptions(screen.getByLabelText(/dealer state/i), "FL");
   await user.type(screen.getByLabelText(/^VIN$/), "1HGCM82633A004352");
   await user.click(screen.getByRole("button", { name: "Start my case" }));
   await user.selectOptions(await screen.findByLabelText(/Florida county where/), "Suwannee");

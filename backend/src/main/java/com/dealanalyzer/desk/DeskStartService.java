@@ -60,7 +60,12 @@ public class DeskStartService {
    */
   public record Routing(String policyVersion, String status, String documentId, String documentType, String vin,
       String route, String agreedVin, String caseVin, FreshCase freshCase, Questions questions) {}
-  public record FreshCase(String vin, String dealerPostalCode, String purchaseMethod) {}
+  public record FreshCase(String vin, String dealerLocation, String purchaseMethod) {
+    @com.fasterxml.jackson.annotation.JsonProperty("dealerPostalCode")
+    public String dealerPostalCode() {
+      return dealerLocation != null && dealerLocation.matches("[0-9]{5}") ? dealerLocation : null;
+    }
+  }
   public record Questions(TradeQuestion trade, FinancingQuestion financing) {}
   /**
    * ask: NONE (the journey's or case's trade is recorded and complete), OWED (recorded, but whether money is

@@ -20,7 +20,8 @@ test("synthetic Florida intake chooses the registration county and fits at 360 p
   }));
   await page.goto("/");
   await page.getByLabel(/Your ZIP code/).fill("32024");
-  await page.getByLabel(/Dealer ZIP code/).fill("32003");
+  await page.getByLabel(/Dealer city/).fill("32003");
+  await page.getByLabel("Dealer state").selectOption("FL");
   await page.getByLabel("VIN", { exact: true }).fill("1HGCM82633A004352");
   await page.getByRole("button", { name: "Start my case" }).click();
   const county = page.getByLabel(/Florida county where/);

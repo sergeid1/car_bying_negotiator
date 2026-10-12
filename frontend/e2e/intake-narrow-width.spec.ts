@@ -56,6 +56,7 @@ test("intake fields stack in a single column at 360 px", async ({ page }) => {
 });
 
 test("every intake control is labelled and shows a visible focus indicator", async ({ page }) => {
+  await page.getByText("Add more (optional)", { exact: true }).click();
   const controls = page.locator("main form input:not([type=radio]):not([type=checkbox]), main form select");
   const count = await controls.count();
   expect(count).toBeGreaterThan(3);

@@ -46,7 +46,7 @@ public class MarketAssessmentService {
   }
 
   public MarketAssessmentView create(String caseId, String accessToken) {
-    var buyingCase = cases.reopen(caseId, accessToken);
+    String marketPostalCode = cases.marketPostalCode(caseId, accessToken);
     var evidence = vehicles.get(caseId, accessToken);
     if (!evidence.reliableForAnalysis()) {
       throw new InvalidVehicleEvidenceException(
@@ -55,7 +55,7 @@ public class MarketAssessmentService {
     var vehicle = evidence.vehicle();
     MarketVehicle query = new MarketVehicle(
         vehicle.vin(), vehicle.year(), vehicle.make(), vehicle.model(), vehicle.trim(),
-        vehicle.mileage(), buyingCase.dealerLocation());
+        vehicle.mileage(), marketPostalCode);
     Instant now = clock.instant();
     ProviderResult result;
     try {

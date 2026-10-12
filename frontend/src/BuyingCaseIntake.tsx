@@ -2,6 +2,7 @@ import { FormEvent, useContext, useEffect, useState } from "react";
 import { arrivalChannel, forgetArrivalChannel } from "./AcquisitionChannel";
 import { openSidePanel } from "./SidePanel";
 import { AccountSignedInContext } from "./BuyerAccount";
+import { DealerFields, STATE_NAMES } from "./DealerFields";
 
 type CaseCredentials = { caseId: string; token: string };
 
@@ -35,22 +36,6 @@ class IntakeProblem extends Error {
   }
 }
 
-const STATE_NAMES: Record<string, string> = {
-  "US-AL": "Alabama", "US-AK": "Alaska", "US-AZ": "Arizona", "US-AR": "Arkansas",
-  "US-CA": "California", "US-CO": "Colorado", "US-CT": "Connecticut", "US-DE": "Delaware",
-  "US-DC": "District of Columbia", "US-FL": "Florida", "US-GA": "Georgia", "US-HI": "Hawaii",
-  "US-ID": "Idaho", "US-IL": "Illinois", "US-IN": "Indiana", "US-IA": "Iowa", "US-KS": "Kansas",
-  "US-KY": "Kentucky", "US-LA": "Louisiana", "US-ME": "Maine", "US-MD": "Maryland",
-  "US-MA": "Massachusetts", "US-MI": "Michigan", "US-MN": "Minnesota", "US-MS": "Mississippi",
-  "US-MO": "Missouri", "US-MT": "Montana", "US-NE": "Nebraska", "US-NV": "Nevada",
-  "US-NH": "New Hampshire", "US-NJ": "New Jersey", "US-NM": "New Mexico", "US-NY": "New York",
-  "US-NC": "North Carolina", "US-ND": "North Dakota", "US-OH": "Ohio", "US-OK": "Oklahoma",
-  "US-OR": "Oregon", "US-PA": "Pennsylvania", "US-RI": "Rhode Island", "US-SC": "South Carolina",
-  "US-SD": "South Dakota", "US-TN": "Tennessee", "US-TX": "Texas", "US-UT": "Utah",
-  "US-VT": "Vermont", "US-VA": "Virginia", "US-WA": "Washington", "US-WV": "West Virginia",
-  "US-WI": "Wisconsin", "US-WY": "Wyoming", "US-AS": "American Samoa", "US-GU": "Guam",
-  "US-MP": "Northern Mariana Islands", "US-PR": "Puerto Rico", "US-VI": "U.S. Virgin Islands",
-};
 
 function stateName(jurisdiction: string) {
   return STATE_NAMES[jurisdiction] ?? jurisdiction;
@@ -78,10 +63,11 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
   /** Called when the new case was saved to the signed-in Buyer Account. */
   onSavedToAccount?: () => void;
   /** Starting values the Buyer can still change, such as the VIN read from desk paperwork. */
-  initial?: { vin?: string; dealerPostalCode?: string; purchaseMethod?: string };
+  initial?: { vin?: string; dealerPostalCode?: string; dealerLocation?: string; purchaseMethod?: string };
   title?: string;
 }) {
   const [options, setOptions] = useState<IntakeOptions>();
+  const [buyerPostalCode, setBuyerPostalCode] = useState("");
   const [identifyBy, setIdentifyBy] = useState<"vin" | "details">("vin");
   const [statedJurisdiction, setStatedJurisdiction] = useState("");
   const [crossingCandidates, setCrossingCandidates] = useState<string[]>();
@@ -142,7 +128,9 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
           },
           body: JSON.stringify({
             buyerPostalCode: String(values.get("buyerPostalCode") ?? "").trim(),
-            dealerPostalCode: String(values.get("dealerPostalCode") ?? "").trim(),
+            dealerCity: String(values.get("dealerCity") ?? "").trim(),
+            dealerState: String(values.get("dealerState") ?? ""),
+            dealerName: String(values.get("dealerName") ?? "").trim() || undefined,
             buyerJurisdiction: statedJurisdiction || undefined,
             buyerCounty: statedCounty || undefined,
             purchaseMethod: String(values.get("purchaseMethod") ?? "CASH"),
@@ -254,10 +242,10 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
   const fieldProblem = (field: string) => (problem?.field === field ? problem.detail : undefined);
 
   return (
-    <section className="panel" aria-labelledby="intake-heading">
+    <section className="panel" id="buying-case-intake" aria-labelledby="intake-heading">
       <div className="section-heading">
         <div>
-          <p className="step">Step 1 of 3</p>
+          <p className="step">Step 1</p>
           <h2 id="intake-heading">{title ?? "Start your Buying Case"}</h2>
         </div>
       </div>
@@ -336,7 +324,8 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
               inputMode="numeric"
               autoComplete="postal-code"
               required
-              onChange={() => {
+              onChange={event => {
+                setBuyerPostalCode(event.target.value);
                 setStatedCounty(""); setCountyCandidates(undefined);
                 setStatedJurisdiction(""); setCrossingCandidates(undefined);
               }}
@@ -346,22 +335,6 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
           {fieldProblem("buyerPostalCode") && (
             <p className="error" id="buyer-postal-error" role="alert">
               {fieldProblem("buyerPostalCode")}
-            </p>
-          )}
-
-          <label>
-            Dealer ZIP code
-            <input
-              name="dealerPostalCode"
-              inputMode="numeric"
-              required
-              defaultValue={initial?.dealerPostalCode}
-              aria-describedby={fieldProblem("dealerPostalCode") ? "dealer-postal-error" : undefined}
-            />
-          </label>
-          {fieldProblem("dealerPostalCode") && (
-            <p className="error" id="dealer-postal-error" role="alert">
-              {fieldProblem("dealerPostalCode")}
             </p>
           )}
 
@@ -410,6 +383,10 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
             </>
           )}
 
+          <DealerFields buyerPostalCode={buyerPostalCode} buyerState={statedJurisdiction}
+            initialLocation={initial?.dealerLocation ?? initial?.dealerPostalCode} />
+          {fieldProblem("dealerCity") && <p className="error" role="alert">{fieldProblem("dealerCity")}</p>}
+          {fieldProblem("dealerState") && <p className="error" role="alert">{fieldProblem("dealerState")}</p>}
           <label>
             How you are paying
             <select name="purchaseMethod" defaultValue={initial?.purchaseMethod ?? "CASH"}>
@@ -463,17 +440,20 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
                   <input name="model" required />
                 </label>
                 <label>
-                  Trim
-                  <input name="trim" required />
+                  Trim (optional)
+                  <input name="trim" />
                 </label>
                 <label>
                   Mileage
-                  <input name="mileage" type="number" min="0" required />
+                  <input name="mileage" type="number" min="0" required aria-describedby="mileage-hint" />
                 </label>
+                <p id="mileage-hint" className="muted">Use 0 if new.</p>
               </>
             )}
           </fieldset>
 
+          <details>
+          <summary>Add more (optional)</summary>
           <label>
             Listing URL (optional)
             <input name="listingUrl" type="url" inputMode="url" />
@@ -485,21 +465,18 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
           </label>
 
           <fieldset className="switches">
-            <legend>Permissions</legend>
-            <p className="muted">
-              Processing your entered details to produce your own report is required. The rest are
-              optional and can be changed later.
-            </p>
+            <legend>Optional permissions</legend>
             <label>
               <input type="checkbox" name="humanReview" />
-              Let a reviewer look at redacted fields if a number needs checking
+              Let a person check redacted fields when a number needs checking
             </label>
             <label>
               <input type="checkbox" name="anonymizedResearch" />
-              Allow anonymized use of my case for research
+              Use my case for research with identifying details removed
             </label>
           </fieldset>
-
+          </details>
+          <p className="muted">Starting means otdog may process what you enter to produce your report.</p>
           <button type="submit" disabled={submitting}>
             {submitting ? "Starting…" : openCase ? "Continue" : "Start my case"}
           </button>

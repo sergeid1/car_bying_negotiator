@@ -34,13 +34,19 @@ function removedName(code: string) {
 }
 
 /** Reachable before any case exists: the Buyer can see what the product returns before uploading. */
-export function SampleReportEntry() {
+export function SampleReportEntry({ entryLink = true }: { entryLink?: boolean }) {
   const [open, setOpen] = useState(false);
   const [sample, setSample] = useState<SampleReport>();
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const section = useRef<HTMLElement>(null);
   // The walkthrough's "See a sample report" arrives at #sample-report and opens the example straight away.
+  useEffect(() => {
+    const show = () => { section.current?.scrollIntoView?.(); section.current?.focus(); void load(); };
+    window.addEventListener("open-sample-report", show);
+    return () => window.removeEventListener("open-sample-report", show);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (window.location.hash !== "#sample-report") return;
     section.current?.scrollIntoView?.();
@@ -66,7 +72,8 @@ export function SampleReportEntry() {
     }
   }
 
-  return <section className="panel sample-report" id="sample-report" tabIndex={-1} ref={section} aria-labelledby="sample-report-heading">
+  return <section className={open ? "panel sample-report" : "sample-report"} id="sample-report" tabIndex={-1} ref={section} aria-label="See an example report">
+    {open && <>
     <div className="section-heading">
       <div>
         <p className="step">Before you upload</p>
@@ -74,10 +81,11 @@ export function SampleReportEntry() {
       </div>
     </div>
     <p>An example Deal Analysis Report built from a synthetic case, so you can see what you receive before starting your own.</p>
+    </>}
     <div className="actions">
       {open
         ? <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Close the example report</button>
-        : <button type="button" className="btn-secondary" onClick={() => void load()}>Open the example report</button>}
+        : entryLink && <a href="#sample-report" onClick={event => { event.preventDefault(); void load(); }}>See an example report</a>}
     </div>
     {open && loading && <p role="status">Loading the example report…</p>}
     {open && failed && <>

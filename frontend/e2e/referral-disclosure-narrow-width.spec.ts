@@ -36,7 +36,8 @@ test("a referral arrival shows its disclosure before upload at 360 px without ho
   expect(new URL(page.url()).search).toBe("");
 
   await page.getByLabel(/your zip code/i).fill("27601");
-  await page.getByLabel(/dealer zip code/i).fill("27604");
+  await page.getByLabel(/dealer city/i).fill("27604");
+  await page.getByLabel("Dealer state").selectOption("NC");
   await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
   await page.getByRole("button", { name: /start my case/i }).click();
 

@@ -64,7 +64,9 @@ class DeskStartAcceptanceTest {
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();
-      var created = post(client, "/api/v1/cases", validCase(), "case");
+      var cityCase = new java.util.HashMap<String, Object>(validCase());
+      cityCase.remove("dealerPostalCode"); cityCase.put("dealerCity", "Raleigh"); cityCase.put("dealerState", "NC");
+      var created = post(client, "/api/v1/cases", cityCase, "case");
       String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
       String base = "/api/v1/cases/" + caseId, start = base + "/desk-start";
       TestDriveAcceptanceTest.agree(app, client, base, caseId, token);
@@ -121,7 +123,8 @@ class DeskStartAcceptanceTest {
       var other = get(client, start + "?documentId=" + otherDocument, token);
       assertThat(other.path("route").asText()).isEqualTo("FRESH_CASE");
       assertThat(other.at("/freshCase/vin").asText()).isEqualTo(OTHER_VIN);
-      assertThat(other.at("/freshCase/dealerPostalCode").asText()).isEqualTo("27604");
+      assertThat(other.at("/freshCase/dealerLocation").asText()).isEqualTo("Raleigh, NC");
+      assertThat(other.at("/freshCase/dealerPostalCode").isNull()).isTrue();
       var refused = call(client, start, token, Map.of("documentId", otherDocument, "route", "AGREED_CAR"));
       assertThat(refused.status()).isEqualTo(409);
       assertThat(refused.body().path("code").asText()).isEqualTo("DIFFERENT_VIN");
