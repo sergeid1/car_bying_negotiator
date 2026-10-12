@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { openCaseStep } from "./case-steps";
 
 for (const state of ["ACCEPTANCE", "WRITTEN_CONFIRMATION", "AGREED", "BLOCKED", "JOURNEY_OPTIONS"]) {
   test(`Agreed Price ${state} fits 360 px`, async ({ page }) => {
@@ -28,6 +29,7 @@ for (const state of ["ACCEPTANCE", "WRITTEN_CONFIRMATION", "AGREED", "BLOCKED", 
     await page.getByLabel("Dealer state").selectOption("NC");
     await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
     await page.getByRole("button", { name: /start my case/i }).click();
+    await openCaseStep(page, "Get quotes");
     const panel = page.locator(".agreed-price-panel");
     await expect(panel.getByRole("heading", { name: "Accept a written quote" })).toBeVisible();
     await expect(panel.getByRole("button", { name: "Refresh acceptance status" })).toBeVisible();

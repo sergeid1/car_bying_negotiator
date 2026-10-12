@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { openCaseStep } from "./case-steps";
 
 const LONG_DEALER = "internet-sales-department.after-hours@a-very-long-dealership-domain-name.example";
 const pass = { pass: true, gateVersion: "outbound-gate.v2", reasons: [] };
@@ -62,6 +63,7 @@ for (const state of ["AWAITING_BUYER", "PAUSED", "TARGET_REACHED"]) {
     await page.getByLabel("Dealer state").selectOption("NC");
     await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
     await page.getByRole("button", { name: /start my case/i }).click();
+    await openCaseStep(page, "Get quotes");
     const panel = page.locator(".negotiation-conversation");
     await expect(panel.getByRole("heading", { name: "Negotiation conversation" })).toBeVisible();
     await expect(panel.getByRole("list", { name: "Conversation, oldest first" })).toBeVisible();

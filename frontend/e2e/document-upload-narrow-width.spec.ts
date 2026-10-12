@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, Page, test } from "@playwright/test";
+import { openCaseStep } from "./case-steps";
 
 const OPTIONS = {
   supported: ["US-NC"],
@@ -68,6 +69,7 @@ async function openCase(page: Page) {
   await page.getByLabel("Dealer state").selectOption("NC");
   await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
   await page.getByRole("button", { name: /start my case/i }).click();
+    await openCaseStep(page, "At the dealer");
   await expect(page.getByRole("heading", { name: /add the dealer's paperwork/i })).toBeVisible();
 }
 

@@ -90,7 +90,7 @@ test("the This case side panel has no automated AA violations", async () => {
       : new Response(JSON.stringify({}), { status: 404 }));
   try {
     const { container } = render(<App />);
-    await userEvent.click(await within(screen.getByRole("banner")).findByRole("button", { name: "This case" }));
+    await userEvent.click(await within(screen.getByRole("main")).findByRole("button", { name: "This case" }));
     await screen.findByRole("dialog", { name: "This case" });
     expect((await axe.run(container, AA)).violations).toEqual([]);
   } finally { window.history.replaceState(null, "", "/"); }
@@ -955,3 +955,24 @@ test("the Florida county chooser has no automated AA violations", async () => {
   await user.selectOptions(await screen.findByLabelText(/Florida county where/), "Suwannee");
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
+
+// Ticket 112: the guided case page, its progress bar and every step panel, at a new case and after the desk check.
+test.each(["NEW", "DESK_COMPARED"] as const)("every step of the guided case page at stage %s has no automated AA violations", async stage => {
+  const { CASE_STEPS } = await import("./CaseFlow");
+  const { caseFlowRecord } = await import("./CaseFlow.fixture");
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => {
+    const body = caseFlowRecord(stage, String(input));
+    return body === undefined ? new Response("{}", { status: 404 }) : new Response(JSON.stringify(body));
+  });
+  window.history.replaceState(null, "", "/#case=case-1&access=secret");
+  const { container } = render(<App pollDelayMs={0} />);
+  const progress = await screen.findByRole("navigation", { name: "Case progress" });
+  await within(progress).findByRole("button", { current: "step" });
+  for (const step of CASE_STEPS) {
+    await userEvent.click(within(progress).getByRole("button", { name: new RegExp(step.name) }));
+    expect(document.getElementById(`case-step-${step.id}-body`)).toBeVisible();
+    expect((await axe.run(container, AA)).violations).toEqual([]);
+  }
+  window.history.replaceState(null, "", "/");
+});
+// End ticket 112.

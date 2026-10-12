@@ -101,7 +101,7 @@ export function VerifiedOfferAnalysis({ caseId, token, offerVersion, pollDelayMs
     {!report && purchaseRequired && <PurchasePoint caseId={caseId} token={token} onPurchased={() => setAttempt(value => value + 1)} />}
     {!report && !purchaseRequired && <div className="panel">
       <h2>Your offer analysis</h2>
-      {waiting ? <p>Verify and freeze your dealer offer to continue to the report.</p> : <>
+      {waiting ? <p>Your report appears here once you check the dealer's offer against the paperwork in this step.</p> : <>
         <ol aria-label="Analysis stages">{labels.map((label, index) => <li key={label} aria-current={index === stage ? "step" : undefined}>{label}{index < stage ? " — complete" : ""}</li>)}</ol>
         {!error && <p role="status">{labels[stage]}…</p>}
       </>}

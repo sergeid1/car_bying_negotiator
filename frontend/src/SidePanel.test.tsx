@@ -51,13 +51,13 @@ test("with no case open the header has no case button, and case links live in th
   expect(within(panel).getByRole("region", { name: "Recover Buying Case access" })).toHaveTextContent("Lost the link?");
 });
 
-test("an open case shows a This case button whose panel holds the case's options", async () => {
+test("an open case shows a This case button on the case page whose panel holds the case's options", async () => {
   window.history.replaceState(null, "", "/#case=case-1&access=token");
   vi.mocked(fetch).mockImplementation(async input => String(input) === "/api/v1/cases/case-1"
     ? new Response(JSON.stringify({ id: "case-1" })) : new Response(JSON.stringify({}), { status: 401 }));
   render(<App />);
   const user = userEvent.setup();
-  await user.click(await within(screen.getByRole("banner")).findByRole("button", { name: "This case" }));
+  await user.click(await within(screen.getByRole("main")).findByRole("button", { name: "This case" }));
   const panel = screen.getByRole("dialog", { name: "This case" });
   expect(within(panel).getByRole("region", { name: "Optional email recovery" })).toBeVisible();
   await user.click(within(panel).getByRole("button", { name: "Close This case" }));

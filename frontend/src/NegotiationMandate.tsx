@@ -20,7 +20,7 @@ const DISCLOSURE_LABELS: Record<Disclosure, string> = {
 };
 const STATUS_LABELS: Record<Status, string> = {
   ACTIVE: "Active", SUPERSEDED: "Replaced by a newer approval", REVOKED: "Revoked",
-  PLAN_CHANGED: "No longer applies: price boundaries changed", EXPIRED: "Expired",
+  PLAN_CHANGED: "No longer applies: your price limits changed", EXPIRED: "Expired",
 };
 const LIFETIMES = [3, 7, 14, 30];
 
@@ -88,7 +88,7 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
   const planChanged = mandates[0]?.status === "PLAN_CHANGED";
 
   return <section className="panel mandate-panel" aria-labelledby="mandate-heading">
-    <h2 id="mandate-heading">Approve a Negotiation Mandate</h2>
+    <h2 id="mandate-heading">Set your negotiating limits</h2>
     <p>A mandate sets the limits for any later contact with a dealer about this car. Approving it sends nothing to any dealer.</p>
     <div className="mandate-terms">
       <section aria-labelledby="mandate-may">
@@ -112,7 +112,7 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
     </div>
     {error && <p role="alert">{error}</p>}
     {proposal && !proposal.available && <p role="status">{proposal.unavailableReason}</p>}
-    {planChanged && <p className="notice">Your price boundaries changed after mandate version {mandates[0].version} was approved, so it no longer applies. Approve a new mandate to continue.</p>}
+    {planChanged && <p className="notice">Your price limits changed after mandate version {mandates[0].version} was approved, so it no longer applies. Approve a new mandate to continue.</p>}
     {current && <section aria-labelledby="mandate-current">
       <h3 id="mandate-current">Current mandate, version {current.version}</h3>
       <dl className="facts">

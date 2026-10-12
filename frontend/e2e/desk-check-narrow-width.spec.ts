@@ -80,6 +80,12 @@ for (const state of ["AWAITING", "DIFFERENCES", "OTHER_CAR", "TRADE", "TRADE_OFF
     await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
     await page.getByRole("button", { name: /start my case/i }).click();
     const panel = page.locator(".desk-check");
+    // A compared paperwork opens on Final check (ticket 112); its button leads to each difference.
+    if (state !== "OTHER_CAR") {
+      await expect(page.getByRole("navigation", { name: "Case progress" }).getByRole("button", { name: /Final check/ }))
+        .toHaveAttribute("aria-current", "step");
+      await page.getByRole("button", { name: "See each difference" }).click();
+    }
     // Opening the agreed case brings the check into view; the camera control is the next tap.
     await expect(panel.getByRole("heading", { name: "Desk Check" })).toBeInViewport();
     await expect(panel.getByLabel("Photograph a page with your camera")).toHaveAttribute("capture", "environment");
