@@ -38,13 +38,15 @@ public class CashEconomicsPersistence {
   /** Whether any effective policy pack exists for a jurisdiction, which is what makes it usable. */
   @Transactional(readOnly = true)
   public boolean hasPolicy(String jurisdiction) {
-    return policies.findTopByJurisdictionOrderByEffectiveAtDesc(jurisdiction).isPresent();
+    return policies.findTopByJurisdictionAndEffectiveAtLessThanEqualOrderByEffectiveAtDesc(
+        jurisdiction, Instant.now()).isPresent();
   }
 
   /** Every jurisdiction with a policy pack, so intake can say which are supported. */
   @Transactional(readOnly = true)
   public java.util.List<String> policyJurisdictions() {
     return policies.findAll().stream()
+        .filter(policy -> !policy.effectiveAt.isAfter(Instant.now()))
         .map(policy -> policy.jurisdiction)
         .distinct()
         .sorted()
@@ -52,14 +54,26 @@ public class CashEconomicsPersistence {
   }
 
   public Policy requirePolicy(String jurisdiction) {
-    JurisdictionPolicyEntity value = policies.findTopByJurisdictionOrderByEffectiveAtDesc(jurisdiction)
+    JurisdictionPolicyEntity value = policies.findTopByJurisdictionAndEffectiveAtLessThanEqualOrderByEffectiveAtDesc(
+        jurisdiction, Instant.now())
         .orElseThrow(() -> new InvalidCashEconomicsException(
             "No cash economics policy is configured for " + jurisdiction));
     return new Policy(value.version, value.jurisdiction, Currency.getInstance(value.currency),
         value.taxRate, Arrays.stream(value.taxableLineTypes.split(","))
             .map(LineType::valueOf).collect(Collectors.toUnmodifiableSet()),
         value.tradeTaxCreditEnabled, value.currencyScale, RoundingMode.valueOf(value.roundingMode),
-        value.reconciliationTolerance);
+        value.reconciliationTolerance, components(value.policyJson));
+  }
+
+  private java.util.List<com.dealanalyzer.economics.CashDealEconomics.TaxComponent> components(String policyJson) {
+    try {
+      var node = json.readTree(policyJson).path("taxComponents");
+      if (node.isMissingNode()) return java.util.List.of();
+      if (!node.isArray() || node.isEmpty()) throw new IllegalStateException("Tax components must be a nonempty array");
+      return json.readerForListOf(com.dealanalyzer.economics.CashDealEconomics.TaxComponent.class).readValue(node);
+    } catch (java.io.IOException exception) {
+      throw new IllegalStateException("Unable to read jurisdiction tax components", exception);
+    }
   }
 
   @Transactional(readOnly = true)

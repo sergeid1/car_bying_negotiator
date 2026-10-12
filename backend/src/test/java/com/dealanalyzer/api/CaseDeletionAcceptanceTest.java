@@ -126,6 +126,7 @@ class CaseDeletionAcceptanceTest {
     // hold no case references, so deleting a case must leave them intact.
     for (String table : tables) {
       if (java.util.Set.of("flyway_schema_history", "jurisdiction_policies", "postal_jurisdictions",
+          "florida_county_surtaxes", "postal_counties",
           "case_deletion_jobs", "case_deletion_attempts",
           "pilot_protocol", "pilot_cohort_totals", "pilot_observations",
           "acquisition_channels", "acquisition_channel_spend", "acquisition_channel_totals",

@@ -13,6 +13,8 @@ public class UnsupportedLocationException extends RuntimeException {
     UNRECOGNIZED_POSTAL_CODE,
     /** The postal code spans a state line and the Buyer has not said which state is theirs. */
     POSTAL_CODE_CROSSES_STATE_LINE,
+    /** Florida county surtax cannot be inferred for a ZIP area spanning counties. */
+    POSTAL_CODE_CROSSES_COUNTY_LINE,
     /** The jurisdiction is real but has no policy pack yet. */
     JURISDICTION_NOT_SUPPORTED
   }

@@ -384,10 +384,18 @@ public class TradeDeskCheck {
       return new TaxCredit("UNAVAILABLE", "The sales tax a trade-in removes is not calculated because the paperwork's "
           + "selling price is missing.", jurisdiction, policy.version(), policy.taxRate(), null);
     // The credit is capped at the taxable basis; the selling price is its lower bound on desk paperwork.
-    BigDecimal credited = BigDecimal.valueOf(Math.min(allowance, Math.max(0, sellingPrice))).movePointLeft(2);
-    long credit = credited.multiply(policy.taxRate()).setScale(policy.currencyScale(), policy.roundingMode())
+    BigDecimal basis = BigDecimal.valueOf(Math.max(0, sellingPrice), 2);
+    BigDecimal withTrade = basis.subtract(BigDecimal.valueOf(allowance, 2)).max(BigDecimal.ZERO);
+    long credit = com.dealanalyzer.economics.CashDealEconomicsCalculator.taxAt(basis, policy)
+        .setScale(policy.currencyScale(), policy.roundingMode())
+        .subtract(com.dealanalyzer.economics.CashDealEconomicsCalculator.taxAt(withTrade, policy)
+            .setScale(policy.currencyScale(), policy.roundingMode()))
         .movePointRight(2).longValueExact();
-    return new TaxCredit("AVAILABLE", null, jurisdiction, policy.version(), policy.taxRate(), credit);
+    String explanation = jurisdiction.startsWith("US-FL:")
+        ? "Florida state tax plus " + jurisdiction.substring(6)
+            + " County surtax on the first $5,000 of the taxable price after the trade-in."
+        : null;
+    return new TaxCredit("AVAILABLE", explanation, jurisdiction, policy.version(), policy.taxRate(), credit);
   }
 
   /**

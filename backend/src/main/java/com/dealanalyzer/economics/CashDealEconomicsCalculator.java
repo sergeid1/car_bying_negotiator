@@ -44,10 +44,11 @@ public final class CashDealEconomicsCalculator {
         .add(sum(offer, LineType.CREDIT, null));
 
     BigDecimal taxableCharges = taxableCharges(offer, vehicleSubtotal, policy);
-    BigDecimal availableTaxCredit = policy.tradeTaxCreditEnabled() ? taxCredits(offer) : ZERO;
+    BigDecimal availableTaxCredit = policy.tradeTaxCreditEnabled()
+        ? (policy.taxComponents().isEmpty() ? taxCredits(offer) : tradeAllowance) : ZERO;
     BigDecimal appliedTaxCredit = availableTaxCredit.min(taxableCharges.max(ZERO));
     BigDecimal taxableBasis = taxableCharges.subtract(appliedTaxCredit).max(ZERO);
-    BigDecimal unroundedTax = taxableBasis.multiply(policy.taxRate());
+    BigDecimal unroundedTax = taxAt(taxableBasis, policy);
     BigDecimal taxes = unroundedTax.setScale(policy.currencyScale(), policy.roundingMode());
     BigDecimal otd = vehicleSubtotal.add(dealerCharges).add(governmentCharges)
         .add(unknownCharges).add(taxes);
@@ -73,10 +74,17 @@ public final class CashDealEconomicsCalculator {
         new PriceReductions(amount(discounts, policy), amount(verifiedRebates, policy),
             amount(excludedRebates, policy), amount(discounts.add(verifiedRebates), policy)),
         new TaxCalculation(taxableCharges, availableTaxCredit, appliedTaxCredit, taxableBasis,
-            policy.taxRate(), unroundedTax),
+            policy.taxRate(), unroundedTax, policy.taxComponents()),
         new RoundingDisclosure(policy.currencyScale(), policy.roundingMode(),
             "TAX_AND_FINAL_MONETARY_OUTPUTS"),
         reconciliation, List.copyOf(classified));
+  }
+
+  /** Shared by economics and the outside trade-offer comparison. */
+  public static BigDecimal taxAt(BigDecimal basis, Policy policy) {
+    return policy.taxComponents().isEmpty() ? basis.max(ZERO).multiply(policy.taxRate())
+        : policy.taxComponents().stream().map(component -> component.tax(basis))
+            .reduce(ZERO, BigDecimal::add);
   }
 
   private static BigDecimal taxableCharges(Offer offer, BigDecimal vehicleSubtotal, Policy policy) {
