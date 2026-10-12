@@ -30,7 +30,8 @@ import { NegotiationConversation } from "./NegotiationConversation";
 import { JourneyCandidates, ShortlistEntry } from "./JourneyCandidates";
 import { QuoteComparison } from "./QuoteComparison";
 import { Passkeys } from "./Passkeys";
-import { Passwords, PasswordSignIn } from "./Passwords";
+import { Passwords } from "./Passwords";
+import { SignIn } from "./SignIn";
 import { DeskTactics } from "./DeskTactics";
 import { syntheticTactic, syntheticTradeTactics } from "./DeskTactics.fixture";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -44,7 +45,7 @@ test("worksheet tactics and pending questions have no automated AA violations", 
 test.each([false, true])("password management and sign-in have no automated AA violations (%s)", async configured => {
   const request = vi.fn().mockResolvedValue(new Response(JSON.stringify({ configured })));
   const { container } = render(<main><h1>Account</h1><Passwords request={request} onSessionEnded={() => {}} />
-    <PasswordSignIn request={request} onSignedIn={async () => {}} /></main>);
+    <SignIn request={request} onSignedIn={async () => {}} /></main>);
   await screen.findByRole("button", { name: configured ? "Change password" : "Set password" });
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
@@ -62,14 +63,30 @@ test.each([undefined, "a.long.buyer.address@example.com"])("header account contr
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 
-test.each([["Sign in", "Sign in"], ["Your case", "Your Buying Case"]])("the %s side panel has no automated AA violations", async (button, title) => {
+test("the Sign in side panel, with its private case link disclosure open, has no automated AA violations", async () => {
   vi.spyOn(globalThis, "fetch").mockImplementation(async input => String(input) === "/api/v1/account"
     ? new Response(JSON.stringify({ code: "SESSION_ENDED" }), { status: 401 })
     : new Response(JSON.stringify({}), { status: 404 }));
   const { container } = render(<App />);
-  await userEvent.click(within(screen.getByRole("banner")).getByRole("button", { name: button }));
-  await screen.findByRole("dialog", { name: title });
+  await userEvent.click(within(screen.getByRole("banner")).getByRole("button", { name: "Sign in" }));
+  const panel = await screen.findByRole("dialog", { name: "Sign in" });
+  await within(panel).findByRole("button", { name: "Continue" });
+  await userEvent.click(within(panel).getByText("Have a private case link?"));
   expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+
+test("the This case side panel has no automated AA violations", async () => {
+  window.history.replaceState(null, "", "/#case=case-1&access=token");
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => String(input) === "/api/v1/account"
+    ? new Response(JSON.stringify({ code: "SESSION_ENDED" }), { status: 401 })
+    : String(input) === "/api/v1/cases/case-1" ? new Response(JSON.stringify({ id: "case-1" }))
+      : new Response(JSON.stringify({}), { status: 404 }));
+  try {
+    const { container } = render(<App />);
+    await userEvent.click(await within(screen.getByRole("banner")).findByRole("button", { name: "This case" }));
+    await screen.findByRole("dialog", { name: "This case" });
+    expect((await axe.run(container, AA)).violations).toEqual([]);
+  } finally { window.history.replaceState(null, "", "/"); }
 });
 
 // Ticket 63: acceptance, written confirmation and saved agreement states.

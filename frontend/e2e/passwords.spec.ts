@@ -23,6 +23,7 @@ for (const width of [360, 1280]) {
           "Set-Cookie": "account_session=password-session; HttpOnly; Secure; SameSite=Strict; Path=/api/v1; Max-Age=1209600" } });
       }
       if (path === "/api/v1/account/sign-out") { signedIn = false; return route.fulfill({ status: 204 }); }
+      if (path === "/api/v1/account/sign-in-requests") return route.fulfill({ status: 202, json: { status: "sent" } });
       if (path.endsWith("/notifications") || path.endsWith("/passkeys")) return route.fulfill({ json: [] });
       if (path.endsWith("/intake-options")) return route.fulfill({ json: { supported: ["US-NC"], consentPolicies: {} } });
       return route.fulfill({ json: {} });
@@ -35,9 +36,16 @@ for (const width of [360, 1280]) {
     await panel.getByRole("button", { name: "Set password", exact: true }).click();
     await expect(panel.getByText("A password is set.")).toBeVisible();
     await panel.getByRole("button", { name: "Sign out", exact: true }).click();
-    await panel.getByLabel("Email for password sign-in", { exact: true }).fill(account.contact.email);
-    await panel.getByLabel("Password", { exact: true }).fill(password);
+    // The one email box leads to the password; its emailed link is the fallback.
+    await panel.getByLabel("Email", { exact: true }).fill(account.contact.email);
+    await panel.getByRole("button", { name: "Continue" }).click();
     await panel.getByRole("button", { name: "Sign in with a password" }).click();
+    await expect(panel.getByLabel("Password", { exact: true })).toBeFocused();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    expect((await new AxeBuilder({ page }).include("[aria-label='Buyer Account']")
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze()).violations).toEqual([]);
+    await panel.getByLabel("Password", { exact: true }).fill(password);
+    await panel.getByRole("button", { name: "Sign in", exact: true }).click();
     // Signing in closes the panel, as a sign-in window does; the Buyer's email reopens the account.
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await openAccount();

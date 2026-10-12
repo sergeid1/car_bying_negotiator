@@ -1,9 +1,10 @@
-import { createContext, FormEvent, useEffect, useRef, useState } from "react";
+import { createContext, useEffect, useState } from "react";
 import type { Credentials } from "./CasePortability";
 import { MailboxConnection } from "./MailboxConnection";
-import { Passkeys, passkeysSupported, signInWithPasskey } from "./Passkeys";
-import { Passwords, PasswordSignIn } from "./Passwords";
+import { Passkeys } from "./Passkeys";
+import { Passwords } from "./Passwords";
 import { openSidePanel } from "./SidePanel";
+import { SignIn } from "./SignIn";
 
 type Contact = { email: string; firstName: string | null; lastName: string | null; phone: string | null };
 type AttachedCase = {
@@ -67,8 +68,10 @@ function startedOn(value?: string | null) {
  * `onSignedIn` reports whether the account has loaded successfully.
  * Changing `recheck` re-reads the account, so a panel that saw the session end can sign it out here.
  */
-export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOpened, onSignInComplete, recheck = 0 }: {
+export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOpened, onSignInComplete, recheck = 0, showing = true }: {
   caseCredentials?: Credentials; onSignedIn?: (signedIn: boolean) => void; recheck?: number;
+  /** Whether the Buyer can see this panel; the email box offers saved passkeys only then. */
+  showing?: boolean;
   /** The Buyer finished signing in here, by email link, password or passkey. */
   onSignInComplete?: () => void;
   onControls?: (controls: AccountControls) => void;
@@ -159,26 +162,16 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
     {error && <p role="alert">{error}</p>}
   </section>;
 
+  // The side panel's own title says "Sign in"; nothing but this line sits above the email box.
   if (!account) return <section id="buyer-account" tabIndex={-1} className="panel" aria-label="Buyer Account">
-    <h2>Buyer Account</h2>
-    <p>Optional. Analysis works without an account. An account keeps your Buying Cases in one place for decisions that
-      take more than a day. Email sign-in links expire in 15 minutes. You can also add a passkey or optional password after signing in.</p>
-    <p>Entering your email creates an account if none exists. No account is needed to analyze a deal.
-      A private case link opens one case; signing in opens the cases saved to your account. Keep your case link
-      if you want to return without signing in.</p>
+    <p className="sign-in-lede">Optional. Keeps your cases in one place.</p>
     {finishLink}
     {loading && !error && <p role="status">Loading your account…</p>}
     {error && <button className="btn-secondary" onClick={() => { setError(""); setLoads(loads + 1); }}>Retry loading account</button>}
-    {!loading && <><SignInRequest busy={busy} run={run} setMessage={setMessage} />
-      <PasswordSignIn request={call} onSignedIn={async () => {
-        setAccount(await (await call("/api/v1/account")).json()); setMessage("Signed in with a password."); onSignInComplete?.();
-      }} />
-      <button className="btn-secondary" disabled={busy || !passkeysSupported()} onClick={() => void run(async () => {
-        await signInWithPasskey(call);
-        setAccount(await (await call("/api/v1/account")).json()); setMessage("Signed in with a passkey."); onSignInComplete?.();
-      }, "Passkey sign-in could not be completed. Try again or use an email link.")}>Sign in with a passkey</button>
-      {!passkeysSupported() && <p>This browser does not support passkeys. Use an email sign-in link.</p>}
-    </>}
+    {!loading && !linkSecret && <SignIn request={call} offerPasskeys={showing} onSignedIn={async method => {
+      setAccount(await (await call("/api/v1/account")).json());
+      setMessage(method === "password" ? "Signed in with a password." : "Signed in with a passkey."); onSignInComplete?.();
+    }} />}
     {message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
   </section>;
 
@@ -297,21 +290,6 @@ function NotificationPreferences({ onSessionEnded }: { onSessionEnded: () => voi
       onClick={() => setLoads(loads + 1)}>Retry email preferences</button>}</>}
     {notice && <p role="status">{notice}</p>}
   </fieldset>;
-}
-
-function SignInRequest({ busy, run, setMessage }: {
-  busy: boolean; run: (action: () => Promise<void>, failure: string) => Promise<void>; setMessage: (value: string) => void;
-}) {
-  const [email, setEmail] = useState("");
-  const key = useRef(crypto.randomUUID());
-  return <form onSubmit={(event: FormEvent) => { event.preventDefault(); void run(async () => {
-    const result = await (await call("/api/v1/account/sign-in-requests", { method: "POST", key: key.current, body: JSON.stringify({ email }) })).json();
-    key.current = crypto.randomUUID(); setMessage(result.status);
-  }, "The sign-in link could not be sent. Retry safely."); }}>
-    <label>Email for sign-in<input type="email" autoComplete="email" required maxLength={254} value={email}
-      onChange={event => { setEmail(event.target.value); key.current = crypto.randomUUID(); }} /></label>
-    <button disabled={busy}>Email me a sign-in link</button>
-  </form>;
 }
 
 function ContactForm({ account, busy, onSave }: {
