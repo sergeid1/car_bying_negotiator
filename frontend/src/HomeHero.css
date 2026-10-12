@@ -3,7 +3,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: clamp(32px, 6vw, 64px);
-  padding: clamp(8px, 2vw, 24px) 0 clamp(16px, 3vw, 40px);
+  padding: 0 0 clamp(16px, 3vw, 40px);
 }
 .home-hero .hero-copy { max-width: 760px; }
 .home-hero h1 { font-size: clamp(2rem, 4.2vw, 3.5rem); line-height: 1.1; margin: 0 0 16px; }
@@ -14,3 +14,6 @@
 @media (max-width: 760px) {
   .home-hero .hero-visual { display: none; }
 }
+/* The hero sits closer to the header than other pages' first panel. */
+main:has(> .home-hero) { padding-top: clamp(16px, 3vw, 36px); }
+.home-hero .lede { max-width: 60ch; }

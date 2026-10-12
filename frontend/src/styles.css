@@ -355,8 +355,8 @@ main > * + * { margin-top: 22px; }
 .hero h1 .hero-quiet { color: var(--ink-muted); }
 .hero-credo { margin: 14px 0 0; color: var(--ink-strong); font-weight: 600; }
 
-/* One workflow column, aligned with the logo and the hero; case access and the account open in side panels. */
-.workspace { width: min(780px, 100%); }
+/* One workflow column spanning the header, from the logo's edge to the account button's; case access and the account open in side panels. */
+.workspace { width: 100%; }
 .column { display: grid; gap: 18px; align-content: start; min-width: 0; }
 .column:focus { outline: none; }
 
@@ -1895,7 +1895,6 @@ fieldset.trade-choices input[type="radio"] { flex: none; width: 20px; height: 20
 
 /* Ticket 107: the how-it-works walkthrough and the start screen's card. Without pinning it is an
    ordered list of scenes and example screens; pinning needs motion and room for two columns. */
-.workspace:has(.how-it-works) { width: min(1080px, 100%); }
 .how-it-works { min-width: 0; }
 .walkthrough-index { display: grid; gap: 4px; }
 .walkthrough { display: grid; gap: 40px; margin: 28px 0 0; padding: 0; list-style: none; counter-reset: walkthrough; }
