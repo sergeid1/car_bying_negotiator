@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, Page, test } from "@playwright/test";
+import { openCaseStep } from "./case-steps";
 
 const OPTIONS = {
   supported: ["US-NC"],
@@ -38,7 +39,8 @@ async function openCase(page: Page) {
   await page.getByLabel(/dealer zip code/i).fill("27604");
   await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
   await page.getByRole("button", { name: /start my case/i }).click();
-  await expect(page.getByRole("heading", { name: "Approve a Negotiation Mandate" })).toBeVisible();
+    await openCaseStep(page, "Compare & negotiate");
+  await expect(page.getByRole("heading", { name: "Set your negotiating limits" })).toBeVisible();
 }
 
 async function expectNoOverflowOrViolations(page: Page) {

@@ -510,7 +510,7 @@ export function DealerDocumentUpload({
     <section className="panel" aria-labelledby={heading?.id ?? "documents-heading"}>
       <div className="section-heading">
         <div>
-          <p className="step">{heading?.step ?? "Step 2 of 3"}</p>
+          <p className="step">{heading?.step ?? "Dealer paperwork"}</p>
           <h2 id={heading?.id ?? "documents-heading"}>{heading?.title ?? "Add the Dealer's paperwork"}</h2>
         </div>
       </div>

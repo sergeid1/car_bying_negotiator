@@ -72,7 +72,7 @@ test("a malformed or absent code is not sent and never blocks the case", async (
   expect(window.location.search).toBe("");
 
   await startCase();
-  await screen.findByRole("heading", { name: /add the dealer's paperwork/i });
+  await screen.findByRole("navigation", { name: "Case progress" });
   expect(calls.find(call => call.url.endsWith("/api/v1/cases"))!.body).not.toHaveProperty("channel");
 });
 
@@ -84,7 +84,7 @@ test("a referral partnership's disclosure is shown before the upload step and pa
   await startCase();
   const disclosure = await screen.findByRole("region", { name: "How you reached us" });
   expect(disclosure).toHaveTextContent(DISCLOSURE);
-  const upload = await screen.findByRole("heading", { name: /add the dealer's paperwork/i });
+  const upload = await screen.findByRole("heading", { name: /add the dealer's paperwork/i, hidden: true });
   expect(disclosure.compareDocumentPosition(upload) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
   const result = await axe.run(container, {
