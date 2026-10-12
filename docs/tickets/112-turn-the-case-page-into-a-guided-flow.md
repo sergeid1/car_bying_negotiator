@@ -7,11 +7,11 @@ last. Only two sections carry step numbers ("Step 2 of 3", "Step 3 of 3"), and s
 yet still show, with "unavailable" or "Requires a verified offer" messages. Operator request on 2026-10-12,
 from a design review of the running client; the operator approved the progress bar and greyed-out later steps.
 
-**Blocked by:** 111 — Simplify the home page and the start form, because both change the page shell and the
-same hot files (`App.tsx`, `styles.css`, `Accessibility.test.tsx`). Run it alone, with no other client ticket
-alongside.
+**Blocked by:** none. It runs in parallel with 110 and 111 (operator decision, 2026-10-12); the three share
+`App.tsx`, `styles.css` and `Accessibility.test.tsx`, so each keeps to the file ownership in its coordinator
+assignment.
 
-**Status:** open — agent-ready once the operator confirms the step names below. Client only; if a step's
+**Status:** open — agent-ready. The step names below are placeholders until the operator confirms them. Client only; if a step's
 "done" state cannot be read from the existing case endpoints, raise it with the coordinator before adding an
 endpoint.
 

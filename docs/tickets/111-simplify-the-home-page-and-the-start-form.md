@@ -7,10 +7,9 @@ my case" sits about 1,200 px down, below the example report card. The form asks 
 Buyers do not know, and requires the trim. The header carries a "Scope" link that Buyers do not understand.
 Operator request on 2026-10-12, from a design review of the running client.
 
-**Blocked by:** 110 — Make sign-in one email box and one button, only because both touch the header and the
-same hot files (`App.tsx`, `styles.css`, `Accessibility.test.tsx`). Ticket 107 also adds a link from the home
-page to the walkthrough; whichever lands second keeps that link as a secondary text link, not a second main
-button.
+**Blocked by:** none. It runs in parallel with 110 and 112 (operator decision, 2026-10-12); the three share
+`App.tsx`, `styles.css` and `Accessibility.test.tsx`, so each keeps to the file ownership in its coordinator
+assignment.
 
 **Status:** open — agent-ready. Client plus a small intake API change; no migration is expected, because
 `analysis_cases.dealer_location` is already `VARCHAR(200)`.
@@ -19,8 +18,8 @@ button.
 
 - One headline, one sentence, one main button: **Check my deal**, which scrolls to and focuses the start form.
   The operator may change the wording.
-- "See an example report" becomes a text link beside the button. The example report card leaves the space
-  above the form.
+- "See an example report" and ticket 107's "How it works" become text links beside the button. The example
+  report card and the how-it-works card leave the space above the form.
 - Replace the engineering badges with up to three points a Buyer cares about, such as "Free for Buyers",
   "No account needed" and "We never work for dealers". Every claim must pass `PilotCopyClaimsTest` and
   `docs/grounded-language-policy.md`.
@@ -50,7 +49,11 @@ Ask in this order, and show the step as "Step 1" only when ticket 112's progress
   fallback explicit and covered by a test.
 - Desk Start and Desk Check copy `dealer_location` into a fresh case. Carry "City, ST" through, and have the
   at-the-dealer form (`AtTheDealer.tsx` `CaseFields`) ask for city and state the same way.
-- The account case list already shows `dealer_location`; check that "City, ST" reads well there.
+- The market assessment (`MarketAssessmentService`) passes `dealer_location` to the market provider as the
+  search location. Use the dealer ZIP when the Buyer gave one, otherwise the Buyer's ZIP, and cover both with a
+  test.
+- The account case list labels the location "Dealer ZIP …" (`BuyerAccountService`); label "City, ST" as the
+  dealer's city instead, and keep reading older cases that stored a ZIP.
 
 ## Done when
 
@@ -58,7 +61,7 @@ Ask in this order, and show the step as "Step 1" only when ticket 112's progress
 - [ ] No form asks for a dealer ZIP code; dealer city and state are stored and shown on the case and in the
       account list.
 - [ ] A case can be started with year, make, model and mileage and no trim.
-- [ ] Trade valuation without a dealer ZIP uses the Buyer's ZIP, with a test.
+- [ ] Trade valuation and the market search without a dealer ZIP use the Buyer's ZIP, with tests.
 - [ ] Optional fields are collapsed by default and keep their values when expanded.
 - [ ] `mvn -Dtest=` the intake, desk-start and trade-desk acceptance tests, `npm test`, `npm run build` and
       `npx playwright test` pass, including the intake and at-the-dealer narrow-width specs and the axe sweep.

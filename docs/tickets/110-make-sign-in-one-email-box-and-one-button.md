@@ -7,8 +7,9 @@ a password box, a passkey button, and "Forgot password? Use 'Email me a sign-in 
 has two buttons that both mean "get back to my stuff": "Your case" and "Sign in". Operator request on
 2026-10-12, from a design review of the running client.
 
-**Blocked by:** none. It touches hot files (`App.tsx`, `styles.css`, `Accessibility.test.tsx`), so run it
-before 111 and 112, not alongside them.
+**Blocked by:** none. It runs in parallel with 111 and 112 (operator decision, 2026-10-12); the three share
+`App.tsx`, `styles.css` and `Accessibility.test.tsx`, so each keeps to the file ownership in its coordinator
+assignment.
 
 **Status:** open — agent-ready. Client only; no API or migration change is expected.
 
