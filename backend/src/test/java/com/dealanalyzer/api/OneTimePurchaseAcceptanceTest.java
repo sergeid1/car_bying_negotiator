@@ -146,6 +146,14 @@ class OneTimePurchaseAcceptanceTest {
       assertThat(sample.at("/report/analysis/limitations").get(0).asText()).isNotBlank();
       assertThat(sample.at("/report/analysis/economics/steps/0/name").asText()).isEqualTo("vehicle subtotal");
       assertThat(sample.at("/report/analysis/economics/outTheDoorTotal/minorUnits").asLong()).isEqualTo(2847500L);
+      // The example page draws the Buyer's report view, so the sample carries that view's fields too.
+      assertThat(sample.at("/report/status").asText()).isEqualTo("COMPLETE");
+      assertThat(sample.at("/report/analysis/reviewLabel").asText()).isEqualTo("Review required");
+      assertThat(sample.at("/report/analysis/marketAvailability").asText()).isEqualTo("AVAILABLE");
+      var amounts = new java.util.HashMap<String, Long>();
+      sample.at("/report/analysis/materialAmounts").forEach(row -> amounts.put(row.path("label").asText(), row.path("minorUnits").asLong()));
+      assertThat(amounts).containsEntry("Out-the-door total", 2847500L).containsEntry("Selling price", 2500000L)
+          .containsEntry("Market selling-price low", 2450000L).containsEntry("Market selling-price high", 2700000L);
       assertThat(sample.toString()).doesNotContain("1HGCM82633A004352", "27601", "27604");
       var mapper = app.context().getBean(ObjectMapper.class);
       com.dealanalyzer.buyingcase.SyntheticAnalysisRequest input;
