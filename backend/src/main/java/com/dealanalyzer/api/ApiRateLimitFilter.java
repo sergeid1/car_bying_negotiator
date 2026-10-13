@@ -35,7 +35,7 @@ class ApiRateLimitFilter extends OncePerRequestFilter {
       // Never trust client-supplied forwarding headers or use attacker-selected tokens as keys.
       long now = System.nanoTime();
       long retry = api.acquire(request.getRemoteAddr(), now);
-      if (retry == 0 && isEmailRequest(request)) retry = email.acquire(request.getRemoteAddr(), now);
+      if (retry == 0 && isPeerLimitedRequest(request)) retry = email.acquire(request.getRemoteAddr(), now);
       if (retry > 0) {
         response.setStatus(429);
         response.setHeader("Retry-After", Long.toString(retry));
@@ -47,12 +47,15 @@ class ApiRateLimitFilter extends OncePerRequestFilter {
     chain.doFilter(request, response);
   }
 
-  private static boolean isEmailRequest(HttpServletRequest request) {
+  /** Unauthenticated routes that send email, and the Google and Apple sign-in start and callback routes. */
+  private static boolean isPeerLimitedRequest(HttpServletRequest request) {
+    if ("GET".equals(request.getMethod())) return request.getServletPath().equals("/api/v1/account/social-sign-in/google/callback");
     if (!"POST".equals(request.getMethod())) return false;
     // The container decodes the servlet path and removes path parameters before routing.
     String path = request.getServletPath();
     return path.equals("/api/v1/account/sign-in-requests") || path.equals("/api/v1/recovery/requests")
-        || path.matches("/api/v1/cases/[^/]+/recovery-email");
+        || path.matches("/api/v1/cases/[^/]+/recovery-email") || path.equals("/api/v1/account/social-sign-in")
+        || path.equals("/api/v1/account/social-sign-in/apple/callback");
   }
 
   static final class PeerQuota {

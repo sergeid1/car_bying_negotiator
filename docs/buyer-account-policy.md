@@ -116,6 +116,82 @@ mail is suppressed remain unverified and are purged by the same abandoned-sign-u
 These limits reset on restart and are not shared across replicas; ingress still needs shared
 quotas. See the [operator procedure](hardening-runbook.md).
 
+## Google and Apple sign-in
+
+Ticket 113. A Buyer can create a Buyer Account or sign in to one with their Google or Apple
+account, next to the email link, passkeys and password. Facebook is not offered.
+
+The flow is the OpenID Connect authorization code flow with PKCE, a `nonce` and a single-use
+`state`. Only the server redeems the authorization code; it never reaches page scripts. Routes
+under `/api/v1/account/social-sign-in`:
+
+- `GET /providers` returns `{"providers": [...]}` listing only configured providers, in the
+  order `GOOGLE`, `APPLE`, so the client hides buttons that cannot work.
+- `POST` with `{"provider": "GOOGLE" | "APPLE"}` and `Account-Request: 1` needs no session. It
+  stores an attempt keyed by the scoped HMAC of the `state`, with the provider, the PKCE verifier
+  and nonce (AES-GCM encrypted under a key derived from the account data key and bound to the
+  attempt and purpose) and the HMAC of a browser-binding cookie, `social_sign_in_binding`
+  (`HttpOnly`, `Secure` as the session cookie, `SameSite=Strict`,
+  `Path=/api/v1/account/social-sign-in`). A browser that already holds a binding cookie keeps it,
+  so attempts started in two tabs both stay usable. It returns `{"authorizationUrl": "..."}`.
+  An unconfigured provider is 404 `SOCIAL_SIGN_IN_UNAVAILABLE`.
+- The provider returns the browser to `{redirect-base}/api/v1/account/social-sign-in/google/callback`
+  (`GET ?code&state`) or `.../apple/callback` (a cross-site form `POST`, because Apple's `email`
+  scope requires `response_mode=form_post`). The callback stores the code, encrypted, against an
+  open attempt of that provider and answers `303` to `{case.recovery.public-url}#social-sign-in=<state>`.
+  A cancelled consent (`access_denied`, `user_cancelled_authorize`) answers
+  `#social-sign-in-error=cancelled`; any other provider error, an unknown, used or expired state,
+  or the other provider's state answers `#social-sign-in-error=failed`. Callbacks never set or
+  read the session cookie: a Strict cookie is not sent on a cross-site navigation.
+- `POST /complete` with `{"state": "..."}` and `Account-Request: 1` consumes the attempt whatever
+  happens next. The binding cookie must match (login-CSRF protection) and the attempt must be
+  unexpired, unused and hold a code. The server exchanges the code and checks the ID token's
+  issuer, audience (exactly this client), expiry, `nbf`, `azp`, nonce and `sub`, and requires
+  `email_verified` to be true. It answers `{"expiresAt": ..., "provider": "GOOGLE" | "APPLE"}`, sets
+  the same `account_session` cookie as other sign-ins and clears the binding cookie. Every refusal
+  is 400 `SOCIAL_SIGN_IN_FAILED` with "Sign-in with Google could not be completed. Try again or
+  continue with your email." (or Apple); a state the server never issued, whose provider is
+  unknown, says "Google or Apple". A provider that cannot be reached is 503
+  `SOCIAL_SIGN_IN_UNAVAILABLE`. A consumed attempt keeps only its provider and times until the
+  worker removes it after expiry; its verifier, nonce and code are erased on consumption.
+
+Which account: V55's `buyer_account_identities` links `(provider, scoped HMAC of sub)` to an
+account. A known identity signs in to its account. An unknown identity uses the verified email's
+keyed lookup, as email sign-in does, creates the account through the same enrollment if there is
+none, marks it verified, and links the identity. Linking to an account that already existed
+records the `SOCIAL_SIGN_IN_LINKED` security event and sends the mandatory `ACCOUNT_SECURITY`
+notification, as password changes do. An account awaiting deletion cannot sign in; the response
+is the same 400. Apple private-relay addresses are ordinary addresses here: an Apple account that
+hides its email gets its own Buyer Account unless the Buyer later signs in with that relay
+address another way.
+
+Sessions record `sign_in_method` `GOOGLE` or `APPLE`. They count as strong sign-ins like the email
+link and passkeys: they may start a mailbox connection and register passkeys.
+
+Data kept: the provider, the keyed `sub` hash and the link date. The provider's access, refresh
+and ID tokens are discarded once the ID token is checked; nothing from the provider is stored
+after sign-in. The export lists each linked provider and its link date, never the `sub` or its
+hash. Account deletion removes and count-verifies the identities with the rest of the account
+graph. The unauthenticated start and callback routes share the per-network-peer quota with the
+sign-in and recovery email routes (above).
+
+Configuration:
+
+- `account.social-sign-in.redirect-base` (`SOCIAL_SIGN_IN_REDIRECT_BASE`, default
+  `${case.recovery.public-url}`); register both callback URLs with the providers exactly.
+- `account.social-sign-in.attempt-lifetime` (default `PT10M`, at most one hour).
+- Google: `account.social-sign-in.google.client-id` / `.client-secret`
+  (`SOCIAL_SIGN_IN_GOOGLE_CLIENT_ID`, `SOCIAL_SIGN_IN_GOOGLE_CLIENT_SECRET`), scopes `openid email`.
+  They may reuse the mailbox Google project, but they are separate settings.
+- Apple: `.apple.client-id` (the Services ID), `.apple.team-id`, `.apple.key-id` and
+  `.apple.private-key` (the PKCS #8 PEM of the Sign in with Apple key; escaped `\n` line breaks
+  are accepted), with `SOCIAL_SIGN_IN_APPLE_*` environment variables. The client secret is an ES256
+  JWT valid for five minutes, signed per token request with the JDK's `SHA256withECDSA` and
+  converted from DER to JOSE form.
+- A provider with blank settings is not offered. Pilot/production declarations refuse partial
+  settings for a provider, a non-HTTPS redirect base, and the token/authorization endpoint
+  overrides that tests use to stub the providers over loopback. No fake provider exists.
+
 ## Passkeys
 
 A signed-in Buyer may add up to 20 discoverable passkeys, name each one, list creation and
@@ -229,7 +305,7 @@ the same unavailable 404 response as an unknown case on case reads and writes.
 ## Export and deletion
 
 `POST /api/v1/account/export` returns a ZIP built on request and never stored: `account.json`
-plus, for each attached case, the same case archive a case export produces. A case with saved
+(including linked Google or Apple sign-ins as provider and link date) plus, for each attached case, the same case archive a case export produces. A case with saved
 reports that still require purchase is listed as `PURCHASE_REQUIRED`, matching the case export
 gate; an expired or pending case is `UNAVAILABLE`.
 
