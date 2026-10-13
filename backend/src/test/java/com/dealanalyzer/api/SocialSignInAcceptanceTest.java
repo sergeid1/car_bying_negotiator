@@ -424,7 +424,7 @@ class SocialSignInAcceptanceTest {
     }
   }
 
-  @Test void discoveryListsOnlyConfiguredProvidersAndStartsShareThePeerQuota() throws Exception {
+  @Test void discoveryListsOnlyConfiguredProvidersAndRetriesLeaveTheEmailQuota() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("social-sign-in-google", false,
         BuyerAccountAcceptanceTest.EmailConfiguration.class,
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef",
@@ -440,9 +440,15 @@ class SocialSignInAcceptanceTest {
       assertThat(unavailable.body().path("code").asText()).isEqualTo("SOCIAL_SIGN_IN_UNAVAILABLE");
       assertThat(callback(base, "google", Map.of("code", "x", "state", "unknown")).location()).isEqualTo(ORIGIN + "#social-sign-in-error=failed");
       assertThat(browser.start("APPLE").status()).isEqualTo(404);
-      var limited = browser.start("GOOGLE");
-      assertThat(limited.status()).isEqualTo(429);
-      assertThat(browser.send("GET", ROOT + "/providers", null, null, false).status()).as("discovery is not peer limited").isEqualTo(200);
+      // Start and callback send no email: retries stay under the general API limiter and leave the email quota alone.
+      for (int i = 0; i < 5; i++) {
+        assertThat(browser.start("GOOGLE").status()).isEqualTo(404);
+        assertThat(callback(base, "google", Map.of("code", "x", "state", "unknown")).status()).isEqualTo(303);
+        assertThat(callback(base, "apple", Map.of("code", "x", "state", "unknown")).status()).isEqualTo(303);
+      }
+      for (int i = 0; i < 3; i++) assertThat(emailSignInRequest(base, "buyer" + i + "@example.com").status())
+          .as("emailed sign-in still has its whole quota").isEqualTo(202);
+      assertThat(emailSignInRequest(base, "buyer@example.com").status()).isEqualTo(429);
     }
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("social-sign-in-google-only", false,
         BuyerAccountAcceptanceTest.EmailConfiguration.class,
@@ -455,6 +461,12 @@ class SocialSignInAcceptanceTest {
       assertThat(browser.start("APPLE").body().path("code").asText()).isEqualTo("SOCIAL_SIGN_IN_UNAVAILABLE");
       assertThat(browser.start("GOOGLE").status()).isEqualTo(200);
     }
+  }
+
+  private static Response emailSignInRequest(String base, String email) throws Exception {
+    return exchange(HttpRequest.newBuilder(URI.create(base + "/api/v1/account/sign-in-requests"))
+        .header("Content-Type", "application/json").header("Idempotency-Key", UUID.randomUUID().toString())
+        .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(Map.of("email", email)))).build());
   }
 
   private static String challenge(String verifier) {

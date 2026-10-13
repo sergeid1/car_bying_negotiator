@@ -54,7 +54,9 @@ server; it never reaches the client's JavaScript.
   passkey: they may start a mailbox connection and register passkeys (only `PASSWORD` sessions are limited).
 - Account deletion deletes the account's identities; the account export lists linked providers and link dates,
   never the `sub`.
-- Unauthenticated start and callback routes share the existing per-network-peer quota in `ApiRateLimitFilter`.
+- Unauthenticated start and callback routes stay under the general per-peer API limit in `ApiRateLimitFilter`, outside
+  the email routes' stricter quota: they send no email, Google or Apple retries must not block an emailed sign-in link,
+  and a 429 on a top-level callback navigation would show raw JSON.
 
 ## Configuration
 

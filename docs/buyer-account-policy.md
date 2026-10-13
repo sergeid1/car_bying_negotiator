@@ -172,8 +172,10 @@ Data kept: the provider, the keyed `sub` hash and the link date. The provider's 
 and ID tokens are discarded once the ID token is checked; nothing from the provider is stored
 after sign-in. The export lists each linked provider and its link date, never the `sub` or its
 hash. Account deletion removes and count-verifies the identities with the rest of the account
-graph. The unauthenticated start and callback routes share the per-network-peer quota with the
-sign-in and recovery email routes (above).
+graph. The unauthenticated start and callback routes send no email, so they are outside the email
+routes' per-network-peer quota (above): Google or Apple retries cannot use up the budget for an
+emailed sign-in link, and a provider callback never meets a 429 there. They stay under the general
+per-peer API limit.
 
 Configuration:
 
