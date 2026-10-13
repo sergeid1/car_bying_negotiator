@@ -87,12 +87,12 @@ for (const colorScheme of ["light", "dark"] as const) {
     await expect(header.getByRole("button", { name: "This case" })).toHaveCount(0);
     await expect(header.getByRole("button", { name: "Your case" })).toHaveCount(0);
     await openAccountPanel(page);
-    const dialog = page.getByRole("dialog", { name: "Sign in" });
+    const dialog = page.getByRole("dialog", { name: "Log in" });
     const panel = page.getByRole("region", { name: "Buyer Account" });
-    await expect(panel.getByText("Optional. Keeps your cases in one place.")).toBeVisible();
-    await expect(panel.getByRole("button", { name: "Continue" })).toBeVisible();
+    await expect(dialog).toHaveClass(/sign-in-card/);
+    await expect(panel.getByRole("button", { name: "Continue with email" })).toBeVisible();
     await expect(dialog.getByRole("textbox")).toHaveCount(1);
-    await expect(dialog.getByRole("button", { name: /^(?!Close)/ })).toHaveCount(1);
+    await expect(panel.getByRole("button", { name: "Use a password instead" })).toBeVisible();
     await expect(dialog.getByRole("region", { name: "Open an existing Buying Case" })).toBeHidden();
     await expectNoOverflowOrViolations(page);
     await dialog.getByText("Have a private case link?").click();
@@ -119,9 +119,9 @@ for (const width of [360, 1280]) {
       const header = page.getByRole("banner");
       const panel = page.getByRole("region", { name: "Buyer Account" });
       await header.getByRole("button", { name: "Sign in", exact: true }).click();
-      await expect(page.getByRole("dialog", { name: "Sign in" })).toBeFocused();
+      await expect(page.getByRole("dialog", { name: "Log in" })).toBeFocused();
       await panel.getByLabel("Email", { exact: true }).fill(ACCOUNT.contact.email);
-      await panel.getByRole("button", { name: "Continue" }).click();
+      await panel.getByRole("button", { name: "Continue with email" }).click();
       await expect(panel.getByRole("status")).toHaveText("Check your email. The link works for 15 minutes.");
       await expect(panel.getByRole("button", { name: "Send again" })).toBeVisible();
       await expectNoOverflowOrViolations(page);
@@ -135,8 +135,8 @@ for (const width of [360, 1280]) {
       if (signOutLocation === "region") await openAccountPanel(page, ACCOUNT.contact.email);
       await (signOutLocation === "banner" ? header : panel).getByRole("button", { name: "Sign out", exact: true }).click();
       if (signOutLocation === "banner") await openAccountPanel(page);
-      await expect(page.getByRole("dialog", { name: "Sign in" })).toBeVisible();
-      await expect(panel.getByRole("button", { name: "Continue" })).toBeVisible();
+      await expect(page.getByRole("dialog", { name: "Log in" })).toBeVisible();
+      await expect(panel.getByRole("button", { name: "Continue with email" })).toBeVisible();
       await expectNoOverflowOrViolations(page);
     }
   });
