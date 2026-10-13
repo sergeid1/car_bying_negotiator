@@ -91,13 +91,13 @@ for (const width of [360, 1280]) {
     await panel.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(signIns).toBe(1);
-    // A browser without passkey autofill reaches the button after Continue.
+    // A browser without passkey autofill can use the card's passkey button directly.
     await page.evaluate(() => { (window as unknown as { noPasskeyAutofill: boolean }).noPasskeyAutofill = true; });
     await openAccount();
     await panel.getByRole("button", { name: "Sign out", exact: true }).click();
     await panel.getByLabel("Email", { exact: true }).fill(account.contact.email);
-    await panel.getByRole("button", { name: "Continue" }).click();
-    await panel.getByRole("button", { name: "Sign in with a passkey" }).click();
+    await expect(page.getByRole("dialog", { name: "Log in" })).toHaveClass(/sign-in-card/);
+    await panel.getByRole("button", { name: "Continue with a passkey" }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await openAccount();
     await expect(panel.getByRole("status")).toHaveText("Signed in with a passkey.");

@@ -70,15 +70,18 @@ test.each([undefined, "a.long.buyer.address@example.com"])("header account contr
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 
-test("the Sign in side panel, with its private case link disclosure open, has no automated AA violations", async () => {
+test.each(["login", "signup"])("the sign-in card in %s mode has no automated AA violations", async mode => {
   vi.spyOn(globalThis, "fetch").mockImplementation(async input => String(input) === "/api/v1/account"
     ? new Response(JSON.stringify({ code: "SESSION_ENDED" }), { status: 401 })
-    : new Response(JSON.stringify({}), { status: 404 }));
+    : String(input).endsWith("/social-sign-in/providers") ? new Response(JSON.stringify({ providers: ["GOOGLE", "APPLE"] }))
+      : new Response(JSON.stringify({}), { status: 404 }));
   const { container } = render(<App />);
   await userEvent.click(within(screen.getByRole("banner")).getByRole("button", { name: "Sign in" }));
-  const panel = await screen.findByRole("dialog", { name: "Sign in" });
-  await within(panel).findByRole("button", { name: "Continue" });
-  await userEvent.click(within(panel).getByText("Have a private case link?"));
+  const panel = await screen.findByRole("dialog", { name: "Log in" });
+  await within(panel).findByRole("button", { name: "Continue with email" });
+  await within(panel).findByRole("button", { name: "Continue with Google" });
+  if (mode === "signup") await userEvent.click(within(panel).getByRole("button", { name: "Sign up" }));
+  else await userEvent.click(within(panel).getByText("Have a private case link?"));
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 

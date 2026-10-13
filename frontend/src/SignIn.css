@@ -1,4 +1,3 @@
-/* Ticket 110: the one-box sign-in panel and its private case link disclosure. */
 .sign-in-lede { color: var(--ink-muted); }
 .sign-in, .sign-in-step, .sign-in form { display: grid; gap: 14px; min-width: 0; }
 .sign-in > *, .sign-in-step > * { margin: 0; }
@@ -17,3 +16,36 @@
 .case-link-access > summary { min-height: 44px; display: flex; align-items: center; }
 .case-link-access .panel { padding: 0; border: 0; background: transparent; }
 .case-link-access .panel > h3 { font-size: 1rem; }
+
+.sign-in-card {
+  inset: 50% auto auto 50%; transform: translate(-50%, -50%);
+  width: min(480px, calc(100% - 32px)); max-height: calc(100dvh - 32px);
+  border: 1px solid var(--line); border-radius: 20px; background: var(--card);
+  overflow: hidden; animation: none;
+}
+.sign-in-card .side-panel-header { padding: 28px 24px 0; border: 0; position: relative; justify-content: center; }
+.sign-in-card .side-panel-title { font-size: 2rem; line-height: 1.2; text-align: center; }
+.sign-in-card .side-panel-close { position: absolute; top: 8px; right: 8px; }
+.sign-in-card .side-panel-body { padding: 12px 32px 24px; min-height: 0; }
+.sign-in-card #buyer-account { padding: 0; border: 0; background: transparent; margin: 0; }
+.sign-in-card .sign-in form > button:not(.btn-link) {
+  justify-self: stretch; width: 100%; background: var(--accent); color: var(--on-brand);
+}
+.sign-in-card .sign-in form > button:not(.btn-link):hover { background: var(--accent-ink); }
+.sign-in-switch { text-align: center; color: var(--ink-muted); font-size: 0.9rem; margin-bottom: 8px; }
+.sign-in-switch .btn-link { display: inline; min-height: 44px; }
+.sign-in-password { justify-self: start; font-size: 0.85rem; margin-top: -12px; }
+.sign-in-providers { display: grid; gap: 12px; }
+.sign-in-provider { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 44px; }
+.sign-in-provider svg { flex-shrink: 0; }
+.provider-google { background: #fff; border-color: #747775; color: #1f1f1f; }
+.provider-google:hover { background: #f2f2f2; color: #1f1f1f; }
+.provider-apple { background: #fff; color: #000; border-color: #000; }
+.provider-apple:hover { background: #f2f2f2; color: #000; }
+.sign-in-divider { display: flex; align-items: center; gap: 12px; color: var(--ink-muted); font-size: 0.85rem; }
+.sign-in-divider::before, .sign-in-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.sign-in-footer, .sign-in-card .account-access-footer { border-top: 1px solid var(--line); padding-top: 16px; margin-top: 8px; }
+.sign-in-footer { text-align: center; color: var(--ink-muted); font-size: 0.85rem; }
+@media (max-width: 400px) {
+  .sign-in-card .side-panel-body { padding: 12px 20px 20px; }
+}

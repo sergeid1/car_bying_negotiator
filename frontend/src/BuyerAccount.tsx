@@ -1,10 +1,10 @@
-import { createContext, useEffect, useState } from "react";
+import { createContext, useEffect, useRef, useState } from "react";
 import type { Credentials } from "./CasePortability";
 import { MailboxConnection } from "./MailboxConnection";
 import { Passkeys } from "./Passkeys";
 import { Passwords } from "./Passwords";
 import { openSidePanel } from "./SidePanel";
-import { SignIn } from "./SignIn";
+import { SignIn, type SignInMode } from "./SignIn";
 
 type Contact = { email: string; firstName: string | null; lastName: string | null; phone: string | null };
 type AttachedCase = {
@@ -68,12 +68,14 @@ function startedOn(value?: string | null) {
  * `onSignedIn` reports whether the account has loaded successfully.
  * Changing `recheck` re-reads the account, so a panel that saw the session end can sign it out here.
  */
-export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOpened, onSignInComplete, recheck = 0, showing = true }: {
+export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOpened, onSignInComplete, recheck = 0, showing = true,
+  signInMode = "login", onSignInMode }: {
+  signInMode?: SignInMode; onSignInMode?: (mode: SignInMode) => void;
   caseCredentials?: Credentials; onSignedIn?: (signedIn: boolean) => void; recheck?: number;
   /** Whether the Buyer can see this panel; the email box offers saved passkeys only then. */
   showing?: boolean;
   /** The Buyer finished signing in here, by email link, password or passkey. */
-  onSignInComplete?: () => void;
+  onSignInComplete?: (notice?: string) => void;
   onControls?: (controls: AccountControls) => void;
   /** Opens an attached case with access that ends when this sign-in ends. */
   onCaseOpened?: (value: Credentials) => void;
@@ -86,6 +88,44 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loads, setLoads] = useState(0);
+  const [socialReturn, setSocialReturn] = useState(() => {
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    return { state: hash.get("social-sign-in"), error: hash.get("social-sign-in-error") };
+  });
+  const socialAttempt = useRef<string | null>(null);
+
+  useEffect(() => {
+    function receiveSocialReturn() {
+      const hash = new URLSearchParams(window.location.hash.slice(1));
+      if (!hash.has("social-sign-in") && !hash.has("social-sign-in-error")) return;
+      setSocialReturn({ state: hash.get("social-sign-in"), error: hash.get("social-sign-in-error") });
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      openSidePanel("account");
+    }
+    receiveSocialReturn();
+    window.addEventListener("hashchange", receiveSocialReturn);
+    return () => window.removeEventListener("hashchange", receiveSocialReturn);
+  }, []);
+  useEffect(() => {
+    if (socialReturn.error) {
+      setError(socialReturn.error === "cancelled" ? "Sign-in with your provider was cancelled."
+        : "Sign-in with your provider could not be completed. Try again or continue with your email.");
+      return;
+    }
+    if (!socialReturn.state || socialAttempt.current === socialReturn.state) return;
+    socialAttempt.current = socialReturn.state;
+    void run(async () => {
+      const result = await (await call("/api/v1/account/social-sign-in/complete", {
+        method: "POST", body: JSON.stringify({ state: socialReturn.state }),
+      })).json();
+      const loaded = await (await call("/api/v1/account")).json();
+      setAccount(loaded); setLoading(false);
+      const notice = result.provider === "GOOGLE" ? "Signed in with Google." : result.provider === "APPLE" ? "Signed in with Apple." : "Signed in.";
+      setMessage(notice); onSignInComplete?.(notice);
+    }, "Sign-in with your provider could not be completed. Try again or continue with your email.").then(() => {
+      setLoading(false); setSocialReturn({ state: null, error: null });
+    });
+  }, [socialReturn]);
 
   useEffect(() => {
     try { window.localStorage.removeItem("deal-xray.account-session"); } catch { /* Browser storage can be unavailable. */ }
@@ -101,6 +141,7 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
     return () => window.removeEventListener("hashchange", receiveLink);
   }, []);
   useEffect(() => {
+    if (socialReturn.state) return;
     let current = true;
     setLoading(true);
     call("/api/v1/account").then(response => response.json())
@@ -111,10 +152,12 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
       .catch((problem: Problem) => {
         if (!current) return;
         setLoading(false);
-        if (problem?.status === 401) signedOut(recheck ? ENDED : ""); else setError("Your account could not be loaded. Retry safely.");
+        if (problem?.status === 401) {
+          if (recheck) signedOut(ENDED); else setAccount(undefined);
+        } else setError("Your account could not be loaded. Retry safely.");
       });
     return () => { current = false; };
-  }, [loads, recheck]);
+  }, [loads, recheck, socialReturn.state]);
   useEffect(() => { onSignedIn?.(!!account); }, [account]);
   useEffect(() => { onControls?.({ email: account?.contact.email, busy, signOut }); }, [account, busy]);
 
@@ -162,16 +205,15 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
     {error && <p role="alert">{error}</p>}
   </section>;
 
-  // The side panel's own title says "Sign in"; nothing but this line sits above the email box.
   if (!account) return <section id="buyer-account" tabIndex={-1} className="panel" aria-label="Buyer Account">
-    <p className="sign-in-lede">Optional. Keeps your cases in one place.</p>
     {finishLink}
     {loading && !error && <p role="status">Loading your account…</p>}
     {error && <button className="btn-secondary" onClick={() => { setError(""); setLoads(loads + 1); }}>Retry loading account</button>}
-    {!loading && !linkSecret && <SignIn request={call} offerPasskeys={showing} onSignedIn={async method => {
+    {!loading && !linkSecret && <SignIn request={call} mode={signInMode} onMode={onSignInMode} offerPasskeys={showing} onSignedIn={async method => {
       setAccount(await (await call("/api/v1/account")).json());
       setMessage(method === "password" ? "Signed in with a password." : "Signed in with a passkey."); onSignInComplete?.();
     }} />}
+    {signInMode === "signup" && <p className="sign-in-footer">Optional. Keeps your cases in one place.</p>}
     {message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
   </section>;
 

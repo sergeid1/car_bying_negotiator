@@ -23,7 +23,7 @@ test("sign in opens a panel over the page that Escape closes, returning focus to
   expect(screen.queryByRole("region", { name: "Buyer Account" })).toBeNull();
 
   await user.click(signIn);
-  const panel = screen.getByRole("dialog", { name: "Sign in" });
+  const panel = screen.getByRole("dialog", { name: "Log in" });
   expect(panel).toHaveAttribute("aria-modal", "true");
   expect(within(panel).getByRole("region", { name: "Buyer Account" })).toBeVisible();
   expect(document.querySelector(".page")).toHaveAttribute("inert");
@@ -42,7 +42,7 @@ test("with no case open the header has no case button, and case links live in th
   expect(header.queryByRole("button", { name: "Your case" })).toBeNull();
   expect(header.queryByRole("link", { name: "Scope" })).toBeNull();
   await user.click(header.getByRole("button", { name: "Sign in" }));
-  const panel = screen.getByRole("dialog", { name: "Sign in" });
+  const panel = screen.getByRole("dialog", { name: "Log in" });
   const disclosure = within(panel).getByText("Have a private case link?").closest("details")!;
   expect(disclosure).not.toHaveAttribute("open");
   await user.click(within(panel).getByText("Have a private case link?"));
@@ -67,7 +67,7 @@ test("an open case shows a This case button on the case page whose panel holds t
 test("a case link that cannot be opened shows the sign-in panel with the disclosure open", async () => {
   window.history.replaceState(null, "", "/#case=gone&access=token");
   render(<App />);
-  const panel = await screen.findByRole("dialog", { name: "Sign in" }, { timeout: 3000 });
+  const panel = await screen.findByRole("dialog", { name: "Log in" }, { timeout: 3000 });
   await waitFor(() => expect(within(panel).getByText("Have a private case link?").closest("details")).toHaveAttribute("open"));
   expect(await within(panel).findByRole("alert")).toHaveTextContent("This link cannot be opened");
 });
@@ -75,7 +75,7 @@ test("a case link that cannot be opened shows the sign-in panel with the disclos
 test("an emailed recovery link opens the sign-in panel at its verify button", () => {
   window.history.replaceState(null, "", "/#recover=secret");
   render(<App />);
-  const panel = screen.getByRole("dialog", { name: "Sign in" });
+  const panel = screen.getByRole("dialog", { name: "Log in" });
   expect(within(panel).getByText("Have a private case link?").closest("details")).toHaveAttribute("open");
   expect(within(panel).getByRole("button", { name: "Verify recovery link" })).toBeVisible();
 });
@@ -84,11 +84,11 @@ test("the intake's sign-in link opens the account panel", async () => {
   render(<App />);
   const user = userEvent.setup();
   await user.click(await screen.findByRole("link", { name: "sign in with a Buyer Account" }));
-  expect(screen.getByRole("dialog", { name: "Sign in" })).toBeVisible();
+  expect(screen.getByRole("dialog", { name: "Log in" })).toBeVisible();
 });
 
 test("an emailed sign-in link opens the account panel to finish signing in", () => {
   window.history.replaceState(null, "", "/#sign-in=secret");
   render(<App />);
-  expect(within(screen.getByRole("dialog", { name: "Sign in" })).getByRole("button", { name: "Finish signing in" })).toBeVisible();
+  expect(within(screen.getByRole("dialog", { name: "Log in" })).getByRole("button", { name: "Finish signing in" })).toBeVisible();
 });
