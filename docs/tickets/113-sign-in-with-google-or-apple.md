@@ -32,9 +32,10 @@ server; it never reaches the client's JavaScript.
 3. **Finish.** `POST /api/v1/account/social-sign-in/complete` with `{"state": "..."}` and `Account-Request: 1`.
    The binding cookie must match the attempt (login-CSRF protection), and the attempt must be unexpired, unused
    and hold a code; it is consumed either way. The server exchanges the code, checks the ID token (issuer,
-   audience, expiry, nonce, `sub`), and requires `email_verified` to be true. Response: the same
-   `AccountController.SignedIn` body and `account_session` cookie as other sign-ins, and the binding cookie is
-   cleared. Failures use one 400 detail (`SOCIAL_SIGN_IN_FAILED`): "Sign-in with {Google|Apple} could not be
+   audience, expiry, nonce, `sub`), and requires `email_verified` to be true. Response:
+   `{"expiresAt": "...", "provider": "GOOGLE" | "APPLE"}`, a response record of this endpoint only (other sign-in
+   responses stay `AccountController.SignedIn`), with the same `account_session` cookie as other sign-ins; the
+   binding cookie is cleared. Failures use one 400 detail (`SOCIAL_SIGN_IN_FAILED`): "Sign-in with {Google|Apple} could not be
    completed. Try again or continue with your email." Provider unreachable is 503 `SOCIAL_SIGN_IN_UNAVAILABLE`.
 4. **Which account.** A new `buyer_account_identities` table links `(provider, keyed hash of sub)` to an account.
    - Known identity: sign in to its account.
@@ -53,7 +54,9 @@ server; it never reaches the client's JavaScript.
   passkey: they may start a mailbox connection and register passkeys (only `PASSWORD` sessions are limited).
 - Account deletion deletes the account's identities; the account export lists linked providers and link dates,
   never the `sub`.
-- Unauthenticated start and callback routes share the existing per-network-peer quota in `ApiRateLimitFilter`.
+- Unauthenticated start and callback routes stay under the general per-peer API limit in `ApiRateLimitFilter`, outside
+  the email routes' stricter quota: they send no email, Google or Apple retries must not block an emailed sign-in link,
+  and a 429 on a top-level callback navigation would show raw JSON.
 
 ## Configuration
 

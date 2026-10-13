@@ -27,17 +27,18 @@ public class AccountExportService {
   private final com.dealanalyzer.mailbox.MailboxConnections mailboxes;
   private final com.dealanalyzer.mailbox.MailboxSendService mailboxSends;
   private final PasskeyService passkeys;
+  private final SocialSignInService social;
   private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
   AccountExportService(BuyerAccountService accounts, AccountSessionRepository sessions, CaseExportService caseExports,
       ObjectMapper json, com.dealanalyzer.notification.BuyerNotifications notifications,
       com.dealanalyzer.journey.JourneyService journeys, com.dealanalyzer.operations.ProviderUsageStore providerUsage,
       com.dealanalyzer.mailbox.MailboxConnections mailboxes, com.dealanalyzer.mailbox.MailboxSendService mailboxSends,
-      PasskeyService passkeys, org.springframework.jdbc.core.JdbcTemplate jdbc) {
+      PasskeyService passkeys, SocialSignInService social, org.springframework.jdbc.core.JdbcTemplate jdbc) {
     this.accounts = accounts; this.sessions = sessions; this.caseExports = caseExports; this.json = json;
     this.notifications = notifications; this.journeys = journeys;
     this.providerUsage = providerUsage; this.mailboxes = mailboxes; this.mailboxSends = mailboxSends;
-    this.passkeys = passkeys; this.jdbc = jdbc;
+    this.passkeys = passkeys; this.social = social; this.jdbc = jdbc;
   }
 
   @Transactional(readOnly = true)
@@ -49,6 +50,8 @@ public class AccountExportService {
     data.put("contact", view.contact());
     data.put("createdAt", view.createdAt());
     data.put("passkeys", passkeys.metadata(session.accountId));
+    // Provider and link date only: the provider's subject is never exported.
+    data.put("socialSignIns", social.exportForAccount(session.accountId));
     data.put("accountSecurityEvents", jdbc.queryForList("select event_type, created_at from buyer_account_security_events where account_id = ? order by created_at", session.accountId));
     data.put("notificationPreferences", notifications.preferencesForAccount(session.accountId));
     data.put("notificationDeliveries", notifications.deliveryHistory(session.accountId));
@@ -77,7 +80,7 @@ public class AccountExportService {
     data.put("cases", cases);
     try (var output = new ByteArrayOutputStream(); var zip = new ZipOutputStream(output)) {
       entry(zip, "README.txt", ("Buyer Account export\naccount.json holds your contact details, sign-in history "
-          + "(times only), email preferences, notification delivery states, inventory search history including search criteria, every Buying Journey with every version of its Shopping Brief, Reference Vehicles, captured candidates, market checks, shortlist positions, linked Buying Cases, the trade-in with its payoff and written trade offers, a connected Gmail or Outlook account (provider and address) "
+          + "(times only), Google or Apple sign-ins linked to the account (provider and link date), email preferences, notification delivery states, inventory search history including search criteria, every Buying Journey with every version of its Shopping Brief, Reference Vehicles, captured candidates, market checks, shortlist positions, linked Buying Cases, the trade-in with its payoff and written trade offers, a connected Gmail or Outlook account (provider and address) "
           + "with the times and outcomes of messages sent through it, and the Buying Cases attached to the account. Each attached case that can be exported is "
           + "included as its own case export under cases/, with the same contents as exporting that case directly. "
           + "A case marked PURCHASE_REQUIRED has saved reports that are exported once the report is purchased; "
