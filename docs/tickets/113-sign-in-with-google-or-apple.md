@@ -7,7 +7,12 @@ account, as one more sign-in method next to the email link, passkeys and passwor
 **Blocked by:** none. It runs in parallel with 114; this ticket owns the API below, and 114 builds against it
 with stubbed responses.
 
-**Status:** open.
+**Status:** complete as of 2026-10-13, against stubbed providers. `SocialSignInService` and
+`SocialSignInController` implement the flow above; migration V55 adds the attempts and identities tables. The
+complete response also carries `provider` (agreed with 114). Start and callbacks use only the general API limiter,
+not the email peer quota, so retries cannot block an emailed link. Open for the operator: register the Google OAuth
+client and the Apple Services ID and key (`docs/hardening-runbook.md`); confirm a real Apple sign-in before enabling
+it, because Apple's PKCE handling was checked against stubs only.
 
 ## How it works
 

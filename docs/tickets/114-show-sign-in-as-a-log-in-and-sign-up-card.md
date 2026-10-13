@@ -8,7 +8,10 @@ the account button keeps opening the existing side panel.
 **Blocked by:** none. It runs in parallel with ticket 113 and builds against 113's API with stubbed responses.
 Any API change goes through the coordinator.
 
-**Status:** open.
+**Status:** complete as of 2026-10-13. Signed out, "Sign in" opens the centered card (`SidePanel` gains a
+centered variant; `SignIn.tsx` holds both modes); signed in, the side panel stays. Provider buttons appear only for
+providers the server lists, so they stay hidden until ticket 113's settings are configured. The success notice
+names the provider from the complete response's `provider` field.
 
 ## The card
 
