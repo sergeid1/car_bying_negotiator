@@ -112,7 +112,7 @@ public class OutboundDraftService {
     var questions = new HashSet<String>();
     String quoteRequestQuestion = null;
     if (dealerId != null) {
-      List<?> listings = manager.createNativeQuery("select v.vin, l.listing_url from vehicles v join listing_snapshots l on l.case_id = v.case_id where v.case_id = :caseId and l.dealer_id = :dealer and l.vin = v.vin order by l.retrieved_at desc, l.id")
+      List<?> listings = manager.createNativeQuery("select v.vin, l.listing_url from vehicles v join listing_snapshots l on l.case_id = v.case_id where v.case_id = :caseId and l.dealer_id = :dealer and l.vin = v.vin and l.source <> 'BUYER_SUPPLIED_LISTING_CAPTURE' order by l.retrieved_at desc, l.id")
           .setParameter("caseId", caseId).setParameter("dealer", dealerId).setMaxResults(1).getResultList();
       if (!listings.isEmpty()) {
         Object[] row = (Object[]) listings.getFirst();

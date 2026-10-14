@@ -68,6 +68,7 @@ class CaseGraphDeletionPlan {
       new Step("document_extractions", "case_id = :caseId"),
       new Step("document_operation_retries", "operation_id in (select id from document_processing_operations where case_id = :caseId)"),
       new Step("document_processing_operations", "case_id = :caseId"),
+      new Step("listing_capture_readings", "case_id = :caseId"),
       new Step("document_pages", "document_id in (select id from source_documents where case_id = :caseId)"),
       new Step("source_documents", "case_id = :caseId"),
       new Step("vehicle_identity_conflicts", "case_id = :caseId"),

@@ -39,6 +39,7 @@ public class DocumentIntakeService {
   private final TaskExecutor taskExecutor;
   private final DocumentPageNormalizer pageNormalizer;
   private final DocumentExtractionService extractionService;
+  private final com.dealanalyzer.listing.capture.ListingCaptureReader listingReader;
   private final com.dealanalyzer.buyingcase.persistence.CaseRetentionService retentionPolicy;
   private final boolean workerEnabled;
 
@@ -52,6 +53,7 @@ public class DocumentIntakeService {
       @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
       DocumentPageNormalizer pageNormalizer,
       DocumentExtractionService extractionService,
+      com.dealanalyzer.listing.capture.ListingCaptureReader listingReader,
       @Value("${document.retention:PT720H}") Duration retention,
       com.dealanalyzer.buyingcase.persistence.CaseRetentionService retentionPolicy,
       @Value("${document.worker.enabled:true}") boolean workerEnabled) {
@@ -67,6 +69,7 @@ public class DocumentIntakeService {
     this.taskExecutor = taskExecutor;
     this.pageNormalizer = pageNormalizer;
     this.extractionService = extractionService;
+    this.listingReader = listingReader;
     this.retentionPolicy = retentionPolicy;
     this.workerEnabled = workerEnabled;
   }
@@ -110,6 +113,42 @@ public class DocumentIntakeService {
   /** A normalized page of trade offer evidence, for a caller that has authorized the trade offer. */
   public byte[] tradeOfferEvidencePage(String caseId, String documentId, int pageNumber) {
     if (!persistence.isTradeOfferEvidence(documentId))
+      throw new com.dealanalyzer.buyingcase.ResourceNotFoundException("Source page not found");
+    String objectKey = persistence.normalizedPageKey(caseId, documentId, pageNumber)
+        .orElseThrow(() -> new com.dealanalyzer.buyingcase.ResourceNotFoundException("Source page not found"));
+    return objectStorage.readNormalized(caseId, documentId, pageNumber, objectKey);
+  }
+
+  /**
+   * The Buyer's own capture of a dealer's listing: a screenshot or a saved PDF of the page. It takes the same
+   * inspection, malware scan, consent check, encrypted storage and normalization as dealer paperwork, is read
+   * only for listing fields, and never changes the case's review status or becomes a Dealer Offer.
+   */
+  public StartedDocumentUpload intakeListingCapture(
+      String caseId, String accessToken, String idempotencyKey, MultipartFile upload) {
+    requireServiceProcessingConsent(caseId, accessToken);
+    return intake(caseId, accessToken, idempotencyKey, upload.getOriginalFilename(), read(upload), null,
+        DocumentIntakePersistence.LISTING_CAPTURE);
+  }
+
+  /** Listing text the Buyer pasted, kept as plain text and processed like an uploaded capture. */
+  public StartedDocumentUpload intakeListingText(
+      String caseId, String accessToken, String idempotencyKey, String text) {
+    requireServiceProcessingConsent(caseId, accessToken);
+    if (text == null || text.isBlank())
+      throw new InvalidDocumentException("EMPTY_TEXT", "Paste the text of the listing first.");
+    if (text.length() > 40000)
+      throw new InvalidDocumentException("FILE_TOO_LARGE", "The pasted listing text is too long. Paste only the listing itself.");
+    String body = text.replace("\r\n", "\n").replace('\r', '\n').strip();
+    byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+    return intake(caseId, accessToken, idempotencyKey, "pasted-listing.txt", bytes,
+        new InspectedDocument("text/plain", RelayTextPages.pages(body).size(), null, null, 150, false, false, false, false),
+        DocumentIntakePersistence.LISTING_CAPTURE);
+  }
+
+  /** A normalized page of a listing capture, for a caller that has authorized the case. */
+  public byte[] listingCapturePage(String caseId, String documentId, int pageNumber) {
+    if (!persistence.purposeOf(documentId).filter(DocumentIntakePersistence.LISTING_CAPTURE::equals).isPresent())
       throw new com.dealanalyzer.buyingcase.ResourceNotFoundException("Source page not found");
     String objectKey = persistence.normalizedPageKey(caseId, documentId, pageNumber)
         .orElseThrow(() -> new com.dealanalyzer.buyingcase.ResourceNotFoundException("Source page not found"));
@@ -196,7 +235,7 @@ public class DocumentIntakeService {
       objectStorage.delete(stored.objectKey());
       throw failure;
     }
-    // Trade offer evidence is not dealer paperwork, so it leaves the case's review status as it was.
+    // Trade offer evidence and listing captures are not dealer paperwork, so they leave the review status as it was.
     if (purpose.equals(DocumentIntakePersistence.DEALER_PAPERWORK))
       casePersistence.updateStatus(caseId, "DOCUMENT_PROCESSING", now);
     dispatch(operationId);
@@ -240,7 +279,7 @@ public class DocumentIntakeService {
     requireServiceProcessingConsent(operation.caseId(), accessToken);
     RetryDecision retry = persistence.retry(operationId, idempotencyKey, Instant.now());
     if (retry.dispatch()) {
-      if (!persistence.isTradeOfferEvidence(operation.documentId()))
+      if (dealerPaperwork(operation.documentId()))
         casePersistence.updateStatus(operation.caseId(), "DOCUMENT_PROCESSING", Instant.now());
       dispatch(operationId);
     }
@@ -290,11 +329,18 @@ public class DocumentIntakeService {
         persistence.completeEvidence(operationId, Instant.now());
         return;
       }
+      boolean listing = !dealerPaperwork(operation.documentId());
       if (!persistence.claimExtraction(operationId, Instant.now())) {
         return;
       }
       stage = "EXTRACTING";
       requireServiceProcessingConsent(operation.caseId(), null);
+      if (listing) {
+        // Listing fields only; the case's review status and Dealer Offers are untouched.
+        listingReader.read(operation.documentId());
+        persistence.completeExtraction(operationId, Instant.now());
+        return;
+      }
       extractionService.extract(operation.documentId());
       persistence.completeExtraction(operationId, Instant.now());
       casePersistence.updateStatus(operation.caseId(), "NEEDS_REVIEW", Instant.now());
@@ -302,18 +348,24 @@ public class DocumentIntakeService {
       if (stage == null) {
         return;
       }
+      boolean listing = stage.equals("EXTRACTING") && !dealerPaperwork(operation.documentId());
       persistence.fail(
           operationId, stage,
           exception instanceof com.dealanalyzer.operations.ProviderMeter.Failure providerFailure
               ? providerFailure.status().name()
-              : stage.equals("EXTRACTING") ? "EXTRACTION_FAILED" : "NORMALIZATION_FAILED",
-          stage.equals("EXTRACTING")
+              : listing ? "LISTING_READ_FAILED" : stage.equals("EXTRACTING") ? "EXTRACTION_FAILED" : "NORMALIZATION_FAILED",
+          listing ? "The listing could not be read. Type what the ad shows instead."
+              : stage.equals("EXTRACTING")
               ? "Deal Terms extraction could not be completed. Retry this stage without uploading again."
               : "Document page normalization could not be completed. Retry this stage without uploading again.",
           Instant.now());
-      if (!persistence.isTradeOfferEvidence(operation.documentId()))
+      if (dealerPaperwork(operation.documentId()))
         casePersistence.updateStatus(operation.caseId(), "FAILED", Instant.now());
     }
+  }
+
+  private boolean dealerPaperwork(String documentId) {
+    return persistence.purposeOf(documentId).map(DocumentIntakePersistence.DEALER_PAPERWORK::equals).orElse(false);
   }
 
   private void requireServiceProcessingConsent(String caseId, String accessToken) {

@@ -78,6 +78,15 @@ public class StoredReportRenderer {
         if (!finding.path("noDollarEffectReason").isNull()) lines.add(new Line(finding.path("noDollarEffectReason").asText(), false));
       }
     }
+    // Reports before ticket 115 have no listing price check, and render as they did.
+    var listing = analysis.path("listingPriceCheck");
+    if (listing.isObject()) {
+      lines.add(new Line("The listing you saved", true));
+      lines.add(new Line(listing.path("summary").asText(), false));
+      if (listing.path("deskQuestion").isTextual()) lines.add(new Line("Question to ask: " + listing.path("deskQuestion").asText(), false));
+      for (var condition : listing.path("priceConditions")) lines.add(new Line("The ad's fine print: " + condition.asText(), false));
+      lines.add(new Line("From your own capture of the dealer's listing.", false));
+    }
     lines.add(new Line("Limitations",true));
     for(var limitation:analysis.path("limitations")) lines.add(new Line(limitation.asText(),false));
     lines.add(new Line("Complete saved payload and evidence",true));

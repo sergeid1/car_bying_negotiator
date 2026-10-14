@@ -183,6 +183,18 @@ public class DealerOfferVerificationService {
         throw invalid("Resolve the document and Buyer-confirmed Vehicle VIN conflict before verification.");
       }
     }
+    // The Buyer's saved listing names a car too; paperwork for another VIN waits until the Buyer settles which.
+    var capture = listings.findLatestCapture(caseId).orElse(null);
+    if (capture != null && capture.vin() != null && documentVin != null) {
+      String value = documentVin.currentCorrection() == null
+          ? documentVin.normalizedValue() : documentVin.currentCorrection().normalizedValue();
+      boolean settled = conflicts.findByCaseId(caseId).stream()
+          .anyMatch(conflict -> conflict.listingSnapshotId().equals(capture.id()) && !conflict.status().equals("UNRESOLVED"));
+      if (value != null && !settled && !capture.vin().equals(value)) {
+        throw invalid("The VIN on this paperwork is different from the VIN in the listing you saved. "
+            + "Check which car it is for, or save the listing for this car.");
+      }
+    }
     var listing = listings.findLatest(caseId).orElse(null);
     if (listing != null) {
       requireSame("VIN", vehicle.vin(), listing.vin());
