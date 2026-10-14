@@ -11,6 +11,7 @@ import { NegotiationMandate } from "./NegotiationMandate";
 import { QuoteRequest } from "./QuoteRequest";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { openSidePanel } from "./SidePanel";
+import { VehicleSafety } from "./VehicleSafety";
 
 type Credentials = { caseId: string; token: string };
 export type CaseStepId = "quotes" | "compare" | "dealer" | "final";
@@ -199,6 +200,7 @@ export function CaseFlow({ caseId, token, openedFromAccount, referral, deskFresh
       </div>
       <button type="button" className="btn-secondary" aria-haspopup="dialog" onClick={() => openSidePanel("case")}>This case</button>
     </section>
+    <VehicleSafety key={`safety-${caseId}-${token}`} {...credentials} />
 
     {deskFresh?.caseId === caseId && <DeskFreshCase value={deskFresh} onBack={onBackToAgreed} />}
     {/* A referral is disclosed before any step asks for the Buyer's paperwork. */}

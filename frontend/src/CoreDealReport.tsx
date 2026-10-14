@@ -11,6 +11,7 @@ import { ReportExplanationLoader } from "./ReportExplanation";
 import { AnimatedAmount } from "./AnimatedAmount";
 import { TradeCheckPanel, type TradeCheckResult } from "./TradeCheck";
 import { DeskTactics, type DeskTacticFinding } from "./DeskTactics";
+import { VehicleSafetyFacts, type VehicleSafetyView } from "./VehicleSafety";
 
 export type MaterialAmount = {
   label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string;
@@ -32,6 +33,7 @@ export type CoreReport = {
   };
   evidence: Record<string, unknown>;
   reproduction: Record<string, unknown>;
+  vehicleSafety?: VehicleSafetyView | null;
 };
 
 export function CoreReportLoader({ caseId, token }: { caseId: string; token: string }) {
@@ -131,6 +133,9 @@ export function CoreDealReport({ report, caseId, token, redacted, children }: { 
     {analysis.dealReview && <RevisedOfferReview review={analysis.dealReview} redacted={redacted} />}
     {analysis.tradeCheck && <div className="panel"><TradeCheckPanel result={analysis.tradeCheck} tactics={analysis.tacticFindings} /></div>}
     <ul className="report-sections" aria-label="Report details">
+      {report.vehicleSafety && !redacted && <ReportSection id="core-vehicle-safety" title="Recalls and safety ratings">
+        <VehicleSafetyFacts view={report.vehicleSafety} />
+      </ReportSection>}
       <ReportSection id="core-amounts" title="Amounts and sources">
         <p>Market analysis: {analysis.marketAvailability}. Cash economics: {analysis.cashAvailability}.</p>
         <dl className="money-list">
