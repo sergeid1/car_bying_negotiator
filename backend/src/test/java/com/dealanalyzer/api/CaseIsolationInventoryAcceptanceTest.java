@@ -170,7 +170,13 @@ class CaseIsolationInventoryAcceptanceTest {
       caseRow("GET", C + "/trade/offers/{offerId}/pages/{pageNumber}/image", null, "offerId=tradeOfferId"),
       caseRow("POST", C + "/trade/estimates", "{\"source\":\"Carfax\",\"lowMinor\":1500000,\"checkedOn\":\"2026-01-02\"}"),
       caseRow("DELETE", C + "/trade/estimates/{estimateId}", null, "estimateId=tradeEstimateId"),
-      caseRow("POST", C + "/trade/carry-over", "{\"sourceCaseId\":\"{otherCaseId}\"}"));
+      caseRow("POST", C + "/trade/carry-over", "{\"sourceCaseId\":\"{otherCaseId}\"}"),
+      caseRow("GET", C + "/listing-captures", null),
+      caseRow("POST", C + "/listing-captures", MULTIPART),
+      caseRow("POST", C + "/listing-captures/text", "{\"text\":\"Price: $25,000\"}"),
+      caseRow("POST", C + "/listing-captures/confirmation",
+          "{\"documentId\":\"{listingCaptureId}\",\"advertisedPriceMinor\":2500000,\"confirmed\":true}"),
+      caseRow("GET", C + "/listing-captures/{documentId}/pages/{pageNumber}/image", null, "documentId=listingCaptureId"));
 
   /** Buyer Account endpoints: the account_session cookie, plus Account-Request: 1 on writes. */
   static final List<Endpoint> ACCOUNT_ENDPOINTS = List.of(
@@ -471,6 +477,8 @@ class CaseIsolationInventoryAcceptanceTest {
     objects.put("reportTotalId", post(client, base + "/feedback/report-total", Map.of("reportVersion", 1), label + "-total", token).path("id").asText());
     objects.put("tradeOfferId", TradeVehicleAcceptanceTest.recordTradeWithOffer(app, id, token, label));
     objects.put("tradeEstimateId", TradeVehicleAcceptanceTest.addEstimate(app, id, token, label));
+    objects.put("listingCaptureId", ListingCaptureAcceptanceTest.paste(client, base + "/listing-captures", token,
+        JSON.readTree("{\"text\":\"Price: $25,000\"}"), label + "-listing"));
 
     // The owning account, with a journey, a candidate and a reference vehicle.
     post(client, V + "/account/sign-in-requests", Map.of("email", email), label + "-sign-in");

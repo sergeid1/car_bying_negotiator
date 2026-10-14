@@ -67,6 +67,21 @@ class ListingSnapshotEntity {
   @Column(name = "created_at", nullable = false)
   Instant createdAt;
 
+  /** The date the Buyer's capture of the ad was taken, when the capture shows it. */
+  @Column(name = "captured_on")
+  java.time.LocalDate capturedOn;
+
+  /** The ad's price fine print, one condition per line, as the Buyer confirmed it. */
+  @Column(name = "price_conditions", length = 4000)
+  String priceConditions;
+
+  @Column(name = "source_document_id", length = 36)
+  String sourceDocumentId;
+
+  /** For each confirmed field: AS_READ, CORRECTED or TYPED, as FIELD=OUTCOME pairs. */
+  @Column(name = "field_confirmations", length = 1000)
+  String fieldConfirmations;
+
   protected ListingSnapshotEntity() {}
 
   ListingSnapshotEntity(

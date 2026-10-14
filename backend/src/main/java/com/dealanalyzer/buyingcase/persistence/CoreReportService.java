@@ -44,6 +44,8 @@ public class CoreReportService {
   private final com.dealanalyzer.trade.desk.TradeDeskCheck trades;
   private final com.dealanalyzer.desk.tactic.DeskTacticService tactics;
   private final com.dealanalyzer.vehicle.safety.VehicleSafetyService safety;
+  private final com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice;
+  private final com.dealanalyzer.listing.persistence.ListingEvidencePersistence listings;
 
   public CoreReportService(EphemeralBuyingCaseService access, AnalysisCaseRepository cases,
       OperationRepository operations, AnalysisReportRepository reports, BuyingCaseStore store,
@@ -52,8 +54,12 @@ public class CoreReportService {
       com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence extractions,
       com.dealanalyzer.trade.desk.TradeDeskCheck trades,
       com.dealanalyzer.desk.tactic.DeskTacticService tactics,
-      com.dealanalyzer.vehicle.safety.VehicleSafetyService safety) {
+      com.dealanalyzer.vehicle.safety.VehicleSafetyService safety,
+      com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice,
+      com.dealanalyzer.listing.persistence.ListingEvidencePersistence listings) {
     this.safety = safety;
+    this.listingPrice = listingPrice;
+    this.listings = listings;
     this.extractions = extractions;
     this.trades = trades;
     this.tactics = tactics;
@@ -194,6 +200,14 @@ public class CoreReportService {
         analysis.path("topReasons").forEach(reason -> reasons.add(reason.asText()));
         analysis.set("topReasons", json.valueToTree(reasons.stream().limit(3).toList()));
       }
+    }
+    // The price in the listing the Buyer saved (ticket 115) beside this offer's vehicle price; added only when the
+    // case has a confirmed listing capture, so reports without one keep their shape.
+    var listingCheck = offer == null ? null
+        : listingPrice.check(caseId, offer.terms(), "DEALER_OFFER", "VERIFIED".equals(offer.status()));
+    if (listingCheck != null) {
+      analysis.set("listingPriceCheck", json.valueToTree(listingCheck));
+      evidence.set("listingCapture", json.valueToTree(listings.findById(listingCheck.listingSnapshotId()).orElse(null)));
     }
     analysis.put("financingAvailability", financeAvailability);
     analysis.set("financingTerms", json.valueToTree(finance == null ? null : finance.inputs()));

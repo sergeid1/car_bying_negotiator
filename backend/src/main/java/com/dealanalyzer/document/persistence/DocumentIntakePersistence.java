@@ -13,6 +13,8 @@ public class DocumentIntakePersistence {
   private static final List<String> RETENTION_PENDING = List.of("ACTIVE", "DELETION_PENDING");
   public static final String DEALER_PAPERWORK = "DEALER_PAPERWORK";
   public static final String TRADE_OFFER_EVIDENCE = "TRADE_OFFER_EVIDENCE";
+  /** The Buyer's own capture of a dealer's listing: read for listing fields, never for Deal Terms. */
+  public static final String LISTING_CAPTURE = "LISTING_CAPTURE";
   private final com.dealanalyzer.buyingcase.persistence.CaseRetentionService retention;
   private final SourceDocumentRepository documents;
   private final DocumentPageRepository pages;
@@ -176,6 +178,12 @@ public class DocumentIntakePersistence {
   @Transactional(readOnly = true)
   public boolean isTradeOfferEvidence(String documentId) {
     return documents.findById(documentId).map(document -> document.purpose.equals(TRADE_OFFER_EVIDENCE)).orElse(false);
+  }
+
+  /** The document's purpose, or empty when the document is unknown. */
+  @Transactional(readOnly = true)
+  public Optional<String> purposeOf(String documentId) {
+    return documents.findById(documentId).map(document -> document.purpose);
   }
 
   /** Ends the processing of trade offer evidence once its pages are normalized. */

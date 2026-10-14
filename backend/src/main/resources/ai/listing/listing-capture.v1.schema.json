@@ -1,0 +1,41 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["fields", "documentWarnings"],
+  "properties": {
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "originalWording", "normalizedValue", "normalizedUnit", "evidence", "confidence"],
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "LISTING_PRICE", "VEHICLE_VIN", "VEHICLE_YEAR", "VEHICLE_MAKE", "VEHICLE_MODEL", "VEHICLE_TRIM",
+              "ODOMETER", "DEALER_NAME", "CAPTURE_DATE", "LISTING_PRICE_CONDITIONS"
+            ]
+          },
+          "originalWording": { "type": "string" },
+          "normalizedValue": { "type": ["string", "null"] },
+          "normalizedUnit": { "type": "string", "enum": ["USD_MINOR", "VIN", "YEAR", "MILES", "DATE", "TEXT"] },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pageNumber", "x", "y", "width", "height"],
+            "properties": {
+              "pageNumber": { "type": "integer" },
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "width": { "type": "number" },
+              "height": { "type": "number" }
+            }
+          },
+          "confidence": { "type": "number" }
+        }
+      }
+    },
+    "documentWarnings": { "type": "array", "items": { "type": "string" } }
+  }
+}

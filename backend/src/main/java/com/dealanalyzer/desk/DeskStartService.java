@@ -43,11 +43,14 @@ public class DeskStartService {
   private final ObjectMapper json;
   private final TradeDeskCheck tradeCheck;
   private final com.dealanalyzer.desk.tactic.DeskTacticService tactics;
+  private final com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice;
   private final FinancingCalculator financing = new FinancingCalculator();
 
   DeskStartService(EphemeralBuyingCaseService cases, DeskCheckService desk, DocumentExtractionPersistence extractions,
       TradeService trades, JdbcTemplate jdbc, ObjectMapper json, TradeDeskCheck tradeCheck,
-      com.dealanalyzer.desk.tactic.DeskTacticService tactics) {
+      com.dealanalyzer.desk.tactic.DeskTacticService tactics,
+      com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice) {
+    this.listingPrice = listingPrice;
     this.cases = cases; this.desk = desk; this.extractions = extractions; this.trades = trades;
     this.jdbc = jdbc; this.json = json; this.tradeCheck = tradeCheck;
     this.tactics = tactics;
@@ -83,7 +86,8 @@ public class DeskStartService {
   /** source: READ_FROM_PAPERWORK or TYPED_BY_BUYER; neither is verified. */
   public record FirstResult(String policyVersion, String route, String source, OutTheDoor outTheDoor, Finding lead,
       List<Finding> findings, TradeDeskCheck.Result trade,
-      List<com.dealanalyzer.desk.tactic.DeskTacticPolicy.Finding> tacticFindings) {}
+      List<com.dealanalyzer.desk.tactic.DeskTacticPolicy.Finding> tacticFindings,
+      com.dealanalyzer.listing.capture.ListingPriceCheck.Result listingPrice) {}
   /** amountMinor is null when the paperwork shows no out-the-door total; it is never treated as zero. */
   public record OutTheDoor(Long amountMinor, Long agreedMinor, Long differenceMinor) {}
   /** amountMinor is the finding's dollar effect when it can be calculated, otherwise null. */
@@ -180,6 +184,14 @@ public class DeskStartService {
       findings.add(new Finding(item.code(), (tactic == null ? "" : tactic.label() + ": ") + item.summary(), item.amountMinor(),
           tactic == null ? item.deskQuestion() : tactic.deskQuestion(), allowanceEvidence, tactic == null ? null : tactic.code()));
     }
+    // The price in the listing the Buyer saved (ticket 115): a higher paperwork price, or another car, is asked about.
+    var listing = listingPrice.check(caseId, terms, "DESK_PAPERWORK", false);
+    if (listing != null && "HIGHER".equals(listing.status()))
+      findings.add(new Finding("LISTING_PRICE_HIGHER", listing.summary(), listing.differenceMinor(), listing.deskQuestion(),
+          evidence(terms, "SELLING_PRICE")));
+    else if (listing != null && "DIFFERENT_VIN".equals(listing.status()))
+      findings.add(new Finding("LISTING_VIN_DIFFERENT", listing.summary(), null, listing.deskQuestion(),
+          evidence(terms, "VEHICLE_VIN")));
     // A different trade-in VIN leads; then the largest calculable dollar effect; findings without an amount
     // keep their rule order after those.
     findings.sort(Comparator.comparing((Finding finding) -> !finding.code().equals("TRADE_VIN_DIFFERENT"))
@@ -189,7 +201,7 @@ public class DeskStartService {
     var total = new OutTheDoor(otd, agreedOtd, otd == null || agreedOtd == null ? null : Math.subtractExact(otd, agreedOtd));
     return new FirstResult(VERSION, request.route(), source, total, findings.isEmpty() ? null : findings.get(0),
         List.copyOf(findings), "NO_ALLOWANCE".equals(trade.status()) ? null : trade,
-        tacticFindings);
+        tacticFindings, listing);
   }
 
   private static String route(String vin, String agreedVin, String caseVin) {
@@ -381,6 +393,11 @@ public class DeskStartService {
     var low = financing.reconcilePayment(principal, lower, months, 0L).paymentMinor();
     var high = financing.reconcilePayment(principal, higher, months, 0L).paymentMinor();
     return low == null || high == null ? null : Math.multiplyExact(high - low, (long) months);
+  }
+
+  private static JsonNode evidence(JsonNode terms, String field) {
+    return stream(terms.path("candidates")).filter(term -> field.equals(term.path("field").asText())).findFirst()
+        .map(term -> nullable(term.path("evidence"))).orElse(null);
   }
 
   private static String value(JsonNode terms, String field) {

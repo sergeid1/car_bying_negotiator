@@ -1,0 +1,82 @@
+/* Ticket 115: the Buyer's own copy of the dealer's ad, its confirmation, and the price check beside paperwork. */
+
+.listing-capture, .listing-price-check { min-width: 0; overflow-wrap: anywhere; }
+.listing-capture { display: grid; gap: 14px; }
+.listing-capture > * + * { margin-top: 0; }
+.listing-capture p { margin: 0; }
+.listing-capture h3 { margin: 0; }
+.listing-capture button { max-width: 100%; min-height: 44px; white-space: normal; }
+.listing-capture input, .listing-capture textarea { min-width: 0; max-width: 100%; }
+.listing-capture .vin, .listing-price-check .vin { font-family: var(--font-mono); }
+.listing-capture input[name="vin"] { font-family: var(--font-mono); text-transform: uppercase; }
+
+.listing-capture .btn-link {
+  min-height: 44px;
+  padding: 0 2px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--focus);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.listing-capture .btn-link:hover { background: transparent; color: var(--ink-strong); }
+
+.listing-capture-start { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.listing-capture-file {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  max-width: 100%;
+  padding: 12px 24px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+.listing-capture-file:hover { background: var(--brand-hover); }
+.listing-capture-file:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.listing-capture-paste, .listing-capture-confirm { display: grid; gap: 12px; }
+.listing-capture-paste textarea { width: 100%; }
+
+.listing-capture-saved {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card-sunk);
+}
+.listing-conflict { display: grid; gap: 10px; }
+.listing-conflict .actions { flex-wrap: wrap; margin: 0; }
+
+.listing-field { display: grid; gap: 6px; }
+.listing-field input { width: 100%; }
+.listing-field-source { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 0.9rem; }
+.listing-source-page { width: min(100%, 480px); }
+
+.listing-capture-conditions { display: grid; gap: 8px; min-width: 0; }
+.listing-capture-conditions textarea { width: 100%; }
+.listing-condition, .listing-capture-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 0;
+}
+.listing-condition input, .listing-capture-check input { flex: none; width: 20px; height: 20px; margin: 2px 0 0; }
+
+.listing-price-check { display: grid; gap: 8px; }
+.listing-price-check > * { margin: 0; }
+.listing-price-check[data-status="HIGHER"], .listing-price-check[data-status="DIFFERENT_VIN"] {
+  padding-left: 12px;
+  border-left: 3px solid var(--warn-ink);
+}
+.listing-conditions { display: grid; gap: 4px; }
+.listing-conditions p, .listing-conditions ul { margin: 0; }
+.listing-conditions ul { padding-left: 1.2rem; }

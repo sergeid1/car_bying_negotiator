@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "listing-capture-fixtures.v1",
+  "intent": "Labelled synthetic captures of a dealer's listing for ticket 115. Every listing, dealer and VIN is invented for testing; none is a real ad. Each fixture is paired with dealer paperwork whose vehicle price is $25,000 (2500000 cents) for VIN 1HGCM82633A004352, the agreed car in the acceptance tests.",
+  "fixtures": [
+    {
+      "label": "matching-price",
+      "description": "The ad shows the same price as the paperwork.",
+      "kind": "PASTED_TEXT",
+      "text": "10/1/26, 9:14 AM\n2003 Honda Accord EX\nInternet Price: $25,000\nVIN: 1HGCM82633A004352\nMileage: 98,200 miles\nDealer: North Branch Motors",
+      "expectedReading": { "status": "READ", "LISTING_PRICE": "2500000", "VEHICLE_VIN": "1HGCM82633A004352", "VEHICLE_YEAR": "2003",
+        "VEHICLE_MAKE": "Honda", "VEHICLE_MODEL": "Accord", "VEHICLE_TRIM": "EX", "ODOMETER": "98200",
+        "DEALER_NAME": "North Branch Motors", "CAPTURE_DATE": "2026-10-01", "conditions": 0 },
+      "expectedCheck": { "status": "SAME", "differenceMinor": 0 }
+    },
+    {
+      "label": "higher-paperwork-price",
+      "description": "The ad shows $23,995; the paperwork asks $25,000 for the same car.",
+      "kind": "PASTED_TEXT",
+      "text": "2003 Honda Accord EX\nSale Price: $23,995\nVIN: 1HGCM82633A004352\nMileage: 98,200 miles\nDealer: North Branch Motors",
+      "expectedReading": { "status": "READ", "LISTING_PRICE": "2399500", "VEHICLE_VIN": "1HGCM82633A004352", "conditions": 0 },
+      "expectedCheck": { "status": "HIGHER", "differenceMinor": 100500 }
+    },
+    {
+      "label": "conditional-ad-price",
+      "description": "The ad's price depends on dealer financing and a rebate the Buyer may not qualify for.",
+      "kind": "PASTED_TEXT",
+      "text": "2003 Honda Accord EX\nOur Price: $23,995*\nVIN: 1HGCM82633A004352\nDealer: North Branch Motors\n*Price requires financing through the dealer with approved credit.\nIncludes $1,500 loyalty rebate. Plus tax, title, license and an $899 dealer fee.",
+      "expectedReading": { "status": "READ", "LISTING_PRICE": "2399500", "VEHICLE_VIN": "1HGCM82633A004352", "conditions": 2 },
+      "expectedCheck": { "status": "HIGHER", "differenceMinor": 100500 }
+    },
+    {
+      "label": "listing-vin-mismatch",
+      "description": "The ad is for a different VIN from the case's car and the paperwork.",
+      "kind": "PASTED_TEXT",
+      "text": "2019 Ford Escape SE\nPrice: $25,000\nVIN: 1M8GDM9AXKP042788\nDealer: North Branch Motors",
+      "expectedReading": { "status": "READ", "LISTING_PRICE": "2500000", "VEHICLE_VIN": "1M8GDM9AXKP042788", "conditions": 0 },
+      "expectedCheck": { "status": "DIFFERENT_VIN" }
+    },
+    {
+      "label": "unreadable-capture",
+      "description": "A capture with no readable text, such as a screenshot under the text reader; the Buyer types the fields.",
+      "kind": "BLANK_PDF",
+      "text": "",
+      "expectedReading": { "status": "UNREADABLE", "conditions": 0 },
+      "expectedCheck": { "status": "HIGHER", "differenceMinor": 50000, "typedPriceMinor": 2450000 }
+    }
+  ]
+}

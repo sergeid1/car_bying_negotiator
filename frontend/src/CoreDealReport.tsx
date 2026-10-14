@@ -12,6 +12,7 @@ import { AnimatedAmount } from "./AnimatedAmount";
 import { TradeCheckPanel, type TradeCheckResult } from "./TradeCheck";
 import { DeskTactics, type DeskTacticFinding } from "./DeskTactics";
 import { VehicleSafetyFacts, type VehicleSafetyView } from "./VehicleSafety";
+import { ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
 
 export type MaterialAmount = {
   label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string;
@@ -24,6 +25,7 @@ export type CoreReport = {
     tacticFindings?: DeskTacticFinding[];
     dealReview?: DealReview;
     tradeCheck?: TradeCheckResult | null;
+    listingPriceCheck?: ListingPriceCheck | null;
     financingAvailability?: string; financing?: FinancingResult | null; financingTerms?: { aprPercent: number | null; termMonths: number | null } | null;
     reviewLabel: string; dealRating: string; ratingBasis: string; nextAction: string;
     topReasons: string[]; marketAvailability: string; cashAvailability: string;
@@ -132,6 +134,7 @@ export function CoreDealReport({ report, caseId, token, redacted, children }: { 
     <nav aria-label="Report sections">{analysis.dealReview && <><a href="#revised-offer-review">Revised offer comparison</a> · </>}<a href="#core-amounts">Amounts</a> · {showFinancing && <><a href="#core-financing">Financing</a> · </>} <a href="#core-evidence">Evidence and calculations</a> · <a href="#core-scope">Scope and policies</a></nav>
     {analysis.dealReview && <RevisedOfferReview review={analysis.dealReview} redacted={redacted} />}
     {analysis.tradeCheck && <div className="panel"><TradeCheckPanel result={analysis.tradeCheck} tactics={analysis.tacticFindings} /></div>}
+    {analysis.listingPriceCheck && <div className="panel"><ListingPriceNote check={analysis.listingPriceCheck} title="The ad you saved" /></div>}
     <ul className="report-sections" aria-label="Report details">
       {report.vehicleSafety && !redacted && <ReportSection id="core-vehicle-safety" title="Recalls and safety ratings">
         <VehicleSafetyFacts view={report.vehicleSafety} />
