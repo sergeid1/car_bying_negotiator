@@ -124,7 +124,7 @@ test("a case API without listing captures still offers every way to add the ad",
 test("the price note says what the ad and the paperwork show, never that otdog checked the dealer's site", () => {
   render(<ListingPriceNote check={{ ...higherCheck, paperwork: "DESK_PAPERWORK", verified: false }} title="The ad you saved" />);
   expect(screen.getByRole("heading", { name: "The ad you saved" })).toBeInTheDocument();
-  expect(screen.getByText(/against the paperwork as read and not yet verified/)).toBeInTheDocument();
+  expect(screen.getByText(/against paperwork numbers that are not yet verified/)).toBeInTheDocument();
   expect(document.body.textContent).toContain("otdog did not visit the dealer's site");
   expect(document.body.textContent).not.toMatch(/illegal|unlawful|bait|deceptive|we checked/i);
   cleanup();

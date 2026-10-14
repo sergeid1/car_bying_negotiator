@@ -249,7 +249,7 @@ export function ListingPriceNote({ check, question = true, title }: { check: Lis
       <q>{check.deskQuestion}</q></p>}
     {check.priceConditions.length > 0 && <Conditions conditions={check.priceConditions} />}
     <p className="muted">From your own copy of the dealer's ad{check.paperwork === "DESK_PAPERWORK" && !check.verified
-      ? ", against the paperwork as read and not yet verified" : ""}. otdog did not visit the dealer's site.</p>
+      ? ", against paperwork numbers that are not yet verified" : ""}. otdog did not visit the dealer's site.</p>
   </div>;
 }
 
