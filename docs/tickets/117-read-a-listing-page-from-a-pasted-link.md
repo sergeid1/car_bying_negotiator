@@ -9,8 +9,8 @@ whose search appears to come from its own crawl of dealer websites.
 **Blocked by:** the operator, on two decisions:
 1. **Spec amendment.** Spec 2.2 excludes "inventory discovery from unlicensed sources or scraping" (section
    2.2) and allows a Listing Snapshot only "when licensed access supports it" (section 5.2). A single
-   Buyer-requested fetch is not inventory discovery, but the spec must say so explicitly (version 2.3)
-   before this is built.
+   Buyer-requested fetch is not inventory discovery, but the spec must say so explicitly in an amendment
+   before this is built (the next spec version after 2.3, which another branch uses for insurance and loan quotes).
 2. **Terms review.** Dealer sites' and listing portals' terms of use, and whether storing the fetched
    facts (not photos or description text) is acceptable, recorded in `docs/provider-inventory.md`.
 Also 115 (the snapshot source and price check this reuses).
@@ -31,7 +31,7 @@ Also 115 (the snapshot source and price check this reuses).
 
 ## Done when
 
-- [ ] Spec 2.3 states the single-fetch exception and the operator's terms review is recorded.
+- [ ] The spec amendment states the single-fetch exception and the operator's terms review is recorded.
 - [ ] The fetch refuses private and metadata addresses, DNS rebinding, redirects off host, oversized and
       slow responses, with tests for each.
 - [ ] A fetched listing becomes the same Buyer-confirmed Listing Snapshot as ticket 115 and feeds the same
