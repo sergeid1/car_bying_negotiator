@@ -15,7 +15,20 @@ upload), 06 and 25 (extraction with evidence and Buyer confirmation), 66 (Desk C
 screenshots needs ticket 36's Claude provider; until then, like ticket 105, the flow works for
 text-bearing captures (a saved PDF of the page, pasted text) and Buyer-typed fields.
 
-**Status:** open — filed on 2026-10-14. Migration V56 is reserved for this ticket.
+**Status:** complete for text-bearing captures and typed fields — migration V56, as of 2026-10-14. Captures enter
+document intake as `LISTING_CAPTURE` (upload, or pasted text up to 40,000 characters) and are read by
+`DeterministicListingCaptureProvider`, or by `ClaudeListingCaptureProvider` (`listing-capture-prompt.v1`, its own
+`ModelTask`, refused by the rollout gate until it has a shadow comparison). The Buyer confirms, corrects or types each
+field through `/api/v1/cases/{caseId}/listing-captures` (`ListingCaptureController`) into a
+`BUYER_SUPPLIED_LISTING_CAPTURE` Listing Snapshot, recording each field as `AS_READ`, `CORRECTED` or `TYPED`.
+`ListingEvidencePersistence.findLatest` excludes captures, so vehicle evidence and verification facts are unchanged;
+`findLatestCapture` reads them. A listing VIN that differs from the case vehicle appends the existing blocking identity
+conflict, and verification refuses paperwork for a different VIN until it is settled. `listing-price-check.v1`
+(`ListingPriceCheck`) feeds the Desk Check (`listingPrice`), the "I'm at the dealer" result (`LISTING_PRICE_HIGHER`,
+`LISTING_VIN_DIFFERENT`) and fresh reports (`analysis.listingPriceCheck`); saved reports render unchanged. Capture
+dealers are not offered as quote-request targets. Open: screenshots read as unreadable until ticket 36 enables the
+Claude reader; in "I'm at the dealer" the capture panel appears below the first result rather than before it;
+listing reads are metered as `EXTRACTION`.
 
 ## How it works
 
@@ -44,23 +57,23 @@ text-bearing captures (a saved PDF of the page, pasted text) and Buyer-typed fie
 
 ## Done when
 
-- [ ] A Buyer can add a listing capture to an open case by upload (PDF, JPEG, PNG, HEIC within the
+- [x] A Buyer can add a listing capture to an open case by upload (PDF, JPEG, PNG, HEIC within the
       existing limits) or by pasting text, from the "Get quotes" step and from "I'm at the dealer".
-- [ ] `LISTING_CAPTURE` documents go through the existing malware, parser confinement and encryption
+- [x] `LISTING_CAPTURE` documents go through the existing malware, parser confinement and encryption
       path, never change the case status, and never feed Dealer Offer creation.
-- [ ] Extracted listing fields carry evidence regions; the Buyer confirms or corrects each before a
+- [x] Extracted listing fields carry evidence regions; the Buyer confirms or corrects each before a
       Listing Snapshot is created; an unreadable capture falls back to typed fields without stopping.
-- [ ] A listing VIN different from the case vehicle or paperwork VIN raises the existing blocking
+- [x] A listing VIN different from the case vehicle or paperwork VIN raises the existing blocking
       identity conflict.
-- [ ] The Desk Check, the "I'm at the dealer" result and a fresh report show the price difference with its
+- [x] The Desk Check, the "I'm at the dealer" result and a fresh report show the price difference with its
       snapshot date and desk question; price conditions captured from the ad are shown with it; saved
       reports from before this ticket render unchanged.
-- [ ] Labelled synthetic fixtures cover: a matching price, a higher paperwork price, a conditional ad price,
+- [x] Labelled synthetic fixtures cover: a matching price, a higher paperwork price, a conditional ad price,
       a listing VIN mismatch, and an unreadable capture.
-- [ ] Copy says this is the Buyer's own capture of the ad, never that the platform checked the dealer's
+- [x] Copy says this is the Buyer's own capture of the ad, never that the platform checked the dealer's
       site, and passes `ClaimVocabulary` and `PilotCopyClaimsTest`.
-- [ ] Captures and snapshots are exported and deleted with the case (`case-portability-policy.md`,
+- [x] Captures and snapshots are exported and deleted with the case (`case-portability-policy.md`,
       `case-deletion-policy.md`); `CaseIsolationInventoryAcceptanceTest` classifies every new endpoint.
-- [ ] New panels are registered in `Accessibility.test.tsx` and pass the 360 px browser gate in both themes.
-- [ ] Migration `V56` (if needed) applies on PostgreSQL and H2; targeted `mvn -Dtest=...` suites, `npm test`,
+- [x] New panels are registered in `Accessibility.test.tsx` and pass the 360 px browser gate in both themes.
+- [x] Migration `V56` (if needed) applies on PostgreSQL and H2; targeted `mvn -Dtest=...` suites, `npm test`,
       `npm run build` and `npx playwright test` pass.

@@ -10,7 +10,16 @@ terms.
 **Blocked by:** none. Builds on 04 (case vehicle), 52 (`NhtsaVpicVinDecoder`, the adapter pattern to
 follow), 11 (report) and 41 (provider metering).
 
-**Status:** open — filed on 2026-10-14. Migration V57 is reserved for this ticket.
+**Status:** complete against a local NHTSA stub — no migration (V57 unused), as of 2026-10-14.
+`com.dealanalyzer.vehicle.safety` holds `VehicleSafetyProvider`, the development fake (the default, labelled
+"Development sample — not NHTSA data") and `NhtsaVehicleSafetyProvider` (`vehicle-safety.provider=nhtsa`): HTTPS only,
+no redirects, a 1 MiB streamed body cap, a deadline covering a stalled body, retries on 429 and 5xx, and only year, make
+and model sent. `VehicleSafetyProductionGuard` refuses the fake under a production-like `DeploymentStage`; calls are
+metered as `VEHICLE_SAFETY`. Successful answers are cached per process by year, make and model (six hours, 500
+entries); failures are not cached. `GET /api/v1/cases/{caseId}/vehicle-safety` serves the case panel, shown collapsed
+below the case header; a fresh report freezes the facts as `vehicleSafety` after rechecking the car under the case
+lock. Open: the live NHTSA service has not been called; a model name NHTSA spells differently returns zero records,
+which the copy covers by sending the Buyer to NHTSA's VIN lookup.
 
 ## How it works
 
@@ -35,21 +44,21 @@ follow), 11 (report) and 41 (provider metering).
 
 ## Done when
 
-- [ ] With a case vehicle that has year, make and model (from VIN or confirmed manual facts), the case
+- [x] With a case vehicle that has year, make and model (from VIN or confirmed manual facts), the case
       shows a "Recalls and safety ratings" panel and a fresh report includes the same facts as of
       their retrieval time.
-- [ ] Each recall shows its NHTSA campaign number, component, summary and remedy, and the desk question;
+- [x] Each recall shows its NHTSA campaign number, component, summary and remedy, and the desk question;
       the panel links to NHTSA's VIN recall lookup with the case VIN ready to copy.
-- [ ] Zero recalls, an unavailable provider and a vehicle without enough facts are each distinct and
+- [x] Zero recalls, an unavailable provider and a vehicle without enough facts are each distinct and
       worded plainly; none is shown as "no recalls".
-- [ ] `VehicleSafetyProductionGuard` refuses the fake under a pilot or production `DeploymentStage`; the
+- [x] `VehicleSafetyProductionGuard` refuses the fake under a pilot or production `DeploymentStage`; the
       NHTSA adapter is metered through `ProviderMeter` and listed in `docs/provider-inventory.md` (data
       sent: year, make, model only).
-- [ ] Adapter tests run against a local stub server: success, several variants, empty results, 429 then
+- [x] Adapter tests run against a local stub server: success, several variants, empty results, 429 then
       success, 5xx exhaustion, oversized body, malformed JSON and a redirect.
-- [ ] Saved reports from before this ticket render unchanged; reports with safety facts export and delete
+- [x] Saved reports from before this ticket render unchanged; reports with safety facts export and delete
       with the case.
-- [ ] Copy passes `ClaimVocabulary` and `PilotCopyClaimsTest`; the panel is registered in
+- [x] Copy passes `ClaimVocabulary` and `PilotCopyClaimsTest`; the panel is registered in
       `Accessibility.test.tsx` and passes the 360 px browser gate in both themes.
-- [ ] Migration `V57` (if needed) applies on PostgreSQL and H2; targeted `mvn -Dtest=...` suites,
+- [x] Migration `V57` (not needed; unused) applies on PostgreSQL and H2; targeted `mvn -Dtest=...` suites,
       `npm test`, `npm run build` and `npx playwright test` pass.
