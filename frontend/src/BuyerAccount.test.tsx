@@ -34,14 +34,12 @@ test("requests a sign-in link from one email box without storing anything in the
   vi.stubGlobal("fetch", fetcher);
   const { container } = render(<BuyerAccount />);
   const user = userEvent.setup();
-  expect(screen.getByText("Optional. Keeps your cases in one place.")).toBeVisible();
   const email = await screen.findByLabelText("Email");
   expect(screen.getAllByRole("textbox")).toEqual([email]);
-  expect(screen.getAllByRole("button")).toEqual([screen.getByRole("button", { name: "Continue" })]);
+  expect(screen.getByRole("button", { name: "Use a password instead" })).toBeVisible();
   expect(container.querySelector("input[type=password]")).toBeNull();
-  expect(container.querySelectorAll("p")).toHaveLength(1);
   await user.type(email, "buyer@example.com");
-  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(screen.getByRole("button", { name: "Continue with email" }));
   expect(await screen.findByRole("status")).toHaveTextContent("Check your email. The link works for 15 minutes.");
   expect(screen.getByRole("status")).toHaveFocus();
   const [path, init] = fetcher.mock.calls.find(([path]) => String(path).endsWith("/sign-in-requests"))!;
@@ -68,7 +66,7 @@ test("an unknown email gets the same answer as a known one", async () => {
     const { container } = render(<BuyerAccount />);
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText("Email"), "buyer@example.com");
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: "Continue with email" }));
     await screen.findByRole("status");
     views.push(container.innerHTML);
     cleanup();
@@ -83,7 +81,7 @@ test("forgot password sends the sign-in link directly", async () => {
   render(<BuyerAccount />);
   const user = userEvent.setup();
   await user.type(await screen.findByLabelText("Email"), "buyer@example.com");
-  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(screen.getByRole("button", { name: "Continue with email" }));
   await user.click(await screen.findByRole("button", { name: "Sign in with a password" }));
   expect(screen.getByLabelText("Password")).toHaveFocus();
   await user.click(screen.getByRole("button", { name: "Forgot password?" }));
@@ -106,7 +104,7 @@ test("signs in with a password from the same email box", async () => {
   render(<BuyerAccount onSignInComplete={complete} />);
   const user = userEvent.setup();
   await user.type(await screen.findByLabelText("Email"), "buyer@example.com");
-  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(screen.getByRole("button", { name: "Continue with email" }));
   await user.click(await screen.findByRole("button", { name: "Sign in with a password" }));
   await user.type(screen.getByLabelText("Password"), "a long private phrase");
   await user.click(screen.getByRole("button", { name: "Sign in" }));
@@ -125,7 +123,7 @@ test("a failed password sign-in stays on the form, clears the password and offer
   render(<BuyerAccount />);
   const user = userEvent.setup();
   await user.type(await screen.findByLabelText("Email"), "buyer@example.com");
-  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(screen.getByRole("button", { name: "Continue with email" }));
   await user.click(await screen.findByRole("button", { name: "Sign in with a password" }));
   await user.type(screen.getByLabelText("Password"), "a long private phrase");
   await user.click(screen.getByRole("button", { name: "Sign in" }));
@@ -170,7 +168,7 @@ test.each([
   await userEvent.setup().click(screen.getByRole("button", { name: "Finish signing in" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(text);
   expect(screen.queryByRole("button", { name: "Finish signing in" })).toBeNull();
-  expect(screen.getByRole("button", { name: "Continue" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Continue with email" })).toBeVisible();
   expect(storage.size).toBe(0);
 });
 
@@ -197,7 +195,7 @@ test("attaches the open case with its case link and signs out server-side", asyn
   expect((attach[1]?.headers as Record<string, string>)["Case-Access-Token"]).toBe("case-token");
   expect(screen.queryByRole("button", { name: "Attach this Buying Case" })).toBeNull();
   await user.click(screen.getByRole("button", { name: "Sign out" }));
-  expect(await screen.findByRole("button", { name: "Continue" })).toBeVisible();
+  expect(await screen.findByRole("button", { name: "Continue with email" })).toBeVisible();
   expect(fetcher.mock.calls.some(([path, init]) => path === "/api/v1/account/sign-out" && init?.method === "POST")).toBe(true);
   expect(storage.size).toBe(0);
 });
@@ -292,7 +290,7 @@ test("removes a legacy browser credential without using it to sign in", async ()
   const fetcher = vi.fn(async () => json({}, 401));
   vi.stubGlobal("fetch", fetcher);
   render(<BuyerAccount />);
-  expect(await screen.findByRole("button", { name: "Continue" })).toBeVisible();
+  expect(await screen.findByRole("button", { name: "Continue with email" })).toBeVisible();
   expect(storage.size).toBe(0);
   expect(fetcher).toHaveBeenCalledWith("/api/v1/account", { headers: {} });
 });

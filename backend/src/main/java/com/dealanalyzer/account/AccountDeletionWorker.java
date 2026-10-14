@@ -27,7 +27,7 @@ public class AccountDeletionWorker {
       "reference_vehicles", "provider_usage", "shopping_brief_versions", "buying_journeys",
       "buyer_notification_preferences", "buyer_notification_deliveries",
       "mailbox_sends", "mailbox_authorizations", "mailbox_connections",
-      "buyer_account_passkeys", "buyer_account_passkey_challenges", "buyer_account_security_events",
+      "buyer_account_identities", "buyer_account_passkeys", "buyer_account_passkey_challenges", "buyer_account_security_events",
       "buyer_account_sessions", "buyer_account_sign_in_links", "buyer_account_cases");
 
   private final AccountDeletionJobRepository jobs;
@@ -54,6 +54,8 @@ public class AccountDeletionWorker {
     Instant now = Instant.now();
     transaction.executeWithoutResult(status -> {
       manager.createNativeQuery("delete from buyer_account_passkey_challenges where expires_at <= :now")
+          .setParameter("now", now).executeUpdate();
+      manager.createNativeQuery("delete from buyer_account_social_sign_in_attempts where expires_at <= :now")
           .setParameter("now", now).executeUpdate();
       for (String id : accounts.findAbandonedSignUps(now.minus(linkLifetime), now, batch)) removeAndVerify(id);
       manager.createNativeQuery("delete from buyer_account_sessions where expires_at <= :now")

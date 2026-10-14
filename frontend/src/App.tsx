@@ -131,15 +131,18 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
   const [accountSignedIn, setAccountSignedIn] = useState(false);
   const [accountControls, setAccountControls] = useState<AccountControls>();
   const [accountRecheck, setAccountRecheck] = useState(0);
+  const [signInMode, setSignInMode] = useState<"login" | "signup">("login");
+  const [accountNotice, setAccountNotice] = useState("");
   // A sign-in or recovery link, or a return from a mailbox provider's consent page, opens the panel that finishes it.
   const [sidePanel, setSidePanel] = useState<SidePanelView | undefined>(() => {
     const query = new URLSearchParams(window.location.search);
-    return window.location.hash.startsWith("#sign-in=") || window.location.hash.startsWith("#recover=")
+    return window.location.hash.startsWith("#sign-in=") || window.location.hash.startsWith("#social-sign-in") || window.location.hash.startsWith("#recover=")
       || (query.has("state") && (query.has("code") || query.has("error"))) ? "account" : undefined;
   });
   // Opens the sign-in panel's private case link disclosure, such as after a case link fails to open.
   const [caseLinkExpand, setCaseLinkExpand] = useState(0);
-  useSidePanelRequests(setSidePanel);
+  function openPanel(view: SidePanelView) { setSignInMode("login"); setAccountNotice(""); setSidePanel(view); }
+  useSidePanelRequests(openPanel);
   const closeSidePanel = () => setSidePanel(undefined);
   // The header's tabs change the address without reloading, so the page is read again on every history move.
   const [address, setAddress] = useState(0);
@@ -224,11 +227,12 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
           {!caseOpen && !partnerKit && <SiteNav page={howItWorks ? "how-it-works" : exampleReport ? "example-report" : guide || guideIndex ? "guides" : standalone ? "other" : "home"} />}
           {!partnerKit && <DealerCameraEntry onPhotos={files => setAtDealer({ files, started: Date.now() })} />}
           <ThemeMenu />
-          {!partnerKit && <AccountHeader controls={accountControls} onOpen={() => setSidePanel("account")} />}
+          {!partnerKit && <AccountHeader controls={accountControls} onOpen={() => openPanel("account")} />}
         </div>
       </header>
 
       <main>
+        {accountNotice && <p role="status">{accountNotice}</p>}
         {!standalone && !caseOpen && <HomeHero />}
 
         <div className="workspace">
@@ -362,21 +366,25 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
           onRevoked={() => { setCaseRevoked(true); setReport(undefined); setStage(undefined); setError(undefined); }} />}
       </SidePanel>
-      {!partnerKit && <SidePanel id="account-panel" title={accountSignedIn ? "Your account" : "Sign in"}
+      {!partnerKit && <SidePanel id="account-panel" title={accountSignedIn ? "Your account" : signInMode === "login" ? "Log in" : "Sign up"}
+        centered={!accountSignedIn}
         open={sidePanel === "account"} onClose={closeSidePanel}>
         <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined}
+          signInMode={signInMode} onSignInMode={setSignInMode}
           onSignedIn={setAccountSignedIn} onControls={setAccountControls} recheck={accountRecheck} showing={sidePanel === "account"}
-          onSignInComplete={closeSidePanel}
+          onSignInComplete={notice => { if (notice) setAccountNotice(notice); closeSidePanel(); }}
           onCaseOpened={value => {
             closeSidePanel();
             setReferral(undefined); setDeskFresh(undefined); setCaseRevoked(false); setCaseCredentials(value);
             setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined);
           }} />
+        <div className="account-access-footer" hidden={!accountSignedIn && signInMode === "signup"}>
         <CaseLinkAccess expand={caseLinkExpand}>
           <SavedCaseAccess onOpened={value => { closeSidePanel(); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }}
             onUnavailable={caseId => { setSidePanel("account"); setCaseLinkExpand(value => value + 1); setCaseCredentials(undefined); setRecoveryCaseId(caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
           <RecoveryAccess caseId={recoveryCaseId ?? caseCredentials?.caseId} onRecovered={value => { closeSidePanel(); setCaseRevoked(false); setCaseCredentials(value); setRecoveryCaseId(value.caseId); setReport(undefined); setStage(undefined); setError(undefined); }} />
         </CaseLinkAccess>
+        </div>
       </SidePanel>}
     </>
   );

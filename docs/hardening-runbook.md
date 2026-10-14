@@ -180,6 +180,18 @@ provider app/publisher verification, exact HTTPS redirect registration, least-pr
 secret management, and real send/revocation checks. The mailbox production guard verifies
 adapter/key configuration only; it does not establish any of those deployment facts.
 
+Google and Apple sign-in (ticket 113) stay off until their settings are present; a provider with
+blank settings is simply not offered, and pilot/production refuse partial settings or a non-HTTPS
+redirect base. Google needs `SOCIAL_SIGN_IN_GOOGLE_CLIENT_ID`/`_SECRET` from an OAuth web client
+with scopes `openid email`. Apple needs a Services ID (`SOCIAL_SIGN_IN_APPLE_CLIENT_ID`),
+`SOCIAL_SIGN_IN_APPLE_TEAM_ID`, and a Sign in with Apple key (`SOCIAL_SIGN_IN_APPLE_KEY_ID`,
+`SOCIAL_SIGN_IN_APPLE_PRIVATE_KEY` as the PKCS #8 PEM; escaped `\n` is accepted). Register
+`{SOCIAL_SIGN_IN_REDIRECT_BASE}/api/v1/account/social-sign-in/google/callback` and
+`.../apple/callback` exactly with each provider; the base defaults to the public client URL.
+Attempt secrets are encrypted under a key derived from `DOCUMENT_STORAGE_ENCRYPTION_KEY`, so
+sign-in with either provider is unavailable without it. Before enabling Apple, confirm a real
+sign-in with the production Services ID; PKCE has been checked against test stubs only.
+
 ## Accepted scan exceptions
 
 `scripts/security-checks.sh` fails on any high or critical finding. A finding may be accepted only

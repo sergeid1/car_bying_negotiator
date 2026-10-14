@@ -23,8 +23,8 @@ export function useSidePanelRequests(onOpen: (view: SidePanelView) => void) {
  * A modal panel that slides over the page from the right. Its content stays mounted while it is closed,
  * so sign-in state and case access keep working in the background.
  */
-export function SidePanel({ id, title, open, onClose, children }: {
-  id: string; title: string; open: boolean; onClose: () => void; children: ReactNode;
+export function SidePanel({ id, title, open, onClose, children, centered = false }: {
+  id: string; title: string; open: boolean; onClose: () => void; children: ReactNode; centered?: boolean;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const opener = useRef<Element | null>(null);
@@ -43,8 +43,9 @@ export function SidePanel({ id, title, open, onClose, children }: {
     if (event.key === "Escape") { event.stopPropagation(); onClose(); return; }
     if (event.key !== "Tab" || !panel.current) return;
     const focusable = Array.from(panel.current.querySelectorAll<HTMLElement>(
-      "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
-    )).filter(element => element.offsetParent !== null || element === document.activeElement);
+      "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex='-1'])",
+    )).filter(element => (typeof element.checkVisibility === "function" ? element.checkVisibility() : element.offsetParent !== null)
+      || element === document.activeElement);
     if (focusable.length === 0) return;
     const first = focusable[0], last = focusable[focusable.length - 1];
     if (event.shiftKey && (document.activeElement === first || document.activeElement === panel.current)) {
@@ -56,7 +57,7 @@ export function SidePanel({ id, title, open, onClose, children }: {
 
   return <>
     <div className="side-panel-backdrop" hidden={!open} onClick={onClose} aria-hidden="true" />
-    <div id={id} className="side-panel" role="dialog" aria-modal="true" aria-labelledby={`${id}-title`}
+    <div id={id} className={`side-panel${centered ? " sign-in-card" : ""}`} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`}
       hidden={!open} tabIndex={-1} ref={panel} onKeyDown={keepFocusInside}>
       <div className="side-panel-header">
         <h2 id={`${id}-title`} className="side-panel-title">{title}</h2>

@@ -38,8 +38,8 @@ for (const width of [360, 1280]) {
     await panel.getByRole("button", { name: "Sign out", exact: true }).click();
     // The one email box leads to the password; its emailed link is the fallback.
     await panel.getByLabel("Email", { exact: true }).fill(account.contact.email);
-    await panel.getByRole("button", { name: "Continue" }).click();
-    await panel.getByRole("button", { name: "Sign in with a password" }).click();
+    await expect(page.getByRole("dialog", { name: "Log in" })).toHaveClass(/sign-in-card/);
+    await panel.getByRole("button", { name: "Use a password instead" }).click();
     await expect(panel.getByLabel("Password", { exact: true })).toBeFocused();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     expect((await new AxeBuilder({ page }).include("[aria-label='Buyer Account']")
