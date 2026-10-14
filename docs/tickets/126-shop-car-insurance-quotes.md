@@ -1,8 +1,8 @@
 # 126 — Shop car insurance quotes
 
 **What to build:** The Buyer journey for insurance. From a Buying Case, or on its own, the Buyer fills in
-one application, sees the participating insurers and what each pays otdog, selects any of them, reviews
-exactly what will be sent, and approves sending it. Quotes come back side by side for the coverage the
+one application, agrees to the licensed partner's consent, and gets quotes from many insurers, the way
+comparison sites work. Quotes come back side by side for the coverage the
 Buyer chose, ordered by premium, with each quote's yearly difference from what the Buyer pays now. The
 Buyer continues with one insurer on that insurer's site, or with none. Spec 2.3 section 5.10, INS-01 to
 INS-04.
@@ -18,9 +18,8 @@ and quote tables.
   the vehicle (from the case when there is one), usage and mileage, the coverage wanted with plain
   explanations of each part, and optionally the current insurer, coverage and premium. Identity details
   the partner needs go in the partner's hosted form when ticket 123 chooses that route.
-- Provider selection with the compensation shown for each, and a per-provider consent to send. Nothing is
-  sent to a provider the Buyer did not select.
-- A review step that shows exactly what each provider will receive, then an explicit "Send to N insurers".
+- The partner's consent, shown in plain words before the application goes to the partner, and the
+  "how otdog makes money" line from ticket 124 beside the quotes.
 - The Buyer can add a quote from a non-participating insurer (for example, their current one), compared on
   the same terms.
 - Results: same-coverage quotes ordered by premium; differing coverage labelled; declines and timeouts
@@ -30,7 +29,7 @@ and quote tables.
 
 ## Done when
 
-- [ ] Backend acceptance tests cover the selection consent, sending only to selected providers, ordering,
+- [ ] Backend acceptance tests cover consent, sending only to the partner, ordering,
       coverage labelling, the yearly difference, Buyer-entered quotes, export and deletion.
 - [ ] No application field appears in logs (test).
 - [ ] Client tests, the axe sweep and the 360 px gate pass for each step.

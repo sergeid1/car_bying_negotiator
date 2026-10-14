@@ -5,8 +5,8 @@ Version: 2.3
 Date: 2026-10-14  
 Supersedes: version 2.2 (2026-10-09), which excluded insurance quoting and lender pre-approval and named
 Buyers as the only payers. Version 2.3 adds insurance and loan shopping: the Buyer fills in one
-application, chooses which insurers or lenders receive it, and compares the quotes side by side.
-Insurers and lenders the Buyer chooses may pay the platform a disclosed fee, which keeps the tool free
+application with a licensed comparison partner and sees quotes from many insurers or lenders side by
+side as options. Insurers, lenders, or the partner may pay the platform a fee, which keeps the tool free
 for Buyers; dealers still pay nothing, and what a provider pays never changes what the platform shows.
 Version 2.2 superseded version 2.1 (2026-10-05), which excluded trade-in valuation. Version 2.2 adds a trade-in
 check: the Buyer records the trade and any payoff, and the platform compares the dealer's trade allowance
@@ -26,8 +26,8 @@ requirements are unchanged unless a section says otherwise. Sources consolidated
 sign. No dealer commissions, no paid recommendations, no dealer customers: it is completely on the
 Buyer's side. Section 1.3 turns this promise into enforceable rules, and Section 1.2 keeps it honest:
 the expert is a tool the Buyer uses, never an agent that acts or signs for them. The tool is free for
-Buyers. Insurers and lenders the Buyer chooses to get quotes from may pay a disclosed fee, and that fee
-never changes what the platform shows or says (Section 1.3).
+Buyers. Insurers and lenders whose quotes the Buyer sees may pay otdog a fee, and that fee never
+changes what the platform shows or says (Section 1.3).
 
 otdog is the Buyer's side of a used-car purchase. It exists so that a person buying a car does
 not get taken advantage of by a dealership. The full journey is:
@@ -53,9 +53,9 @@ not get taken advantage of by a dealership. The full journey is:
    that car's paperwork and get the same market, fee, and jurisdiction check on the spot. If the Buyer
    trades a car in, the platform asks whether money is owed on it and how much, and checks the dealer's
    trade allowance against the trade's value.
-6. **Insure and finance.** The Buyer fills in one application and chooses which insurers, or which
-   lenders, receive it. Insurers return quotes for the same coverage and lenders return soft-inquiry
-   pre-approvals; the platform lays them side by side, ordered by cost alone. The Buyer picks one and
+6. **Insure and finance.** The Buyer fills in one application with a licensed comparison partner and
+   gets quotes from many insurers, or soft-inquiry pre-approvals from many lenders, the way comparison
+   sites work. The platform lays them side by side as options, ordered by cost alone. The Buyer picks one and
    completes it with that provider, or picks none. A chosen pre-approval becomes the Buyer's outside
    financing offer, so the Desk Check shows whether the dealer's financing beats it. Shopping around can
    lower what a Buyer pays; the platform turns it into one application instead of many.
@@ -66,9 +66,9 @@ shopping, the Message Assistant, and test-drive scheduling. Phase 5 adds insuran
 **A tool, not an agent.** The platform helps the Buyer the way a writing or research assistant does: it
 finds, checks, explains, and drafts, and the Buyer acts. The Buyer is the only party who talks to the
 dealer. Nothing reaches a dealer that the Buyer did not approve word for word, and it reaches the dealer
-from the Buyer, not from the platform. The same holds for insurers and lenders: an application reaches
-only the providers the Buyer selected, after the Buyer reviews exactly what is sent, and only the Buyer
-accepts a quote, buys a policy, or signs a loan.
+from the Buyer, not from the platform. For insurance and loans the platform shows options: a licensed
+partner handles the application with the Buyer's consent, and only the Buyer accepts a quote, buys a
+policy, or signs a loan.
 
 The AI Deal Analyzer is a buyer-aligned, document-first web product for a U.S. consumer evaluating a used vehicle offered by a licensed dealer. Given a vehicle or listing, the buyer's jurisdiction, and a dealer quote, it produces a versioned, evidence-backed **Deal Analysis Report** that answers:
 
@@ -110,10 +110,11 @@ drafts the Buyer's emails to dealers, and checks the dealer's actual paperwork. 
 Buyer sends every email and makes every decision. Copy says the platform **helps the Buyer** ask for
 quotes, check them, and write replies; it never says the platform negotiates, contacts dealers, or acts
 on the Buyer's behalf. Do not market it as a legal review, a negotiator or agent, a guaranteed savings
-product, or a declaration that a document is “safe to sign.” Copy may say the platform helps the Buyer
-compare insurance quotes and loan pre-approvals, and must disclose that participating insurers and
-lenders may pay otdog. It never says the platform finds the best or cheapest rate, guarantees savings,
-or picks a provider for the Buyer.
+product, or a declaration that a document is “safe to sign.” Copy may say the Buyer can compare insurance quotes
+and loan pre-approvals from many providers with one application. Wherever quotes appear, one general
+line links to how otdog makes money ("otdog may be paid by companies shown here; it never changes the
+order"), as comparison sites do; what each provider pays is not shown. Copy never says the platform
+finds the best or cheapest rate, guarantees savings, or picks a provider for the Buyer.
 
 ### 1.3 Credo: we don't work with dealers, we help people
 
@@ -125,12 +126,12 @@ enforceable product rules, not marketing:
 1. **No dealer money.** No dealer or dealer group, and no one paid through the dealer's deal
    (dealer-arranged financing, dealer reserve, or products sold at the desk), pays the platform for
    leads, placement, referrals, appointments, sales, subscriptions, or data. The tool is free for
-   Buyers. Revenue comes from disclosed fees that insurers and lenders pay when a Buyer chooses to get a
-   quote or pre-approval from them (Section 5.10).
+   Buyers. Revenue comes from fees that insurers, lenders, or a licensed comparison partner pay for
+   quotes and pre-approvals Buyers get through the platform (Section 5.10).
 2. **Not a lead source.** The platform never sells, rents, or hands Buyer identity or contact details
    to a dealer. A dealer learns only what the Buyer chooses to send from their own email. An insurance
-   or loan application goes only to the providers the Buyer selected and is never sold or shared
-   beyond them.
+   or loan application is shared only with the licensed partner and the providers quoting through it,
+   with the Buyer's consent, and is never sold beyond them or given to a dealer.
 3. **Buyer-only ranking.** Search results, shortlists, and recommendations are ordered only by the
    Buyer's criteria and evidence. No dealer relationship can change ordering, inclusion, or wording.
 4. **Buyer's limits rule.** No draft offers above the Buyer's approved ceiling or commits the Buyer to a
@@ -142,8 +143,8 @@ enforceable product rules, not marketing:
 7. **Compensation-blind.** What an insurer or lender pays the platform never affects which providers a
    Buyer can choose, the order or wording of quotes, any finding, or the Desk Check. Quotes are ordered
    by cost alone, a provider that pays nothing is compared on the same terms, and when the dealer's
-   financing beats the Buyer's pre-approval the platform says so. Compensation is published, and the code
-   that orders and judges quotes cannot read it.
+   financing beats the Buyer's pre-approval the platform says so. The code that orders and judges
+   quotes cannot read compensation.
 
 A design that conflicts with this credo is out of scope regardless of other benefits.
 
@@ -205,11 +206,11 @@ Phases 2–4 (to build):
 Phase 5 (to build):
 
 - Insurance quote shopping: one application (drivers, garaging address, the vehicle, the coverage wanted,
-  and optionally the current insurer, coverage, and premium) sent to the participating insurers the Buyer
-  selects, through a licensed insurance partner; quotes compared at the same coverage.
-- Loan pre-approval shopping: one application sent to the participating lenders the Buyer selects, for
-  soft-inquiry pre-approvals; a chosen pre-approval becomes the outside Finance Offer.
-- A published compensation disclosure, shown before the Buyer selects providers.
+  and optionally the current insurer, coverage, and premium) through a licensed comparison partner, which
+  returns quotes from many insurers; quotes compared at the same coverage.
+- Loan pre-approval shopping: one application through a licensed lending partner for soft-inquiry
+  pre-approvals from many lenders; a chosen pre-approval becomes the outside Finance Offer.
+- One general "how otdog makes money" line wherever quotes appear.
 
 ### 2.2 Excluded
 
@@ -225,8 +226,8 @@ Phase 5 (to build):
   the platform. Only the Buyer agrees to buy, and only in person or by their own action.
 - Hard credit inquiries started by the platform, loan origination or underwriting, credit eligibility
   decisions, and binding or selling insurance by the platform itself. Insurers and lenders make every
-  decision; the platform sends the Buyer's application only to providers the Buyer selected, through
-  licensed partners, and requests only soft-inquiry pre-approvals.
+  decision; applications go through licensed partners with the Buyer's consent, and pre-approvals are
+  soft inquiries only.
 - Revenue from dealer-arranged financing, dealer reserve, or insurance and products sold at the desk.
 - Proprietary trade-in valuation models, buying or selling the Buyer's trade, and requesting, arranging,
   or referring trade offers from third parties. The trade check uses only the Buyer's own written offers
@@ -237,8 +238,8 @@ Phase 5 (to build):
 - Dealer rankings or cross-Buyer dealer intelligence, until the open decision in Section 18 is made.
   A Buyer still sees how each dealer behaved in their own journey.
 - Anything that makes the platform a lead source: dealer-paid leads, placement, referral, appointment,
-  or success fees; dealer subscriptions; sale of Buyer data; sharing an application beyond the providers
-  the Buyer selected; and provider-paid placement or ordering of quotes.
+  or success fees; dealer subscriptions; sale of Buyer data; sharing an application beyond the licensed
+  partner and the providers quoting through it; and provider-paid placement or ordering of quotes.
 - Native mobile apps, multilingual support, and Buyer subscriptions. A Buyer-paid success fee is an
   open decision in Section 18.
 
@@ -431,13 +432,13 @@ equity. Negative equity added to the amount financed is shown with its cost over
 
 ### 5.10 Insurance and loan quotes (Phase 5)
 
-Either starts from a Buying Case or on its own. The Buyer fills in one application: for insurance, the
-drivers, the address where the car is kept, the vehicle (from the case when there is one), the coverage
-wanted, and optionally the current insurer, coverage, and premium; for a loan, the amount, term, vehicle,
-income and housing, and the identity details a lender needs for a soft inquiry. The Buyer then sees the
-participating providers and what each pays otdog, selects any of them, reviews exactly what will be sent,
-and approves sending it. Identity details such as Social Security number and date of birth are entered in
-the licensed partner's own form, or passed to the selected providers without the platform storing them
+Either starts from a Buying Case or on its own, and works like a comparison site. The Buyer fills in one
+application: for insurance, the drivers, the address where the car is kept, the vehicle (from the case
+when there is one), the coverage wanted, and optionally the current insurer, coverage, and premium; for a
+loan, the amount, term, vehicle, income and housing, and the identity details a lender needs for a soft
+inquiry. The Buyer agrees to the licensed partner's consent, and the partner returns quotes from the
+insurers or lenders it works with. Identity details such as Social Security number and date of birth are
+entered in the licensed partner's own form, or passed to the partner without the platform storing them
 (Section 13).
 
 Insurance quotes are shown for the coverage the Buyer chose, ordered by premium, with deductibles and
@@ -649,14 +650,14 @@ Every Discrepancy records expected value, observed value, delta where meaningful
 
 ### 8.12 Insurance and loan quotes
 
-- **INS-01:** One insurance application per journey, or per case without a journey, reused for each insurer the Buyer selects; the vehicle comes from the case when there is one.
-- **INS-02:** An application reaches only the insurers the Buyer selected, after the Buyer approves the exact data sent, through a licensed partner.
+- **INS-01:** One insurance application per journey, or per case without a journey; the vehicle comes from the case when there is one.
+- **INS-02:** An application goes only to the licensed partner and the insurers quoting through it, with the Buyer's consent; the platform never sells or shares it otherwise.
 - **INS-03:** Quotes are compared only at the same coverage and ordered by premium; a quote for different coverage is labelled, not ranked.
 - **INS-04:** When the Buyer gave a current premium, each quote shows its yearly difference for the coverage entered, without promising savings.
-- **LOAN-01:** Pre-approval requests are soft inquiries only, under the Buyer's written authorization naming each selected lender.
+- **LOAN-01:** Pre-approval requests are soft inquiries only, under the Buyer's written authorization.
 - **LOAN-02:** Pre-approvals are ordered by total cost computed by FIN-01 and show APR, term, amount, payment, conditions, and expiry.
 - **LOAN-03:** A chosen pre-approval becomes the outside Finance Offer used by FIN-04 and DESK-04.
-- **PAY-01:** Provider compensation is published, shown before the Buyer selects providers, and kept in a module that quote ordering, findings, and the Desk Check cannot read. Ranking-integrity tests prove that changing a provider's compensation changes no order, inclusion, or wording.
+- **PAY-01:** Provider compensation is kept in a module that quote ordering, findings, and the Desk Check cannot read; one general "how otdog makes money" line is linked wherever quotes appear. Ranking-integrity tests prove that changing a provider's compensation changes no order, inclusion, or wording.
 - **PAY-02:** A quote or offer the Buyer enters from a non-participating provider is compared on the same terms as participating ones.
 - **PAY-03:** No compensation from a dealer, dealer-arranged financing, dealer reserve, or a product sold at the desk.
 
@@ -827,7 +828,7 @@ Upload, correction, baseline approval, analysis, export, and deletion operations
 - Never put raw documents, raw text, access links, Buyer identity plus VIN, or financing details into ordinary logs, analytics, support tooling, or error trackers.
 - Collect no SSN, driver's license, bank credential, or payment credential for analysis. For a Phase 5
   application, Social Security number, date of birth, and driver's license number are entered in the
-  licensed partner's form, or sent to the selected providers without being stored or logged by the
+  licensed partner's form, or sent to the partner without being stored or logged by the
   platform. Phase 5 likely makes the platform a "finder" under the FTC Safeguards Rule (GLBA): a GLBA
   privacy notice and a written information security program are required before launch, confirmed by
   counsel.
@@ -974,13 +975,13 @@ a permissioned corpus.
 
 ### Phase 5 — Insurance and loan quotes
 
-Deliver the insurance and loan applications, provider selection with the compensation disclosure, the
-licensed partner adapters with deterministic fakes, side-by-side quotes, the yearly insurance difference,
+Deliver the insurance and loan applications, the "how otdog makes money" line, the licensed partner
+adapters with deterministic fakes, side-by-side quotes, the yearly insurance difference,
 and the chosen pre-approval as the outside Finance Offer.
 
 Gate: the licensing route and partner terms in Section 18 are settled; ranking-integrity tests prove
-compensation changes no order or wording; counsel approves the disclosures, the FCRA authorization, the
-GLBA privacy notice, and consent wording for any provider contact.
+compensation changes no order or wording; counsel approves the "how otdog makes money" wording, the FCRA
+authorization, the GLBA privacy notice, and consent wording for any provider contact.
 
 ## 18. Decisions and prerequisites
 
@@ -988,7 +989,7 @@ The following defaults resolve prior scope ambiguity:
 
 - used dealer retail purchases only;
 - Phase 1 sends nothing; from Phase 3 the platform drafts dealer messages and the Buyer sends each one from their own address after approving it, from their own mail app or through a connected Gmail or Outlook account;
-- free for Buyers; revenue from disclosed fees paid by insurers and lenders the Buyer chooses to get quotes from (version 2.3); no dealer money;
+- free for Buyers; revenue from fees paid by insurers, lenders, or licensed comparison partners for quotes Buyers get through the platform (version 2.3); no dealer money;
 - no required account for Phase 1; a passwordless account for Phases 2–4;
 - raw-document retention default no longer than 30 days;
 - Buyer correction by default; human review only through separate consent;
@@ -1017,8 +1018,8 @@ Before Phase 2 and 3 reach Buyers outside moderated testing:
 12. Before Phase 5 reaches Buyers: counsel confirms the licensing route for insurance quotes and loan
     applications in Florida, including whether the platform is a loan broker; partner terms are executed
     and forbid reselling an application or contacting the Buyer beyond the quote without the Buyer's
-    consent; and counsel approves the compensation disclosure, FCRA authorization, GLBA privacy notice,
-    and TCPA consent wording.
+    consent; and counsel approves the "how otdog makes money" wording, FCRA authorization, GLBA privacy
+    notice, and TCPA consent wording.
 
 Open decisions for the product owner:
 

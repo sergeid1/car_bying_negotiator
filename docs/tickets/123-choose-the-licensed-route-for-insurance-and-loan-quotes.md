@@ -22,12 +22,14 @@ chooses, is how the free tool is funded.
 - **Loans.** Whether to work through a licensed lending marketplace or contract with lenders and credit
   unions directly; whether Florida treats otdog as a loan broker or needs another license; that the Buyer
   never pays otdog a fee; and the FCRA written authorization for soft inquiries.
+- **Disclosure.** Whether the general "how otdog makes money" line (spec 1.2) is enough, or whether
+  FTC or Florida rules need more; the operator prefers not to show what each provider pays.
 - **Data.** GLBA privacy notice and the FTC Safeguards Rule's written security program; whether
   Social Security number and date of birth are entered only in the partner's hosted form (recommended, so
   otdog never holds them); TCPA consent if any provider may call or text the Buyer.
 - **Partner terms** must forbid reselling or sharing the application, forbid contacting the Buyer beyond
   the quote without the Buyer's consent, allow showing quotes side by side ordered by cost, and give
-  otdog a flat, published fee that does not vary with the quote's position.
+  otdog a flat fee that does not vary with the quote's position.
 
 ## Done when
 

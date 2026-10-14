@@ -12,6 +12,6 @@ Quotes from the partner reach Buyers only after the Phase 5 gate in spec section
 
 - HTTPS only, timeout, bounded retries, body size cap, no redirects off host, credentials from managed
   secrets; selected by configuration, off by default.
-- Only the fields the partner's terms require are sent, and only for providers the Buyer selected.
+- Only the fields the partner's terms require are sent, and only after the Buyer's consent.
 - Recorded fixtures for the conformance suite; main tests do not call the live partner.
 - `docs/provider-inventory.md` records purpose, data sent, region, retention, fee and deletion behaviour.
