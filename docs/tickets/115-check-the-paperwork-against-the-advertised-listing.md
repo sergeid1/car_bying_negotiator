@@ -25,8 +25,10 @@ field through `/api/v1/cases/{caseId}/listing-captures` (`ListingCaptureControll
 `findLatestCapture` reads them. A listing VIN that differs from the case vehicle appends the existing blocking identity
 conflict, and verification refuses paperwork for a different VIN until it is settled. `listing-price-check.v1`
 (`ListingPriceCheck`) feeds the Desk Check (`listingPrice`), the "I'm at the dealer" result (`LISTING_PRICE_HIGHER`,
-`LISTING_VIN_DIFFERENT`) and fresh reports (`analysis.listingPriceCheck`); saved reports render unchanged. Capture
-dealers are not offered as quote-request targets. Open: screenshots read as unreadable until ticket 36 enables the
+`LISTING_VIN_DIFFERENT`) and fresh reports (`analysis.listingPriceCheck`); saved reports render unchanged. The dealer
+from a saved ad whose VIN matches the case can receive a quote request (operator decision, 2026-10-14); with no
+listing link, `QuoteRequestText` names the car by VIN alone, and a provider listing's link is preferred when both
+exist. Open: screenshots read as unreadable until ticket 36 enables the
 Claude reader; in "I'm at the dealer" the capture panel appears below the first result rather than before it;
 listing reads are metered as `EXTRACTION`.
 

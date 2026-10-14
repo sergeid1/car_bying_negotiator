@@ -88,6 +88,10 @@ class ListingCaptureAcceptanceTest {
       assertThat(same.at("/check/summary").asText()).contains("same as the listing you saved on October 1, 2026");
       assertThat(same.at("/snapshot/capturedOn").asText()).isEqualTo("2026-10-01");
       assertThat(same.path("identityConflicts")).isEmpty();
+      // The dealer from the Buyer's saved ad can receive a quote request; with no link, the VIN alone names the car.
+      String captureDealer = jdbc.queryForObject("select dealer_id from listing_snapshots where case_id = ? and source = ? "
+          + "order by retrieved_at desc, id desc limit 1", String.class, caseId, "BUYER_SUPPLIED_LISTING_CAPTURE");
+      assertThat(get(client, base + "/quote-requests", token).path("dealers").findValuesAsText("id")).contains(captureDealer);
 
       // Conditional ad price, lower than the paperwork: the difference, the date, the question and the fine print.
       var conditional = awaitRead(client, captures, token, paste(client, captures, token, fixtures.get("conditional-ad-price"), "conditional"));

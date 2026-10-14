@@ -49,7 +49,7 @@ test("prepares a request using the dealer ID supplied by the quote view", async 
 test("an empty eligible dealer list explains what is needed accessibly", async () => {
   mock({ negotiationState: "NO_MANDATE", requests: [], documents: [], dealers: [] });
   const { container } = render(<QuoteRequest caseId="c1" token="secret" />);
-  expect(await screen.findByText(/No dealers have a listing that matches/)).toBeInTheDocument();
+  expect(await screen.findByText(/No dealer has a listing for this car's VIN yet/)).toBeInTheDocument();
   expect(screen.queryByRole("combobox", { name: "Dealer" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Prepare request" })).not.toBeInTheDocument();
   expect((await axe.run(container, { rules: { "color-contrast": { enabled: false } } })).violations).toEqual([]);

@@ -153,7 +153,6 @@ public class QuoteRequestService implements RelayMessageOwner {
         select d.id, d.name from dealers d join vehicles v on v.case_id = d.case_id
         where d.case_id = ? and exists (
           select 1 from listing_snapshots l where l.case_id = d.case_id and l.dealer_id = d.id and l.vin = v.vin
-            and l.source <> 'BUYER_SUPPLIED_LISTING_CAPTURE'
         ) order by d.name, d.id
         """, (r, n) -> new Dealer(r.getString(1), r.getString(2)), caseId).stream()
         .filter(dealer -> drafts.context(caseId, dealer.id()).quoteRequestQuestion() != null).toList();

@@ -93,7 +93,7 @@ export function QuoteRequest({ caseId, token }: {
         <label>Dealer email<input name="email" type="email" required disabled={busy} autoComplete="off" /></label>
         <p>Check the address against the dealer's listing. Every message in this conversation goes to it.</p>
         <button type="submit" disabled={busy || !view}>Prepare request</button>
-      </form> : <p>No dealers have a listing that matches this Vehicle's confirmed VIN. Add a matching dealer listing before preparing a quote request.</p>)}
+      </form> : <p>No dealer has a listing for this car's VIN yet. Save the dealer's ad for this car below, then choose that dealer here.</p>)}
       <button type="button" disabled={busy} onClick={() => {
         setError(undefined); void refresh().catch(() => setError("Quote requests could not be refreshed."));
       }}>Refresh conversation</button>
