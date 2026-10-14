@@ -978,3 +978,12 @@ test.each(["NEW", "DESK_COMPARED"] as const)("every step of the guided case page
   window.history.replaceState(null, "", "/");
 });
 // End ticket 112.
+
+test("model recalls, rating variants and VIN copy have no automated AA violations", async () => {
+  const { VehicleSafetyFacts } = await import("./VehicleSafety");
+  const { vehicleSafetyFixture } = await import("./VehicleSafety.fixture");
+  const { container } = render(<main><h1>Car details</h1><section aria-label="Recalls and safety ratings">
+    <h2>Recalls and safety ratings</h2><VehicleSafetyFacts view={vehicleSafetyFixture} />
+  </section></main>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
