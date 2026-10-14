@@ -11,6 +11,7 @@ import { NegotiationMandate } from "./NegotiationMandate";
 import { QuoteRequest } from "./QuoteRequest";
 import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { openSidePanel } from "./SidePanel";
+import { ListingCapture } from "./ListingCapture";
 
 type Credentials = { caseId: string; token: string };
 export type CaseStepId = "quotes" | "compare" | "dealer" | "final";
@@ -172,7 +173,10 @@ export function CaseFlow({ caseId, token, openedFromAccount, referral, deskFresh
   const folded = CASE_STEPS.filter((step, index) => stateOf(index) === "done" && open !== step.id);
 
   const content: Record<CaseStepId, ReactNode> = {
-    quotes: <QuoteRequest key={`quote-${caseId}-${token}`} {...credentials} />,
+    quotes: <>
+      <QuoteRequest key={`quote-${caseId}-${token}`} {...credentials} />
+      <ListingCapture key={`listing-${caseId}-${token}`} {...credentials} />
+    </>,
     compare: <>
       <OfferVerification key={`verify-${caseId}-${token}`} {...credentials}
         onOfferFrozen={offer => { setFrozenOffer(offer.version); setDeskRefresh(value => value + 1); }} />

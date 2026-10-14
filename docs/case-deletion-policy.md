@@ -242,3 +242,16 @@ and have no evidence document. CaseGraphDeletionPlan erases a case-held trade's 
 account deletion erase the journey trade's estimates and verify their absence; removing the trade-in
 removes them. Carrying a trade from a case without a journey copies its estimates. The case export and
 the account export (`estimates` on each journey's trade-in) hold them.
+
+## Listing captures (ticket 115)
+
+The Buyer's own copy of a dealer's ad (a screenshot, a saved PDF of the page or pasted text) is a
+`source_documents` row with `purpose = 'LISTING_CAPTURE'`: it takes the ordinary inspection, malware
+scan, encryption, page normalization and retention, is never extracted for Deal Terms, never changes
+the case's review status and never becomes a Dealer Offer. V56 `listing_capture_readings` holds what
+was read from it, with each field's evidence region, until the Buyer confirms it; the confirmed fields
+are a `listing_snapshots` row with source `BUYER_SUPPLIED_LISTING_CAPTURE`, its `captured_on`,
+`price_conditions`, `source_document_id` and `field_confirmations`, and a VIN conflict it raises is a
+`vehicle_identity_conflicts` row. CaseGraphDeletionPlan erases the readings before the source documents,
+and the snapshots, their dealer rows and conflicts with the rest of the vehicle evidence. Nothing is kept
+in any anonymous total.

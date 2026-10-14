@@ -80,7 +80,7 @@ public class ListingCaptureService {
       List<String> warnings) {}
   /** snapshot is the latest confirmed capture; check sets its price beside the latest Dealer Offer, when there is one. */
   public record View(List<Capture> captures, ListingSnapshotView snapshot, ListingPriceCheck.Result check,
-      List<String> identityConflicts) {}
+      List<com.dealanalyzer.vehicle.VehicleEvidenceService.IdentityConflictView> identityConflicts) {}
   public record TextInput(String text) {}
   /** What the Buyer confirmed, corrected or typed; documentId names the capture it came from, if any. */
   public record Confirmation(String documentId, Long advertisedPriceMinor, String vin, Integer year, String make,
@@ -125,9 +125,10 @@ public class ListingCaptureService {
     var offer = offers.latestOffer(caseId).orElse(null);
     var check = snapshot == null || offer == null ? null
         : priceCheck.check(caseId, offer.terms(), "DEALER_OFFER", "VERIFIED".equals(offer.status()));
-    List<String> open = snapshot == null ? List.of() : conflicts.findByCaseId(caseId).stream()
-        .filter(conflict -> conflict.listingSnapshotId().equals(snapshot.id()) && conflict.status().equals("UNRESOLVED"))
-        .map(conflict -> conflict.id()).toList();
+    var open = snapshot == null ? List.<com.dealanalyzer.vehicle.VehicleEvidenceService.IdentityConflictView>of()
+        : conflicts.findByCaseId(caseId).stream()
+            .filter(conflict -> conflict.listingSnapshotId().equals(snapshot.id()) && conflict.status().equals("UNRESOLVED"))
+            .toList();
     return new View(captures, snapshot, check, open);
   }
 
@@ -175,10 +176,12 @@ public class ListingCaptureService {
       throw new IllegalStateException("A confirmed listing capture must satisfy the listing provider contract");
     var snapshot = listings.appendCapture(caseId, listing, new CaptureDetails(
         input.capturedOn(), conditions(input.priceConditions()), documentId, String.join(";", outcomes)));
-    // A different VIN from the case's car, or from the dealer's paperwork, is the existing blocking conflict.
-    if (snapshot.vin() != null) {
-      var vehicle = vehicles.findByCaseId(caseId).orElse(null);
-      String other = vehicle != null && vehicle.vin() != null ? vehicle.vin() : paperworkVin(caseId);
+    // A different VIN from the case's car, or from the dealer's paperwork when the car has no VIN yet, is the
+    // existing blocking conflict, which the Buyer resolves against the case's car. Without a car, verification
+    // still refuses paperwork whose VIN differs from the ad's.
+    var vehicle = vehicles.findByCaseId(caseId).orElse(null);
+    if (snapshot.vin() != null && vehicle != null) {
+      String other = vehicle.vin() != null ? vehicle.vin() : paperworkVin(caseId);
       if (other != null && !other.equals(snapshot.vin()))
         conflicts.appendVinMismatch(caseId, snapshot.id(), other, snapshot.vin(), now);
     }

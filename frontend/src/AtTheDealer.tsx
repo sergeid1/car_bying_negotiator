@@ -6,6 +6,7 @@ import type { FreshDeskCase } from "./DeskCheck";
 import { toMinor, vehicleName, type Trade, type TradeView } from "./TradeVehicle";
 import { TradeValueLinks } from "./TradeValueChecks";
 import type { DeskTacticFinding } from "./DeskTactics";
+import { ListingCapture, ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
 
 type Credentials = { caseId: string; token: string };
 type Route = "AGREED_CAR" | "THIS_CASE";
@@ -27,6 +28,7 @@ export type FirstResult = {
   outTheDoor: { amountMinor: number | null; agreedMinor: number | null; differenceMinor: number | null };
   lead: DeskFinding | null; findings: DeskFinding[];
   tacticFindings?: DeskTacticFinding[];
+  listingPrice?: ListingPriceCheck | null;
 };
 type Typed = { vin?: string; sellingPriceMinor?: number; tradeAllowanceMinor?: number; cashDownMinor?: number;
   monthlyPaymentMinor?: number; termMonths?: number; aprPercent?: number; outTheDoorMinor?: number };
@@ -300,6 +302,10 @@ export function AtTheDealer({ files, open, onCaseOpened, onFreshCase, onDeskChec
 
     {phase === "result" && result && <ResultView result={result} headingRef={resultHeading} elapsed={elapsed}
       onDeskCheck={onDeskCheck} onType={() => { setTyped(undefined); setPhase("typed"); }} onClose={onClose} />}
+    {/* The dealer's ad, saved by the Buyer, sets the advertised price beside this paperwork. */}
+    {phase === "result" && result && target && <ListingCapture key={`listing-${target.caseId}`} caseId={target.caseId}
+      token={target.token} compact pollDelayMs={pollDelayMs}
+      onConfirmed={() => void step(() => showResult(route!, typed, ownApr))} />}
 
     {/* Kept mounted while it reads, so the photos are sent once through the ordinary intake. */}
     {target && files.length > 0 && !typed && phase !== "fresh" && phase !== "start" && <DealerDocumentUpload key={target.caseId}
@@ -575,6 +581,8 @@ function ResultView({ result, headingRef, elapsed, onDeskCheck, onType, onClose 
       {result.tacticFindings?.some(tactic => (tactic.code === result.lead?.code || tactic.tradeFindingCode === result.lead?.code) && tactic.questionReview === "PENDING_OPERATOR_REVIEW")
         && <p className="muted">Draft question wording awaits operator review.</p>}
     </div> : <p>Nothing in these terms stood out. Check them against the paperwork for the full result.</p>}
+    {result.listingPrice && <ListingPriceNote check={result.listingPrice} title="The ad you saved"
+      question={!result.findings.some(finding => finding.code.startsWith("LISTING_"))} />}
     {more.length > 0 && <details>
       <summary>{more.length} more to ask about</summary>
       <ul className="dealer-more">{more.map((finding, index) => <li key={`${finding.code}-${index}`}>

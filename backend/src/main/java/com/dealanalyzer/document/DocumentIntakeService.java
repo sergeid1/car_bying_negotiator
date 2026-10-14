@@ -131,12 +131,10 @@ public class DocumentIntakeService {
         DocumentIntakePersistence.LISTING_CAPTURE);
   }
 
-  /** Listing text the Buyer pasted, kept as plain text and processed like an uploaded capture. */
+  /** Listing text the Buyer pasted, kept as plain text and processed like an uploaded capture; the caller refuses blank text. */
   public StartedDocumentUpload intakeListingText(
       String caseId, String accessToken, String idempotencyKey, String text) {
     requireServiceProcessingConsent(caseId, accessToken);
-    if (text == null || text.isBlank())
-      throw new InvalidDocumentException("EMPTY_TEXT", "Paste the text of the listing first.");
     if (text.length() > 40000)
       throw new InvalidDocumentException("FILE_TOO_LARGE", "The pasted listing text is too long. Paste only the listing itself.");
     String body = text.replace("\r\n", "\n").replace('\r', '\n').strip();

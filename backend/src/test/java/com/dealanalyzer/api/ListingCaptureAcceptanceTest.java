@@ -143,6 +143,11 @@ class ListingCaptureAcceptanceTest {
       var other = TradeVehicleAcceptanceTest.call(client, "POST", base + "/desk-start/result",
           Map.of("documentId", desk, "route", "AGREED_CAR"), token, null).body();
       assertThat(find(other.path("findings"), "code", "LISTING_VIN_DIFFERENT").path("deskQuestion").asText()).contains(OTHER_VIN);
+      assertThat(blocked.at("/identityConflicts/0/confirmedValue").asText()).isEqualTo(VIN);
+      post(client, base + "/vehicle-evidence/conflicts/" + blocked.at("/identityConflicts/0/id").asText() + "/resolution",
+          Map.of("resolution", "KEEP_CONFIRMED_VEHICLE"), "keep-car", token);
+      assertThat(get(client, captures, token).path("identityConflicts")).isEmpty();
+      assertThat(get(client, base + "/vehicle-evidence", token).path("reliableForAnalysis").asBoolean()).isTrue();
 
       // Captures and snapshots are exported with the case and deleted with it.
       var exported = post(client, base + "/exports", Map.of("format", "ZIP", "reportVersion", 0), "export", token);
