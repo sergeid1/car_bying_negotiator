@@ -74,7 +74,8 @@ public class CoreReportService {
   @Transactional
   public StartedReport analyze(String caseId, String token, String key) {
     Instant startedAt = Instant.now();
-    access.reopen(caseId, token);
+    // The safety lookup authorizes the case outside this transaction; loading the case here before the lock below
+    // would hold a stale version that a concurrent report request can overtake.
     var safetyView = operations.findByIdempotencyKey(key).isPresent() ? null : safety.get(caseId, token);
     // The trade check may call the valuation provider, whose meter row commits on its own and references the
     // case, so it runs before the case row is locked.

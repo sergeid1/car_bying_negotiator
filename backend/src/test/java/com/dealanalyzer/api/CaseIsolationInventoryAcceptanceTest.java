@@ -176,7 +176,8 @@ class CaseIsolationInventoryAcceptanceTest {
       caseRow("POST", C + "/listing-captures/text", "{\"text\":\"Price: $25,000\"}"),
       caseRow("POST", C + "/listing-captures/confirmation",
           "{\"documentId\":\"{listingCaptureId}\",\"advertisedPriceMinor\":2500000,\"confirmed\":true}"),
-      caseRow("GET", C + "/listing-captures/{documentId}/pages/{pageNumber}/image", null, "documentId=listingCaptureId"));
+      caseRow("GET", C + "/listing-captures/{documentId}/pages/{pageNumber}/image", null, "documentId=listingCaptureId"),
+      caseRow("GET", C + "/vehicle-safety", null));
 
   /** Buyer Account endpoints: the account_session cookie, plus Account-Request: 1 on writes. */
   static final List<Endpoint> ACCOUNT_ENDPOINTS = List.of(
