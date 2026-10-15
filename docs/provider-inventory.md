@@ -275,3 +275,45 @@ The fixture reports zero cost. No Buyer identity or contact details cross the ad
 include postal code and are therefore personal data. Account exports include search history; journey and
 account deletion remove and verify usage before deleting the parent graph. Search-start takes account then
 journey locks, and late responses only update existing rows, so deletion cannot recreate search history.
+
+# Insurance quote adapter (ticket 125)
+
+`InsuranceQuoteAdapter.request(InsuranceApplication, InsuranceQuoteConsent)` returns, per insurer behind the
+licensed partner, a quote or a stated `PartnerOutcome` (declined, needs more information, unavailable, timed
+out), or partner-level unavailability, time-out or rate limiting with a fixed reason and no substituted quote.
+A quote carries the premium in USD minor units, its 6- or 12-month term, the coverage the insurer actually
+priced (limits and deductibles per line), quote and expiry times, and the provider's HTTPS link for the Buyer
+to continue; the result carries the code-owned partner name, version, licence metadata, retrieval time and
+reported cost. Responses with a different provider, future or stale (over one hour) timestamps, an expired
+quote, or duplicate insurers are rejected. Nothing is sent without the Buyer's consent, recorded as the
+consent text version and agreement time (INS-02).
+
+The application holds rating facts only: drivers' age, years licensed and recent accidents and violations;
+the garaging ZIP and state; the vehicle (optional VIN, year, make, model, trim, annual mileage); the chosen
+coverage; and optionally the current insurer, coverage and premium. Social Security number, date of birth and
+driver's license number are never fields of it (spec section 13); the conformance suite checks this. The case
+or journey an application belongs to does not cross the adapter boundary.
+
+`CoverageComparison` treats a quote as the same coverage only when every line, limit and deductible matches the
+Buyer's choice, orders those by yearly premium then insurer name, and lists other quotes with their
+differences and no rank (INS-03). `YearlyDifference` is the quote's yearly premium minus the Buyer's current
+yearly premium for same-coverage quotes, with whether the current policy was entered at the chosen coverage
+(INS-04). Order never depends on the partner's order or on anything a provider pays.
+
+No licensed partner is integrated; ticket 127 owns that work. `DeterministicFakeInsuranceQuoteAdapter` is the
+default, performs no I/O and labels its quotes as synthetic. Five fixed insurers derive premiums and outcomes
+from the application: two quote the chosen coverage (12 and 6 months), one prices different coverage, one
+declines a driver with two or more at-fault accidents or three or more violations, and one needs more
+information without annual mileage and otherwise times out. A clock and scenario supply repeatable
+unavailable, timed-out and rate-limited partner results. Every replacement adapter must extend
+`InsuranceQuoteAdapterConformance`. `InsuranceQuoteProductionGuard` refuses development or synthetic adapters
+under `pilot`, `prod`, `production` or an equivalent evidence deployment.
+
+Ticket 126 can call `InsuranceQuoteService.request(scope, application, consent)` after authorizing the case or
+journey. Each attempt is metered through `ProviderMeter` as `INSURANCE_QUOTE` with the shared timeout,
+concurrency bound and failure classification. Usage rows store partner, version, licence, availability, the
+number of insurers that quoted, retrieval time, latency and cost; no applicant, vehicle, address, insurer or
+premium detail is stored. Case-scoped rows need no migration. Journey-scoped rows set `journey_id` and
+`account_id` under the same account then journey locks as inventory search, but the `provider_usage_scope`
+check (V40) admits journey rows only for inventory search and market retrieval, so they need ticket 126's
+migration to widen it. This ticket adds no endpoint, UI or stored application.

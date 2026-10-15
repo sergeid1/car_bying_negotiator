@@ -1,6 +1,9 @@
 package com.dealanalyzer.operations;
 
 import com.dealanalyzer.ai.ModelProvenance;
+import com.dealanalyzer.insurance.quote.InsuranceQuoteAdapter;
+import com.dealanalyzer.insurance.quote.InsuranceQuoteContract;
+import com.dealanalyzer.insurance.quote.InsuranceQuoteScope;
 import com.dealanalyzer.shopping.inventory.InventoryResults;
 import com.dealanalyzer.shopping.inventory.InventorySearchAdapter;
 import com.dealanalyzer.trade.valuation.TradeValuationAdapter;
@@ -133,6 +136,40 @@ public class ProviderMeter {
       return unavailable;
     } finally {
       store.tradeValuationLatency(id, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+    }
+  }
+
+  /**
+   * Insurance quote calls share the timeout and concurrency limits. A case or journey scope is metered;
+   * no application detail reaches the usage row, and a rejected response carries no quote.
+   */
+  public InsuranceQuoteAdapter.Result callInsuranceQuote(InsuranceQuoteScope scope,
+      InsuranceQuoteAdapter.Provider provider, Supplier<InsuranceQuoteAdapter.Result> invocation) {
+    String id = store.startInsuranceQuote(scope, provider);
+    long started = System.nanoTime();
+    var rejected = new java.util.concurrent.atomic.AtomicReference<InsuranceQuoteAdapter.Reason>();
+    var spent = new java.util.concurrent.atomic.AtomicReference<BigDecimal>();
+    try {
+      return run(id, invocation, result -> {
+        spent.set(result.costUsd());
+        var failure = InsuranceQuoteContract.failure(result, provider, Instant.now());
+        if (failure != null) {
+          rejected.set(failure);
+          throw new IllegalArgumentException("Invalid insurance quote contract");
+        }
+        store.insuranceQuoteResult(id, result);
+        return result.availability() == InsuranceQuoteAdapter.Availability.AVAILABLE
+            ? Status.SUCCESS : Status.PROVIDER_UNAVAILABLE;
+      }, null);
+    } catch (Failure failure) {
+      var reason = rejected.get() != null ? rejected.get() : failure.timedOut
+          ? InsuranceQuoteAdapter.Reason.TIMED_OUT : failure.status() == Status.CONTRACT_FAILURE
+          ? InsuranceQuoteAdapter.Reason.INVALID_RESPONSE : InsuranceQuoteAdapter.Reason.PROVIDER_UNAVAILABLE;
+      var unavailable = InsuranceQuoteContract.unavailable(provider, reason, Instant.now(), spent.get());
+      store.insuranceQuoteResult(id, unavailable);
+      return unavailable;
+    } finally {
+      store.insuranceQuoteLatency(id, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
     }
   }
 
