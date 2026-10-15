@@ -21,6 +21,7 @@ import { SiteNav } from "./SiteNav";
 import logo from "./assets/otdog-logo.png";
 import logoDark from "./assets/otdog-logo-dark.png";
 import { SidePanel, type SidePanelView, useSidePanelRequests } from "./SidePanel";
+import { TotoChat } from "./TotoChat";
 
 type MoneyAmount = {
   minorUnits: number;
@@ -388,6 +389,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         </CaseLinkAccess>
         </div>
       </SidePanel>}
+      <TotoChat />
     </>
   );
 }
