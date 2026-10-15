@@ -286,12 +286,8 @@ authorize the scope first. Usage contains only scope IDs, code-owned provider me
 offer count, retrieval time, latency, status and reported cost (null when unknown, including transport
 failures). Rejected response cost is retained. No application facts, authorization text, lender terms,
 source references or continuation links are stored in usage. Existing retention/deletion applies;
-late results only update existing usage rows. No migration, endpoint or saved application is added.
-The existing V40 `provider_usage_scope` constraint still restricts journey operations to inventory
-and market retrieval. Journey pre-approval persistence requires the coordinator's shared schema
-change to admit `PRE_APPROVAL` (and ticket 125's `INSURANCE_QUOTE`); this ticket leaves migrations
-unchanged as assigned. `PreApprovalUsageAcceptanceTest` preserves the failing journey scenario
-until that integration dependency is resolved.
+late results only update existing usage rows. V57 widens the `provider_usage_scope` check so journey
+rows can hold `PRE_APPROVAL` and `INSURANCE_QUOTE`. No endpoint or saved application is added.
 
 # Shopping inventory adapter (ticket 53)
 
@@ -359,6 +355,5 @@ journey. Each attempt is metered through `ProviderMeter` as `INSURANCE_QUOTE` wi
 concurrency bound and failure classification. Usage rows store partner, version, licence, availability, the
 number of insurers that quoted, retrieval time, latency and cost; no applicant, vehicle, address, insurer or
 premium detail is stored. Case-scoped rows need no migration. Journey-scoped rows set `journey_id` and
-`account_id` under the same account then journey locks as inventory search, but the `provider_usage_scope`
-check (V40) admits journey rows only for inventory search and market retrieval, so they need ticket 126's
-migration to widen it. This ticket adds no endpoint, UI or stored application.
+`account_id` under the same account then journey locks as inventory search; V57 admits them in the
+`provider_usage_scope` check. This ticket adds no endpoint, UI or stored application.

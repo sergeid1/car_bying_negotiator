@@ -8,7 +8,16 @@ sections 5.10, 8.12 (INS-01 to INS-04) and 11.2.
 
 **Blocked by:** none.
 
-**Status:** open — filed on 2026-10-14.
+**Status:** complete — `com.dealanalyzer.insurance.quote`, as of 2026-10-15. `InsuranceQuoteAdapter.request`
+returns code-owned partner metadata, partner-level availability, and one entry per insurer with a shared
+`com.dealanalyzer.partner.PartnerOutcome`; only `OFFERED` carries a quote. `InsuranceQuoteConsent` is required
+before anything is sent or metered (INS-02). `CoverageComparison` orders same-coverage quotes by yearly premium and
+lists different-coverage quotes with their differences and no rank (INS-03); `YearlyDifference` is pure code and
+never worded as savings (INS-04). `DeterministicFakeInsuranceQuoteAdapter` is the default and passes
+`InsuranceQuoteAdapterConformance`; `InsuranceQuoteProductionGuard` refuses it under `pilot`.
+`InsuranceQuoteService.request(InsuranceQuoteScope, …)` meters every attempt as `INSURANCE_QUOTE` for a case or a
+journey (V57 admits journey rows); no application detail is stored. Open for 126: the account export lists journey
+usage only for inventory and market retrieval, and the one-hour response age needs checking against 127's terms.
 
 ## Scope
 
