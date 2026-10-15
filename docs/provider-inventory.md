@@ -248,6 +248,51 @@ stored in usage. Existing case retention and deletion govern these operational r
 update existing rows. This ticket adds no endpoint, UI or saved valuation evidence; ticket 103 owns
 consumer integration and immutable report evidence.
 
+# Loan pre-approval adapter (ticket 128)
+
+`PreApprovalAdapter.request(LoanApplication, CreditAuthorization)` is the replaceable loan-partner
+boundary. The application contains requested USD principal, term, vehicle facts, income and housing;
+it has no SSN, date of birth or driver's licence field. Identity entry belongs in the licensed partner's
+form. The caller must supply the Buyer's recorded written FCRA authorization version and timestamp.
+The service and fake refuse missing or future authorization before invoking the partner. Recording
+and loading that authorization, application persistence and the Buyer flow belong to ticket 129.
+
+The result carries code-owned provider/version/licence metadata, retrieval time, reported cost and
+explicit per-lender outcomes (`PartnerOutcome`). Only `OFFERED` carries terms: amount, APR, term,
+explicit upfront fees, optional lender-stated payment, vehicle age/mileage/down-payment conditions,
+expiry, inquiry type, HTTPS continuation link and source reference/observation time. The contract
+rejects any non-soft inquiry, expired offer, differing requested principal or unsupported calculation;
+the metered boundary drops all offers in such a response and reports a fixed reason. No provider
+message becomes a diagnostic. The platform does not accept an offer or sign a loan.
+
+`PreApprovalContract.orderedOffers` uses the existing FIN-01 `FinancingCalculator.partialSchedule`
+for standard fixed-rate monthly loans, including zero APR; total loan cost is scheduled payments plus
+explicit upfront fees. This is a loan comparison, not a Total Transaction Cost for a verified purchase.
+FIN-02 `reconcilePayment` supplies the payment tolerance and difference from lender-stated payment.
+Ordering uses computed full-term cost, with lender name as a stable tie-breaker; no compensation input
+exists. Different terms are visible and ranked for the same requested principal. Purchase-aligned
+outside Finance Offer selection and dealer comparison remain ticket 129.
+
+`DeterministicFakePreApprovalAdapter` is the local default, makes no inquiries or network calls,
+reports zero cost and labels results synthetic. Fixed-clock fixtures cover normal, zero APR, payment
+mismatch, all lender outcomes, non-soft inquiry, expiry, unavailability, timeout and rate limiting.
+Every future partner runs `PreApprovalAdapterConformance` against recorded fixtures. The
+`PreApprovalProductionGuard` refuses synthetic/development adapters in pilot, prod, production or
+equivalent evidence deployment configuration. No live lender is integrated; that is ticket 130.
+
+`PreApprovalService.request` meters each authorized attempt as `PRE_APPROVAL`, with the existing
+timeout and concurrency bounds, either for a case or an account/journey without a case. Callers must
+authorize the scope first. Usage contains only scope IDs, code-owned provider metadata, availability,
+offer count, retrieval time, latency, status and reported cost (null when unknown, including transport
+failures). Rejected response cost is retained. No application facts, authorization text, lender terms,
+source references or continuation links are stored in usage. Existing retention/deletion applies;
+late results only update existing usage rows. No migration, endpoint or saved application is added.
+The existing V40 `provider_usage_scope` constraint still restricts journey operations to inventory
+and market retrieval. Journey pre-approval persistence requires the coordinator's shared schema
+change to admit `PRE_APPROVAL` (and ticket 125's `INSURANCE_QUOTE`); this ticket leaves migrations
+unchanged as assigned. `PreApprovalUsageAcceptanceTest` preserves the failing journey scenario
+until that integration dependency is resolved.
+
 # Shopping inventory adapter (ticket 53)
 
 `InventorySearchAdapter` accepts structured Shopping Brief criteria and a radius, returning normalized
