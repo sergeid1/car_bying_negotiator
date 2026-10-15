@@ -109,7 +109,7 @@ export function ReferralPartnerKit() {
           otdog works only for Buyers. It does not work with dealers: it has no dealer customers or
           partners, takes no money from dealers, and shares nothing about a Buyer with any dealer.
         </li>
-        <li>No dealer, lender, or other commercial party pays for placement, leads, or referrals.</li>
+        <li>No dealer pays otdog for anything, and no company pays for placement.</li>
         <li>Partners are not paid for referrals, and partners do not pay for placement or referrals.</li>
         <li>Every Buyer who arrives through a partner's link is shown a disclosure of the referral.</li>
         <li>

@@ -8,7 +8,10 @@ Spec 2.3 sections 1.3 and 8.12 (PAY-01 to PAY-03).
 
 **Blocked by:** none for the structure and tests; the line's final wording needs counsel (ticket 123).
 
-**Status:** open — filed on 2026-10-14.
+**Status:** open — the "How otdog makes money" page (`?page=how-otdog-makes-money`), its footer link, and the
+footer and partner-kit wording ("No dealer pays otdog for anything. No company pays for placement") are in, as
+of 2026-10-14. Remaining: the compensation package, the architecture and ranking-integrity tests, the dealer
+guard, the claim checks for "best rate", "cheapest" and "guaranteed", and the Terms and Privacy updates.
 
 ## Scope
 
