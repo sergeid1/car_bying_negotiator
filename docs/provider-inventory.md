@@ -248,6 +248,47 @@ stored in usage. Existing case retention and deletion govern these operational r
 update existing rows. This ticket adds no endpoint, UI or saved valuation evidence; ticket 103 owns
 consumer integration and immutable report evidence.
 
+# Loan pre-approval adapter (ticket 128)
+
+`PreApprovalAdapter.request(LoanApplication, CreditAuthorization)` is the replaceable loan-partner
+boundary. The application contains requested USD principal, term, vehicle facts, income and housing;
+it has no SSN, date of birth or driver's licence field. Identity entry belongs in the licensed partner's
+form. The caller must supply the Buyer's recorded written FCRA authorization version and timestamp.
+The service and fake refuse missing or future authorization before invoking the partner. Recording
+and loading that authorization, application persistence and the Buyer flow belong to ticket 129.
+
+The result carries code-owned provider/version/licence metadata, retrieval time, reported cost and
+explicit per-lender outcomes (`PartnerOutcome`). Only `OFFERED` carries terms: amount, APR, term,
+explicit upfront fees, optional lender-stated payment, vehicle age/mileage/down-payment conditions,
+expiry, inquiry type, HTTPS continuation link and source reference/observation time. The contract
+rejects any non-soft inquiry, expired offer, differing requested principal or unsupported calculation;
+the metered boundary drops all offers in such a response and reports a fixed reason. No provider
+message becomes a diagnostic. The platform does not accept an offer or sign a loan.
+
+`PreApprovalContract.orderedOffers` uses the existing FIN-01 `FinancingCalculator.partialSchedule`
+for standard fixed-rate monthly loans, including zero APR; total loan cost is scheduled payments plus
+explicit upfront fees. This is a loan comparison, not a Total Transaction Cost for a verified purchase.
+FIN-02 `reconcilePayment` supplies the payment tolerance and difference from lender-stated payment.
+Ordering uses computed full-term cost, with lender name as a stable tie-breaker; no compensation input
+exists. Different terms are visible and ranked for the same requested principal. Purchase-aligned
+outside Finance Offer selection and dealer comparison remain ticket 129.
+
+`DeterministicFakePreApprovalAdapter` is the local default, makes no inquiries or network calls,
+reports zero cost and labels results synthetic. Fixed-clock fixtures cover normal, zero APR, payment
+mismatch, all lender outcomes, non-soft inquiry, expiry, unavailability, timeout and rate limiting.
+Every future partner runs `PreApprovalAdapterConformance` against recorded fixtures. The
+`PreApprovalProductionGuard` refuses synthetic/development adapters in pilot, prod, production or
+equivalent evidence deployment configuration. No live lender is integrated; that is ticket 130.
+
+`PreApprovalService.request` meters each authorized attempt as `PRE_APPROVAL`, with the existing
+timeout and concurrency bounds, either for a case or an account/journey without a case. Callers must
+authorize the scope first. Usage contains only scope IDs, code-owned provider metadata, availability,
+offer count, retrieval time, latency, status and reported cost (null when unknown, including transport
+failures). Rejected response cost is retained. No application facts, authorization text, lender terms,
+source references or continuation links are stored in usage. Existing retention/deletion applies;
+late results only update existing usage rows. V57 widens the `provider_usage_scope` check so journey
+rows can hold `PRE_APPROVAL` and `INSURANCE_QUOTE`. No endpoint or saved application is added.
+
 # Shopping inventory adapter (ticket 53)
 
 `InventorySearchAdapter` accepts structured Shopping Brief criteria and a radius, returning normalized
@@ -275,3 +316,44 @@ The fixture reports zero cost. No Buyer identity or contact details cross the ad
 include postal code and are therefore personal data. Account exports include search history; journey and
 account deletion remove and verify usage before deleting the parent graph. Search-start takes account then
 journey locks, and late responses only update existing rows, so deletion cannot recreate search history.
+
+# Insurance quote adapter (ticket 125)
+
+`InsuranceQuoteAdapter.request(InsuranceApplication, InsuranceQuoteConsent)` returns, per insurer behind the
+licensed partner, a quote or a stated `PartnerOutcome` (declined, needs more information, unavailable, timed
+out), or partner-level unavailability, time-out or rate limiting with a fixed reason and no substituted quote.
+A quote carries the premium in USD minor units, its 6- or 12-month term, the coverage the insurer actually
+priced (limits and deductibles per line), quote and expiry times, and the provider's HTTPS link for the Buyer
+to continue; the result carries the code-owned partner name, version, licence metadata, retrieval time and
+reported cost. Responses with a different provider, future or stale (over one hour) timestamps, an expired
+quote, or duplicate insurers are rejected. Nothing is sent without the Buyer's consent, recorded as the
+consent text version and agreement time (INS-02).
+
+The application holds rating facts only: drivers' age, years licensed and recent accidents and violations;
+the garaging ZIP and state; the vehicle (optional VIN, year, make, model, trim, annual mileage); the chosen
+coverage; and optionally the current insurer, coverage and premium. Social Security number, date of birth and
+driver's license number are never fields of it (spec section 13); the conformance suite checks this. The case
+or journey an application belongs to does not cross the adapter boundary.
+
+`CoverageComparison` treats a quote as the same coverage only when every line, limit and deductible matches the
+Buyer's choice, orders those by yearly premium then insurer name, and lists other quotes with their
+differences and no rank (INS-03). `YearlyDifference` is the quote's yearly premium minus the Buyer's current
+yearly premium for same-coverage quotes, with whether the current policy was entered at the chosen coverage
+(INS-04). Order never depends on the partner's order or on anything a provider pays.
+
+No licensed partner is integrated; ticket 127 owns that work. `DeterministicFakeInsuranceQuoteAdapter` is the
+default, performs no I/O and labels its quotes as synthetic. Five fixed insurers derive premiums and outcomes
+from the application: two quote the chosen coverage (12 and 6 months), one prices different coverage, one
+declines a driver with two or more at-fault accidents or three or more violations, and one needs more
+information without annual mileage and otherwise times out. A clock and scenario supply repeatable
+unavailable, timed-out and rate-limited partner results. Every replacement adapter must extend
+`InsuranceQuoteAdapterConformance`. `InsuranceQuoteProductionGuard` refuses development or synthetic adapters
+under `pilot`, `prod`, `production` or an equivalent evidence deployment.
+
+Ticket 126 can call `InsuranceQuoteService.request(scope, application, consent)` after authorizing the case or
+journey. Each attempt is metered through `ProviderMeter` as `INSURANCE_QUOTE` with the shared timeout,
+concurrency bound and failure classification. Usage rows store partner, version, licence, availability, the
+number of insurers that quoted, retrieval time, latency and cost; no applicant, vehicle, address, insurer or
+premium detail is stored. Case-scoped rows need no migration. Journey-scoped rows set `journey_id` and
+`account_id` under the same account then journey locks as inventory search; V57 admits them in the
+`provider_usage_scope` check. This ticket adds no endpoint, UI or stored application.

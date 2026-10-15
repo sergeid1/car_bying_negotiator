@@ -1,6 +1,9 @@
 package com.dealanalyzer.operations;
 
 import com.dealanalyzer.ai.ModelProvenance;
+import com.dealanalyzer.insurance.quote.InsuranceQuoteAdapter;
+import com.dealanalyzer.insurance.quote.InsuranceQuoteScope;
+import com.dealanalyzer.loan.preapproval.PreApprovalAdapter;
 import com.dealanalyzer.shopping.inventory.InventorySearchAdapter;
 import com.dealanalyzer.trade.valuation.TradeValuationAdapter;
 import jakarta.persistence.EntityManager;
@@ -128,6 +131,49 @@ public class ProviderUsageStore {
         .setParameter("millis", millis).setParameter("id", id).executeUpdate();
   }
 
+  /**
+   * An insurance application belongs to a case, or to a journey without a case; a journey takes the same
+   * account then journey locks as inventory search. Application details are never stored here.
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public String startInsuranceQuote(InsuranceQuoteScope scope, InsuranceQuoteAdapter.Provider provider) {
+    if (scope.caseId() != null) requireActiveCase(scope.caseId());
+    else {
+      var accounts = manager.createNativeQuery("select lifecycle from buyer_accounts where id = :id for update")
+          .setParameter("id", scope.accountId()).getResultList();
+      if (accounts.isEmpty() || !"ACTIVE".equals(accounts.getFirst()))
+        throw new com.dealanalyzer.buyingcase.ResourceNotFoundException("Buying Journey not found");
+      if (manager.createNativeQuery("select id from buying_journeys where id = :id and account_id = :account for update")
+          .setParameter("id", scope.journeyId()).setParameter("account", scope.accountId()).getResultList().isEmpty())
+        throw new com.dealanalyzer.buyingcase.ResourceNotFoundException("Buying Journey not found");
+    }
+    var row = new ProviderUsageEntity();
+    row.id = UUID.randomUUID().toString(); row.caseId = scope.caseId();
+    row.journeyId = scope.journeyId(); row.accountId = scope.accountId();
+    row.operation = ProviderMeter.Operation.INSURANCE_QUOTE.name(); row.provider = provider.name();
+    row.providerVersion = provider.version(); row.modelVersion = "none"; row.schemaVersion = "insurance-quote.v1";
+    row.license = provider.licenceMetadata(); row.unit = "REQUEST"; row.units = 1;
+    row.status = "STARTED"; row.createdAt = Instant.now(); row.resultCount = 0;
+    row.inventoryAvailability = "PENDING";
+    manager.persist(row); return row.id;
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void insuranceQuoteResult(String id, InsuranceQuoteAdapter.Result result) {
+    // Result count is the number of insurers that offered a quote; no insurer, premium or applicant fact.
+    manager.createQuery("update ProviderUsageEntity u set u.resultCount = :count, u.retrievedAt = :time, "
+        + "u.costUsd = :cost, u.inventoryAvailability = :availability where u.id = :id")
+        .setParameter("count", (int) result.insurers().stream().filter(entry -> entry.quote() != null).count())
+        .setParameter("time", result.retrievedAt()).setParameter("cost", result.costUsd())
+        .setParameter("availability", result.availability().name()).setParameter("id", id).executeUpdate();
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void insuranceQuoteLatency(String id, long millis) {
+    manager.createQuery("update ProviderUsageEntity u set u.latencyMillis = :millis where u.id = :id")
+        .setParameter("millis", millis).setParameter("id", id).executeUpdate();
+  }
+
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public String start(String caseId, ProviderMeter.Operation operation, Object provider, long units) {
     requireActiveCase(caseId);
@@ -158,6 +204,47 @@ public class ProviderUsageStore {
     }
     row.status = "STARTED"; row.createdAt = Instant.now(); manager.persist(row);
     return row.id;
+  }
+
+  /** No application, authorization, source reference or continuation URL is stored in telemetry. */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public String startPreApproval(String caseId, String accountId, String journeyId,
+      PreApprovalAdapter.Provider provider) {
+    if (caseId != null) {
+      if (accountId != null || journeyId != null) throw new IllegalArgumentException("One loan usage scope required");
+      requireActiveCase(caseId);
+    } else {
+      if (accountId == null || journeyId == null) throw new IllegalArgumentException("Loan journey scope required");
+      var accounts = manager.createNativeQuery("select lifecycle from buyer_accounts where id = :id for update")
+          .setParameter("id", accountId).getResultList();
+      if (accounts.isEmpty() || !"ACTIVE".equals(accounts.getFirst()))
+        throw new com.dealanalyzer.buyingcase.ResourceNotFoundException("Buying Journey not found");
+      if (manager.createNativeQuery("select id from buying_journeys where id = :id and account_id = :account for update")
+          .setParameter("id", journeyId).setParameter("account", accountId).getResultList().isEmpty())
+        throw new com.dealanalyzer.buyingcase.ResourceNotFoundException("Buying Journey not found");
+    }
+    var row = new ProviderUsageEntity();
+    row.id = UUID.randomUUID().toString(); row.caseId = caseId; row.accountId = accountId; row.journeyId = journeyId;
+    row.operation = ProviderMeter.Operation.PRE_APPROVAL.name(); row.provider = provider.name();
+    row.providerVersion = provider.version(); row.license = provider.licenceMetadata();
+    row.modelVersion = "none"; row.schemaVersion = "pre-approval.v1"; row.unit = "REQUEST"; row.units = 1;
+    row.status = "STARTED"; row.createdAt = Instant.now(); row.resultCount = 0; row.inventoryAvailability = "PENDING";
+    manager.persist(row); return row.id;
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void preApprovalResult(String id, PreApprovalAdapter.Result result) {
+    manager.createQuery("update ProviderUsageEntity u set u.resultCount = :count, u.retrievedAt = :time, "
+        + "u.costUsd = :cost, u.inventoryAvailability = :availability where u.id = :id")
+        .setParameter("count", (int) result.lenders().stream().filter(lender -> lender.preApproval() != null).count())
+        .setParameter("time", result.retrievedAt()).setParameter("cost", result.costUsd())
+        .setParameter("availability", result.availability().name()).setParameter("id", id).executeUpdate();
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void preApprovalLatency(String id, long millis) {
+    manager.createQuery("update ProviderUsageEntity u set u.latencyMillis = :millis where u.id = :id")
+        .setParameter("millis", millis).setParameter("id", id).executeUpdate();
   }
   /**
    * Starts usage for a model call. Every value comes from code-owned configuration and task

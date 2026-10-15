@@ -7,7 +7,16 @@ LOAN-03) and 11.2.
 
 **Blocked by:** none.
 
-**Status:** open — filed on 2026-10-14.
+**Status:** complete — `com.dealanalyzer.loan.preapproval`, as of 2026-10-15. `PreApprovalAdapter.request`
+returns code-owned partner metadata, partner-level availability, and one entry per lender with the shared
+`PartnerOutcome`; only `OFFERED` carries a pre-approval. A recorded `CreditAuthorization` is required, and a response
+with any non-soft or unknown inquiry type is refused with no offers (LOAN-01). `PreApprovalContract.orderedOffers`
+computes payment, interest and total cost with `FinancingCalculator` and orders by total cost then lender name, with
+a payment reconciliation against the lender's figure (FIN-01, FIN-02, LOAN-02). `DeterministicFakePreApprovalAdapter`
+is the default and passes the conformance suite; `PreApprovalProductionGuard` refuses it under `pilot`.
+`PreApprovalService.request(caseId, accountId, journeyId, …)` meters every attempt as `PRE_APPROVAL` (V57 admits
+journey rows); no application facts are stored. Open for 129: recording and loading the authorization, the account
+export of journey usage, and the scope parameters, which differ from 125's `InsuranceQuoteScope`.
 
 ## Scope
 

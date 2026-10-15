@@ -1,6 +1,12 @@
 package com.dealanalyzer.operations;
 
 import com.dealanalyzer.ai.ModelProvenance;
+import com.dealanalyzer.insurance.quote.InsuranceQuoteAdapter;
+import com.dealanalyzer.insurance.quote.InsuranceQuoteContract;
+import com.dealanalyzer.insurance.quote.InsuranceQuoteScope;
+import com.dealanalyzer.loan.preapproval.LoanApplication;
+import com.dealanalyzer.loan.preapproval.PreApprovalAdapter;
+import com.dealanalyzer.loan.preapproval.PreApprovalContract;
 import com.dealanalyzer.shopping.inventory.InventoryResults;
 import com.dealanalyzer.shopping.inventory.InventorySearchAdapter;
 import com.dealanalyzer.trade.valuation.TradeValuationAdapter;
@@ -19,7 +25,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class ProviderMeter {
-  public enum Operation { EXTRACTION, MARKET_RETRIEVAL, LISTING_RETRIEVAL, SYNTHETIC_MARKET, REPLY_DRAFT, EXPLANATION, INVENTORY_SEARCH, TRADE_VALUATION, VEHICLE_SAFETY }
+  public enum Operation { EXTRACTION, MARKET_RETRIEVAL, LISTING_RETRIEVAL, SYNTHETIC_MARKET, REPLY_DRAFT, EXPLANATION, INVENTORY_SEARCH, TRADE_VALUATION, VEHICLE_SAFETY, INSURANCE_QUOTE, PRE_APPROVAL }
   public enum Status { SUCCESS, PROVIDER_UNAVAILABLE, PROVIDER_FAILURE, CONTRACT_FAILURE, BUYER_INPUT, INTERNAL }
   /** A safe boundary error: provider text and exception causes must never escape into diagnostics. */
   public static final class Failure extends RuntimeException {
@@ -133,6 +139,74 @@ public class ProviderMeter {
       return unavailable;
     } finally {
       store.tradeValuationLatency(id, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+    }
+  }
+
+  /** Pre-approval attempts share provider bounds; unsafe offers never leave this boundary. */
+  public PreApprovalAdapter.Result callPreApproval(
+      String caseId, String accountId, String journeyId,
+      PreApprovalAdapter.Provider provider, LoanApplication application,
+      Supplier<PreApprovalAdapter.Result> invocation) {
+    String id = store.startPreApproval(caseId, accountId, journeyId, provider);
+    long started = System.nanoTime();
+    var rejected = new java.util.concurrent.atomic.AtomicReference<PreApprovalAdapter.Reason>();
+    var spent = new java.util.concurrent.atomic.AtomicReference<BigDecimal>();
+    try {
+      return run(id, invocation, result -> {
+        spent.set(result.costUsd());
+        var failure = PreApprovalContract.failure(result, provider, application, Instant.now());
+        if (failure != null) {
+          rejected.set(failure);
+          throw new IllegalArgumentException("Invalid pre-approval contract");
+        }
+        store.preApprovalResult(id, result);
+        return result.availability() == PreApprovalAdapter.Availability.AVAILABLE
+            ? Status.SUCCESS : Status.PROVIDER_UNAVAILABLE;
+      }, null);
+    } catch (Failure failure) {
+      var reason = rejected.get() != null ? rejected.get() : failure.timedOut
+          ? PreApprovalAdapter.Reason.TIMED_OUT
+          : failure.status() == Status.CONTRACT_FAILURE
+          ? PreApprovalAdapter.Reason.INVALID_RESPONSE : PreApprovalAdapter.Reason.PROVIDER_UNAVAILABLE;
+      var unavailable = PreApprovalContract.unavailable(provider, reason, Instant.now(), spent.get());
+      store.preApprovalResult(id, unavailable);
+      return unavailable;
+    } finally {
+      store.preApprovalLatency(id, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+    }
+  }
+
+  /**
+   * Insurance quote calls share the timeout and concurrency limits. A case or journey scope is metered;
+   * no application detail reaches the usage row, and a rejected response carries no quote.
+   */
+  public InsuranceQuoteAdapter.Result callInsuranceQuote(InsuranceQuoteScope scope,
+      InsuranceQuoteAdapter.Provider provider, Supplier<InsuranceQuoteAdapter.Result> invocation) {
+    String id = store.startInsuranceQuote(scope, provider);
+    long started = System.nanoTime();
+    var rejected = new java.util.concurrent.atomic.AtomicReference<InsuranceQuoteAdapter.Reason>();
+    var spent = new java.util.concurrent.atomic.AtomicReference<BigDecimal>();
+    try {
+      return run(id, invocation, result -> {
+        spent.set(result.costUsd());
+        var failure = InsuranceQuoteContract.failure(result, provider, Instant.now());
+        if (failure != null) {
+          rejected.set(failure);
+          throw new IllegalArgumentException("Invalid insurance quote contract");
+        }
+        store.insuranceQuoteResult(id, result);
+        return result.availability() == InsuranceQuoteAdapter.Availability.AVAILABLE
+            ? Status.SUCCESS : Status.PROVIDER_UNAVAILABLE;
+      }, null);
+    } catch (Failure failure) {
+      var reason = rejected.get() != null ? rejected.get() : failure.timedOut
+          ? InsuranceQuoteAdapter.Reason.TIMED_OUT : failure.status() == Status.CONTRACT_FAILURE
+          ? InsuranceQuoteAdapter.Reason.INVALID_RESPONSE : InsuranceQuoteAdapter.Reason.PROVIDER_UNAVAILABLE;
+      var unavailable = InsuranceQuoteContract.unavailable(provider, reason, Instant.now(), spent.get());
+      store.insuranceQuoteResult(id, unavailable);
+      return unavailable;
+    } finally {
+      store.insuranceQuoteLatency(id, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
     }
   }
 
