@@ -144,9 +144,10 @@ negated disclaimers that withdraw a claim rather than make one.
 
 The standing commercial-relationship disclosure in `frontend/src/App.tsx` states that the product
 is a tool on the Buyer's side, the credo ("We don't work with dealers. We help people."), that the
-Buyer sends every email from their own email and makes every decision, that no dealer, lender, or
-other commercial party pays for placement, leads, or referrals, and that no commercial relationship
-affects any market range, rating, finding, or suggested boundary. The referral partner kit keeps the
+Buyer sends every email from their own email and makes every decision, that no dealer pays otdog for
+anything and no company pays for placement, and that no commercial relationship affects any market
+range, rating, finding, quote order, or suggested boundary. It links to the "How otdog makes money" page
+(spec 2.3). The referral partner kit keeps the
 credo, the same no-dealer-money term, and its statement that the product does not contact dealers
 for the Buyer. The test fails if either is removed.
 

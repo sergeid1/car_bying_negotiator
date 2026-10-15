@@ -52,7 +52,8 @@ test("the page footer links to the kit, and an unknown page shows the usual star
   const terms = footer.textContent!.replace(/\s+/g, " ");
   expect(terms).toContain("otdog is a tool on your side, the Buyer's. We don't work with dealers. We help people.");
   expect(terms).toContain("You send every email from your own email and make every decision");
-  expect(terms).toContain("No dealer, lender, or other commercial party pays for placement, leads, or referrals");
+  expect(terms).toContain("No dealer pays otdog for anything. No company pays for placement");
+  expect(within(footer).getByRole("link", { name: "How otdog makes money" }).getAttribute("href")).toBe("?page=how-otdog-makes-money");
   expect(terms).not.toMatch(/gmail|outlook|mailbox/i);
 });
 
@@ -65,7 +66,7 @@ test("the kit names its audience, excludes dealers and lenders, and states the f
   const terms = within(screen.getByRole("region", { name: "Terms of the arrangement" })).getAllByRole("listitem")
     .map(item => item.textContent!.replace(/\s+/g, " "));
   expect(terms).toContain("Partners are not paid for referrals, and partners do not pay for placement or referrals.");
-  expect(terms).toContain("No dealer, lender, or other commercial party pays for placement, leads, or referrals.");
+  expect(terms).toContain("No dealer pays otdog for anything, and no company pays for placement.");
   expect(terms.some(term => term.includes("shown a disclosure of the referral"))).toBe(true);
   expect(terms.some(term => term.includes("No partner relationship affects any market range, rating, finding, or suggested boundary"))).toBe(true);
 

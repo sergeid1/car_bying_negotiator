@@ -88,7 +88,8 @@ class PilotCopyClaimsTest {
     assertThat(app).contains("We don't work with dealers. We help people.");
     assertThat(app).contains("You send every email from your own email and make every decision");
     assertThat(app).contains("no commercial relationship affects any");
-    assertThat(app).contains("pays for placement, leads, or referrals");
+    assertThat(app).contains("No dealer pays otdog for anything. No company pays for placement");
+    assertThat(app).contains("How otdog makes money");
   }
 
   @Test void thePartnerKitKeepsTheCredoAndTheNoDealerMoneyTerms() throws IOException {
@@ -96,7 +97,7 @@ class PilotCopyClaimsTest {
     assertThat(kit).contains("does not contact dealers for the Buyer");
     assertThat(kit).contains("We don't work with dealers. We help people.");
     assertThat(kit).contains("The Buyer sends every email from their own email and makes every decision");
-    assertThat(kit).contains("pays for placement, leads, or referrals");
+    assertThat(kit).contains("No dealer pays otdog for anything, and no company pays for placement.");
   }
 
   @Test void positioningClaimsAreProhibited() {

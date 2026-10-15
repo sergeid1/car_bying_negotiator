@@ -23,6 +23,7 @@ import { OfferTerms, PurchasePoint } from "./OneTimeOffer";
 import { ExampleReportPage } from "./SampleReport";
 import { ExplainerGuide, GuideLinks } from "./ExplainerGuides";
 import { ReferralPartnerKit } from "./ReferralPartnerKit";
+import { HowOtdogMakesMoney } from "./HowOtdogMakesMoney";
 import { HowItWorks, HowItWorksCard } from "./HowItWorks";
 import { HomeHero } from "./HomeHero";
 
@@ -535,6 +536,12 @@ test("the referral partner kit, its example disclosure, and its built links have
   await user.click(screen.getByRole("button", { name: "Build links" }));
   await screen.findByRole("list", { name: "Referral links for inspector-1" });
   result = await axe.run(container, AA);
+  expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
+});
+
+test("the how-otdog-makes-money page has no automated AA violations", async () => {
+  const { container } = render(<main><HowOtdogMakesMoney /></main>);
+  const result = await axe.run(container, AA);
   expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.html) }))).toEqual([]);
 });
 

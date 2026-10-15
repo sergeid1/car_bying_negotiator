@@ -15,6 +15,7 @@ import { ExampleReportPage, requestedExampleReport } from "./SampleReport";
 import { ExplainerGuide, GuideLinks, requestedGuide, requestedGuideIndex } from "./ExplainerGuides";
 import { partnerKitLink, ReferralPartnerKit, requestedPartnerKit } from "./ReferralPartnerKit";
 import { HowItWorks, requestedHowItWorks } from "./HowItWorks";
+import { HowOtdogMakesMoney, howOtdogMakesMoneyLink, requestedHowOtdogMakesMoney } from "./HowOtdogMakesMoney";
 import { HomeHero } from "./HomeHero";
 import { SiteNav } from "./SiteNav";
 import logo from "./assets/otdog-logo.png";
@@ -151,14 +152,14 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
     window.addEventListener("popstate", moved);
     return () => window.removeEventListener("popstate", moved);
   }, []);
-  const { guide, guideIndex, partnerKit, howItWorks, exampleReport } = useMemo(() => {
+  const { guide, guideIndex, partnerKit, howItWorks, money, exampleReport } = useMemo(() => {
     const guide = requestedGuide();
     return { guide, guideIndex: !guide && requestedGuideIndex(), partnerKit: requestedPartnerKit(),
-      howItWorks: requestedHowItWorks(), exampleReport: !guide && requestedExampleReport() };
+      howItWorks: requestedHowItWorks(), money: requestedHowOtdogMakesMoney(), exampleReport: !guide && requestedExampleReport() };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
   // A guide, the partner kit or the walkthrough replaces the start screen at its own shareable address.
-  const standalone = Boolean(guide || guideIndex || partnerKit || howItWorks || exampleReport);
+  const standalone = Boolean(guide || guideIndex || partnerKit || howItWorks || money || exampleReport);
   // A case opened from the Buyer Account closes when the sign-in ends; its private case link is unaffected.
   const openedFromAccount = Boolean(caseCredentials && isAccountPass(caseCredentials.token));
   useEffect(() => {
@@ -253,6 +254,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               onDeskCheck={() => { setAtDealer(undefined); setDealerRequest(value => value + 1); }} onClose={() => setAtDealer(undefined)} />}
             {!guide && partnerKit && <ReferralPartnerKit />}
             {!guide && !partnerKit && howItWorks && !atDealer && !caseOpen && <HowItWorks />}
+            {!guide && !partnerKit && money && !atDealer && !caseOpen && <HowOtdogMakesMoney />}
             {!standalone && accountSignedIn && <BuyingJourneys
               onSessionEnded={() => { setAccountSignedIn(false); setAccountRecheck(value => value + 1); }}
               onCaseOpened={(value, disclosure) => {
@@ -344,9 +346,9 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
                 otdog never contacts a dealer itself.
               </p>
               <p>
-                No dealer, lender, or other commercial party pays for placement, leads, or referrals,
-                and no commercial relationship affects any market range, rating, finding, or suggested
-                boundary.
+                No dealer pays otdog for anything. No company pays for placement, and no commercial
+                relationship affects any market range, rating, finding, quote order, or suggested
+                boundary. <a href={howOtdogMakesMoneyLink}>How otdog makes money</a>
               </p>
               <p>
                 It reviews the dealer's own paperwork for financial consistency. It is not legal, tax,
