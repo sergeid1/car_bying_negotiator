@@ -36,6 +36,7 @@ import { Passkeys } from "./Passkeys";
 import { Passwords } from "./Passwords";
 import { SignIn } from "./SignIn";
 import { DeskTactics } from "./DeskTactics";
+import { TotoChat } from "./TotoChat";
 import { syntheticTactic, syntheticTradeTactics } from "./DeskTactics.fixture";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -1030,3 +1031,33 @@ test("the listing capture, its confirmation form, a VIN conflict and the price n
   vi.unstubAllGlobals();
 });
 // End ticket 115.
+
+test.each([false, true])("the Ask Toto panel with answers, citations, a fallback and a cap has no automated AA violations (narrow %s)", async narrow => {
+  if (narrow) vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} }));
+  const citation = (articleId: string, title: string, link: string | null) => ({ articleId, title, link });
+  const replies = [
+    { kind: "ANSWER", message: null, suggestions: [], paragraphs: [
+      { text: "A doc fee is what the dealer charges to prepare the paperwork.", citations: [citation("dealer-fees", "Which dealer fees to ask about", "?guide=dealer-fees")] },
+      { text: "Ask the dealer to show it as its own line.", citations: [citation("doc-fee", "Doc fees", null)] }] },
+    { kind: "FALLBACK", paragraphs: [], message: "I can't answer that one well. These guides may help.",
+      suggestions: [citation("otd", "How to read an out-the-door quote", "?guide=out-the-door-quote")] },
+  ];
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => String(input) === "/api/v1/toto"
+    ? new Response(JSON.stringify({ available: true }))
+    : replies.length ? new Response(JSON.stringify(replies.shift()))
+      : new Response(JSON.stringify({ code: "TOTO_RESTING", detail: "Toto is resting until tomorrow." }), { status: 429 }));
+  const { container } = render(<main><h1>Guides</h1><TotoChat /></main>);
+  await userEvent.click(await screen.findByRole("button", { name: "Ask Toto" }));
+  const panel = screen.getByRole("dialog", { name: "Ask Toto" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  for (const question of ["What is a doc fee?", "What is a spot delivery?", "And a trade-in?"]) {
+    await userEvent.type(within(panel).getByRole("textbox", { name: "Your question" }), `${question}{Enter}`);
+    await within(panel).findByText(question);
+    await within(panel).findByRole("button", { name: "Ask" });
+  }
+  await within(panel).findAllByText("Toto is resting until tomorrow.");
+  await userEvent.click(within(panel).getByRole("button", { name: "Ask" }));
+  expect(within(panel).getByRole("alert")).toHaveTextContent("Type a question first.");
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  vi.unstubAllGlobals();
+});

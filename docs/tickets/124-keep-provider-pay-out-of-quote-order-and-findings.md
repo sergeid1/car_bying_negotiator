@@ -8,10 +8,20 @@ Spec 2.3 sections 1.3 and 8.12 (PAY-01 to PAY-03).
 
 **Blocked by:** none for the structure and tests; the line's final wording needs counsel (ticket 123).
 
-**Status:** open — the "How otdog makes money" page (`?page=how-otdog-makes-money`), its footer link, and the
-footer and partner-kit wording ("No dealer pays otdog for anything. No company pays for placement") are in, as
-of 2026-10-14. Remaining: the compensation package, the architecture and ranking-integrity tests, the dealer
-guard, the claim checks for "best rate", "cheapest" and "guaranteed", and the Terms and Privacy updates.
+**Status:** complete — as of 2026-10-15; the line's final wording and the Terms and Privacy drafts await counsel
+(ticket 123). The "How otdog makes money" page, its footer link and the footer and partner-kit wording landed on
+2026-10-14. `com.dealanalyzer.compensation.ProviderFees` holds versioned, dated fees (`CURRENT` is empty: no
+signed fee schedule yet), and its `Fee` constructor is the PAY-03 guard: only insurers, direct lenders and
+licensed comparison partners can be registered, never a dealer, dealer group, dealer-arranged financing, dealer
+reserve or desk product. `CompensationArchitectureTest` scans every compiled production class outside the
+package for a reference to it, and proves the scan rejects a compiled fixture that has one.
+`QuoteRankingIntegrityTest` shows that random fees, participation and placement fields leave insurance and
+pre-approval order, inclusion and wording unchanged, that renaming a provider moves it only among exact ties,
+that the partner's order has no effect, and that a Buyer-entered quote is ordered on the same terms (PAY-02).
+Equal-cost quotes are broken by provider name (`CoverageComparison`, `PreApprovalContract`), never by the
+partner's order. `PilotCopyClaimsTest` now refuses "best rate" and "cheapest" alongside "guaranteed". Drafts for
+counsel: `docs/terms-of-service-draft.md` and `docs/privacy-policy-draft.md`. The line beside each quote list
+ships with the lists themselves in tickets 126 and 129.
 
 ## Scope
 
@@ -33,6 +43,6 @@ guard, the claim checks for "best rate", "cheapest" and "guaranteed", and the Te
 
 ## Done when
 
-- [ ] The architecture test and ranking-integrity tests pass, and fail when a deliberate dependency or
+- [x] The architecture test and ranking-integrity tests pass, and fail when a deliberate dependency or
       compensation-based ordering is introduced.
-- [ ] The page is in the axe sweep and passes the 360 px gate.
+- [x] The page is in the axe sweep and passes the 360 px gate.

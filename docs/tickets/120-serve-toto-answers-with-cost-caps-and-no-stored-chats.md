@@ -29,6 +29,34 @@ the coordinator reserves the number after the ticket 115–116 integration (V56 
 - `docs/provider-inventory.md` and `docs/hardening-threat-model.md` record that Buyer questions go to the
   model provider and are not stored by otdog.
 
+## Agreed interface (coordinator, 2026-10-15)
+
+Ticket 121 builds its panel against a mock of this shape, so 119 and 120 implement it as written. Change it
+only through the coordinator.
+
+- `GET /api/v1/toto` → `200 {"available": boolean}`. The client shows nothing when `available` is false or
+  the request fails.
+- `POST /api/v1/toto/answers` with `{"question": string, "turns": [{"role": "BUYER" | "TOTO", "text": string}]}`,
+  oldest turn first, at most six. Same-origin JSON, no case or account token required.
+  The client (ticket 121) sends only answered exchanges and cuts Toto's earlier text to 1,500 characters, so a
+  long answer never trips `TOTO_TURNS_INVALID`; the server still enforces the limit.
+- `200` body:
+  - `kind`: `ANSWER`, `DECLINE` or `FALLBACK`.
+  - `paragraphs`: for `ANSWER`, one to four `{"text": string, "citations": [Citation, ...]}` with at least one
+    citation each; empty otherwise.
+  - `message`: for `DECLINE` and `FALLBACK`, the code-owned wording from `docs/toto-answer-policy.md` (the server
+    owns it, the client shows it as given); `null` for `ANSWER`.
+  - `suggestions`: for `FALLBACK`, the keyword-matched guide articles as `Citation`s; empty otherwise.
+  - `Citation` is `{"articleId": string, "title": string, "link": string | null}`. `link` is a relative client
+    link into an existing guide (for example `?guide=doc-fee`) when one exists; otherwise `null` and the client
+    shows the title as text.
+- Refusals are `ProblemDetail` bodies with a `code` property and a plain `detail`:
+  - `400` `TOTO_QUESTION_INVALID` (empty or over 1,000 characters), `TOTO_TURNS_INVALID` (more than six turns or
+    a turn over 1,500 characters);
+  - `429` `TOTO_RESTING` (account, client or daily spending cap); `detail` is the "Toto is resting" wording;
+  - `503` `TOTO_UNAVAILABLE` (disabled since the last `GET`).
+  Any other failure is a network or server error; the client shows its own plain wording and keeps the chat.
+
 ## Done when
 
 - [ ] Endpoint tests cover each limit, each cap, the disabled state, and a provider failure.
