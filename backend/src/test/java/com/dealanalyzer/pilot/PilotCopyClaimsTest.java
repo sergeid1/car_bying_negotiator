@@ -33,7 +33,7 @@ class PilotCopyClaimsTest {
       "fraud", word("fraud|fraudulent|scam|deceptive"),
       "advice", word("advice|we advise|you should|we recommend that you"),
       "safe to sign", Pattern.compile("safe to sign", Pattern.CASE_INSENSITIVE),
-      "guarantee", word("guarantee|guaranteed|guarantees|risk-free"),
+      "guarantee", word("guarantee|guaranteed|guarantees|risk-free|best[\\s_-]*rate|cheapest"),
       "savings", Pattern.compile("(?i)\\b(you will save|savings of|save you \\$)"),
       "negotiates for you", word("(we|it) negotiates?|negotiates? (for|with dealers for)"
           + " (you|the buyer)|negotiating for (you|the buyer)"),
@@ -45,6 +45,11 @@ class PilotCopyClaimsTest {
           + " (for (you|the buyer)|itself|in its own name)"));
 
   private final ObjectMapper json = new ObjectMapper();
+
+  @Test void quoteClaimsAreProhibitedIncludingIdentifiersAndComments() {
+    for (String copy : List.of("best rate", "bestRate", "cheapest", "guaranteed", "// Guaranteed rate"))
+      assertThat(PROHIBITED.get("guarantee").matcher(copy).find()).as(copy).isTrue();
+  }
 
   @Test void shippedCopyMakesNoUnreviewedClaim() throws IOException {
     var reviewed = reviewed();
