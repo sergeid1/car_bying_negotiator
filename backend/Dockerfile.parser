@@ -1,8 +1,10 @@
 FROM eclipse-temurin:21-jre AS runtime
 # Take Ubuntu security fixes (e.g. OpenSSL) as soon as they ship, not when the base image is rebuilt.
 # The base image ships Canonical's pebble outside dpkg, so apt never patches it; nothing here runs it.
+# Nothing in the image runs curl; removing it (and libcurl, which only curl uses) drops its CVEs from the image.
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends libheif-examples libheif-plugin-libde265 \
+    && apt-get purge -y --auto-remove curl libcurl4t64 \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /usr/bin/pebble \
     && groupadd --gid 10001 parser && useradd --uid 10001 --gid parser --no-create-home parser
