@@ -7,7 +7,14 @@ clears it, and the panel says so.
 
 **Blocked by:** 120 for the endpoint shape. The panel can be built against a mocked endpoint first.
 
-**Status:** open — filed on 2026-10-14.
+**Status:** open — the panel is built against the agreed interface in ticket 120, as of 2026-10-15. Remaining:
+the live endpoint (tickets 119 and 120) and the operator's trademark check on the name "Toto". `TotoChat.tsx`
+is mounted in `App.tsx` and renders only when `GET /api/v1/toto` reports `available: true`, so Buyers see
+nothing until then. It is a full-screen modal dialog at 720 px and below, and a non-modal 420 px side panel
+above that. It sends the last six answered turns, with Toto's earlier text cut to the 1,500-character turn
+limit. A citation is a link only to a guide `ExplainerGuides.tsx` knows; otherwise its title shows as text.
+Guide links open without a reload, so the chat survives. Tests: `TotoChat.test.tsx`, the Toto sweep in
+`Accessibility.test.tsx`, and `e2e/ask-toto-narrow-width.spec.ts`.
 
 ## Scope
 
@@ -29,8 +36,8 @@ clears it, and the panel says so.
 
 ## Done when
 
-- [ ] Component tests cover asking, answering with citations, declining, the fallback, caps and the hidden
+- [x] Component tests cover asking, answering with citations, declining, the fallback, caps and the hidden
       state when Toto is unavailable.
-- [ ] The panel is registered in the `Accessibility.test.tsx` axe sweep with no violations.
-- [ ] The 360 px browser gate passes with the panel open, with no horizontal overflow.
-- [ ] `npm test`, `npm run build` and `npx playwright test` pass.
+- [x] The panel is registered in the `Accessibility.test.tsx` axe sweep with no violations.
+- [x] The 360 px browser gate passes with the panel open, with no horizontal overflow.
+- [x] `npm test`, `npm run build` and `npx playwright test` pass.

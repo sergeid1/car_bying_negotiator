@@ -38,6 +38,8 @@ only through the coordinator.
   the request fails.
 - `POST /api/v1/toto/answers` with `{"question": string, "turns": [{"role": "BUYER" | "TOTO", "text": string}]}`,
   oldest turn first, at most six. Same-origin JSON, no case or account token required.
+  The client (ticket 121) sends only answered exchanges and cuts Toto's earlier text to 1,500 characters, so a
+  long answer never trips `TOTO_TURNS_INVALID`; the server still enforces the limit.
 - `200` body:
   - `kind`: `ANSWER`, `DECLINE` or `FALLBACK`.
   - `paragraphs`: for `ANSWER`, one to four `{"text": string, "citations": [Citation, ...]}` with at least one
