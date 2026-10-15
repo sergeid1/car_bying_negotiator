@@ -12,6 +12,7 @@ import com.dealanalyzer.partner.PartnerOutcome;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.math.BigDecimal;
@@ -19,8 +20,11 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
+import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 class QuoteRankingIntegrityTest {
@@ -61,6 +65,42 @@ class QuoteRankingIntegrityTest {
     assertThat(evidence(actual)).isEqualTo(evidence(expected));
   }
 
+  /**
+   * Equal-cost quotes fall back to a neutral alphabetical name order, so renaming a provider may reorder them
+   * among themselves and nowhere else. Sorting each run of equal keys makes that the only freedom allowed.
+   */
+  private static ArrayNode withinTies(JsonNode rows, Function<JsonNode, String> key) {
+    var result = JSON.createArrayNode();
+    var group = new ArrayList<JsonNode>();
+    String current = null;
+    for (var row : rows) {
+      var next = key.apply(row);
+      if (!next.equals(current)) { flush(group, result); current = next; }
+      group.add(row);
+    }
+    flush(group, result);
+    return result;
+  }
+
+  private static void flush(List<JsonNode> group, ArrayNode result) {
+    group.sort(Comparator.comparing(JsonNode::toString));
+    result.addAll(group);
+    group.clear();
+  }
+
+  private static JsonNode insuranceEvidence(CoverageComparison.Comparison comparison) {
+    var tree = (ObjectNode) evidence(comparison);
+    tree.set("sameCoverage", withinTies(tree.get("sameCoverage"), row -> row.at("/entry/quote/premiumMinor").asText()));
+    // Different-coverage and no-quote rows carry no rank; only their contents must match.
+    tree.set("differentCoverage", withinTies(tree.get("differentCoverage"), row -> ""));
+    tree.set("withoutQuote", withinTies(tree.get("withoutQuote"), row -> ""));
+    return tree;
+  }
+
+  private static JsonNode loanEvidence(List<PreApprovalContract.CalculatedOffer> offers) {
+    return withinTies(evidence(offers), row -> row.get("totalCostMinor").asText());
+  }
+
   private static void stripNames(JsonNode node) {
     if (node instanceof ObjectNode object) { object.remove("insurer"); object.remove("lenderName"); }
     node.forEach(QuoteRankingIntegrityTest::stripNames);
@@ -94,7 +134,12 @@ class QuoteRankingIntegrityTest {
       var catalog = new ProviderFees("random-" + seed, ProviderFees.CURRENT.effectiveFrom(), fees);
       assertThat(catalog.version()).isEqualTo("random-" + seed);
       var current = new InsuranceApplication.CurrentPolicy("Current", CHOSEN, 150000, Term.TWELVE_MONTHS);
-      sameEvidence(CoverageComparison.compare(CHOSEN, current, changed), CoverageComparison.compare(CHOSEN, current, entries));
+      var baseline = CoverageComparison.compare(CHOSEN, current, entries);
+      assertThat(insuranceEvidence(CoverageComparison.compare(CHOSEN, current, changed))).isEqualTo(insuranceEvidence(baseline));
+      // The partner's order is a placement channel, so it must have no effect at all.
+      var reordered = new ArrayList<>(entries);
+      Collections.shuffle(reordered, random);
+      assertThat(CoverageComparison.compare(CHOSEN, current, reordered)).isEqualTo(baseline);
     }
   }
 
@@ -120,8 +165,11 @@ class QuoteRankingIntegrityTest {
       assertThat(catalog.fees()).hasSize(fees.size());
       var baseline = result(entries);
       var variant = result(changed);
-      sameEvidence(PreApprovalContract.orderedOffers(variant, APPLICATION, NOW),
-          PreApprovalContract.orderedOffers(baseline, APPLICATION, NOW));
+      var ordered = PreApprovalContract.orderedOffers(baseline, APPLICATION, NOW);
+      assertThat(loanEvidence(PreApprovalContract.orderedOffers(variant, APPLICATION, NOW))).isEqualTo(loanEvidence(ordered));
+      var reordered = new ArrayList<>(entries);
+      Collections.shuffle(reordered, random);
+      assertThat(PreApprovalContract.orderedOffers(result(reordered), APPLICATION, NOW)).isEqualTo(ordered);
       assertThat(variant.notice()).isEqualTo(baseline.notice());
       assertThat(evidence(variant.lenders())).isEqualTo(evidence(baseline.lenders()));
     }
@@ -140,12 +188,15 @@ class QuoteRankingIntegrityTest {
     var buyerLoan = loan(2, 4, 0);
     assertThat(PreApprovalContract.orderedOffers(result(List.of(participatingLoan, buyerLoan)), APPLICATION, NOW))
         .extracting(PreApprovalContract.CalculatedOffer::preApproval).containsExactly(buyerLoan.preApproval(), participatingLoan.preApproval());
+    // A tie with a paying provider is broken by name alone, whichever one the partner lists first.
     var tiedInsurance = insurance(3, 100000, CHOSEN);
-    assertThat(CoverageComparison.compare(CHOSEN, null, List.of(tiedInsurance, buyerInsurance)).sameCoverage())
-        .extracting(row -> row.entry()).containsExactly(tiedInsurance, buyerInsurance);
+    for (var order : List.of(List.of(tiedInsurance, buyerInsurance), List.of(buyerInsurance, tiedInsurance)))
+      assertThat(CoverageComparison.compare(CHOSEN, null, order).sameCoverage())
+          .extracting(row -> row.entry()).containsExactly(buyerInsurance, tiedInsurance);
     var tiedLoan = loan(3, 4, 0);
-    assertThat(PreApprovalContract.orderedOffers(result(List.of(tiedLoan, buyerLoan)), APPLICATION, NOW))
-        .extracting(PreApprovalContract.CalculatedOffer::preApproval).containsExactly(tiedLoan.preApproval(), buyerLoan.preApproval());
+    for (var order : List.of(List.of(tiedLoan, buyerLoan), List.of(buyerLoan, tiedLoan)))
+      assertThat(PreApprovalContract.orderedOffers(result(order), APPLICATION, NOW))
+          .extracting(PreApprovalContract.CalculatedOffer::preApproval).containsExactly(buyerLoan.preApproval(), tiedLoan.preApproval());
   }
 
   @Test void integrityAssertionRejectsDeliberateCompensationBasedOrdering() {

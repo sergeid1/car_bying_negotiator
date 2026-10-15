@@ -70,14 +70,10 @@ class CoverageComparisonTest {
     });
     assertThat(comparison.withoutQuote()).extracting(InsurerEntry::insurer).containsExactly("Insurer E", "Insurer F");
 
-    // Cost determines rank; equally priced offers retain input order without a name preference.
+    // The partner's order has no effect on the result.
     for (int seed = 0; seed < 5; seed++) {
       Collections.shuffle(entries, new java.util.Random(seed));
-      var shuffled = CoverageComparison.compare(chosen, null, entries);
-      assertThat(shuffled.sameCoverage()).extracting(row -> row.entry().quote().yearlyPremiumMinor())
-          .containsExactly(140000L, 150000L, 150000L);
-      assertThat(shuffled.sameCoverage()).containsExactlyInAnyOrderElementsOf(comparison.sameCoverage());
-      assertThat(shuffled.withoutQuote()).containsExactlyInAnyOrderElementsOf(comparison.withoutQuote());
+      assertThat(CoverageComparison.compare(chosen, null, entries)).isEqualTo(comparison);
     }
   }
 

@@ -45,6 +45,6 @@ public final class PreApprovalContract {
       return new CalculatedOffer(entry.lenderName(), offer, schedule.paymentMinor(), schedule.interestMinor(),
           Math.addExact(schedule.totalPaymentsMinor(), offer.upfrontFeesMinor()),
           offer.lenderPaymentMinor() == null ? null : offer.lenderPaymentMinor() - schedule.paymentMinor(), reconciliation);
-    }).sorted(Comparator.comparingLong(CalculatedOffer::totalCostMinor)).toList();
+    }).sorted(Comparator.comparingLong(CalculatedOffer::totalCostMinor).thenComparing(CalculatedOffer::lenderName)).toList();
   }
 }

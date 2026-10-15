@@ -6,13 +6,14 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
  * Compares quotes only at the coverage the Buyer chose (INS-03). A quote is "same coverage" only when every
  * line, limit and deductible matches; any other quote is listed with its differences and never ordered
- * against the same-coverage quotes. Order depends on premium only. Ties retain input order;
- * provider identity and payment never break a tie.
+ * against the same-coverage quotes. Order depends on premium and insurer name only, never on the partner's
+ * order or anything a provider pays.
  */
 public final class CoverageComparison {
   private CoverageComparison() {}
@@ -29,7 +30,7 @@ public final class CoverageComparison {
 
   /**
    * {@code sameCoverage} is ordered by yearly premium; {@code differentCoverage} and {@code withoutQuote}
-   * retain input order and carry no rank.
+   * are listed by insurer name and carry no rank.
    */
   public record Comparison(List<Compared> sameCoverage, List<Compared> differentCoverage, List<InsurerEntry> withoutQuote) {
     public Comparison {
@@ -64,7 +65,13 @@ public final class CoverageComparison {
       if (differences.isEmpty()) same.add(new Compared(entry, differences, YearlyDifference.of(entry.quote(), current, chosen)));
       else different.add(new Compared(entry, differences, null));
     }
-    same.sort(Comparator.comparingLong(compared -> compared.entry().quote().yearlyPremiumMinor()));
+    Comparator<InsurerEntry> byName = Comparator.comparing((InsurerEntry entry) -> entry.insurer().toLowerCase(Locale.ROOT))
+        .thenComparing(InsurerEntry::insurer);
+    same.sort(Comparator.comparingLong((Compared compared) -> compared.entry().quote().yearlyPremiumMinor())
+        .thenComparing(Compared::entry, byName)
+        .thenComparingInt(compared -> compared.entry().quote().term().months()));
+    different.sort(Comparator.comparing(Compared::entry, byName));
+    without.sort(byName);
     return new Comparison(same, different, without);
   }
 
