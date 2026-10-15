@@ -78,6 +78,43 @@ public class StoredReportRenderer {
         if (!finding.path("noDollarEffectReason").isNull()) lines.add(new Line(finding.path("noDollarEffectReason").asText(), false));
       }
     }
+    if (payload.path("vehicleSafety").isObject()) {
+      var safety = payload.at("/vehicleSafety/facts");
+      lines.add(new Line("Recalls and safety ratings", true));
+      lines.add(new Line("Source: " + safety.path("source").asText() + "; retrieved: " + safety.path("retrievedAt").asText(), false));
+      lines.add(new Line("These are model recalls, not this VIN's recall or repair status. Check this car at https://www.nhtsa.gov/recalls", false));
+      if ("MISSING_VEHICLE".equals(safety.path("status").asText()))
+        lines.add(new Line("Confirm the car's year, make and model to look up recalls and ratings.", false));
+      else if (!"AVAILABLE".equals(safety.path("status").asText()))
+        lines.add(new Line("NHTSA did not answer; recall counts and ratings are unavailable.", false));
+      else {
+        if (safety.path("recalls").isEmpty()) lines.add(new Line("NHTSA returned zero model recall records for this lookup. Check this car's VIN with NHTSA.", false));
+        for (var recall : safety.path("recalls")) {
+          lines.add(new Line("Campaign " + recall.path("campaignNumber").asText() + ": " + recall.path("component").asText(), true));
+          lines.add(new Line(recall.path("summary").asText(), false));
+          lines.add(new Line("Consequence: " + recall.path("consequence").asText("Not supplied"), false));
+          lines.add(new Line("Remedy: " + recall.path("remedy").asText("Not supplied"), false));
+          lines.add(new Line("Report date: " + recall.path("reportDate").asText("Not supplied"), false));
+          lines.add(new Line("Ask the dealer: Has campaign " + recall.path("campaignNumber").asText() + " been repaired on this car, and can you show the repair record?", false));
+        }
+        if (safety.path("ratings").isEmpty()) lines.add(new Line("NHTSA returned no rating variants for this model.", false));
+        for (var variant : safety.path("ratings")) {
+          lines.add(new Line(variant.path("name").asText() + " (all returned variants shown; no match selected)", true));
+          for (String field : List.of("overall", "frontal", "side", "rollover"))
+            lines.add(new Line(field + ": " + (variant.path(field).isNull() ? "Not rated" : variant.path(field).asText() + " of 5 stars"), false));
+          lines.add(new Line("Rollover risk (fraction): " + variant.path("rolloverRisk").asText("Not supplied"), false));
+        }
+      }
+    }
+    // Reports before ticket 115 have no listing price check, and render as they did.
+    var listing = analysis.path("listingPriceCheck");
+    if (listing.isObject()) {
+      lines.add(new Line("The listing you saved", true));
+      lines.add(new Line(listing.path("summary").asText(), false));
+      if (listing.path("deskQuestion").isTextual()) lines.add(new Line("Question to ask: " + listing.path("deskQuestion").asText(), false));
+      for (var condition : listing.path("priceConditions")) lines.add(new Line("The ad's fine print: " + condition.asText(), false));
+      lines.add(new Line("From your own capture of the dealer's listing.", false));
+    }
     lines.add(new Line("Limitations",true));
     for(var limitation:analysis.path("limitations")) lines.add(new Line(limitation.asText(),false));
     lines.add(new Line("Complete saved payload and evidence",true));

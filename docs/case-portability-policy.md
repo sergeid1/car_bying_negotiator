@@ -63,6 +63,10 @@ Archives contain:
   evidence, extractions, corrections, verifications, offers, economics, market evidence, plans,
   approved baselines, financing, reviews, negotiation versions, stored report explanations (with the
   path and model versions that produced them), reports and recovery delivery metadata.
+  Listing captures (ticket 115) are included: `listing_capture_readings` with each field read and its
+  evidence region, and `listing_snapshots` with the confirmed ad's price, `captured_on`,
+  `price_conditions`, `source_document_id` and `field_confirmations`; the capture itself is a
+  `source_documents` row with `purpose = 'LISTING_CAPTURE'`.
 - `reports/report-N.html`: each immutable saved report, including labels, limitations and evidence.
 - `documents/`: retained active originals named by document ID and normalized PNG pages. Filenames,
   media types and the document/page relationships remain in the JSON records. Expired, deleted or

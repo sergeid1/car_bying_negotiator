@@ -1,0 +1,11 @@
+.vehicle-safety { min-width: 0; overflow-wrap: anywhere; }
+.case-flow > details.vehicle-safety { margin-top: -16px; margin-bottom: -8px; border-top-left-radius: 0; border-top-right-radius: 0; }
+.vehicle-safety > summary { cursor: pointer; }
+details.panel.vehicle-safety > summary { min-height: 44px; padding-block: 8px; }
+.vehicle-safety > summary h2 { display: inline; font-size: 1.1rem; }
+.vehicle-safety-records { padding-inline-start: 1.2rem; }
+.vehicle-safety-records > li { margin-block: 1rem; }
+.vehicle-safety-ratings { display: grid; gap: .5rem; }
+.vehicle-safety-ratings > div { display: flex; justify-content: space-between; gap: 1rem; }
+.vehicle-safety-ratings dd { margin: 0; text-align: right; }
+.vehicle-safety-vin { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }

@@ -978,3 +978,48 @@ test.each(["NEW", "DESK_COMPARED"] as const)("every step of the guided case page
   window.history.replaceState(null, "", "/");
 });
 // End ticket 112.
+
+test("model recalls, rating variants and VIN copy have no automated AA violations", async () => {
+  const { VehicleSafetyFacts } = await import("./VehicleSafety");
+  const { vehicleSafetyFixture } = await import("./VehicleSafety.fixture");
+  const { container } = render(<main><h1>Car details</h1><section aria-label="Recalls and safety ratings">
+    <h2>Recalls and safety ratings</h2><VehicleSafetyFacts view={vehicleSafetyFixture} />
+  </section></main>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+// Ticket 115: the Buyer's copy of the dealer's ad, its confirmation form with a source page, a VIN conflict, and the
+// price check in the Desk Check style note.
+test("the listing capture, its confirmation form, a VIN conflict and the price note have no automated AA violations", async () => {
+  const { ListingCapture, ListingPriceNote } = await import("./ListingCapture");
+  const { conflictingListing, higherCheck, readCapture, savedListing } = await import("./ListingCapture.fixture");
+  vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:page", revokeObjectURL: () => {} }));
+  const answers: unknown[] = [savedListing, { ...savedListing, captures: [readCapture] }];
+  vi.spyOn(globalThis, "fetch").mockImplementation(async input => String(input).endsWith("/image")
+    ? new Response(new Blob(["png"], { type: "image/png" }))
+    : new Response(JSON.stringify(answers.length > 1 ? answers.shift() : answers[0])));
+  const { container } = render(<main><h1>Synthetic case</h1><ListingCapture caseId="case-1" token="secret" pollDelayMs={10} />
+    <section aria-label="Report note"><h2>Report</h2><ListingPriceNote check={higherCheck} title="The ad you saved" /></section></main>);
+  await screen.findByText(/Your saved ad/);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  await userEvent.click(screen.getByRole("button", { name: "Paste the ad's text" }));
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  await userEvent.type(screen.getByLabelText(/The ad's text/), "Our Price: $23,995*");
+  await userEvent.click(screen.getByRole("button", { name: "Read this text" }));
+  await screen.findByRole("heading", { name: "Check each field against the ad" });
+  await userEvent.click(screen.getByRole("button", { name: /Show where the price the ad shows was read/ }));
+  await screen.findByRole("img", { name: /where the price the ad shows was read/ });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  cleanup();
+  const typed = render(<main><h1>Synthetic case</h1><ListingCapture caseId="case-1" token="secret" compact /></main>);
+  await screen.findByText(/Your saved ad/);
+  await userEvent.click(screen.getByRole("button", { name: "Type what the ad shows" }));
+  await userEvent.click(screen.getByRole("button", { name: "Save this ad" }));
+  expect((await axe.run(typed.container, AA)).violations).toEqual([]);
+  cleanup();
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify(conflictingListing)));
+  const conflict = render(<main><h1>Synthetic case</h1><ListingCapture caseId="case-1" token="secret" /></main>);
+  await screen.findByRole("button", { name: "Keep this case's car" });
+  expect((await axe.run(conflict.container, AA)).violations).toEqual([]);
+  vi.unstubAllGlobals();
+});
+// End ticket 115.

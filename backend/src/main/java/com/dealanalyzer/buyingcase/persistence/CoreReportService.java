@@ -43,6 +43,9 @@ public class CoreReportService {
   private final com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence extractions;
   private final com.dealanalyzer.trade.desk.TradeDeskCheck trades;
   private final com.dealanalyzer.desk.tactic.DeskTacticService tactics;
+  private final com.dealanalyzer.vehicle.safety.VehicleSafetyService safety;
+  private final com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice;
+  private final com.dealanalyzer.listing.persistence.ListingEvidencePersistence listings;
 
   public CoreReportService(EphemeralBuyingCaseService access, AnalysisCaseRepository cases,
       OperationRepository operations, AnalysisReportRepository reports, BuyingCaseStore store,
@@ -50,7 +53,13 @@ public class CoreReportService {
       PricePlanService plans, VehicleEvidenceService vehicles, ObjectMapper json, FinancingService financing, com.dealanalyzer.review.DealReviewService reviews, NegotiationService negotiation, com.dealanalyzer.pilot.PilotEvents pilotEvents,
       com.dealanalyzer.extraction.persistence.DocumentExtractionPersistence extractions,
       com.dealanalyzer.trade.desk.TradeDeskCheck trades,
-      com.dealanalyzer.desk.tactic.DeskTacticService tactics) {
+      com.dealanalyzer.desk.tactic.DeskTacticService tactics,
+      com.dealanalyzer.vehicle.safety.VehicleSafetyService safety,
+      com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice,
+      com.dealanalyzer.listing.persistence.ListingEvidencePersistence listings) {
+    this.safety = safety;
+    this.listingPrice = listingPrice;
+    this.listings = listings;
     this.extractions = extractions;
     this.trades = trades;
     this.tactics = tactics;
@@ -65,6 +74,9 @@ public class CoreReportService {
   @Transactional
   public StartedReport analyze(String caseId, String token, String key) {
     Instant startedAt = Instant.now();
+    // The safety lookup authorizes the case outside this transaction; loading the case here before the lock below
+    // would hold a stale version that a concurrent report request can overtake.
+    var safetyView = operations.findByIdempotencyKey(key).isPresent() ? null : safety.get(caseId, token);
     // The trade check may call the valuation provider, whose meter row commits on its own and references the
     // case, so it runs before the case row is locked.
     var tradeOffer = operations.findByIdempotencyKey(key).isPresent() ? null : offers.latestOffer(caseId).orElse(null);
@@ -96,6 +108,7 @@ public class CoreReportService {
     VehicleEvidenceService.VehicleEvidenceView vehicle = null;
     try { vehicle = vehicles.get(caseId, token); }
     catch (com.dealanalyzer.vehicle.InvalidVehicleEvidenceException missing) { /* Explicitly unavailable below. */ }
+    safetyView = safety.snapshot(safetyView, vehicle);
     boolean current = ("READY_TO_ANALYZE".equals(buyingCase.status)
         || List.of("COMPLETE", "PARTIAL").contains(buyingCase.status) && !buyingCase.coreReviewBlocked)
         && "CASH".equals(buyingCase.purchaseMethod) && offer != null && cash != null && vehicle != null
@@ -145,6 +158,7 @@ public class CoreReportService {
     if (!worksheetFindings.isEmpty()) evidence.set("fourSquareWorksheet", json.valueToTree(worksheet));
     evidence.put("caseStatusAtAnalysis", buyingCase.status);
     evidence.put("buyerJurisdiction", buyingCase.buyerJurisdiction);
+    evidence.set("vehicleSafety", json.valueToTree(safetyView));
     ObjectNode analysis = json.createObjectNode();
     JsonNode tacticTerms = worksheet != null && (offer == null || !worksheet.id().equals(offer.extractionId()) || !dealerCurrent)
         ? tactics.asRead(worksheet) : offer == null ? tactics.asRead(null) : offer.terms();
@@ -187,6 +201,14 @@ public class CoreReportService {
         analysis.path("topReasons").forEach(reason -> reasons.add(reason.asText()));
         analysis.set("topReasons", json.valueToTree(reasons.stream().limit(3).toList()));
       }
+    }
+    // The price in the listing the Buyer saved (ticket 115) beside this offer's vehicle price; added only when the
+    // case has a confirmed listing capture, so reports without one keep their shape.
+    var listingCheck = offer == null ? null
+        : listingPrice.check(caseId, offer.terms(), "DEALER_OFFER", "VERIFIED".equals(offer.status()));
+    if (listingCheck != null) {
+      analysis.set("listingPriceCheck", json.valueToTree(listingCheck));
+      evidence.set("listingCapture", json.valueToTree(listings.findById(listingCheck.listingSnapshotId()).orElse(null)));
     }
     analysis.put("financingAvailability", financeAvailability);
     analysis.set("financingTerms", json.valueToTree(finance == null ? null : finance.inputs()));
@@ -260,6 +282,7 @@ public class CoreReportService {
     payload.set("reproduction", json.valueToTree(Map.of("inputFingerprint", offers.fingerprint(evidence),
         "analysisFingerprint", fingerprint, "inputs", "#/evidence", "policyVersions", "#/analysis/policyVersions",
         "regenerationDifferences", List.of("id", "version", "generatedAt", "asOf", "review check time"))));
+    payload.set("vehicleSafety", json.valueToTree(safetyView));
     operations.saveAndFlush(new OperationEntity(operationId, caseId, key, "COMPLETE", now));
     reports.saveAndFlush(new AnalysisReportEntity(caseId, version, write(payload), fingerprint, now, operationId));
     negotiation.append(caseId, version);

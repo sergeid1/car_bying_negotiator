@@ -61,8 +61,9 @@ class ProviderReadyEvidenceAcceptanceTest {
       }
       var usage = ServiceOperationsAcceptanceTest.opGet(app.client(),
           "/api/v1/operator/cases/" + id + "/usage", ServiceOperationsAcceptanceTest.SUPPORT);
-      assertThat(usage).hasSize(9);
-      assertThat(usage.findValuesAsText("operation")).contains("MARKET_RETRIEVAL", "LISTING_RETRIEVAL");
+      // Nine market and listing calls, plus the report's one model recall and rating lookup (ticket 116).
+      assertThat(usage).hasSize(10);
+      assertThat(usage.findValuesAsText("operation")).contains("MARKET_RETRIEVAL", "LISTING_RETRIEVAL", "VEHICLE_SAFETY");
       for (var call : usage) {
         assertThat(call.path("unit").asText()).isEqualTo("REQUEST");
         assertThat(call.path("units").asLong()).isEqualTo(1);

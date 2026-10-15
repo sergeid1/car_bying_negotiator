@@ -139,6 +139,8 @@ public class ProviderUsageStore {
       case "com.dealanalyzer.extraction.DeterministicDealerDocumentProvider" -> "deterministic-dealer-layout.v1";
       case "com.dealanalyzer.market.DeterministicFakeMarketDataProvider" -> "deterministic-market-provider.v1";
       case "com.dealanalyzer.listing.DeterministicListingEvidenceProvider" -> "listing-provider.v1";
+      case "com.dealanalyzer.vehicle.safety.NhtsaVehicleSafetyProvider" -> "nhtsa-vehicle-safety.v1";
+      case "com.dealanalyzer.vehicle.safety.FakeVehicleSafetyProvider" -> "fake-vehicle-safety.v1";
       default -> "UNREGISTERED";
     };
     row.provider = version.equals("UNREGISTERED") ? "UNREGISTERED" : "LOCAL_DETERMINISTIC";
@@ -149,6 +151,11 @@ public class ProviderUsageStore {
         operation == ProviderMeter.Operation.EXTRACTION ? "LOCAL_PROCESSING" : "SYNTHETIC_DISPLAY_AND_CACHE_PERMITTED";
     row.unit = operation == ProviderMeter.Operation.EXTRACTION ? "PAGE" : "REQUEST";
     row.units = units; row.costUsd = version.equals("UNREGISTERED") ? null : BigDecimal.ZERO;
+    if (operation == ProviderMeter.Operation.VEHICLE_SAFETY && !version.equals("UNREGISTERED")) {
+      row.provider = version.startsWith("nhtsa-") ? "NHTSA" : "LOCAL_DETERMINISTIC";
+      row.schemaVersion = "vehicle-safety.v1";
+      row.license = version.startsWith("nhtsa-") ? "PUBLIC_US_GOVERNMENT_DATA" : "SYNTHETIC_DISPLAY_AND_CACHE_PERMITTED";
+    }
     row.status = "STARTED"; row.createdAt = Instant.now(); manager.persist(row);
     return row.id;
   }

@@ -111,6 +111,18 @@ public class VehicleEvidenceService {
       IdentityConflictView conflict = conflictPersistence.useListing(caseId, conflictId, now);
       ListingSnapshotView listing = listingPersistence.findById(conflict.listingSnapshotId())
           .orElseThrow(() -> new InvalidVehicleEvidenceException("Listing snapshot was not found."));
+      // The Buyer's capture of an ad may show only some facts; the car keeps the ones it does not show.
+      var existing = persistence.findByCaseId(caseId).orElse(null);
+      if (existing != null && ListingEvidencePersistence.BUYER_CAPTURE.equals(listing.source()))
+        listing = new ListingSnapshotView(listing.id(), listing.listingUrl(), listing.vin(),
+            listing.year() == null ? existing.year() : listing.year(),
+            listing.make() == null ? existing.make() : listing.make(),
+            listing.model() == null ? existing.model() : listing.model(),
+            listing.trim() == null ? existing.trim() : listing.trim(),
+            listing.mileage() == null ? existing.mileage() : listing.mileage(),
+            listing.advertisedPriceMinor(), listing.currency(), listing.source(), listing.retrievedAt(),
+            listing.providerVersion(), listing.licenseMetadata(), listing.dealer(), listing.capturedOn(),
+            listing.priceConditions(), listing.sourceDocumentId());
       persistence.confirmListing(caseId, listing, now);
     }
     return current(caseId);
@@ -192,7 +204,11 @@ public class VehicleEvidenceService {
       Instant retrievedAt,
       String providerVersion,
       String licenseMetadata,
-      DealerView dealer) {}
+      DealerView dealer,
+      // The rest are set only on the Buyer's own capture of the ad (ticket 115).
+      java.time.LocalDate capturedOn,
+      List<String> priceConditions,
+      String sourceDocumentId) {}
 
   public record DealerView(String id, String name, String city, String state) {}
 
