@@ -21,7 +21,8 @@ public final class InsuranceQuoteContract {
       if (!insurers.add(entry.insurer().toLowerCase(Locale.ROOT))) return Reason.INVALID_RESPONSE;
       var quote = entry.quote();
       if (quote == null) continue;
-      if (quote.quotedAt().isAfter(result.retrievedAt().plusSeconds(60))
+      if (quote.expiresAt() == null || quote.continueUrl() == null
+          || quote.quotedAt().isAfter(result.retrievedAt().plusSeconds(60))
           || !quote.expiresAt().isAfter(result.retrievedAt())) return Reason.INVALID_RESPONSE;
       if (quote.quotedAt().isBefore(now.minus(MAX_AGE))) return Reason.STALE_RESPONSE;
     }

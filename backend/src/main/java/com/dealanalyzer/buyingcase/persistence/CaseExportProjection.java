@@ -25,6 +25,11 @@ class CaseExportProjection {
     result.set("trade_offers", rows("trade_offers", "id, trade_id, evidence_document_id, amount_minor, source, offer_date, expires_on, created_at", "trade_id in (select id from trade_vehicles where " + trades + ")", caseId));
     result.set("trade_estimates", rows("trade_estimates", "id, trade_id, source, low_minor, high_minor, checked_on, created_at", "trade_id in (select id from trade_vehicles where " + trades + ")", caseId));
     result.set("trade_case_journeys", rows("trade_case_journeys", "case_id, journey_id, created_at", "case_id = :caseId", caseId));
+    // The insurance application this case uses (its own, or its journey's), its consent-backed requests and its quotes.
+    String insurance = "application_id in (select id from insurance_applications where " + trades + ")";
+    result.set("insurance_applications", rows("insurance_applications", "id, journey_id, case_id, application_json, schema_version, revision, changed_at, created_at", trades, caseId));
+    result.set("insurance_quote_requests", rows("insurance_quote_requests", "id, application_id, application_revision, consent_text_version, consent_agreed_at, provider, provider_version, licence_metadata, synthetic, availability, reason, retrieved_at, created_at", insurance, caseId));
+    result.set("insurance_quotes", rows("insurance_quotes", "id, application_id, request_id, source, insurer, outcome, premium_minor, term, coverage_json, quoted_at, expires_at, continue_url, created_at", insurance, caseId));
     result.set("agreed_prices", rows("agreed_prices", "id, case_id, acceptance_request_id, dealer_offer_id, offer_version, baseline_id, baseline_version, actor, accepted_at, evidence_message_id, evidence_document_id, journey_result_json", "case_id = :caseId", caseId));
     result.set("quote_acceptance_requests", rows("quote_acceptance_requests", "id, case_id, quote_request_id, draft_id, offer_version, plan_version, evidence_message_id, evidence_document_id, kind, state, message_id, created_at", "case_id = :caseId", caseId));
     result.set("quote_requests", rows("quote_requests", "id, case_id, draft_id, dealer_address, state, message_id, approved_at, created_at", "case_id = :caseId", caseId));

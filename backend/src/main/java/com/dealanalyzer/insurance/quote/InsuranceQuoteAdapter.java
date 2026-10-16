@@ -29,16 +29,18 @@ public interface InsuranceQuoteAdapter {
 
   /**
    * One insurer's priced offer. {@code coverage} is what the insurer actually priced, which may differ from
-   * the Buyer's choice; {@code continueUrl} is where the Buyer continues on the provider's own site.
+   * the Buyer's choice; {@code continueUrl} is where the Buyer continues on the provider's own site. A quote the
+   * Buyer entered from a non-participating insurer may have no expiry or link; a partner's quote always has
+   * both ({@link InsuranceQuoteContract}).
    */
   record InsuranceQuote(long premiumMinor, String currency, Term term, CoverageSet coverage, Instant quotedAt,
       Instant expiresAt, URI continueUrl) {
     public InsuranceQuote {
       currency = currency == null ? null : currency.strip().toUpperCase(Locale.ROOT);
       if (premiumMinor <= 0 || !"USD".equals(currency) || term == null || coverage == null || quotedAt == null
-          || expiresAt == null || !expiresAt.isAfter(quotedAt) || continueUrl == null
-          || !"https".equalsIgnoreCase(continueUrl.getScheme()) || continueUrl.getHost() == null
-          || continueUrl.getUserInfo() != null)
+          || (expiresAt != null && !expiresAt.isAfter(quotedAt))
+          || (continueUrl != null && (!"https".equalsIgnoreCase(continueUrl.getScheme()) || continueUrl.getHost() == null
+              || continueUrl.getUserInfo() != null)))
         throw new IllegalArgumentException("Invalid insurance quote");
     }
     public long yearlyPremiumMinor() { return term.yearlyMinor(premiumMinor); }

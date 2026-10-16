@@ -67,6 +67,12 @@ Archives contain:
   evidence region, and `listing_snapshots` with the confirmed ad's price, `captured_on`,
   `price_conditions`, `source_document_id` and `field_confirmations`; the capture itself is a
   `source_documents` row with `purpose = 'LISTING_CAPTURE'`.
+  Insurance shopping (ticket 126) is included: `insurance_applications` with the stored application
+  as `application_json` (rating facts only), `insurance_quote_requests` with the consent version and
+  time each request was sent under and the partner's metadata, and `insurance_quotes` with each
+  insurer's outcome, premium, term, priced coverage, expiry and continue link, and the Buyer-entered
+  quotes. A case in a Buying Journey exports the journey's application. The account export holds the
+  same records under each journey's `insuranceApplication`.
 - `reports/report-N.html`: each immutable saved report, including labels, limitations and evidence.
 - `documents/`: retained active originals named by document ID and normalized PNG pages. Filenames,
   media types and the document/page relationships remain in the JSON records. Expired, deleted or
