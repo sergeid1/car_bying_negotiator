@@ -14,6 +14,7 @@ import { openSidePanel } from "./SidePanel";
 import { VehicleSafety } from "./VehicleSafety";
 import { ListingCapture } from "./ListingCapture";
 import { InsuranceQuotes } from "./InsuranceQuotes";
+import { LoanPreApprovals } from "./LoanPreApprovals";
 
 type Credentials = { caseId: string; token: string };
 export type CaseStepId = "quotes" | "compare" | "dealer" | "final";
@@ -257,6 +258,8 @@ export function CaseFlow({ caseId, token, openedFromAccount, referral, deskFresh
 
     {/* Insurance quotes are optional and not a step: the Buyer can shop them at any point in the case. */}
     <InsuranceQuotes key={`insurance-${caseId}-${token}`} {...credentials} />
+    {/* Loan pre-approvals are optional too; the one the Buyer chooses is their own financing at the desk (ticket 129). */}
+    <LoanPreApprovals key={`loan-${caseId}-${token}`} {...credentials} />
 
     {!openedFromAccount && <SaveCaseLink {...credentials} />}
     {openedFromAccount && <section className="panel" aria-label="Opened from your Buyer Account">

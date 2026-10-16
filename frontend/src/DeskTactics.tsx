@@ -7,11 +7,15 @@ export type DeskTacticFinding = {
 };
 
 const money = (minor: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(minor / 100);
+/** Not a tactic: the dealer's financing costs less than the Buyer's own offer, said plainly (ticket 129). */
+export const DEALER_FINANCING_COSTS_LESS = "DEALER_FINANCING_COSTS_LESS";
 
 export function DeskTactics({ findings = [] }: { findings?: DeskTacticFinding[] }) {
-  findings = findings.filter(finding => !finding.tradeFindingCode);
-  if (!findings.length) return null;
-  return <section className="desk-tactics" aria-label="Worksheet tactics">
+  const cheaper = findings.find(finding => finding.code === DEALER_FINANCING_COSTS_LESS);
+  findings = findings.filter(finding => !finding.tradeFindingCode && finding.code !== DEALER_FINANCING_COSTS_LESS);
+  if (!findings.length && !cheaper) return null;
+  return <>{cheaper && <DealerFinancingCostsLess finding={cheaper} />}
+  {findings.length > 0 && <section className="desk-tactics" aria-label="Worksheet tactics">
     <h3>Worksheet tactics to ask about</h3>
     <ul>{findings.map(finding => <li key={finding.code}>
       <h4>{finding.label}</h4>
@@ -33,6 +37,24 @@ export function DeskTactics({ findings = [] }: { findings?: DeskTacticFinding[] 
         </li>)}</ul>
       </details>
     </li>)}</ul>
+  </section>}</>;
+}
+
+/** The dealer's financing costs less than the Buyer's own offer; its effects are negative, so they are shown as amounts less. */
+function DealerFinancingCostsLess({ finding }: { finding: DeskTacticFinding }) {
+  return <section className="desk-tactics desk-own-financing" aria-label="Your own financing">
+    <h3>{finding.label}</h3>
+    <p>{finding.summary}</p>
+    <p>{finding.verified ? "Verified terms." : "As read, not verified."}
+      {finding.monthlyEffectMinor !== null && ` ${money(Math.abs(finding.monthlyEffectMinor))} less a month.`}
+      {finding.totalEffectMinor !== null && ` ${money(Math.abs(finding.totalEffectMinor))} less in scheduled interest over the term.`}
+      {finding.noDollarEffectReason && ` Dollar effect unavailable: ${finding.noDollarEffectReason}`}</p>
+    <p>Draft desk question: {finding.deskQuestion}</p>
+    {finding.questionReview === "PENDING_OPERATOR_REVIEW" && <p className="muted">Question wording awaits operator review.</p>}
+    <details><summary>Calculation and evidence</summary>
+      <p>{finding.effectBasis}</p>
+      <p>Policy: {finding.policyVersion}. Code: {finding.code}.</p>
+    </details>
   </section>;
 }
 
