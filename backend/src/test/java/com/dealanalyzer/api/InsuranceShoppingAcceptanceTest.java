@@ -293,7 +293,10 @@ class InsuranceShoppingAcceptanceTest {
       assertThat(insurance.at("/application/garaging/zip").asText()).isEqualTo(ZIP);
       assertThat(insurance.path("quoteRequests")).hasSize(1);
       assertThat(insurance.path("quotes").findValuesAsText("insurer")).contains("Synthetic Insurer Alpha", OWN_INSURER);
-      assertThat(insurance.at("/quotes/0/coverage").isArray()).isTrue();
+      // Partner quotes from one request share a created_at, so export order among them is not fixed; find an offer.
+      var offered = new ArrayList<JsonNode>();
+      insurance.path("quotes").forEach(quote -> { if ("OFFERED".equals(quote.path("outcome").asText())) offered.add(quote); });
+      assertThat(offered).isNotEmpty().allSatisfy(quote -> assertThat(quote.path("coverage").isArray()).isTrue());
       assertThat(exported.path("journeyInsuranceQuoteRequests")).hasSize(1);
 
       // Deleting the journey removes the application, its requests and quotes.
