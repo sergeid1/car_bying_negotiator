@@ -10,7 +10,7 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from "rea
 import { ReportExplanationLoader } from "./ReportExplanation";
 import { AnimatedAmount } from "./AnimatedAmount";
 import { TradeCheckPanel, type TradeCheckResult } from "./TradeCheck";
-import { DeskTactics, type DeskTacticFinding } from "./DeskTactics";
+import { DEALER_FINANCING_COSTS_LESS, DeskTactics, type DeskTacticFinding } from "./DeskTactics";
 import { VehicleSafetyFacts, type VehicleSafetyView } from "./VehicleSafety";
 import { ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
 
@@ -151,7 +151,9 @@ export function CoreDealReport({ report, caseId, token, redacted, children }: { 
       {showFinancing && <ReportSection id="core-financing" title="Dealer financing">
         <DealerFinancingResult result={analysis.financing ?? null} availability={analysis.financingAvailability!} terms={analysis.financingTerms} headless />
       </ReportSection>}
-      {analysis.tacticFindings?.some(finding => !finding.tradeFindingCode) && <ReportSection id="core-tactics" title="Worksheet tactics">
+      {analysis.tacticFindings?.some(finding => !finding.tradeFindingCode) && <ReportSection id="core-tactics"
+        title={analysis.tacticFindings.some(finding => !finding.tradeFindingCode && finding.code !== DEALER_FINANCING_COSTS_LESS)
+          ? "Worksheet tactics" : "Your own financing"}>
         <DeskTactics findings={analysis.tacticFindings} />
       </ReportSection>}
       <ReportSection id="core-market" title="Market evidence" headingId="market-evidence-heading">

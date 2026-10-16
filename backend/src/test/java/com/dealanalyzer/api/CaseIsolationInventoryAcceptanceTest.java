@@ -69,6 +69,15 @@ class CaseIsolationInventoryAcceptanceTest {
   static final String INSURANCE_CONSENT = "{\"consentTextVersion\":\"" + com.dealanalyzer.insurance.InsuranceShoppingService.CONSENT_VERSION + "\",\"agreed\":true}";
   static final String INSURANCE_OWN_QUOTE = "{\"insurer\":\"Suncoast Direct\",\"premiumMinor\":190000,\"term\":\"TWELVE_MONTHS\"}";
 
+  /** Ticket 129: a valid loan application, the current credit authorization and a Buyer-entered offer. */
+  static final String LOAN_APPLICATION;
+  static {
+    try { LOAN_APPLICATION = JSON.writeValueAsString(LoanShoppingAcceptanceTest.application(null, 3_000_000L, 60)); }
+    catch (com.fasterxml.jackson.core.JsonProcessingException failure) { throw new IllegalStateException(failure); }
+  }
+  static final String LOAN_AUTHORIZATION = "{\"authorizationTextVersion\":\"" + com.dealanalyzer.loan.LoanShoppingService.AUTHORIZATION_VERSION + "\",\"authorized\":true}";
+  static final String LOAN_OWN_OFFER = "{\"lender\":\"Space Coast Credit Union\",\"aprPercent\":4.9}";
+
   /** Every endpoint that takes a Case-Access-Token or a {caseId}, with a body that reaches its access check. */
   static final List<Endpoint> CASE_ENDPOINTS = List.of(
       caseRow("GET", C, null),
@@ -186,6 +195,14 @@ class CaseIsolationInventoryAcceptanceTest {
       caseRow("POST", C + "/insurance/quote-requests", INSURANCE_CONSENT),
       caseRow("POST", C + "/insurance/own-quotes", INSURANCE_OWN_QUOTE),
       caseRow("DELETE", C + "/insurance/own-quotes/{quoteId}", null, "quoteId=insuranceQuoteId"),
+      caseRow("GET", C + "/loan", null),
+      caseRow("PUT", C + "/loan", LOAN_APPLICATION),
+      caseRow("DELETE", C + "/loan", null),
+      caseRow("POST", C + "/loan/pre-approval-requests", LOAN_AUTHORIZATION),
+      caseRow("POST", C + "/loan/own-offers", LOAN_OWN_OFFER),
+      caseRow("DELETE", C + "/loan/own-offers/{offerId}", null, "offerId=loanOfferId"),
+      caseRow("PUT", C + "/loan/chosen-offer", "{\"offerId\":\"{loanOfferId}\"}"),
+      caseRow("DELETE", C + "/loan/chosen-offer", null),
       caseRow("GET", C + "/listing-captures", null),
       caseRow("POST", C + "/listing-captures", MULTIPART),
       caseRow("POST", C + "/listing-captures/text", "{\"text\":\"Price: $25,000\"}"),
@@ -242,7 +259,15 @@ class CaseIsolationInventoryAcceptanceTest {
       accountRow("DELETE", V + "/journeys/{journeyId}/insurance", null),
       accountRow("POST", V + "/journeys/{journeyId}/insurance/quote-requests", INSURANCE_CONSENT),
       accountRow("POST", V + "/journeys/{journeyId}/insurance/own-quotes", INSURANCE_OWN_QUOTE),
-      accountRow("DELETE", V + "/journeys/{journeyId}/insurance/own-quotes/{quoteId}", null, "quoteId=journeyInsuranceQuoteId"));
+      accountRow("DELETE", V + "/journeys/{journeyId}/insurance/own-quotes/{quoteId}", null, "quoteId=journeyInsuranceQuoteId"),
+      accountRow("GET", V + "/journeys/{journeyId}/loan", null),
+      accountRow("PUT", V + "/journeys/{journeyId}/loan", LOAN_APPLICATION),
+      accountRow("DELETE", V + "/journeys/{journeyId}/loan", null),
+      accountRow("POST", V + "/journeys/{journeyId}/loan/pre-approval-requests", LOAN_AUTHORIZATION),
+      accountRow("POST", V + "/journeys/{journeyId}/loan/own-offers", LOAN_OWN_OFFER),
+      accountRow("DELETE", V + "/journeys/{journeyId}/loan/own-offers/{offerId}", null, "offerId=journeyLoanOfferId"),
+      accountRow("PUT", V + "/journeys/{journeyId}/loan/chosen-offer", "{\"offerId\":\"{journeyLoanOfferId}\"}"),
+      accountRow("DELETE", V + "/journeys/{journeyId}/loan/chosen-offer", null));
 
   /** Endpoints anyone may call, each with the reason it needs no credential. */
   static final List<Endpoint> PUBLIC_ENDPOINTS = List.of(
@@ -500,6 +525,7 @@ class CaseIsolationInventoryAcceptanceTest {
     objects.put("tradeOfferId", TradeVehicleAcceptanceTest.recordTradeWithOffer(app, id, token, label));
     objects.put("tradeEstimateId", TradeVehicleAcceptanceTest.addEstimate(app, id, token, label));
     objects.put("insuranceQuoteId", ownInsuranceQuote(client, base + "/insurance", new Credentials(token, null, null), label + "-case"));
+    objects.put("loanOfferId", ownLoanOffer(client, base + "/loan", new Credentials(token, null, null), label + "-case"));
     objects.put("listingCaptureId", ListingCaptureAcceptanceTest.paste(client, base + "/listing-captures", token,
         JSON.readTree("{\"text\":\"Price: $25,000\"}"), label + "-listing"));
 
@@ -529,7 +555,20 @@ class CaseIsolationInventoryAcceptanceTest {
     assertThat(objects.get("referenceId")).isNotBlank();
     objects.put("journeyInsuranceQuoteId", ownInsuranceQuote(client, V + "/journeys/" + journeyId + "/insurance",
         new Credentials(null, session, null), label + "-journey"));
+    objects.put("journeyLoanOfferId", ownLoanOffer(client, V + "/journeys/" + journeyId + "/loan",
+        new Credentials(null, session, null), label + "-journey"));
     return new Fixture(id, token, objects);
+  }
+
+  /** Stores a loan application and one Buyer-entered offer, and returns the offer's ID. */
+  private static String ownLoanOffer(RestClient client, String base, Credentials credentials, String label) throws Exception {
+    var stored = call(client, "PUT", base, LOAN_APPLICATION, null, credentials);
+    assertThat(stored.status()).as(stored.toString()).isEqualTo(200);
+    var added = call(client, "POST", base + "/own-offers", LOAN_OWN_OFFER, label + "-loan-offer", credentials);
+    assertThat(added.status()).as(added.toString()).isEqualTo(201);
+    String offerId = JSON.readTree(added.body()).at("/results/sameTerms/0/id").asText();
+    assertThat(offerId).isNotBlank();
+    return offerId;
   }
 
   /** Stores an insurance application and one Buyer-entered quote, and returns the quote's ID. */

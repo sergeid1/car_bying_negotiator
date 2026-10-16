@@ -282,6 +282,32 @@ Rows without an account carry no Buyer identifier or content, are kept as operat
 records until a general operations-retention policy exists, and are not deleted by any
 Buyer action because nothing in them belongs to one Buyer.
 
+## Loan applications and pre-approvals (ticket 129)
+
+V59 `loan_applications`, `loan_pre_approval_requests` and `loan_offers` hold the Buyer's loan
+shopping (LOAN-01 to LOAN-03). An application belongs to its Buying Journey (`journey_id`,
+`account_id`), whether or not any case was opened, or, for a case without a journey, to that case
+(`case_id`); a case in a journey uses the journey's application. It holds the amount, term, vehicle
+(VIN, model year, make, model, mileage), yearly income, housing and monthly housing cost. It holds no
+name, address, date of birth or Social Security number: identity details a soft inquiry needs belong in
+the licensed partner's own form, and anything else sent with the application is not stored. Each
+request records the written credit authorization version the Buyer agreed to and when, the code-owned
+partner metadata and the partner's availability; each offer row is one lender's outcome from that
+request, or an offer the Buyer entered from a non-participating lender. A partner offer is kept only
+when it is a soft inquiry. `chosen_offer_id` and `chosen_at` record the offer the Buyer chose as their
+own financing; a FIN-04 comparison saved from it is an ordinary `outside_finance_offers` row and is
+deleted with the case like any other. No compensation, placement or participation field exists in any
+of them (PAY-01).
+CaseGraphDeletionPlan erases a case-held application's offers, requests and the application before the
+case. Journey deletion and account deletion erase the journey's application, requests and offers and
+verify their absence; removing the application in the panel does the same, and removing a Buyer-entered
+offer deletes that row and the choice of it. The partner call's `provider_usage` row
+(`PRE_APPROVAL`) holds no application detail and goes with the case, journey or account like other
+usage rows. The case export holds the application the case uses (its own or its journey's), its
+requests and offers; the account export holds each journey's `loanApplication` with its
+`preApprovalRequests` and `offers`, and the account's journey-scoped `journeyPreApprovalRequests` usage
+rows. Nothing is kept in any anonymous total, and nothing about an application is written to logs.
+
 ## Listing captures (ticket 115)
 
 The Buyer's own copy of a dealer's ad (a screenshot, a saved PDF of the page or pasted text) is a

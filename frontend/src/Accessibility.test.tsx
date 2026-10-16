@@ -913,6 +913,54 @@ test.each(["EMPTY", "EDITING", "CONSENT", "QUOTED", "JOURNEY"])("the insurance q
 });
 // End ticket 126.
 
+// Ticket 129: loan pre-approvals — the start, the application with field errors, the authorization, the ordered offers with
+// an offer of the Buyer's own, the chosen pre-approval, the journey panel, the dealer-wins desk finding and the outside
+// financing filled from the chosen pre-approval.
+import { LoanPreApprovals } from "./LoanPreApprovals";
+import { loanView } from "./LoanPreApprovals.fixture";
+import { OutsideFinancing } from "./OutsideFinancing";
+import { syntheticDealerCostsLess } from "./DeskTactics.fixture";
+test.each(["EMPTY", "EDITING", "AUTHORIZATION", "OFFERED", "CHOSEN", "JOURNEY"])("the loan pre-approvals panel (%s) has no automated AA violations", async state => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => init?.method === "PUT"
+    ? new Response(JSON.stringify({ detail: "Check the highlighted loan details.", errors: [
+      { field: "amountMinor", message: "Enter the amount you want to borrow, up to $500,000." },
+      { field: "vehicle.mileage", message: "Enter the car's mileage, up to 1,000,000." },
+      { field: "housing", message: "Choose whether you own, rent or live another way." }] }), { status: 400 })
+    : new Response(JSON.stringify(state === "EMPTY" ? loanView("EMPTY")
+      : state === "JOURNEY" ? loanView("CHOSEN", { holder: "JOURNEY", caseVehicle: null })
+      : loanView(state === "OFFERED" ? "OFFERED" : state === "CHOSEN" ? "CHOSEN" : "APPLIED"))));
+  const { container } = render(state === "JOURNEY"
+    ? <main><h1>Your account</h1><section aria-labelledby="journeys"><h2 id="journeys">Buying Journeys</h2>
+      <LoanPreApprovals journeyId="journey" onSessionEnded={() => undefined} level={3} /></section></main>
+    : <main><h1>Buying Case</h1><LoanPreApprovals caseId="case" token="token" /></main>);
+  await screen.findByRole("heading", { name: "Loan pre-approvals" });
+  if (state === "EDITING") {
+    await userEvent.click(await screen.findByRole("button", { name: "Edit application" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save application" }));
+    await screen.findByText("Enter the amount you want to borrow, up to $500,000.");
+  }
+  if (state === "AUTHORIZATION") {
+    await userEvent.click(await screen.findByRole("button", { name: "Get pre-approvals" }));
+    await screen.findByRole("button", { name: "Send and get pre-approvals" });
+  }
+  if (state === "OFFERED") {
+    await userEvent.click(await screen.findByRole("button", { name: "Add an offer I already have" }));
+    await screen.findByRole("form", { name: "An offer you already have" });
+  }
+  if (state === "CHOSEN" || state === "JOURNEY") await screen.findByRole("region", { name: "Your own financing" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+test("the dealer-wins desk finding and the outside offer filled from a chosen pre-approval have no automated AA violations", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(loanView("CHOSEN"))));
+  const { container } = render(<main><h1>Desk Check</h1><DeskTactics findings={[syntheticDealerCostsLess, syntheticTactic]} />
+    <OutsideFinancing caseId="case" token="token" /></main>);
+  await userEvent.click(screen.getByText("Compare one outside financing offer"));
+  await userEvent.click(screen.getByRole("button", { name: "Fill in my chosen pre-approval" }));
+  await screen.findByText(/Using your chosen pre-approval from Coastal Auto Finance/);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+// End ticket 129.
+
 // Ticket 105: "I'm at the dealer" from the header — starting a case, routing, typing the numbers, questions and the first result.
 import { AtTheDealer, DealerCameraEntry } from "./AtTheDealer";
 function dealerFetch(route: string, status = "READ") {

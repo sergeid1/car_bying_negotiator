@@ -8,11 +8,14 @@ import java.util.*;
 
 /** Pure documentary rules. No model, valuation, trade equity calculation or persistence. */
 public final class DeskTacticPolicy {
-  public static final String VERSION = "desk-tactics.v2";
+  public static final String VERSION = "desk-tactics.v3";
   public static final long PAYMENT_TOLERANCE_MINOR = 100;
   public static final String PAYMENT_QUESTION = "Please show how this payment follows from the price, amount financed, APR, term and down payment, including any products in it.";
   public static final String TERM_QUESTION = "Please show the payment and total interest at my shorter term, with the same amount financed and APR.";
   public static final String APR_QUESTION = "Please show the payment and total interest using my own lender's APR, with the same amount financed and term.";
+  public static final String DEALER_APR_QUESTION = "Please confirm the contract will show this APR, term and amount financed, with no products added to the loan.";
+  /** Not a tactic: the dealer's financing costs less than the Buyer's own offer, and the Desk Check says so (spec 5.10). */
+  public static final String DEALER_FINANCING_COSTS_LESS = "DEALER_FINANCING_COSTS_LESS";
   public static final String EQUITY_QUESTION = "Please show where the amount still owed on my trade is included in the loan, and its payment and interest effect.";
   public static final String ALLOWANCE_QUESTION = "Please show the trade allowance with the selling price and discount we agreed, so I can compare their combined effect.";
 
@@ -73,7 +76,7 @@ public final class DeskTacticPolicy {
   public List<Finding> evaluate(Input input) { return evaluate(input, List.of()); }
   public List<Finding> evaluate(Input input, List<Rule> additionalRules) {
     List<Finding> findings = new ArrayList<>();
-    for (Rule rule : List.<Rule>of(this::paymentPacking, this::stretchedTerm, this::aprAboveOwn))
+    for (Rule rule : List.<Rule>of(this::paymentPacking, this::stretchedTerm, this::aprAboveOwn, this::dealerAprBelowOwn))
       rule.evaluate(input).ifPresent(findings::add);
     for (Rule rule : additionalRules) rule.evaluate(input).ifPresent(findings::add);
     return List.copyOf(findings);
@@ -130,6 +133,31 @@ public final class DeskTacticPolicy {
         available ? high.interestMinor() - low.interestMinor() : null,
         principal.basis() + "; APR-only comparison at the worksheet term, excluding differences in lender fees and timing.",
         available ? null : "Amount financed or term is missing or outside the supported ordinary monthly schedule.", APR_QUESTION, true));
+  }
+
+  /**
+   * The dealer's APR is below the Buyer's own offer, so at the worksheet's amount financed and term the dealer's
+   * loan costs less. Effects are negative: the Buyer pays less with the dealer's financing. Nothing about what any
+   * lender pays otdog reaches this rule (PAY-01).
+   */
+  private Optional<Finding> dealerAprBelowOwn(Input input) {
+    BigDecimal dealer = apr(input.terms()), own = input.buyerOffer() == null ? null : input.buyerOffer().aprPercent();
+    if (!validApr(dealer) || !validApr(own) || dealer.compareTo(own) >= 0) return Optional.empty();
+    var principal = principal(input.terms());
+    var low = calculator.partialSchedule(principal.amount(), dealer, months(input.terms()));
+    var high = calculator.partialSchedule(principal.amount(), own, months(input.terms()));
+    boolean available = high != null && low != null;
+    var fields = new ArrayList<>(principal.fields()); fields.addAll(List.of("APR", "TERM_MONTHS"));
+    return Optional.of(finding(input, DEALER_FINANCING_COSTS_LESS, "Dealer financing costs less",
+        "The dealer's financing costs less than your own offer: its APR of " + dealer.toPlainString() + "% is below your own offer's "
+            + own.toPlainString() + "%."
+            + (available ? " At the same amount financed and term, it is " + dollars(high.interestMinor() - low.interestMinor())
+                + " less in scheduled interest." : ""),
+        fields, available ? low.paymentMinor() - high.paymentMinor() : null,
+        available ? low.interestMinor() - high.interestMinor() : null,
+        principal.basis() + "; APR-only comparison at the worksheet term, excluding differences in lender fees and timing. "
+            + "Negative amounts are what the dealer's financing costs less than your own offer.",
+        available ? null : "Amount financed or term is missing or outside the supported ordinary monthly schedule.", DEALER_APR_QUESTION, true));
   }
 
   private Finding finding(Input input, String code, String label, String summary, List<String> fields,

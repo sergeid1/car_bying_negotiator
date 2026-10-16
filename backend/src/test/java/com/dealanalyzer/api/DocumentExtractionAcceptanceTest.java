@@ -684,6 +684,31 @@ class DocumentExtractionAcceptanceTest {
       assertThat(savedComparison.at("/result/outsideMinusDealerCostMinor").asLong()).isEqualTo(-542098);
       assertThat(savedComparison.at("/result/aprOnlyScheduledPaymentsDeltaMinor").asLong()).isEqualTo(-542098);
       assertThat(HttpAcceptanceHarness.post(application.client(), outsidePath, outsideRequest, "outside-one", token)).isEqualTo(savedComparison);
+      // Ticket 129 (LOAN-03): a chosen pre-approval becomes the outside Finance Offer; its amount, APR, term and fees
+      // replace whatever the form sent, and the Buyer still confirms the purchase assumptions.
+      String loanPath = "/api/v1/cases/" + caseId + "/loan";
+      var loanApplication = LoanShoppingAcceptanceTest.application(null, 2680000L, 60);
+      TradeVehicleAcceptanceTest.put(application.client(), loanPath, loanApplication, token);
+      var preApprovals = LoanShoppingAcceptanceTest.keyed(application.client(), "POST", loanPath + "/pre-approval-requests",
+          LoanShoppingAcceptanceTest.AUTHORIZATION, token, "pre-approvals").body();
+      String preApprovalId = preApprovals.at("/results/sameTerms/0/id").asText();
+      var preApprovalOutside = (com.fasterxml.jackson.databind.node.ObjectNode) outsideLoan.deepCopy();
+      preApprovalOutside.put("aprPercent", 99).put("cashPaidAtClosingMinor", 200000);
+      var preApprovalRequest = Map.of("dealerFinanceOfferId", finance.get("id").asText(), "confirmed", true, "loan", preApprovalOutside,
+          "preApprovalId", preApprovalId);
+      assertThatThrownBy(() -> HttpAcceptanceHarness.post(application.client(), outsidePath, preApprovalRequest, "unchosen-pre-approval", token))
+          .as("only the chosen pre-approval").isInstanceOf(HttpClientErrorException.UnprocessableContent.class);
+      TradeVehicleAcceptanceTest.put(application.client(), loanPath + "/chosen-offer", Map.of("offerId", preApprovalId), token);
+      var fromPreApproval = HttpAcceptanceHarness.post(application.client(), outsidePath, preApprovalRequest, "chosen-pre-approval", token);
+      assertThat(fromPreApproval.at("/source").asText()).isEqualTo("BUYER_CHOSEN_PRE_APPROVAL");
+      assertThat(fromPreApproval.at("/preApproval/offerId").asText()).isEqualTo(preApprovalId);
+      assertThat(fromPreApproval.at("/preApproval/lender").asText()).isEqualTo(preApprovals.at("/results/sameTerms/0/lender").asText());
+      assertThat(fromPreApproval.at("/inputs/aprPercent").decimalValue()).isEqualByComparingTo(preApprovals.at("/results/sameTerms/0/aprPercent").decimalValue());
+      assertThat(fromPreApproval.at("/inputs/principalMinor").asLong()).isEqualTo(2680000);
+      assertThat(fromPreApproval.at("/inputs/termMonths").asInt()).isEqualTo(60);
+      assertThat(fromPreApproval.at("/result/status").asText()).isEqualTo("COMPARABLE");
+      // The dealer's 7.5% costs more than the pre-approval, so the outside scenario costs less over the term.
+      assertThat(fromPreApproval.at("/result/outsideMinusDealerCostMinor").asLong()).isNegative();
       assertThat(HttpAcceptanceHarness.get(application.client(), financePath + "/latest", token)).isEqualTo(finance);
       assertThatThrownBy(() -> HttpAcceptanceHarness.get(application.client(), outsidePath + "/latest", "wrong-token"))
           .isInstanceOf(HttpClientErrorException.class);
@@ -763,7 +788,7 @@ class DocumentExtractionAcceptanceTest {
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCaseId + "/finance-offers/latest", savedToken)).isEqualTo(savedFinance);
       assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCaseId + "/outside-finance-offers/1", savedToken)).isEqualTo(savedComparison);
-      assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCaseId + "/outside-finance-offers/latest", savedToken).at("/version").asInt()).isEqualTo(3);
+      assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCaseId + "/outside-finance-offers/latest", savedToken).at("/version").asInt()).isEqualTo(4);
 
       assertThat(HttpAcceptanceHarness.get(restarted.client(), "/api/v1/cases/" + savedCaseId + "/reports/1", savedToken)).isEqualTo(savedReport);
       var jdbc = new org.springframework.jdbc.core.JdbcTemplate(restarted.context().getBean(javax.sql.DataSource.class));

@@ -220,16 +220,10 @@ public class DeskStartService {
         new FinancingQuestion(showsLoan && own[0] == null, showsLoan, (BigDecimal) own[0], (Integer) own[1]));
   }
 
-  /** The APR and term of the Buyer's latest saved outside financing on this case, or nulls. */
+  /** The APR and term of the Buyer's own financing on this case (a saved outside offer or a chosen pre-approval), or nulls. */
   private Object[] ownFinancing(String caseId) {
-    return jdbc.query("select payload_json from outside_finance_offers where case_id = ? order by version desc fetch first 1 rows only",
-        (r, n) -> r.getString(1), caseId).stream().findFirst().map(payload -> {
-          try {
-            JsonNode loan = json.readTree(payload);
-            return new Object[] {loan.path("aprPercent").isNumber() ? loan.path("aprPercent").decimalValue() : null,
-                loan.path("termMonths").isInt() ? loan.path("termMonths").intValue() : null};
-          } catch (java.io.IOException unreadable) { return new Object[2]; }
-        }).orElse(new Object[2]);
+    var own = tactics.ownOffer(caseId);
+    return own == null ? new Object[2] : new Object[] {own.aprPercent(), own.termMonths()};
   }
 
   private String caseVin(String caseId) {

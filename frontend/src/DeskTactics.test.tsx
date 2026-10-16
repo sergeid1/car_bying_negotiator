@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
 import { DeskTactics } from "./DeskTactics";
-import { syntheticTactic, syntheticTradeTactics } from "./DeskTactics.fixture";
+import { syntheticDealerCostsLess, syntheticTactic, syntheticTradeTactics } from "./DeskTactics.fixture";
 
 afterEach(cleanup);
 test("tactics show amounts, documentary status, evidence and question review", () => {
@@ -25,4 +25,14 @@ test("linked trade tactics never create a second worksheet item, and v1 remains 
   expect(screen.getByText("Possible payment packing")).toBeInTheDocument();
   expect(screen.queryByText("Negative equity folded in")).not.toBeInTheDocument();
   expect(screen.getByText(/Policy: desk-tactics.v1/)).toBeInTheDocument();
+});
+
+test("when the dealer's financing costs less than the Buyer's own offer, it is said plainly and not listed as a tactic", () => {
+  render(<DeskTactics findings={[syntheticDealerCostsLess]} />);
+  const own = screen.getByRole("region", { name: "Your own financing" });
+  expect(own).toHaveTextContent("Dealer financing costs less");
+  expect(own).toHaveTextContent("The dealer's financing costs less than your own offer");
+  expect(own).toHaveTextContent("$20.58 less a month. $1,234.56 less in scheduled interest over the term.");
+  expect(own).not.toHaveTextContent("-$");
+  expect(screen.queryByRole("region", { name: "Worksheet tactics" })).toBeNull();
 });

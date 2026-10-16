@@ -2,6 +2,7 @@ import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { JourneyCandidates, JourneyCaseCredentials } from "./JourneyCandidates";
 import { QuoteComparison } from "./QuoteComparison";
 import { InsuranceQuotes } from "./InsuranceQuotes";
+import { LoanPreApprovals } from "./LoanPreApprovals";
 
 type Option = { id: string; label: string };
 type Model = Option & { trims: Option[] };
@@ -153,6 +154,7 @@ export function BuyingJourneys({ onSessionEnded, onCaseOpened }: { onSessionEnde
         onCaseOpened={onCaseOpened} request={(path, init) => call(path, init)} />
         <QuoteComparison key={journey.id} journeyId={journey.id} onSessionEnded={onSessionEnded} /></>}
       insurance={<InsuranceQuotes key={`insurance-${journey.id}`} journeyId={journey.id} onSessionEnded={onSessionEnded} level={3} />}
+      loans={<LoanPreApprovals key={`loan-${journey.id}`} journeyId={journey.id} onSessionEnded={onSessionEnded} level={3} />}
       onBack={() => show({ mode: "list" })}
       onEdit={() => show({ mode: "edit", journey })}
       onVersion={version => run(async () => {
@@ -193,8 +195,9 @@ export function BuyingJourneys({ onSessionEnded, onCaseOpened }: { onSessionEnde
   </section>;
 }
 
-function JourneyDetail({ journey, shown, busy, references, candidates, insurance, onBack, onEdit, onVersion, onDelete }: {
+function JourneyDetail({ journey, shown, busy, references, candidates, insurance, loans, onBack, onEdit, onVersion, onDelete }: {
   journey: Journey; shown: ShoppingBrief; busy: boolean; references: ReactNode; candidates: ReactNode; insurance?: ReactNode;
+  loans?: ReactNode;
   onBack: () => void; onEdit: () => void;
   onVersion: (version: number) => void; onDelete: () => void;
 }) {
@@ -230,9 +233,10 @@ function JourneyDetail({ journey, shown, busy, references, candidates, insurance
     {references}
     {current ? candidates : <p className="muted">Candidate Vehicles are searched for the current brief version only.</p>}
     {insurance}
+    {loans}
     <h3>Delete this journey</h3>
     <p>Deleting removes this Buying Journey, every version of its Shopping Brief, every Reference Vehicle VIN, captured
-      candidates, shortlist, case links and its insurance application and quotes at once. Buying Cases opened from it remain available separately.
+      candidates, shortlist, case links, its insurance application and quotes, and its loan application and pre-approvals at once. Buying Cases opened from it remain available separately.
       This cannot be undone.</p>
     <label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />I want to permanently delete this Buying Journey and every version of its Shopping Brief.</label>
     <button className="btn-danger" disabled={busy || !confirmed} onClick={onDelete}>Delete Buying Journey</button>
