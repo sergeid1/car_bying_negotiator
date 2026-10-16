@@ -171,3 +171,22 @@ stays on the caller after a successful result; a late result cannot become a rep
 Recovery cursors advance by immutable operation ID rather than offset, so completing one
 batch cannot cause the next batch to skip rows. This is startup recovery for a single active
 worker deployment, not distributed queue leasing.
+
+Toto (ticket 120) is a public, credential-free model endpoint, so its threats are cost and
+content. Buyer questions and up to six earlier turns go to the configured model provider and
+are not stored by otdog: the client keeps the chat in memory, and the server writes no question,
+turn or answer text to the database, logs, metrics or error reports; parse failures and refusals
+return fixed wording that never echoes input. `provider_usage` keeps counts, tokens, cost, outcome
+and provenance only. Abuse is bounded by request limits (question 1–1,000 characters, at most six
+turns of 1,500), a per-account daily cap counted from durable usage rows, a per-client-address
+daily cap through the in-process peer quota, and a deployment-wide daily spending ceiling. The
+ceiling adds known `ModelPricing` cost to a worst-case price for every row without a known cost
+(in flight, failed or unpriced) and for every call admitted in this process, so unknown cost can
+only overstate spend. Admission is serialized per process; with several replicas, calls admitted
+at the same moment on different replicas, before either has written its usage row, can together
+exceed the ceiling by a few worst-case calls, and the client-address cap resets on restart and is per replica, so the edge must
+still apply shared quotas. Many accounts or rotating addresses reach the spending ceiling, which
+makes Toto unavailable for everyone until the next UTC day: availability is traded for bounded
+cost. A signed-in Buyer's session cookie only selects their cap; the JSON-only content type keeps
+a cross-site form from spending it. Injected instructions in questions or turns are content to the
+task (ticket 119), and its code-side checks, not the instructions, are the safety boundary.

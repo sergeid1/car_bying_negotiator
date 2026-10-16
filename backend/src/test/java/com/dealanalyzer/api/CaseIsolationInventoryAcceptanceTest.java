@@ -290,6 +290,8 @@ class CaseIsolationInventoryAcceptanceTest {
       publicRow("GET", V + "/sample-report", "A redacted report built from a synthetic fixture case."),
       publicRow("GET", V + "/document-limits", "Upload limits the intake form shows before a case exists."),
       publicRow("GET", V + "/intake-options", "Served jurisdictions and consent policy versions for the intake form."),
+      publicRow("GET", V + "/toto", "Whether Toto is available, the same for everyone."),
+      publicRow("POST", V + "/toto/answers", "Answers a process question from the reviewed guide; takes no case or account data. An optional session cookie only selects the account's daily cap."),
       publicRow("*", "/error", "Spring Boot's error view; it renders failures of other requests."));
 
 

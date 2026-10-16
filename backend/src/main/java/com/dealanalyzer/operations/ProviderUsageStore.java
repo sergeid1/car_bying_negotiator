@@ -319,6 +319,20 @@ public class ProviderUsageStore {
     return manager.createQuery("select coalesce(sum(u.costUsd), 0) from ProviderUsageEntity u where u.operation = 'GUIDE_ANSWER' and u.createdAt >= :from and u.createdAt < :until",
         BigDecimal.class).setParameter("from", from).setParameter("until", until).getSingleResult();
   }
+
+  /** Guide answers in [from, until) with no known cost: in flight, failed before usage, or unpriced. */
+  @Transactional(readOnly = true)
+  public long guideAnswersWithoutCost(Instant from, Instant until) {
+    return manager.createQuery("select count(u) from ProviderUsageEntity u where u.operation = 'GUIDE_ANSWER' and u.costUsd is null and u.createdAt >= :from and u.createdAt < :until",
+        Long.class).setParameter("from", from).setParameter("until", until).getSingleResult();
+  }
+
+  /** One account's guide answers in [from, until), whatever their outcome. */
+  @Transactional(readOnly = true)
+  public long guideAnswerCount(String accountId, Instant from, Instant until) {
+    return manager.createQuery("select count(u) from ProviderUsageEntity u where u.accountId = :account and u.operation = 'GUIDE_ANSWER' and u.createdAt >= :from and u.createdAt < :until",
+        Long.class).setParameter("account", accountId).setParameter("from", from).setParameter("until", until).getSingleResult();
+  }
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void finish(String id, ProviderMeter.Status status, ProviderMeter.ModelUsage usage) {
     manager.createQuery("update ProviderUsageEntity u set u.status = :status, u.finishedAt = :now, u.inputTokens = :input, u.outputTokens = :output, u.costUsd = :cost where u.id = :id")
