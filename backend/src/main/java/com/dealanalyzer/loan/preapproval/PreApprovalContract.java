@@ -33,18 +33,33 @@ public final class PreApprovalContract {
       long paymentMinor, long totalInterestMinor, long totalCostMinor,
       Long lenderMinusCalculatedMinor, FinancingCalculator.PaymentReconciliation reconciliation) {}
 
+  /** FIN-01 figures for one offer: full scheduled payments plus explicit upfront fees; null outside the supported schedule. */
+  public record Calculation(long paymentMinor, long totalInterestMinor, long totalCostMinor,
+      Long lenderMinusCalculatedMinor, FinancingCalculator.PaymentReconciliation reconciliation) {}
+  public static Calculation calculate(long amountMinor, BigDecimal aprPercent, int termMonths, long upfrontFeesMinor,
+      Long lenderPaymentMinor) {
+    var calculator = new FinancingCalculator();
+    var schedule = calculator.partialSchedule(amountMinor, aprPercent, termMonths);
+    if (schedule == null) return null;
+    return new Calculation(schedule.paymentMinor(), schedule.interestMinor(), Math.addExact(schedule.totalPaymentsMinor(), upfrontFeesMinor),
+        lenderPaymentMinor == null ? null : lenderPaymentMinor - schedule.paymentMinor(),
+        calculator.reconcilePayment(amountMinor, aprPercent, termMonths, lenderPaymentMinor));
+  }
+  /** Total cost, then lender name: the only order, for partner and Buyer-entered offers alike (LOAN-02, PAY-02). */
+  public static <T> Comparator<T> byTotalCost(java.util.function.ToLongFunction<T> totalCost, java.util.function.Function<T, String> lender) {
+    return Comparator.comparingLong(totalCost).thenComparing(lender);
+  }
+
   /** Same requested principal; full scheduled payments plus explicit upfront fees, no compensation input. */
   public static List<CalculatedOffer> orderedOffers(Result result, LoanApplication application, Instant now) {
     if (failure(result, result.provider(), application, now) != null)
       throw new IllegalArgumentException("Invalid pre-approval contract");
-    var calculator = new FinancingCalculator();
     return result.lenders().stream().filter(entry -> entry.preApproval() != null).map(entry -> {
       var offer = entry.preApproval();
-      var schedule = calculator.partialSchedule(offer.amountMinor(), offer.aprPercent(), offer.termMonths());
-      var reconciliation = calculator.reconcilePayment(offer.amountMinor(), offer.aprPercent(), offer.termMonths(), offer.lenderPaymentMinor());
-      return new CalculatedOffer(entry.lenderName(), offer, schedule.paymentMinor(), schedule.interestMinor(),
-          Math.addExact(schedule.totalPaymentsMinor(), offer.upfrontFeesMinor()),
-          offer.lenderPaymentMinor() == null ? null : offer.lenderPaymentMinor() - schedule.paymentMinor(), reconciliation);
-    }).sorted(Comparator.comparingLong(CalculatedOffer::totalCostMinor).thenComparing(CalculatedOffer::lenderName)).toList();
+      var calculation = calculate(offer.amountMinor(), offer.aprPercent(), offer.termMonths(), offer.upfrontFeesMinor(),
+          offer.lenderPaymentMinor());
+      return new CalculatedOffer(entry.lenderName(), offer, calculation.paymentMinor(), calculation.totalInterestMinor(),
+          calculation.totalCostMinor(), calculation.lenderMinusCalculatedMinor(), calculation.reconciliation());
+    }).sorted(byTotalCost(CalculatedOffer::totalCostMinor, CalculatedOffer::lenderName)).toList();
   }
 }

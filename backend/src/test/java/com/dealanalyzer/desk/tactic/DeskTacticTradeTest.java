@@ -34,7 +34,7 @@ class DeskTacticTradeTest {
         assertThat(f.tradeFindingCode()).isEqualTo(fixture.path("tradeCode").asText());
         assertThat(f.totalEffectMinor()).isEqualTo(fixture.path("totalMinor").asLong());
         assertThat(f.monthlyEffectMinor()).isEqualTo(fixture.has("monthlyMinor") ? fixture.path("monthlyMinor").asLong() : null);
-        assertThat(f.policyVersion()).isEqualTo("desk-tactics.v2");
+        assertThat(f.policyVersion()).isEqualTo("desk-tactics.v3");
         assertThat(f.questionReview()).isEqualTo("PENDING_OPERATOR_REVIEW");
         assertThat(f.evidenceRegions().getFirst().region().path("pageNumber").asInt()).isEqualTo(2);
         assertThat(f.evidenceRegions().getLast().region()).isEqualTo(fixture.path("trade"));

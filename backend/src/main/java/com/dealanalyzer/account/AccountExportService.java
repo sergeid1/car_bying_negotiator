@@ -62,6 +62,7 @@ public class AccountExportService {
     data.put("inventorySearchRuns", providerUsage.inventoryForAccount(session.accountId));
     data.put("journeyMarketRetrievals", providerUsage.marketForAccount(session.accountId));
     data.put("journeyInsuranceQuoteRequests", providerUsage.insuranceQuotesForAccount(session.accountId));
+    data.put("journeyPreApprovalRequests", providerUsage.preApprovalsForAccount(session.accountId));
     // Provider and address only: mailbox tokens are never exported.
     data.put("mailboxConnections", mailboxes.exportForAccount(session.accountId));
     data.put("mailboxSends", mailboxSends.exportForAccount(session.accountId));
