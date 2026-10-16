@@ -175,6 +175,42 @@ class QuoteRankingIntegrityTest {
     }
   }
 
+  /**
+   * Ticket 129: when the dealer's financing costs less than the chosen pre-approval, the Desk Check says so, and
+   * nothing a lender pays otdog can change that finding, its amount or its wording (PAY-01, DESK-04).
+   */
+  @Test void dealerFinancingThatCostsLessThanTheChosenPreApprovalIsSaidWhateverTheLenderPays() throws Exception {
+    var terms = JSON.readTree("""
+        {"candidates":[{"field":"APR","value":"3.9","unit":"PERCENT","buyerVerified":true},
+          {"field":"TERM_MONTHS","value":"60","unit":"MONTH","buyerVerified":true},
+          {"field":"AMOUNT_FINANCED","value":"2500000","unit":"USD_MINOR","buyerVerified":true}]}""");
+    JsonNode baseline = null;
+    for (int seed = 0; seed < 50; seed++) {
+      var random = new Random(seed);
+      var entries = new ArrayList<>(List.of(loan(1, 6, 0), loan(2, 5, 0), loan(3, 7, 10000)));
+      Collections.shuffle(entries, random);
+      var fees = new ArrayList<ProviderFees.Fee>();
+      for (int i = 1; i <= 3; i++)
+        if (random.nextBoolean()) fees.add(new ProviderFees.Fee("lender-" + i, ProviderFees.Source.DIRECT_LENDER, random.nextInt(100000)));
+      var catalog = new ProviderFees("random-" + seed, ProviderFees.CURRENT.effectiveFrom(), fees);
+      assertThat(catalog.fees()).hasSize(fees.size());
+      // The Buyer chooses the lowest-cost pre-approval at 5%, above the dealer's 3.9%.
+      var chosen = PreApprovalContract.orderedOffers(result(entries), APPLICATION, NOW).getFirst();
+      assertThat(chosen.lenderName()).isEqualTo("Lender 2");
+      var own = new com.dealanalyzer.desk.tactic.DeskTacticPolicy.BuyerOffer(chosen.preApproval().aprPercent(),
+          chosen.preApproval().termMonths(), JSON.createObjectNode().put("source", "chosen_loan_offer"));
+      var findings = new com.dealanalyzer.desk.tactic.DeskTacticPolicy().evaluate(
+          new com.dealanalyzer.desk.tactic.DeskTacticPolicy.Input(terms, own));
+      assertThat(findings).extracting(com.dealanalyzer.desk.tactic.DeskTacticPolicy.Finding::code)
+          .containsExactly(com.dealanalyzer.desk.tactic.DeskTacticPolicy.DEALER_FINANCING_COSTS_LESS);
+      assertThat(findings.getFirst().summary()).startsWith("The dealer's financing costs less than your own offer");
+      assertThat(findings.getFirst().totalEffectMinor()).isNegative();
+      var evidence = JSON.valueToTree(findings);
+      if (baseline == null) baseline = evidence;
+      assertThat(evidence).isEqualTo(baseline);
+    }
+  }
+
   @Test void buyerEnteredNonparticipatingOffersUseTheSameCostRulesIncludingTies() {
     var catalog = new ProviderFees("participating-only", ProviderFees.CURRENT.effectiveFrom(), List.of(
         new ProviderFees.Fee("insurer-1", ProviderFees.Source.INSURER, 1000),

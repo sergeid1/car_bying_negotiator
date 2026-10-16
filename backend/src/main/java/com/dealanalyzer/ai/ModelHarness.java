@@ -3,6 +3,7 @@ package com.dealanalyzer.ai;
 import com.dealanalyzer.ai.ModelGateway.ModelExchange;
 import com.dealanalyzer.ai.ModelGateway.ModelRequest;
 import com.dealanalyzer.operations.ProviderMeter;
+import com.dealanalyzer.operations.ModelUsageScope;
 import com.dealanalyzer.operations.ProviderMeter.Status;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -74,13 +75,22 @@ public class ModelHarness {
    */
   public <T> ModelResult<T> run(String caseId, ModelTask<T> task, List<UntrustedInput> inputs, long units,
       Consumer<? super T> accept) {
+    return runScoped(ModelUsageScope.forCase(caseId), task, inputs, units, accept);
+  }
+
+  public <T> ModelResult<T> runScoped(ModelUsageScope scope, ModelTask<T> task, List<UntrustedInput> inputs, long units) {
+    return runScoped(scope, task, inputs, units, value -> {});
+  }
+
+  public <T> ModelResult<T> runScoped(ModelUsageScope scope, ModelTask<T> task, List<UntrustedInput> inputs, long units,
+      Consumer<? super T> accept) {
     Objects.requireNonNull(accept);
     if (gateway == null) throw new ProviderMeter.Failure(Status.PROVIDER_UNAVAILABLE);
     ModelProvenance provenance = ModelRolloutGate.provenance(settings, task);
     ModelRequest request = new ModelRequest(
         settings.modelId(), task.instructions(), task.outputSchema(), task.maxOutputTokens(), inputs,
         task.cacheInstructions());
-    Attempt<T> attempt = meter.callModel(caseId, task.operation(), provenance, license, units,
+    Attempt<T> attempt = meter.callModelScoped(scope, task.operation(), provenance, license, units,
         () -> attempt(task, accept, gateway.send(request)), Attempt::status, Attempt::usage);
     if (attempt.status() != Status.SUCCESS) throw new ProviderMeter.Failure(attempt.status());
     return new ModelResult<>(attempt.value(), provenance);

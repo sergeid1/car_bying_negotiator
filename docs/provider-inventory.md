@@ -287,7 +287,9 @@ offer count, retrieval time, latency, status and reported cost (null when unknow
 failures). Rejected response cost is retained. No application facts, authorization text, lender terms,
 source references or continuation links are stored in usage. Existing retention/deletion applies;
 late results only update existing usage rows. V57 widens the `provider_usage_scope` check so journey
-rows can hold `PRE_APPROVAL` and `INSURANCE_QUOTE`. No endpoint or saved application is added.
+rows can hold `PRE_APPROVAL` and `INSURANCE_QUOTE`. No endpoint or saved application is added here; ticket 129 adds
+the Buyer's loan application (V59), its case and journey `/loan` routes and the chosen pre-approval. otdog sends the
+partner the amount, term, vehicle, yearly income and housing; it stores no name, address, date of birth or SSN.
 
 # Shopping inventory adapter (ticket 53)
 
@@ -356,4 +358,7 @@ concurrency bound and failure classification. Usage rows store partner, version,
 number of insurers that quoted, retrieval time, latency and cost; no applicant, vehicle, address, insurer or
 premium detail is stored. Case-scoped rows need no migration. Journey-scoped rows set `journey_id` and
 `account_id` under the same account then journey locks as inventory search; V57 admits them in the
-`provider_usage_scope` check. This ticket adds no endpoint, UI or stored application.
+`provider_usage_scope` check. This ticket adds no endpoint, UI or stored application; ticket 126 adds the Buyer's
+insurance application (V58) and its case and journey `/insurance` routes. otdog sends the partner rating facts only
+(driver age and history, ZIP and state, the vehicle, usage, coverage); it stores no name, date of birth, licence
+number or street address.

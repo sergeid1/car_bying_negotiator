@@ -25,6 +25,11 @@ public class RecordingUsageStore extends ProviderUsageStore {
     return String.valueOf(started.size() - 1);
   }
 
+  @Override public String startModelScoped(ModelUsageScope scope, ProviderMeter.Operation operation,
+      ModelProvenance provenance, String license, long units) {
+    return startModel(scope.caseId(), operation, provenance, license, units);
+  }
+
   @Override public void finish(String id, ProviderMeter.Status status) { finish(id, status, null); }
 
   @Override public void finish(String id, ProviderMeter.Status status, ProviderMeter.ModelUsage usage) {

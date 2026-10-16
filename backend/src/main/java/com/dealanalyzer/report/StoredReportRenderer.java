@@ -53,8 +53,18 @@ public class StoredReportRenderer {
     } else lines.add(new Line("Market evidence details are unavailable in this saved report.", false));
     var standaloneTactics = new ArrayList<JsonNode>();
     var linkedTactics = new ArrayList<JsonNode>();
+    var dealerCostsLess = new ArrayList<JsonNode>();
     for (var finding : analysis.path("tacticFindings"))
-      (finding.path("tradeFindingCode").asText("").isEmpty() ? standaloneTactics : linkedTactics).add(finding);
+      (finding.path("code").asText().equals(com.dealanalyzer.desk.tactic.DeskTacticPolicy.DEALER_FINANCING_COSTS_LESS) ? dealerCostsLess
+          : finding.path("tradeFindingCode").asText("").isEmpty() ? standaloneTactics : linkedTactics).add(finding);
+    // Not a tactic: the dealer's financing costs less than the Buyer's own offer, said plainly (spec 5.10).
+    for (var finding : dealerCostsLess) {
+      lines.add(new Line(finding.path("label").asText(), true));
+      lines.add(new Line(finding.path("summary").asText(), false));
+      lines.add(new Line("Draft desk question (" + finding.path("questionReview").asText() + "): " + finding.path("deskQuestion").asText(), false));
+      lines.add(new Line("Calculation: " + finding.path("effectBasis").asText(), false));
+      if (!finding.path("noDollarEffectReason").isNull()) lines.add(new Line(finding.path("noDollarEffectReason").asText(), false));
+    }
     if (!linkedTactics.isEmpty()) {
       lines.add(new Line("Trade-in findings", true));
       for (var tradeFinding : analysis.at("/tradeCheck/findings")) {

@@ -11,7 +11,9 @@ free, so every answer is paid for by the operator, and the caps below keep that 
 **Status:** open — filed on 2026-10-14. No migration unless the daily counters need a table; if so,
 the coordinator reserves the number after the ticket 115–116 integration (V56 and V57 are taken).
 Ticket 119 (2026-10-16) found that usage recording needs no-case `GUIDE_ANSWER` rows; that work and its
-migration moved to ticket 131, which this ticket's caps and spending ceiling build on.
+migration moved to ticket 131 (complete 2026-10-16). Use `TotoAnswerTask.Answerer.answer(ModelUsageScope.guideAnswer(accountId), …)`
+with a null account for clients without one, and `ProviderUsageStore.guideAnswerCostUsd(from, until)` for the ceiling;
+it sums known cost only, so the ceiling must also account for in-flight and unpriced calls.
 
 ## Scope
 

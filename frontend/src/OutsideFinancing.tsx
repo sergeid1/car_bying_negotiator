@@ -8,6 +8,7 @@ type Inputs = { principalMinor: number | null; aprPercent: number | null; termMo
   purchasePriceMinor: number | null; outTheDoorTotalMinor: number | null; netAmountDueMinor: number | null;
   cashPaidAtClosingMinor: number | null; deferredChargesMinor: number | null };
 export type Comparison = { version: number; createdAt: string; inputs: Inputs;
+  preApproval?: { offerId: string; lender: string; offerSource: "PARTNER" | "BUYER_ENTERED" } | null;
   dealerFinancing: { id: string; inputs: Inputs }; result: {
     status: string; policyVersion: string; issues: string[]; purchaseDifferences: string[];
     dealer: Economics; outside: Economics; outsideMinusDealerCostMinor: number | null;
@@ -42,6 +43,7 @@ export function OutsideFinancingResult({ comparison }: { comparison: Comparison 
   const comparable = result.status === "COMPARABLE";
   return <section className="panel" aria-label="Saved financing comparison"><h3>Outside financing comparison — version {comparison.version}</h3>
     <p>Buyer-selected financing, not a dealer discount. Saved estimate as of {comparison.createdAt}, using dealer financing {comparison.dealerFinancing.id}. This historical snapshot does not reflect later offer or vehicle changes. Save a new comparison against current verified financing to update it.</p>
+    {comparison.preApproval && <p>Outside financing: your chosen pre-approval from {comparison.preApproval.lender}.</p>}
     <p>Comparison: {result.status}</p>
     {[...result.issues, ...result.purchaseDifferences].map((issue, index) => <p className="notice" key={index}>{issue}</p>)}
     <table><caption>Full-term economics under each saved scenario’s purchase assumptions</caption>

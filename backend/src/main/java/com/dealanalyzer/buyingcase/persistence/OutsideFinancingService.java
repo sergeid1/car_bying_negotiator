@@ -4,6 +4,8 @@ import com.dealanalyzer.buyingcase.EphemeralBuyingCaseService;
 import com.dealanalyzer.buyingcase.IdempotencyConflictException;
 import com.dealanalyzer.buyingcase.ResourceNotFoundException;
 import com.dealanalyzer.finance.FinanceLoan;
+import com.dealanalyzer.finance.FinancingCalculator;
+import com.dealanalyzer.loan.ChosenLoanOffers;
 import com.dealanalyzer.finance.FinancingComparison;
 import com.dealanalyzer.verification.persistence.DealerOfferPersistence;
 import com.dealanalyzer.vehicle.VehicleEvidenceService;
@@ -26,11 +28,14 @@ public class OutsideFinancingService {
   private final OutsideFinanceOfferRepository offers;
   private final FinancingComparisonRepository results;
   private final ObjectMapper json;
+  private final ChosenLoanOffers chosenLoans;
   public OutsideFinancingService(EphemeralBuyingCaseService access, AnalysisCaseRepository cases,
       DealerOfferPersistence dealers, FinancingService financing, VehicleEvidenceService vehicles,
-      OutsideFinanceOfferRepository offers, FinancingComparisonRepository results, ObjectMapper json) {
+      OutsideFinanceOfferRepository offers, FinancingComparisonRepository results, ObjectMapper json,
+      ChosenLoanOffers chosenLoans) {
     this.access = access; this.cases = cases; this.dealers = dealers; this.financing = financing;
     this.vehicles = vehicles; this.offers = offers; this.results = results; this.json = json;
+    this.chosenLoans = chosenLoans;
   }
   @Transactional
   public View compare(String caseId, String token, String key, Request request) {
@@ -52,6 +57,18 @@ public class OutsideFinancingService {
     var finance = financing.snapshot(caseId).orElseThrow(() -> invalid("Confirm dealer financing first"));
     if (!finance.id().equals(request.dealerFinanceOfferId()) || !finance.dealerOfferId().equals(dealer.id()))
       throw invalid("Comparison must reference current dealer financing and Dealer Offer");
+    // A chosen pre-approval supplies its own amount, APR, term and fees (LOAN-03); the Buyer confirms the purchase assumptions.
+    FinanceLoan loan = request.loan();
+    PreApprovalReference preApproval = null;
+    if (request.preApprovalId() != null) {
+      var chosen = chosenLoans.forCase(caseId, Instant.now()).filter(offer -> offer.offerId().equals(request.preApprovalId()))
+          .orElseThrow(() -> invalid("Use this pre-approval as your own financing first; an expired pre-approval cannot be compared"));
+      loan = new FinanceLoan(loan.currency(), loan.purchasePriceMinor(), loan.outTheDoorTotalMinor(), loan.netAmountDueMinor(),
+          chosen.amountMinor(), chosen.aprPercent(), chosen.termMonths(), "STANDARD_FIXED_RATE", FinancingCalculator.TIMING,
+          loan.financedFeesMinor(), chosen.upfrontFeesMinor(), loan.cashPaidAtClosingMinor(), loan.deferredChargesMinor(),
+          chosen.lenderPaymentMinor(), loan.financedAddOns());
+      preApproval = new PreApprovalReference(chosen.offerId(), chosen.lender(), chosen.source());
+    }
     var vehicle = vehicles.get(caseId, token);
     if (!vehicle.reliableForAnalysis() || dealer.createdAt().isBefore(vehicle.vehicle().confirmedAt()))
       throw invalid("Reverify the Dealer Offer against current vehicle evidence first");
@@ -59,13 +76,14 @@ public class OutsideFinancingService {
     var offer = new OutsideFinanceOfferEntity();
     offer.id = UUID.randomUUID().toString(); offer.caseId = caseId; offer.version = version;
     offer.dealerFinanceOfferId = finance.id(); offer.idempotencyKey = key; offer.requestFingerprint = fingerprint;
-    offer.payloadJson = write(request.loan()); offer.createdAt = Instant.now();
+    offer.payloadJson = write(loan); offer.createdAt = Instant.now();
     offers.saveAndFlush(offer);
     var result = new FinancingComparisonEntity();
     result.id = UUID.randomUUID().toString(); result.caseId = caseId; result.version = version;
     result.outsideFinanceOfferId = offer.id; result.policyVersion = FinancingComparison.VERSION; result.createdAt = offer.createdAt;
-    var view = new View(offer.id, caseId, version, "BUYER_SELECTED_OUTSIDE_FINANCING", "BUYER_CONFIRMED",
-        finance, request.loan(), result.id, new FinancingComparison().compare(finance.inputs(), request.loan()), offer.createdAt);
+    var view = new View(offer.id, caseId, version, preApproval == null ? "BUYER_SELECTED_OUTSIDE_FINANCING" : "BUYER_CHOSEN_PRE_APPROVAL",
+        "BUYER_CONFIRMED", finance, loan, result.id, new FinancingComparison().compare(finance.inputs(), loan), offer.createdAt,
+        preApproval);
     result.payloadJson = write(view); results.saveAndFlush(result);
     return view;
   }
@@ -90,8 +108,11 @@ public class OutsideFinancingService {
     catch (java.io.IOException failure) { throw new IllegalStateException("Unable to write comparison snapshot", failure); }
   }
   private ResponseStatusException invalid(String message) { return new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, message); }
-  public record Request(String dealerFinanceOfferId, boolean confirmed, FinanceLoan loan) {}
+  /** {@code preApprovalId}, when given, is the Buyer's chosen pre-approval, whose terms replace the loan's (LOAN-03). */
+  public record Request(String dealerFinanceOfferId, boolean confirmed, FinanceLoan loan, String preApprovalId) {}
   public record View(String id, String caseId, int version, String source, String confirmationStatus,
       FinancingService.View dealerFinancing, FinanceLoan inputs, String resultId,
-      FinancingComparison.Result result, Instant createdAt) {}
+      FinancingComparison.Result result, Instant createdAt, PreApprovalReference preApproval) {}
+  /** offerSource: PARTNER or BUYER_ENTERED, as in the loan offers. */
+  public record PreApprovalReference(String offerId, String lender, String offerSource) {}
 }

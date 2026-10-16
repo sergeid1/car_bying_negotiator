@@ -20,3 +20,13 @@ export const syntheticTradeTactics: DeskTacticFinding[] = [
     totalEffectMinor: -100000, effectBasis: "Net trade-and-price effect from trade-desk-check.v1; negative means the Buyer is behind; no monthly effect.",
     deskQuestion: "Please show the trade allowance with the selling price and discount we agreed, so I can compare their combined effect." },
 ];
+
+/** Ticket 129: the dealer's financing costs less than the Buyer's chosen pre-approval. Effects are negative. */
+export const syntheticDealerCostsLess: DeskTacticFinding = {
+  code: "DEALER_FINANCING_COSTS_LESS", label: "Dealer financing costs less",
+  summary: "The dealer's financing costs less than your own offer: its APR of 3.9% is below your own offer's 5.49%. At the same amount financed and term, it is $1,234.56 less in scheduled interest.",
+  monthlyEffectMinor: -2058, totalEffectMinor: -123456, effectBasis: "Worksheet amount financed; APR-only comparison at the worksheet term, excluding differences in lender fees and timing.",
+  noDollarEffectReason: null, deskQuestion: "Please confirm the contract will show this APR, term and amount financed, with no products added to the loan.",
+  questionReview: "PENDING_OPERATOR_REVIEW", policyVersion: "desk-tactics.v3", verified: true,
+  evidenceRegions: [{ field: "BUYER_FINANCING_OFFER", region: { source: "chosen_loan_offer" }, verified: true }],
+};

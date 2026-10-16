@@ -46,6 +46,100 @@ class BuyerAccountAcceptanceTest {
 
   @BeforeEach void clear() { sent.clear(); }
 
+  @Test void guideAnswersUseRealMeteringWithoutACaseAndFollowAccountExportAndDeletion(CapturedOutput logs) throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("guide-usage", false, EmailConfiguration.class, KEY,
+        "--case.deletion.delay=PT1H")) {
+      String token = signIn(app.client(), "guide@example.com");
+      var jdbc = new JdbcTemplate(app.context().getBean(javax.sql.DataSource.class));
+      String accountId = jdbc.queryForObject("select id from buyer_accounts", String.class);
+      var store = app.context().getBean(com.dealanalyzer.operations.ProviderUsageStore.class);
+      var meter = app.context().getBean(com.dealanalyzer.operations.ProviderMeter.class);
+      var guide = new com.dealanalyzer.ai.TotoGuideLoader.Guide("test.v1", List.of(
+          new com.dealanalyzer.ai.TotoGuideLoader.Article("paperwork", "Paperwork", "Private answer sentinel passage.")));
+      var provider = com.dealanalyzer.ai.ModelProvider.ANTHROPIC;
+      var calls = new java.util.concurrent.atomic.AtomicInteger();
+      var reject = new java.util.concurrent.atomic.AtomicBoolean();
+      var harness = new com.dealanalyzer.ai.ModelHarness(meter,
+          new com.dealanalyzer.ai.ModelSettings(true, provider, provider.defaultModel(), "test.v1", "test.v1"),
+          request -> {
+            calls.incrementAndGet();
+            assertThat(request.toString()).doesNotContain(accountId, token);
+            return new com.dealanalyzer.ai.ModelGateway.ModelExchange(
+                com.dealanalyzer.ai.ModelGateway.Outcome.COMPLETED, request.modelId(),
+                reject.get() ? "Private rejected output sentinel" :
+                "{\"kind\":\"ANSWER\",\"paragraphs\":[{\"text\":\"Private answer sentinel passage.\",\"article_ids\":[\"paperwork\"]}],\"decline_reason\":null}", 100, 20);
+          }, "test-terms", JSON);
+      var answerer = new com.dealanalyzer.ai.TotoAnswerTask.Answerer(harness, guide);
+      var anonymous = com.dealanalyzer.operations.ModelUsageScope.guideAnswer(null);
+      var signedIn = com.dealanalyzer.operations.ModelUsageScope.guideAnswer(accountId);
+      var from = java.time.Instant.now().minusSeconds(1);
+      for (var scope : List.of(anonymous, signedIn)) {
+        assertThat(answerer.answer(scope, "Private question sentinel", List.of()).kind())
+            .isEqualTo(com.dealanalyzer.ai.TotoAnswerTask.Kind.ANSWER);
+      }
+      assertThat(calls).hasValue(2);
+      assertThat(jdbc.queryForObject("select count(*) from provider_usage where case_id is null and journey_id is null and operation = 'GUIDE_ANSWER' and status = 'SUCCESS' and input_tokens = 100 and output_tokens = 20", Long.class)).isEqualTo(2);
+      reject.set(true);
+      assertThat(answerer.answer(anonymous, "Private question sentinel", List.of()).kind())
+          .isEqualTo(com.dealanalyzer.ai.TotoAnswerTask.Kind.FALLBACK);
+      assertThat(jdbc.queryForObject("select count(*) from provider_usage where status = 'CONTRACT_FAILURE' and input_tokens = 100", Long.class)).isEqualTo(1);
+      assertThat(jdbc.queryForList("select * from provider_usage").toString())
+          .doesNotContain("Private question sentinel", "Private answer sentinel passage", "Private rejected output sentinel");
+      assertThat(logs.getAll()).doesNotContain("Private question sentinel", "Private answer sentinel passage", "Private rejected output sentinel");
+      var cost = com.dealanalyzer.ai.ModelPricing.costUsd(provider, provider.defaultModel(), 100, 20).orElseThrow();
+      assertThat(store.guideAnswerCostUsd(from, java.time.Instant.now().plusSeconds(1)))
+          .isEqualByComparingTo(cost.multiply(java.math.BigDecimal.valueOf(3)));
+      assertThat(store.guideAnswerCostUsd(from.minusSeconds(86400), from)).isZero();
+      var task = com.dealanalyzer.ai.TotoAnswerTask.task(guide);
+      var provenance = new com.dealanalyzer.ai.ModelProvenance(provider, provider.defaultModel(),
+          task.promptVersion(), task.schemaVersion(), "test.v1", "test.v1");
+      var created = post(app.client(), "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase());
+      var caseScope = com.dealanalyzer.operations.ModelUsageScope.forCase(created.at("/case/id").asText());
+      assertThatThrownBy(() -> answerer.answer(caseScope, "Private question sentinel", List.of()))
+          .isInstanceOf(IllegalArgumentException.class);
+      assertThatThrownBy(() -> store.startModelScoped(caseScope,
+          com.dealanalyzer.operations.ProviderMeter.Operation.GUIDE_ANSWER, provenance, "test-terms", 1))
+          .isInstanceOf(org.springframework.dao.InvalidDataAccessApiUsageException.class)
+          .hasRootCauseInstanceOf(IllegalArgumentException.class);
+      assertThatThrownBy(() -> jdbc.update("update provider_usage set case_id = ? where account_id is null", caseScope.caseId()))
+          .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+      String journeyId = java.util.UUID.randomUUID().toString();
+      jdbc.update("insert into buying_journeys (id, account_id, request_key_hash, state, created_at, updated_at) values (?, ?, ?, 'SHOPPING', current_timestamp, current_timestamp)",
+          journeyId, accountId, "guide-scope-test");
+      assertThatThrownBy(() -> jdbc.update("update provider_usage set journey_id = ? where account_id = ?", journeyId, accountId))
+          .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+      assertThatThrownBy(() -> jdbc.update("update provider_usage set query_json = ? where account_id = ?", "not permitted", accountId))
+          .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+      for (var operation : com.dealanalyzer.operations.ProviderMeter.Operation.values()) {
+        if (operation == com.dealanalyzer.operations.ProviderMeter.Operation.GUIDE_ANSWER) continue;
+        assertThatThrownBy(() -> store.startModelScoped(anonymous, operation, provenance, "test-terms", 1))
+            .isInstanceOf(org.springframework.dao.InvalidDataAccessApiUsageException.class)
+            .hasRootCauseInstanceOf(IllegalArgumentException.class);
+        // Exercise V60 directly as well as the Java guard.
+        assertThatThrownBy(() -> jdbc.update("update provider_usage set operation = ? where account_id is null", operation.name()))
+            .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+      }
+      byte[] zip = app.client().post().uri("/api/v1/account/export")
+          .header("Cookie", AccountSessionTestSupport.cookie(token)).header("Account-Request", "1").retrieve().body(byte[].class);
+      var exported = JSON.readTree(unzip(zip).get("account.json")).path("guideAnswerUsage");
+      assertThat(exported.size()).isEqualTo(1);
+      assertThat(exported.get(0).path("inputTokens").asLong()).isEqualTo(100);
+      assertThat(exported.get(0).path("promptVersion").asText()).contains(guide.version());
+      String rowId = store.guideAnswersForAccount(accountId).getFirst().id();
+      assertThat(exchange(app.client(), "POST", "/api/v1/account/deletion", Map.of(), token).status()).isEqualTo(202);
+      assertThatThrownBy(() -> answerer.answer(signedIn, "Private question sentinel", List.of()))
+          .isInstanceOf(com.dealanalyzer.buyingcase.ResourceNotFoundException.class);
+      app.context().getBean(com.dealanalyzer.account.AccountDeletionWorker.class).runOnce();
+      assertThat(store.guideAnswersForAccount(accountId)).isEmpty();
+      store.finish(rowId, com.dealanalyzer.operations.ProviderMeter.Status.SUCCESS,
+          new com.dealanalyzer.operations.ProviderMeter.ModelUsage(1, 1, cost));
+      assertThat(jdbc.queryForObject("select count(*) from provider_usage", Long.class)).isEqualTo(2);
+      assertThat(calls).hasValue(3);
+      assertThatThrownBy(() -> answerer.answer(signedIn, "Private question sentinel", List.of()))
+          .isInstanceOf(com.dealanalyzer.buyingcase.ResourceNotFoundException.class);
+    }
+  }
+
   @Test void signInIsPasswordlessSingleUseAndSessionsAreRevocable() throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("sign-in", false, EmailConfiguration.class, KEY)) {
       var client = app.client();

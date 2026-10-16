@@ -26,6 +26,9 @@ export function DealerFinancingForm({ caseId, token, outside = false, onSaved }:
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [key, setKey] = useState(() => crypto.randomUUID());
+  // The Buyer's chosen loan pre-approval (ticket 129): its amount, APR, term and fees fill the outside offer and stay fixed.
+  const [preApproval, setPreApproval] = useState<{ id: string; lender: string }>();
+  const fixed = (name: string) => Boolean(preApproval) && ["principalMinor", "upfrontFeesMinor", "apr", "term", "schedule", "timing"].includes(name);
   function update(name: string, value: string) { setValues({ ...values, [name]: value }); setConfirmed(false); setKey(crypto.randomUUID()); }
   function cents(value: string | undefined) { return value == null || value === "" ? null : Math.round(Number(value) * 100); }
   async function save(event: React.FormEvent) {
@@ -41,7 +44,8 @@ export function DealerFinancingForm({ caseId, token, outside = false, onSaved }:
         schedule: values.schedule || null, paymentTiming: values.timing || null,
         financedAddOns: addons.map(addon => ({ label: addon.label, cashPriceMinor: cents(addon.price) })) };
       const saved = await fetch(`${path}/${outside ? "outside-finance-offers" : "finance-offers"}`, { method: "POST", headers,
-        body: JSON.stringify({ [outside ? "dealerFinanceOfferId" : "dealerOfferId"]: offer.id, confirmed, loan }) });
+        body: JSON.stringify({ [outside ? "dealerFinanceOfferId" : "dealerOfferId"]: offer.id, confirmed, loan,
+          ...(outside && preApproval ? { preApprovalId: preApproval.id } : {}) }) });
       if (!saved.ok) {
         const error = await saved.json().catch(() => ({}));
         throw new Error(error.detail || error.message || "Finance Offer could not be saved. Check case access, purchase method and verified offer.");
@@ -67,16 +71,33 @@ export function DealerFinancingForm({ caseId, token, outside = false, onSaved }:
       setMessage("Dealer purchase assumptions copied. Confirm that these prices, rebates and add-ons also apply with outside financing. Enter outside principal, fees and total cash paid separately.");
     } catch (error) { setMessage(String(error)); } finally { setBusy(false); }
   }
+  async function fillChosenPreApproval() {
+    setBusy(true); setMessage("");
+    try {
+      const response = await fetch(`/api/v1/cases/${encodeURIComponent(caseId)}/loan`, { headers: { "Case-Access-Token": token } });
+      const chosen = response.ok ? (await response.json().catch(() => null))?.chosen : null;
+      if (!chosen?.offerId || chosen.expired) throw new Error("Choose a pre-approval that has not expired in Loan pre-approvals first.");
+      setValues({ ...values, principalMinor: String(chosen.amountMinor / 100), upfrontFeesMinor: String(chosen.upfrontFeesMinor / 100),
+        apr: String(chosen.aprPercent), term: String(chosen.termMonths), schedule: "STANDARD_FIXED_RATE",
+        timing: "MONTHLY_IN_ARREARS_FIRST_PAYMENT_ONE_MONTH" });
+      setPreApproval({ id: chosen.offerId, lender: chosen.lender });
+      setConfirmed(false); setKey(crypto.randomUUID());
+      setMessage(`Filled in from your chosen pre-approval from ${chosen.lender}: its amount, APR, term and fees. Enter the purchase assumptions and the cash you would pay with it.`);
+    } catch (error) { setMessage(String(error)); } finally { setBusy(false); }
+  }
   return <details className="panel"><summary>{outside ? "Compare one outside financing offer" : "Verify dealer financing (finance purchases)"}</summary>
     <form onSubmit={save} aria-label={outside ? "Compare outside financing" : "Verify dealer financing"}><fieldset disabled={busy}><legend>Buyer-confirmed loan terms</legend>
       {outside && <><p>Buyer-selected outside financing is not a dealer discount. Purchase price, OTD, net due, cash contribution excluding lender fees, deferred charges and add-ons must match before a cost delta is shown. Resolve financing-dependent rebates with the dealer before confirming matching assumptions.</p>
-        <button className="btn-secondary" type="button" onClick={copyPurchase}>Copy dealer purchase assumptions</button></>}
+        <button className="btn-secondary" type="button" onClick={copyPurchase}>Copy dealer purchase assumptions</button>
+        {preApproval ? <p>Using your chosen pre-approval from {preApproval.lender}. <button className="btn-ghost" type="button" onClick={() => {
+          setPreApproval(undefined); setConfirmed(false); setKey(crypto.randomUUID()); }}>Enter an offer by hand instead</button></p>
+          : <button className="btn-secondary" type="button" onClick={fillChosenPreApproval}>Fill in my chosen pre-approval</button>}</>}
       <p>Enter USD amounts from the current offer. Enter 0 for confirmed zero fees or charges; leave unknown values blank. Add-ons must already be included in the principal. Cash paid includes upfront fees. Known deferred charges exclude scheduled loan payments.</p>
-      {fields.map(([name, label]) => <label key={name}>{label} (USD)<input type="number" min="0" step="0.01" value={values[name] || ""} onChange={e => update(name, e.target.value)} /></label>)}
-      <label>APR (%)<input type="number" min="0" max="100" step="0.00000001" value={values.apr || ""} onChange={e => update("apr", e.target.value)} /></label>
-      <label>Term (months)<input type="number" min="1" max="1200" step="1" value={values.term || ""} onChange={e => update("term", e.target.value)} /></label>
-      <label>Schedule<select value={values.schedule || ""} onChange={e => update("schedule", e.target.value)}><option value="">Unknown</option><option value="STANDARD_FIXED_RATE">Standard fixed rate</option><option value="BALLOON">Balloon</option><option value="IRREGULAR">Irregular or variable rate</option></select></label>
-      <label>Payment timing<select value={values.timing || ""} onChange={e => update("timing", e.target.value)}><option value="">Unknown</option><option value="MONTHLY_IN_ARREARS_FIRST_PAYMENT_ONE_MONTH">Monthly; first payment one month after funding</option><option value="OTHER">Other timing</option></select></label>
+      {fields.map(([name, label]) => <label key={name}>{label} (USD)<input type="number" min="0" step="0.01" value={values[name] || ""} readOnly={fixed(name)} onChange={e => update(name, e.target.value)} /></label>)}
+      <label>APR (%)<input type="number" min="0" max="100" step="0.00000001" value={values.apr || ""} readOnly={fixed("apr")} onChange={e => update("apr", e.target.value)} /></label>
+      <label>Term (months)<input type="number" min="1" max="1200" step="1" value={values.term || ""} readOnly={fixed("term")} onChange={e => update("term", e.target.value)} /></label>
+      <label>Schedule<select value={values.schedule || ""} disabled={fixed("schedule")} onChange={e => update("schedule", e.target.value)}><option value="">Unknown</option><option value="STANDARD_FIXED_RATE">Standard fixed rate</option><option value="BALLOON">Balloon</option><option value="IRREGULAR">Irregular or variable rate</option></select></label>
+      <label>Payment timing<select value={values.timing || ""} disabled={fixed("timing")} onChange={e => update("timing", e.target.value)}><option value="">Unknown</option><option value="MONTHLY_IN_ARREARS_FIRST_PAYMENT_ONE_MONTH">Monthly; first payment one month after funding</option><option value="OTHER">Other timing</option></select></label>
       <h4>Financed add-ons</h4>
       {addons.map((addon, index) => <div key={index}><label>Add-on {index + 1} name<input required value={addon.label} onChange={e => { setAddons(addons.map((item, i) => i === index ? { ...item, label: e.target.value } : item)); setConfirmed(false); setKey(crypto.randomUUID()); }} /></label>
         <label>Add-on {index + 1} cash price (USD)<input required type="number" min="0" step="0.01" value={addon.price} onChange={e => { setAddons(addons.map((item, i) => i === index ? { ...item, price: e.target.value } : item)); setConfirmed(false); setKey(crypto.randomUUID()); }} /></label>

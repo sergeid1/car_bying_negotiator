@@ -46,3 +46,38 @@ it("shows full-term cost deltas only for aligned scenarios and labels saved evid
   await waitFor(() => expect(screen.getByText(/No cost delta is available/)).toBeInTheDocument());
   expect(screen.queryByText(/Outside minus dealer Total Transaction Cost:/)).not.toBeInTheDocument();
 });
+
+it("fills the outside offer from the chosen pre-approval, keeps its loan terms fixed and sends its ID", async () => {
+  const fetch = vi.fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ chosen: { offerId: "coastal", lender: "Coastal Auto Finance", amountMinor: 3000000,
+      aprPercent: 5.49, termMonths: 60, upfrontFeesMinor: 0, expired: false } }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "finance-one" }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ version: 2, createdAt: "2026-10-16", dealerFinancing: { id: "finance-one", inputs: {} },
+      inputs: {}, preApproval: { offerId: "coastal", lender: "Coastal Auto Finance", offerSource: "PARTNER" }, result: {
+        status: "UNAVAILABLE", issues: [], purchaseDifferences: [], dealer: { status: "UNAVAILABLE" }, outside: { status: "UNAVAILABLE" },
+        outsideMinusDealerCostMinor: null, aprOnlyScheduledPaymentsDeltaMinor: null } }) });
+  vi.stubGlobal("fetch", fetch);
+  render(<OutsideFinancing caseId="case-one" token="secret" />);
+  fireEvent.click(screen.getByRole("button", { name: "Fill in my chosen pre-approval", hidden: true }));
+  await waitFor(() => expect(screen.getByText(/Filled in from your chosen pre-approval from Coastal Auto Finance/)).toBeInTheDocument());
+  expect(fetch.mock.calls[0][0]).toBe("/api/v1/cases/case-one/loan");
+  expect(screen.getByLabelText("APR (%)")).toHaveValue(5.49);
+  expect(screen.getByLabelText("APR (%)")).toHaveAttribute("readonly");
+  expect(screen.getByLabelText("Amount financed (USD)")).toHaveValue(30000);
+  fireEvent.click(screen.getByRole("checkbox", { hidden: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Save and compare outside financing", hidden: true }));
+  await waitFor(() => expect(screen.getByText("Outside financing: your chosen pre-approval from Coastal Auto Finance.")).toBeInTheDocument());
+  const request = JSON.parse(fetch.mock.calls[2][1].body);
+  expect(request.preApprovalId).toBe("coastal");
+  expect(request.loan.aprPercent).toBe(5.49);
+  expect(request.loan.principalMinor).toBe(3000000);
+  expect(request.loan.termMonths).toBe(60);
+});
+
+it("asks for a chosen pre-approval when there is none", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ chosen: null }) }));
+  render(<OutsideFinancing caseId="case-one" token="secret" />);
+  fireEvent.click(screen.getByRole("button", { name: "Fill in my chosen pre-approval", hidden: true }));
+  await waitFor(() => expect(screen.getByText(/Choose a pre-approval that has not expired in Loan pre-approvals first/)).toBeInTheDocument());
+  expect(screen.getByLabelText("APR (%)")).not.toHaveAttribute("readonly");
+});

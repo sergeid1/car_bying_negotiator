@@ -260,9 +260,9 @@ class TotoAnswerTaskTest {
 
   @Test void persistenceScopeFailureIsNotDisguisedAsAProviderFallback() {
     var guardedStore = new RecordingUsageStore() {
-      @Override public String startModel(String caseId, ProviderMeter.Operation operation,
+      @Override public String startModelScoped(com.dealanalyzer.operations.ModelUsageScope scope, ProviderMeter.Operation operation,
           ModelProvenance provenance, String license, long units) {
-        // Mirrors the existing real store's null-case guard until ticket 120 changes its scope.
+        // Persistence failures (for example a deleted account) must remain visible to the caller.
         throw new com.dealanalyzer.buyingcase.ResourceNotFoundException("Buying Case not found");
       }
     };

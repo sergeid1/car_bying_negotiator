@@ -1,0 +1,44 @@
+/* Ticket 129: loan pre-approvals from one application, the written credit authorization, and offers ordered by total cost. */
+
+.loan-pre-approvals, .loan-pre-approvals .facts, .loan-results, .loan-authorization, .loan-chosen { min-width: 0; overflow-wrap: anywhere; }
+.loan-pre-approvals button { max-width: 100%; white-space: normal; min-height: 44px; }
+.loan-pre-approvals h3, .loan-pre-approvals h4 { margin: 0; }
+.loan-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.loan-summary, .loan-results, .loan-authorization, .loan-chosen { display: grid; gap: 12px; }
+.loan-summary > *, .loan-results > p, .loan-authorization > p, .loan-chosen > p { margin: 0; }
+.loan-form .field-error { margin-top: -6px; }
+.loan-vin { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
+fieldset.loan-group > legend { grid-column: 1 / -1; margin-bottom: 4px; }
+
+fieldset.loan-choices { grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr)); gap: 8px; }
+fieldset.loan-choices > legend { grid-column: 1 / -1; margin-bottom: 4px; }
+fieldset.loan-choices > label:has(> input[type="radio"]) {
+  flex-direction: row; align-items: flex-start; gap: 12px; min-height: 44px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--card-sunk); color: var(--ink); font-weight: 500;
+}
+fieldset.loan-choices > label:has(> input:checked) { border-color: var(--focus); }
+fieldset.loan-choices input[type="radio"] { flex: none; width: 20px; height: 20px; min-height: 0; margin: 1px 0 0; padding: 0;
+  accent-color: var(--brand-ink); }
+
+.loan-chosen { padding: 14px 16px; border: 1px solid var(--focus); border-radius: 12px; background: var(--card-sunk); }
+.loan-money { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card-sunk); }
+.loan-offer-list, .loan-outcomes { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.loan-offer-list { counter-reset: loan-offer; }
+ol.loan-offer-list > li { counter-increment: loan-offer; }
+ol.loan-offer-list > li .loan-offer-lender::before {
+  content: counter(loan-offer) ". "; color: var(--ink-muted); font-variant-numeric: tabular-nums;
+}
+.loan-offer { display: grid; gap: 6px; min-width: 0; padding: 14px 16px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--card); }
+.loan-offer p { margin: 0; }
+.loan-offer-lender { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.loan-offer-terms { font-weight: 600; font-variant-numeric: tabular-nums; }
+.loan-figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr)); gap: 4px 16px; margin: 0; }
+.loan-figures > div { min-width: 0; }
+.loan-figures dt { color: var(--ink-muted); font-size: 0.85rem; }
+.loan-figures dd { margin: 0; font-variant-numeric: tabular-nums; }
+.loan-tag { padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink-muted);
+  font-size: 0.8rem; font-weight: 600; }
+.loan-tag-chosen { border-color: var(--focus); color: var(--ink); }
+.loan-continue { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
+.loan-outcomes > li { padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }

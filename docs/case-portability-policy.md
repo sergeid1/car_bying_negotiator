@@ -73,6 +73,13 @@ Archives contain:
   insurer's outcome, premium, term, priced coverage, expiry and continue link, and the Buyer-entered
   quotes. A case in a Buying Journey exports the journey's application. The account export holds the
   same records under each journey's `insuranceApplication`.
+  Loan shopping (ticket 129) is included: `loan_applications` with the stored application as
+  `application_json` (amount, term, vehicle, income and housing; no identity details) and the chosen
+  offer, `loan_pre_approval_requests` with the credit authorization version and time each request was
+  sent under and the partner's metadata, and `loan_offers` with each lender's outcome, amount, APR,
+  term, fees, stated payment, conditions, inquiry type, expiry and continue link, and the Buyer-entered
+  offers. A case in a Buying Journey exports the journey's application. The account export holds the
+  same records under each journey's `loanApplication`.
 - `reports/report-N.html`: each immutable saved report, including labels, limitations and evidence.
 - `documents/`: retained active originals named by document ID and normalized PNG pages. Filenames,
   media types and the document/page relationships remain in the JSON records. Expired, deleted or

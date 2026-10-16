@@ -95,6 +95,12 @@ public class ProviderUsageStore {
     return journeyUsage(accountId, "INSURANCE_QUOTE");
   }
 
+  /** Metered lending partner calls made for an account's journeys; they hold no application detail. */
+  @Transactional(readOnly = true)
+  public java.util.List<InventoryUsage> preApprovalsForAccount(String accountId) {
+    return journeyUsage(accountId, "PRE_APPROVAL");
+  }
+
   private java.util.List<InventoryUsage> journeyUsage(String accountId, String operation) {
     return manager.createQuery("select u from ProviderUsageEntity u where u.accountId = :account and u.operation = :operation order by u.createdAt, u.id",
         ProviderUsageEntity.class).setParameter("account", accountId).setParameter("operation", operation).getResultList().stream()
@@ -259,9 +265,28 @@ public class ProviderUsageStore {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public String startModel(String caseId, ProviderMeter.Operation operation, ModelProvenance provenance,
       String license, long units) {
-    requireActiveCase(caseId);
+    return startModelScoped(ModelUsageScope.forCase(caseId), operation, provenance, license, units);
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public String startModelScoped(ModelUsageScope scope, ProviderMeter.Operation operation, ModelProvenance provenance,
+      String license, long units) {
+    if (operation == ProviderMeter.Operation.GUIDE_ANSWER && scope.caseId() != null)
+      throw new IllegalArgumentException("Guide answers have no case");
+    if (scope.caseId() != null) requireActiveCase(scope.caseId());
+    else {
+      if (operation != ProviderMeter.Operation.GUIDE_ANSWER)
+        throw new IllegalArgumentException("Only guide answers permit usage without a case");
+      if (scope.accountId() != null) {
+        // Serialize with account deletion: a late call cannot recreate erased account usage.
+        var accounts = manager.createNativeQuery("select lifecycle from buyer_accounts where id = :id for update")
+            .setParameter("id", scope.accountId()).getResultList();
+        if (accounts.isEmpty() || !"ACTIVE".equals(accounts.getFirst()))
+          throw new com.dealanalyzer.buyingcase.ResourceNotFoundException("Buyer Account not found");
+      }
+    }
     var row = new ProviderUsageEntity();
-    row.id = UUID.randomUUID().toString(); row.caseId = caseId; row.operation = operation.name();
+    row.id = UUID.randomUUID().toString(); row.caseId = scope.caseId(); row.accountId = scope.accountId(); row.operation = operation.name();
     row.provider = provenance.provider().name(); row.providerVersion = provenance.provider().api();
     row.modelVersion = provenance.modelId(); row.schemaVersion = provenance.schemaVersion();
     row.promptVersion = provenance.promptVersion();
@@ -273,6 +298,26 @@ public class ProviderUsageStore {
     row.units = units; row.costUsd = null;
     row.status = "STARTED"; row.createdAt = Instant.now(); manager.persist(row);
     return row.id;
+  }
+
+  public record GuideAnswerUsage(String id, String provider, String providerVersion, String license, String modelVersion, String schemaVersion,
+      String promptVersion, String thresholdSetVersion, String evaluationSetVersion, long units,
+      Long inputTokens, Long outputTokens, BigDecimal costUsd, String status, Instant createdAt, Instant finishedAt) {}
+
+  @Transactional(readOnly = true)
+  public java.util.List<GuideAnswerUsage> guideAnswersForAccount(String accountId) {
+    return manager.createQuery("select u from ProviderUsageEntity u where u.accountId = :account and u.operation = 'GUIDE_ANSWER' order by u.createdAt, u.id",
+        ProviderUsageEntity.class).setParameter("account", accountId).getResultList().stream()
+        .map(u -> new GuideAnswerUsage(u.id, u.provider, u.providerVersion, u.license, u.modelVersion, u.schemaVersion, u.promptVersion,
+            u.thresholdSetVersion, u.evaluationSetVersion, u.units, u.inputTokens, u.outputTokens, u.costUsd,
+            u.status, u.createdAt, u.finishedAt)).toList();
+  }
+
+  /** Deployment-wide priced spending, across anonymous and account usage, in [from, until). */
+  @Transactional(readOnly = true)
+  public BigDecimal guideAnswerCostUsd(Instant from, Instant until) {
+    return manager.createQuery("select coalesce(sum(u.costUsd), 0) from ProviderUsageEntity u where u.operation = 'GUIDE_ANSWER' and u.createdAt >= :from and u.createdAt < :until",
+        BigDecimal.class).setParameter("from", from).setParameter("until", until).getSingleResult();
   }
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void finish(String id, ProviderMeter.Status status, ProviderMeter.ModelUsage usage) {
