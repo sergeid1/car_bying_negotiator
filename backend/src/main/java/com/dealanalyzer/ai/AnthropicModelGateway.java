@@ -18,6 +18,8 @@ import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.OutputConfig;
 import com.anthropic.models.messages.StopReason;
+import com.anthropic.models.messages.TextBlockParam;
+import com.anthropic.models.messages.CacheControlEphemeral;
 import java.io.InterruptedIOException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -78,7 +80,7 @@ public final class AnthropicModelGateway implements ModelGateway {
     // Adaptive thinking is the model default and is left on. Server-side refusal fallbacks are
     // deliberately not requested: a fallback would answer with a model that has no recorded
     // shadow comparison, so a refusal fails closed instead.
-    return MessageCreateParams.builder()
+    var builder = MessageCreateParams.builder()
         .model(request.modelId())
         .maxTokens(request.maxOutputTokens())
         .system(UntrustedFraming.instructions(request.instructions()))
@@ -87,8 +89,13 @@ public final class AnthropicModelGateway implements ModelGateway {
             .effort(OutputConfig.Effort.HIGH)
             .format(JsonOutputFormat.builder().schema(schema.build()).build())
             .build())
-        .addUserMessageOfBlockParams(blocks(request.inputs()))
-        .build();
+        .addUserMessageOfBlockParams(blocks(request.inputs()));
+    if (request.cacheInstructions()) {
+      builder.systemOfTextBlockParams(List.of(TextBlockParam.builder()
+          .text(UntrustedFraming.instructions(request.instructions()))
+          .cacheControl(CacheControlEphemeral.builder().build()).build()));
+    }
+    return builder.build();
   }
 
   static List<ContentBlockParam> blocks(List<UntrustedInput> inputs) {

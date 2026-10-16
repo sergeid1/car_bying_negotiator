@@ -1,0 +1,8 @@
+{
+  "version": "toto-fixture.v1",
+  "articles": [
+    {"id": "doc-fee", "title": "Understanding a doc fee", "text": "A doc fee is a dealer charge for paperwork. A sample doc fee is $100. This example is not a limit.", "link": "?guide=doc-fee"},
+    {"id": "outside-financing", "title": "Comparing outside financing offers", "text": "Compare the amount financed and the loan term. A sample rate is 6%. Example Community Bank is a fictional lender."},
+    {"id": "bring-documents", "title": "Documents to bring", "text": "Bring your identification and outside financing offer. Keep a copy of the documents."}
+  ]
+}
