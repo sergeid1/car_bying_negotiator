@@ -1,0 +1,54 @@
+/* Ticket 126: car insurance quotes from one application, the partner's consent, and quotes compared at one coverage. */
+
+.insurance-quotes, .insurance-quotes .facts, .insurance-results, .insurance-consent { min-width: 0; overflow-wrap: anywhere; }
+.insurance-quotes button { max-width: 100%; white-space: normal; min-height: 44px; }
+.insurance-quotes h3, .insurance-quotes h4 { margin: 0; }
+.insurance-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.insurance-summary, .insurance-results, .insurance-consent { display: grid; gap: 12px; }
+.insurance-summary > *, .insurance-results > p, .insurance-consent > p { margin: 0; }
+.insurance-line { display: block; }
+.insurance-form .field-error { margin-top: -6px; }
+.insurance-vin { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; }
+
+fieldset.insurance-group > legend { grid-column: 1 / -1; margin-bottom: 4px; }
+.insurance-driver { min-width: 0; }
+.insurance-driver-title { grid-column: 1 / -1; font-size: 1rem; }
+.insurance-driver > button { justify-self: start; }
+
+fieldset.insurance-choices { grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr)); gap: 8px; }
+fieldset.insurance-choices > legend { grid-column: 1 / -1; margin-bottom: 4px; }
+fieldset.insurance-choices > label:has(> input[type="radio"]) {
+  flex-direction: row; align-items: flex-start; gap: 12px; min-height: 44px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--card-sunk); color: var(--ink); font-weight: 500;
+}
+fieldset.insurance-choices > label:has(> input:checked) { border-color: var(--focus); }
+fieldset.insurance-choices input[type="radio"] { flex: none; width: 20px; height: 20px; min-height: 0; margin: 1px 0 0; padding: 0;
+  accent-color: var(--brand-ink); }
+
+fieldset.insurance-coverage { grid-template-columns: 1fr; gap: 12px; }
+fieldset.insurance-coverage > .insurance-coverage-line {
+  grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
+}
+.insurance-coverage-line > label:has(> input[type="checkbox"]),
+.insurance-coverage-line > .insurance-explanation,
+.insurance-coverage-line > .field-error { grid-column: 1 / -1; }
+.insurance-explanation { margin: -4px 0 0; font-size: 0.9rem; }
+
+.insurance-money { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card-sunk); }
+.insurance-quote-list, .insurance-outcomes { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.insurance-quote-list { counter-reset: insurance-quote; }
+ol.insurance-quote-list > li { counter-increment: insurance-quote; }
+ol.insurance-quote-list > li .insurance-quote-insurer::before {
+  content: counter(insurance-quote) ". "; color: var(--ink-muted); font-variant-numeric: tabular-nums;
+}
+.insurance-quote { display: grid; gap: 6px; min-width: 0; padding: 14px 16px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--card); }
+.insurance-quote p { margin: 0; }
+.insurance-quote > button { justify-self: start; }
+.insurance-quote-insurer { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.insurance-quote-price { font-weight: 600; font-variant-numeric: tabular-nums; }
+.insurance-tag { padding: 2px 8px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink-muted);
+  font-size: 0.8rem; font-weight: 600; }
+.insurance-differences { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+.insurance-continue { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
+.insurance-outcomes > li { padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }

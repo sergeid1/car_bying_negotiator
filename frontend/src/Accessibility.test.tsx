@@ -878,6 +878,41 @@ test.each(["RECORDED", "EDITING", "EMPTY", "ESTIMATING"])("the trade-in panel (%
 });
 // End ticket 100.
 
+// Ticket 126: car insurance quotes — the start, the application with field errors, the consent and the compared quotes.
+import { InsuranceQuotes } from "./InsuranceQuotes";
+import { insuranceView } from "./InsuranceQuotes.fixture";
+test.each(["EMPTY", "EDITING", "CONSENT", "QUOTED", "JOURNEY"])("the insurance quotes panel (%s) has no automated AA violations", async state => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => init?.method === "PUT"
+    ? new Response(JSON.stringify({ detail: "Check the highlighted insurance details.", errors: [
+      { field: "drivers[0].ageYears", message: "Enter the driver's age, from 15 to 120." },
+      { field: "vehicle.usage", message: "Choose how the car is mostly driven." },
+      { field: "coverage.COLLISION", message: "Choose the limits and deductible for collision." }] }), { status: 400 })
+    : new Response(JSON.stringify(state === "EMPTY" ? insuranceView("EMPTY")
+      : state === "JOURNEY" ? insuranceView("QUOTED", { holder: "JOURNEY", caseVehicle: null }) : insuranceView(state === "QUOTED" ? "QUOTED" : "APPLIED"))));
+  const { container } = render(state === "JOURNEY"
+    ? <main><h1>Your account</h1><section aria-labelledby="journeys"><h2 id="journeys">Buying Journeys</h2>
+      <InsuranceQuotes journeyId="journey" onSessionEnded={() => undefined} level={3} /></section></main>
+    : <main><h1>Buying Case</h1><InsuranceQuotes caseId="case" token="token" /></main>);
+  await screen.findByRole("heading", { name: "Car insurance quotes" });
+  if (state === "EDITING") {
+    await userEvent.click(await screen.findByRole("button", { name: "Edit application" }));
+    await userEvent.click(screen.getByRole("radio", { name: "No, it's different" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save application" }));
+    await screen.findByText("Enter the driver's age, from 15 to 120.");
+  }
+  if (state === "CONSENT") {
+    await userEvent.click(await screen.findByRole("button", { name: "Get quotes" }));
+    await screen.findByRole("button", { name: "Send and get quotes" });
+  }
+  if (state === "QUOTED") {
+    await userEvent.click(await screen.findByRole("button", { name: "Add a quote I already have" }));
+    await userEvent.click(screen.getByRole("radio", { name: "No, different coverage" }));
+  }
+  if (state === "JOURNEY") await screen.findByRole("list", { name: "Quotes for the coverage you chose" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+// End ticket 126.
+
 // Ticket 105: "I'm at the dealer" from the header — starting a case, routing, typing the numbers, questions and the first result.
 import { AtTheDealer, DealerCameraEntry } from "./AtTheDealer";
 function dealerFetch(route: string, status = "READ") {

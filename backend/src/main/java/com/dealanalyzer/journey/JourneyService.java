@@ -63,14 +63,16 @@ public class JourneyService {
   private final ObjectMapper json;
   private final EntityManager manager;
   private final com.dealanalyzer.trade.TradeJourneyRecords trades;
+  private final com.dealanalyzer.insurance.InsuranceJourneyRecords insurance;
 
   JourneyService(AccountJourneyAccess accounts, BuyingJourneyRepository journeys, ShoppingBriefVersionRepository briefs,
       ShoppingBriefValidator validator, VehicleReference reference, CaseAccessService secrets, ObjectMapper json,
       EntityManager manager, ReferenceVehicleRepository vehicles, VinDecoder decoder, PlatformTransactionManager transactions,
-      com.dealanalyzer.trade.TradeJourneyRecords trades) {
+      com.dealanalyzer.trade.TradeJourneyRecords trades, com.dealanalyzer.insurance.InsuranceJourneyRecords insurance) {
     this.accounts = accounts; this.journeys = journeys; this.briefs = briefs; this.validator = validator;
     this.reference = reference; this.secrets = secrets; this.json = json; this.manager = manager;
     this.vehicles = vehicles; this.decoder = decoder; this.trades = trades;
+    this.insurance = insurance;
     this.reads = new TransactionTemplate(transactions); this.reads.setReadOnly(true);
     this.writes = new TransactionTemplate(transactions);
   }
@@ -259,7 +261,7 @@ public class JourneyService {
   }
 
   /**
-   * Deletes a journey, every brief version, Reference Vehicle, inventory search record and its Trade Vehicle, then verifies they are gone, as account
+   * Deletes a journey, every brief version, Reference Vehicle, inventory search record, its Trade Vehicle and insurance application, then verifies they are gone, as account
    * deletion does for the account graph. Access ends with the transaction; nothing is kept.
    */
   @Transactional
@@ -270,6 +272,7 @@ public class JourneyService {
     String id = journey.id;
     manager.flush(); manager.detach(journey);
     trades.deleteForJourney(id);
+    insurance.deleteForJourney(id);
     for (String table : List.of("journey_candidate_cases", "journey_candidates", "reference_vehicles", "provider_usage", "shopping_brief_versions", "buying_journeys")) {
       String column = table.equals("buying_journeys") ? "id" : "journey_id";
       manager.createNativeQuery("delete from " + table + " where " + column + " = :id").setParameter("id", id).executeUpdate();
@@ -325,6 +328,7 @@ public class JourneyService {
             return captured;
           }).toList());
       row.put("tradeVehicle", trades.exportForJourney(journey.id));
+      row.put("insuranceApplication", insurance.exportForJourney(journey.id));
       row.put("buyingCases", manager.createNativeQuery("select case_id, candidate_id, created_at from journey_candidate_cases where journey_id = :id order by created_at, case_id")
           .setParameter("id", journey.id).getResultList().stream().map(item -> {
             Object[] link = (Object[]) item;

@@ -89,6 +89,12 @@ public class ProviderUsageStore {
     return journeyUsage(accountId, "MARKET_RETRIEVAL");
   }
 
+  /** Metered insurance partner calls made for an account's journeys; they hold no application detail. */
+  @Transactional(readOnly = true)
+  public java.util.List<InventoryUsage> insuranceQuotesForAccount(String accountId) {
+    return journeyUsage(accountId, "INSURANCE_QUOTE");
+  }
+
   private java.util.List<InventoryUsage> journeyUsage(String accountId, String operation) {
     return manager.createQuery("select u from ProviderUsageEntity u where u.accountId = :account and u.operation = :operation order by u.createdAt, u.id",
         ProviderUsageEntity.class).setParameter("account", accountId).setParameter("operation", operation).getResultList().stream()
