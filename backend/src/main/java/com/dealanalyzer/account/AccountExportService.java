@@ -62,6 +62,7 @@ public class AccountExportService {
     data.put("inventorySearchRuns", providerUsage.inventoryForAccount(session.accountId));
     data.put("journeyMarketRetrievals", providerUsage.marketForAccount(session.accountId));
     data.put("journeyInsuranceQuoteRequests", providerUsage.insuranceQuotesForAccount(session.accountId));
+    data.put("guideAnswerUsage", providerUsage.guideAnswersForAccount(session.accountId));
     // Provider and address only: mailbox tokens are never exported.
     data.put("mailboxConnections", mailboxes.exportForAccount(session.accountId));
     data.put("mailboxSends", mailboxSends.exportForAccount(session.accountId));
@@ -82,7 +83,7 @@ public class AccountExportService {
     try (var output = new ByteArrayOutputStream(); var zip = new ZipOutputStream(output)) {
       entry(zip, "README.txt", ("Buyer Account export\naccount.json holds your contact details, sign-in history "
           + "(times only), Google or Apple sign-ins linked to the account (provider and link date), email preferences, notification delivery states, inventory search history including search criteria, every Buying Journey with every version of its Shopping Brief, Reference Vehicles, captured candidates, market checks, shortlist positions, linked Buying Cases, the trade-in with its payoff and written trade offers, a connected Gmail or Outlook account (provider and address) "
-          + "with the times and outcomes of messages sent through it, and the Buying Cases attached to the account. Each attached case that can be exported is "
+          + "with the times and outcomes of messages sent through it, Toto usage counts, tokens, outcomes and model provenance (no conversation text), and the Buying Cases attached to the account. Each attached case that can be exported is "
           + "included as its own case export under cases/, with the same contents as exporting that case directly. "
           + "A case marked PURCHASE_REQUIRED has saved reports that are exported once the report is purchased; "
           + "a case marked UNAVAILABLE has expired or is being deleted. Sign-in links, session credentials and "

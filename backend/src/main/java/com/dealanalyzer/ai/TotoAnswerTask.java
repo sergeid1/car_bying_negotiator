@@ -101,7 +101,12 @@ public class TotoAnswerTask {
     }
 
     public Answer answer(String question, List<Turn> recentTurns) {
-      return TotoAnswerTask.answer(harness, task, guide, question, recentTurns);
+      return answer(com.dealanalyzer.operations.ModelUsageScope.guideAnswer(null), question, recentTurns);
+    }
+
+    public Answer answer(com.dealanalyzer.operations.ModelUsageScope scope, String question, List<Turn> recentTurns) {
+      if (scope.caseId() != null) throw new IllegalArgumentException("Guide answers have no case");
+      return TotoAnswerTask.answer(harness, task, guide, scope, question, recentTurns);
     }
   }
 
@@ -146,7 +151,7 @@ public class TotoAnswerTask {
 
   /** Uses the registered task snapshot so the guide in the gate and in each request is identical. */
   private static Answer answer(ModelHarness harness, ModelTask<Output> task, Guide guide,
-      String question, List<Turn> recentTurns) {
+      com.dealanalyzer.operations.ModelUsageScope scope, String question, List<Turn> recentTurns) {
     if (guide.articles().isEmpty()) return fallback(guide, question);
     var inputs = new ArrayList<UntrustedInput>();
     inputs.add(new UntrustedInput.Text("buyer question", question));
@@ -157,9 +162,7 @@ public class TotoAnswerTask {
           turn.text()));
     }
     try {
-      // Ticket 120 must add case-free usage persistence for anonymous and signed-in callers.
-      // Until then the real usage store rejects this null case id before calling the provider.
-      var result = harness.run(null, task, inputs, 1);
+      var result = harness.runScoped(scope, task, inputs, 1);
       Output output = result.value();
       List<AnswerParagraph> paragraphs = output.paragraphs().stream().map(paragraph ->
           new AnswerParagraph(paragraph.text(), paragraph.articleIds().stream()

@@ -220,6 +220,14 @@ public class ProviderMeter {
     return run(store.startModel(caseId, operation, provenance, license, units), invocation, classify, usage);
   }
 
+  public <T> T callModelScoped(ModelUsageScope scope, Operation operation, ModelProvenance provenance, String license,
+      long units, Supplier<T> invocation, Function<T, Status> classify, Function<T, ModelUsage> usage) {
+    // Preserve the existing case path, including stores implementing that boundary.
+    if (scope.caseId() != null)
+      return callModel(scope.caseId(), operation, provenance, license, units, invocation, classify, usage);
+    return run(store.startModelScoped(scope, operation, provenance, license, units), invocation, classify, usage);
+  }
+
   private <T> T run(String id, Supplier<T> invocation, Function<T, Status> classify,
       Function<T, ModelUsage> usage) {
     T result;
