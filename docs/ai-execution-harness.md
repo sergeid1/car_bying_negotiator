@@ -144,15 +144,19 @@ disabled. Its prompt version is `toto-answer-prompt.v1.<guide-version>` and its 
   Each recent `Turn` has a `BUYER` or `TOTO` role and text. The question and the last six turns
   become separately framed `UntrustedInput.Text` values; roles select code-owned frame labels,
   and previous Toto text remains untrusted user-channel content.
-  The API accepts no case or account data and uses no case id for metering. It does not store
+  The model inputs accept no case or account data and use no case id for metering. It does not store
   question/history text. No HTTP endpoint, authentication or request limits are implemented here;
-  ticket 120 owns that boundary for anonymous and signed-in clients. **Persistence integration gap:**
-  the answerer currently works against the recording usage store only. With a nonempty guide and
-  enabled harness, the real `ProviderUsageStore.startModel` rejects the null case id before calling
-  the provider. Its scope constraint also disallows case-free `GUIDE_ANSWER` rows. That error is
-  deliberately not caught as a fallback. Ticket 120 owns the store change and migration to permit
-  guide usage with no case and an optional account, separately from model inputs. Ticket 119 makes
-  no persistence or migration change.
+  ticket 120 owns that boundary for anonymous and signed-in clients. Ticket 131 adds
+  `ModelUsageScope.guideAnswer(accountId)` (null for anonymous), passed through
+  `Answerer.answer(scope, question, turns)`, `ModelHarness.runScoped` and
+  `ProviderMeter.callModelScoped` separately from model inputs. The two-argument answer method
+  uses anonymous usage. V60 permits case-free GUIDE_ANSWER usage with an optional active account;
+  other operations retain their scope rules. Account start locks serialize with account deletion,
+  and late completion only updates existing rows. Account export includes `guideAnswerUsage`.
+  `ProviderUsageStore.guideAnswerCostUsd(from, until)` sums known ModelPricing costs across all
+  guide callers in the half-open creation-time interval, including failed/rejected calls with
+  reported tokens. Null costs (unfinished or unpriced attempts) do not contribute; caps and any
+  reservation for in-flight calls belong to ticket 120. Persistence errors propagate unchanged.
 - **Caching.** The entire fixed guide and task instructions occupy one stable system block.
   `ModelTask.cacheInstructions` opts into Anthropic's explicit ephemeral cache control; the
   harness carries that flag to `ModelRequest`. Existing task/request constructors default it to

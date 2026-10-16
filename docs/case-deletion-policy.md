@@ -266,6 +266,22 @@ each journey's `insuranceApplication` with its `quoteRequests` and `quotes`, and
 journey-scoped `journeyInsuranceQuoteRequests` usage rows. Nothing is kept in any anonymous total, and
 nothing about an application is written to logs.
 
+## Toto guide-answer usage (ticket 131)
+
+V60 permits `GUIDE_ANSWER` usage without a Buying Case or Journey and with an optional
+Buyer Account. The rows contain request counts, token counts, outcome, model provenance,
+timestamps and known cost only; no question, conversation, answer or client identifier is
+stored. Account-associated rows appear in `account.json` as `guideAnswerUsage` and are
+removed and verified absent by the account deletion worker's existing `provider_usage`
+step. New account-associated calls lock the active account before recording usage, so
+pending or completed account deletion refuses them; late completions update existing
+rows only and cannot recreate removed history. Case and Journey deletion do not remove
+independent guide-answer usage. Account deletion does not claim to erase provider-held
+copies or backups.
+Rows without an account carry no Buyer identifier or content, are kept as operator cost
+records until a general operations-retention policy exists, and are not deleted by any
+Buyer action because nothing in them belongs to one Buyer.
+
 ## Listing captures (ticket 115)
 
 The Buyer's own copy of a dealer's ad (a screenshot, a saved PDF of the page or pasted text) is a
