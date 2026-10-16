@@ -20,13 +20,22 @@ public record InsuranceApplication(List<Driver> drivers, Garaging garaging, Insu
     drivers = List.copyOf(drivers);
   }
 
-  /** Rating facts only; no name or identifier crosses the boundary. */
-  public record Driver(int ageYears, int yearsLicensed, int atFaultAccidentsLastFiveYears, int violationsLastThreeYears) {
+  /**
+   * Rating facts only; no name or identifier crosses the boundary. {@code licenceState} is the two-letter state
+   * that issued the driver's licence, or null when it was not given.
+   */
+  public record Driver(int ageYears, int yearsLicensed, int atFaultAccidentsLastFiveYears, int violationsLastThreeYears,
+      String licenceState) {
     public Driver {
+      licenceState = licenceState == null || licenceState.isBlank() ? null : licenceState.strip().toUpperCase(Locale.ROOT);
       if (ageYears < 15 || ageYears > 120 || yearsLicensed < 0 || yearsLicensed > ageYears
           || atFaultAccidentsLastFiveYears < 0 || atFaultAccidentsLastFiveYears > 20
-          || violationsLastThreeYears < 0 || violationsLastThreeYears > 20)
+          || violationsLastThreeYears < 0 || violationsLastThreeYears > 20
+          || (licenceState != null && !licenceState.matches("[A-Z]{2}")))
         throw new IllegalArgumentException("Invalid driver");
+    }
+    public Driver(int ageYears, int yearsLicensed, int atFaultAccidentsLastFiveYears, int violationsLastThreeYears) {
+      this(ageYears, yearsLicensed, atFaultAccidentsLastFiveYears, violationsLastThreeYears, null);
     }
   }
 
@@ -40,7 +49,14 @@ public record InsuranceApplication(List<Driver> drivers, Garaging garaging, Insu
     }
   }
 
-  public record InsuredVehicle(String vin, int modelYear, String make, String model, String trim, Integer annualMileage) {
+  /** How the car is mostly driven, or null when it was not given. */
+  public enum Usage { COMMUTE, PLEASURE, BUSINESS }
+
+  public record InsuredVehicle(String vin, int modelYear, String make, String model, String trim, Integer annualMileage,
+      Usage usage) {
+    public InsuredVehicle(String vin, int modelYear, String make, String model, String trim, Integer annualMileage) {
+      this(vin, modelYear, make, model, trim, annualMileage, null);
+    }
     public InsuredVehicle {
       vin = vin == null || vin.isBlank() ? null : Vin.validated(vin);
       make = text(make); model = text(model);

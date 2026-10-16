@@ -78,7 +78,8 @@ public class ModelHarness {
     if (gateway == null) throw new ProviderMeter.Failure(Status.PROVIDER_UNAVAILABLE);
     ModelProvenance provenance = ModelRolloutGate.provenance(settings, task);
     ModelRequest request = new ModelRequest(
-        settings.modelId(), task.instructions(), task.outputSchema(), task.maxOutputTokens(), inputs);
+        settings.modelId(), task.instructions(), task.outputSchema(), task.maxOutputTokens(), inputs,
+        task.cacheInstructions());
     Attempt<T> attempt = meter.callModel(caseId, task.operation(), provenance, license, units,
         () -> attempt(task, accept, gateway.send(request)), Attempt::status, Attempt::usage);
     if (attempt.status() != Status.SUCCESS) throw new ProviderMeter.Failure(attempt.status());

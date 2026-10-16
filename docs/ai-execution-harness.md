@@ -14,7 +14,8 @@ startup.
    short code-owned label.
 3. `ModelHarness` builds the request from the task and configuration only, and routes it through
    `ProviderMeter.callModel` under the task's operation (`EXTRACTION`, `REPLY_DRAFT` for Dealer
-   reply suggestions, or `EXPLANATION` for report explanations), with the existing timeout, concurrency bound, usage store and `Failure` taxonomy.
+   reply suggestions, `EXPLANATION` for report explanations, or `GUIDE_ANSWER` for Toto process
+   questions), with the existing timeout, concurrency bound, usage store and `Failure` taxonomy.
 4. The gateway for the configured provider sends it (see [Providers](#providers)) with
    structured output constrained to the task schema.
 5. The output is checked against the task schema, then the task parser. The caller receives a
@@ -125,6 +126,71 @@ context uses) or `claude`, and the shipped configuration keeps the deterministic
 
 Ticket 36 keeps the measured held-out accuracy, corpus regression tests and enabling the provider.
 
+## Toto process answers (ticket 119)
+
+`TotoAnswerTask` registers a `ModelTask<Output>` on `GUIDE_ANSWER`, even while model paths are
+disabled. Its prompt version is `toto-answer-prompt.v1.<guide-version>` and its schema is
+`toto-answer-schema.v1`, so a guide change needs a new shadow comparison for each provider/model.
+
+- **Guide boundary.** A code-owned `TotoGuideLoader` bean returns one immutable `Guide(version,
+  articles)`, with each article carrying `id`, `title`, `text` and optional `link`. A link is
+  `?guide=<existing-client-guide-id>` or null, set only by the reviewed loader. The guide is loaded once at
+  startup and shared by the registered task and `TotoAnswerTask.Answerer`. Ticket 118 can supply
+  its reviewed Markdown loader through this interface without changing the task. Until then,
+  the default loader has no articles (`toto-guide.unavailable`); no fixture ships as a real guide
+  and no provider is called with that empty context. The synthetic development guide lives only
+  in test resources. Ticket 118 still owns review metadata, guide content and the written policy.
+- **Request API.** Inject `TotoAnswerTask.Answerer` and call `answer(question, recentTurns)`.
+  Each recent `Turn` has a `BUYER` or `TOTO` role and text. The question and the last six turns
+  become separately framed `UntrustedInput.Text` values; roles select code-owned frame labels,
+  and previous Toto text remains untrusted user-channel content.
+  The API accepts no case or account data and uses no case id for metering. It does not store
+  question/history text. No HTTP endpoint, authentication or request limits are implemented here;
+  ticket 120 owns that boundary for anonymous and signed-in clients. **Persistence integration gap:**
+  the answerer currently works against the recording usage store only. With a nonempty guide and
+  enabled harness, the real `ProviderUsageStore.startModel` rejects the null case id before calling
+  the provider. Its scope constraint also disallows case-free `GUIDE_ANSWER` rows. That error is
+  deliberately not caught as a fallback. Ticket 120 owns the store change and migration to permit
+  guide usage with no case and an optional account, separately from model inputs. Ticket 119 makes
+  no persistence or migration change.
+- **Caching.** The entire fixed guide and task instructions occupy one stable system block.
+  `ModelTask.cacheInstructions` opts into Anthropic's explicit ephemeral cache control; the
+  harness carries that flag to `ModelRequest`. Existing task/request constructors default it to
+  false. OpenAI receives the same stable `instructions` prefix for its automatic prompt cache.
+  Cache hits still depend on vendor eligibility and minimum prefix sizes; the small test fixture
+  does not demonstrate live cache savings. Existing token metering and list-price estimates are
+  retained, so this task does not claim cache-adjusted billing accuracy.
+- **Checked output.** The closed schema requires `kind`, `paragraphs` and nullable
+  `decline_reason`; paragraph objects require `text` and `article_ids`. Code independently
+  enforces one to four nonempty answer paragraphs of at most 600 characters, valid nonempty
+  citations, cited numeric/amount/percentage tokens, no contacts or URLs, and the shared
+  `ProhibitedClaims.PATTERNS` used by `PilotCopyClaimsTest`. As an additional conservative check,
+  each paragraph must be a contiguous, word-bounded passage from one cited article (whitespace
+  may differ). This prevents invented dealer/lender/insurer names without relying on a model or
+  capitalization heuristic. Paraphrases and spliced passages fall back, even when otherwise
+  reasonable; guide articles should provide short passages suitable for display.
+- **Declines and failures.** A decline contains no paragraphs and a `DeclineReason`; only the
+  enum's fixed Buyer wording is displayed. The six categories mirror ticket 118's list:
+  `LEGAL_OR_TAX`, `WHETHER_TO_SIGN`, `OWN_CASE`, `VEHICLE_JUDGMENT`, `PROVIDER_CHOICE`, and
+  `OUTSIDE_CAR_BUYING`. **Ticket 118 must confirm these categories and wording before rollout.**
+  Rejected output and provider failures return exactly “I can't answer that one well. These
+  guides may help,” with up to three `Citation(articleId, title, link)` suggestions ranked by
+  question/title keyword overlap, then article id. With no matching title there are no links.
+  Model output never supplies a URL, title or fallback wording. There is no retry or second model.
+- **Result.** `Answer` follows ticket 120's agreed response fields: kind (`ANSWER`, `DECLINE`, or
+  code-only `FALLBACK`), checked `AnswerParagraph(text, citations)` values, a code-owned
+  decline/fallback `message` (null for answers), and fallback `suggestions` as full citations.
+  Every citation has `articleId`, guide-owned `title`, and relative `link` or null. Non-answer
+  paragraphs and non-fallback suggestions are empty. `Answer` additionally carries provenance
+  for the backend; ticket 120 can map the agreed HTTP fields without losing citation information.
+  Against a recording store, rejections are recorded as metered contract failures
+  with token usage. Fallback carries no model provenance or partial model text.
+
+`TotoAnswerTaskTest` exercises the schema through both real SDKs against local stub servers,
+each rejection rule, code-owned declines, fallback ranking, metering, default absence of a guide,
+rollout discovery and injected instructions in questions/history. These are synthetic development
+checks, not a reviewed guide, a live provider evaluation, or shadow-comparison evidence.
+
 ## Metering and cost
 
 `provider_usage` rows for model calls record the provider (`ANTHROPIC` or `OPENAI`) and its API, the
@@ -176,7 +242,7 @@ configured provider; another provider's terms, credentials or comparisons never 
   record in `classpath:ai/shadow-comparisons.json` for the exact provider, model, prompt, schema,
   threshold-set and evaluation-set versions.
 
-Tasks are registered as Spring beans of type `ModelTask`: the reply-draft and explanation tasks
+Tasks are registered as Spring beans of type `ModelTask`: the reply-draft, explanation and Toto answer tasks
 always, and the deal-terms extraction task only while `extraction.provider=claude`. Changing the
 provider, the model, a prompt, a schema, the threshold set or the evaluation set therefore requires
 a new comparison before the application will start with model paths on. `ModelReleaseCheckTest`

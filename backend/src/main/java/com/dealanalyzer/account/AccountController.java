@@ -104,7 +104,7 @@ public class AccountController {
   /** Reviewed account outcomes keep their code and fixed detail; nothing echoes Buyer input. */
   @RestControllerAdvice(assignableTypes = {AccountController.class, PasskeyController.class, PasswordController.class, SocialSignInController.class, com.dealanalyzer.notification.NotificationController.class,
       com.dealanalyzer.journey.JourneyController.class, com.dealanalyzer.appointment.TestDriveController.class,
-      com.dealanalyzer.mailbox.MailboxController.class})
+      com.dealanalyzer.mailbox.MailboxController.class, com.dealanalyzer.insurance.InsuranceController.class})
   @Order(Ordered.HIGHEST_PRECEDENCE)
   static class Problems {
     @ExceptionHandler(AccountProblem.class)

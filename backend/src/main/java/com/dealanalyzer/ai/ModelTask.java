@@ -21,7 +21,14 @@ public record ModelTask<T>(
     String instructions,
     Map<String, Object> outputSchema,
     int maxOutputTokens,
-    Function<JsonNode, T> parse) {
+    Function<JsonNode, T> parse,
+    boolean cacheInstructions) {
+  public ModelTask(ProviderMeter.Operation operation, String promptVersion, String schemaVersion,
+      String instructions, Map<String, Object> outputSchema, int maxOutputTokens,
+      Function<JsonNode, T> parse) {
+    this(operation, promptVersion, schemaVersion, instructions, outputSchema, maxOutputTokens, parse, false);
+  }
+
   public ModelTask {
     Objects.requireNonNull(operation);
     Objects.requireNonNull(parse);

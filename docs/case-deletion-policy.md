@@ -243,6 +243,29 @@ account deletion erase the journey trade's estimates and verify their absence; r
 removes them. Carrying a trade from a case without a journey copies its estimates. The case export and
 the account export (`estimates` on each journey's trade-in) hold them.
 
+## Insurance applications and quotes (ticket 126)
+
+V58 `insurance_applications`, `insurance_quote_requests` and `insurance_quotes` hold the Buyer's
+insurance shopping (INS-01 to INS-04). An application belongs to its Buying Journey (`journey_id`,
+`account_id`), whether or not any case was opened, or, for a case without a journey, to that case
+(`case_id`); a case in a journey uses the journey's application. It holds rating facts only: drivers'
+ages, licence states, years licensed, at-fault accidents and tickets, the garaging ZIP and state, the
+vehicle, its usage and yearly miles, the chosen coverage and, optionally, the current insurer,
+coverage and premium. It holds no name, date of birth, licence number, street address or Social
+Security number. Each quote request records the consent version the Buyer agreed to and when, the
+code-owned partner metadata and the partner's availability; each quote row is one insurer's outcome
+from that request, or a quote the Buyer entered from a non-participating insurer. No compensation,
+placement or participation field exists in any of them (PAY-01).
+CaseGraphDeletionPlan erases a case-held application's quotes, requests and the application before
+the case. Journey deletion and account deletion erase the journey's application, requests and quotes
+and verify their absence; removing the application in the panel does the same, and removing a
+Buyer-entered quote deletes that row. The partner call's `provider_usage` row holds no application
+detail and goes with the case, journey or account like other usage rows. The case export holds the
+application the case uses (its own or its journey's), its requests and quotes; the account export holds
+each journey's `insuranceApplication` with its `quoteRequests` and `quotes`, and the account's
+journey-scoped `journeyInsuranceQuoteRequests` usage rows. Nothing is kept in any anonymous total, and
+nothing about an application is written to logs.
+
 ## Listing captures (ticket 115)
 
 The Buyer's own copy of a dealer's ad (a screenshot, a saved PDF of the page or pasted text) is a

@@ -6,10 +6,12 @@ recent turns with each question, and the server keeps only usage counts. That ke
 and account deletion, export and retention, because there is nothing to delete or export. The tool is
 free, so every answer is paid for by the operator, and the caps below keep that cost bounded.
 
-**Blocked by:** 119.
+**Blocked by:** 119, and 131 for usage recording without a case.
 
 **Status:** open — filed on 2026-10-14. No migration unless the daily counters need a table; if so,
 the coordinator reserves the number after the ticket 115–116 integration (V56 and V57 are taken).
+Ticket 119 (2026-10-16) found that usage recording needs no-case `GUIDE_ANSWER` rows; that work and its
+migration moved to ticket 131, which this ticket's caps and spending ceiling build on.
 
 ## Scope
 

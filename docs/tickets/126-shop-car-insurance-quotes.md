@@ -9,8 +9,16 @@ INS-04.
 
 **Blocked by:** 124 (compensation-blind structure), 125 (adapter and fake). Live insurers need 123 and 127.
 
-**Status:** open — filed on 2026-10-14. The coordinator reserves a migration number for the application
-and quote tables.
+**Status:** complete against the ticket 125 fake, as of 2026-10-16. `com.dealanalyzer.insurance` adds the
+application (V58: `insurance_applications`, `insurance_quote_requests`, `insurance_quotes`), case routes under
+`/api/v1/cases/{caseId}/insurance` and journey routes under `/api/v1/journeys/{journeyId}/insurance`, each with
+`/quote-requests` and `/own-quotes`. A case in a journey uses the journey's application, as trades do. Quotes go to
+the partner only with the current consent version agreed; results use 125's `CoverageComparison` and
+`YearlyDifference`, with Buyer-entered quotes compared on the same terms and expired quotes listed apart. Records are
+exported and deleted with their case, journey or account. The client panel (`InsuranceQuotes.tsx`) sits below the case
+steps and on a journey's page. Open in ticket 134 (after 123 and 127): otdog stores age, ZIP and state, not name, date of birth,
+licence number or street address, so a partner that needs them needs a hand-off to its hosted form; the consent
+text is a draft (`otdog-insurance-consent.draft-1`) until the partner's terms and counsel settle it.
 
 ## Scope
 
@@ -29,7 +37,7 @@ and quote tables.
 
 ## Done when
 
-- [ ] Backend acceptance tests cover consent, sending only to the partner, ordering,
+- [x] Backend acceptance tests cover consent, sending only to the partner, ordering,
       coverage labelling, the yearly difference, Buyer-entered quotes, export and deletion.
-- [ ] No application field appears in logs (test).
-- [ ] Client tests, the axe sweep and the 360 px gate pass for each step.
+- [x] No application field appears in logs (test).
+- [x] Client tests, the axe sweep and the 360 px gate pass for each step.

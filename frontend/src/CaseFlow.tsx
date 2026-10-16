@@ -13,6 +13,7 @@ import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { openSidePanel } from "./SidePanel";
 import { VehicleSafety } from "./VehicleSafety";
 import { ListingCapture } from "./ListingCapture";
+import { InsuranceQuotes } from "./InsuranceQuotes";
 
 type Credentials = { caseId: string; token: string };
 export type CaseStepId = "quotes" | "compare" | "dealer" | "final";
@@ -253,6 +254,9 @@ export function CaseFlow({ caseId, token, openedFromAccount, referral, deskFresh
         <div id={`case-step-${step.id}-body`} className="case-step-body stack" hidden={!isOpen}>{content[step.id]}</div>
       </section>;
     })}
+
+    {/* Insurance quotes are optional and not a step: the Buyer can shop them at any point in the case. */}
+    <InsuranceQuotes key={`insurance-${caseId}-${token}`} {...credentials} />
 
     {!openedFromAccount && <SaveCaseLink {...credentials} />}
     {openedFromAccount && <section className="panel" aria-label="Opened from your Buyer Account">

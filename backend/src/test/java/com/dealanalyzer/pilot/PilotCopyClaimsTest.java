@@ -2,6 +2,7 @@ package com.dealanalyzer.pilot;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.dealanalyzer.ai.ProhibitedClaims;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -28,21 +29,7 @@ class PilotCopyClaimsTest {
   private static final Path REPOSITORY = Path.of("..").toAbsolutePath().normalize();
 
   /** One pattern per prohibited claim category in the tickets. */
-  private static final Map<String, Pattern> PROHIBITED = Map.of(
-      "illegal", word("illegal|unlawful|violates the law"),
-      "fraud", word("fraud|fraudulent|scam|deceptive"),
-      "advice", word("advice|we advise|you should|we recommend that you"),
-      "safe to sign", Pattern.compile("safe to sign", Pattern.CASE_INSENSITIVE),
-      "guarantee", word("guarantee|guaranteed|guarantees|risk-free|best[\\s_-]*rate|cheapest"),
-      "savings", Pattern.compile("(?i)\\b(you will save|savings of|save you \\$)"),
-      "negotiates for you", word("(we|it) negotiates?|negotiates? (for|with dealers for)"
-          + " (you|the buyer)|negotiating for (you|the buyer)"),
-      "on your behalf", word("on (your|the buyer['’]s|a buyer['’]s|buyers['’]) behalf"),
-      "agent", word("our agent|your agent|ai agent|ai negotiator|autonomous|autonomously"
-          + "|(your|the buyer['’]s) representative|represents? (you|the buyer)"),
-      "contacts dealers", word("(we|deal x-ray|the platform|the product) (will )?(contacts?|emails?|writes? to)"
-          + " (the |a |your )?dealers?|(contacts?|emails?|writes? to) (the |a |your )?dealers?"
-          + " (for (you|the buyer)|itself|in its own name)"));
+  private static final Map<String, Pattern> PROHIBITED = ProhibitedClaims.PATTERNS;
 
   private final ObjectMapper json = new ObjectMapper();
 
@@ -196,7 +183,4 @@ class PilotCopyClaimsTest {
     }
   }
 
-  private static Pattern word(String alternatives) {
-    return Pattern.compile("(?i)\\b(" + alternatives + ")\\b");
-  }
 }
