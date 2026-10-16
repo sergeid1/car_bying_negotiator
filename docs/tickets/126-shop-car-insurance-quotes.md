@@ -16,7 +16,7 @@ application (V58: `insurance_applications`, `insurance_quote_requests`, `insuran
 the partner only with the current consent version agreed; results use 125's `CoverageComparison` and
 `YearlyDifference`, with Buyer-entered quotes compared on the same terms and expired quotes listed apart. Records are
 exported and deleted with their case, journey or account. The client panel (`InsuranceQuotes.tsx`) sits below the case
-steps and on a journey's page. Open for 123 and 127: otdog stores age, ZIP and state, not name, date of birth,
+steps and on a journey's page. Open in ticket 134 (after 123 and 127): otdog stores age, ZIP and state, not name, date of birth,
 licence number or street address, so a partner that needs them needs a hand-off to its hosted form; the consent
 text is a draft (`otdog-insurance-consent.draft-1`) until the partner's terms and counsel settle it.
 

@@ -17,9 +17,9 @@ paragraph for known citations, cited numbers only, the shared `ProhibitedClaims`
 `PilotCopyClaimsTest`), no URL, email or phone, and, stricter than this ticket asks, an exact passage of a cited
 article, which also keeps out unnamed dealers, lenders and insurers. Rejections and provider failures give the fixed
 fallback with title-matched guides. The result already has ticket 120's agreed shape (`ANSWER`/`DECLINE`/`FALLBACK`,
-citations with id, title and link). Open: the six decline reasons and their wording are provisional until 118
-confirms them; against the real usage store the answer fails before any provider call until ticket 120 adds
-case-free `GUIDE_ANSWER` usage; the exact-passage rule may raise the fallback rate, which ticket 122 measures.
+citations with id, title and link). Open: the six decline reasons and their wording are provisional until ticket 132; against the real usage store the
+answer fails before any provider call until ticket 131 adds case-free `GUIDE_ANSWER` usage; whether the exact-passage
+rule stays is ticket 133.
 
 ## Scope
 
