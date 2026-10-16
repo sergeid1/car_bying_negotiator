@@ -15,7 +15,7 @@ guide-answer row without a known cost (in flight, failed or unpriced) and every 
 unknown cost only overstates spend. Days are UTC days; the client cap is a rolling 24 hours. Defaults: 30 account
 and 10 client questions a day, a $20.00 daily ceiling (`TOTO_DAILY_SPENDING_CEILING_USD`; the operator confirms it).
 Known limits: behind the Cloudflare Worker and the pilot nginx proxy every visitor shares the proxy's address, so
-the client cap is one deployment-wide bucket until the deployment passes a trusted client address; admission is
+the client cap is one deployment-wide bucket until the deployment passes a trusted client address (ticket 136); admission is
 per process, so several replicas can overshoot the ceiling by a few worst-case calls.
 
 ## Scope

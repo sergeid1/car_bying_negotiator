@@ -188,7 +188,7 @@ exceed the ceiling by a few worst-case calls, and the client-address cap resets 
 still apply shared quotas. Behind the Cloudflare Worker and the pilot nginx proxy, which clear
 forwarding headers, every visitor without an account has the proxy's address, so the client cap is
 one deployment-wide bucket of ten questions a day until the deployment passes a trusted client
-address to the service. Many accounts or rotating addresses reach the spending ceiling, which
+address to the service (ticket 136). Many accounts or rotating addresses reach the spending ceiling, which
 makes Toto unavailable for everyone until the next UTC day: availability is traded for bounded
 cost. A signed-in Buyer's session cookie only selects their cap; the JSON-only content type keeps
 a cross-site form from spending it. Injected instructions in questions or turns are content to the
