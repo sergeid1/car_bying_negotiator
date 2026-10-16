@@ -8,7 +8,17 @@ plainly when the dealer's financing costs less. Spec 2.3 section 5.10, LOAN-01 t
 
 **Blocked by:** 124, 128. Live lenders need 123 and 130.
 
-**Status:** open — filed on 2026-10-14. The coordinator reserves a migration number.
+**Status:** complete against the ticket 128 fake, as of 2026-10-16. `com.dealanalyzer.loan` adds the application
+(V59: `loan_applications`, `loan_pre_approval_requests`, `loan_offers`) and case and journey routes under `/loan`, with
+`/pre-approval-requests`, `/own-offers` and `/chosen-offer`. A case in a journey uses the journey's application, as
+insurance and trades do. Requests need the current written credit authorization; partner offers are kept only from soft
+inquiries (code and a V59 check). Offers for the same amount and term are ordered by FIN-01 total cost, Buyer-entered
+offers on the same terms. "Use this pre-approval" records the choice; the outside Finance Offer form can fill from it
+(`preApprovalId`, source `BUYER_CHOSEN_PRE_APPROVAL`), and desk start, the Desk Check and DESK-04 use the later of the
+chosen offer and a manual outside offer. When the dealer's APR is lower, the new `DEALER_FINANCING_COSTS_LESS` finding
+says so with the interest difference, whatever lenders pay otdog (`desk-tactics.v3`). Export and deletion follow ticket
+126. Open in ticket 135 (after 123 and 130): otdog stores no name, address, date of birth or SSN, so a real soft
+inquiry needs a hand-off to the partner's form; the authorization text is a draft (`otdog-credit-authorization.draft-1`).
 
 ## Scope
 
@@ -29,6 +39,6 @@ plainly when the dealer's financing costs less. Spec 2.3 section 5.10, LOAN-01 t
 
 ## Done when
 
-- [ ] Acceptance tests cover authorization, soft-only refusal, sending only to the partner, ordering,
+- [x] Acceptance tests cover authorization, soft-only refusal, sending only to the partner, ordering,
       the outside Finance Offer hand-off, the dealer-wins case, export and deletion.
-- [ ] Client tests, the axe sweep and the 360 px gate pass.
+- [x] Client tests, the axe sweep and the 360 px gate pass.
