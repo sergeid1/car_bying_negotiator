@@ -8,12 +8,15 @@ free, so every answer is paid for by the operator, and the caps below keep that 
 
 **Blocked by:** 119, and 131 for usage recording without a case.
 
-**Status:** open — filed on 2026-10-14. No migration unless the daily counters need a table; if so,
-the coordinator reserves the number after the ticket 115–116 integration (V56 and V57 are taken).
-Ticket 119 (2026-10-16) found that usage recording needs no-case `GUIDE_ANSWER` rows; that work and its
-migration moved to ticket 131 (complete 2026-10-16). Use `TotoAnswerTask.Answerer.answer(ModelUsageScope.guideAnswer(accountId), …)`
-with a null account for clients without one, and `ProviderUsageStore.guideAnswerCostUsd(from, until)` for the ceiling;
-it sums known cost only, so the ceiling must also account for in-flight and unpriced calls.
+**Status:** complete — 2026-10-16. No migration: account counts come from `provider_usage` rows and client
+counts from the existing in-process peer quota. `TotoController` and `TotoService` serve the agreed interface;
+`toto.enabled` stays `false`. The spending ceiling adds known cost to a worst-case `ModelPricing` price for every
+guide-answer row without a known cost (in flight, failed or unpriced) and every call admitted in the process, so
+unknown cost only overstates spend. Days are UTC days; the client cap is a rolling 24 hours. Defaults: 30 account
+and 10 client questions a day, a $20.00 daily ceiling (`TOTO_DAILY_SPENDING_CEILING_USD`; the operator confirms it).
+Known limits: behind the Cloudflare Worker and the pilot nginx proxy every visitor shares the proxy's address, so
+the client cap is one deployment-wide bucket until the deployment passes a trusted client address; admission is
+per process, so several replicas can overshoot the ceiling by a few worst-case calls.
 
 ## Scope
 
@@ -63,6 +66,6 @@ only through the coordinator.
 
 ## Done when
 
-- [ ] Endpoint tests cover each limit, each cap, the disabled state, and a provider failure.
-- [ ] A test proves no question or answer text reaches logs or the usage store.
-- [ ] The spending ceiling stops calls once reached and resets the next day.
+- [x] Endpoint tests cover each limit, each cap, the disabled state, and a provider failure.
+- [x] A test proves no question or answer text reaches logs or the usage store.
+- [x] The spending ceiling stops calls once reached and resets the next day.

@@ -155,8 +155,9 @@ disabled. Its prompt version is `toto-answer-prompt.v1.<guide-version>` and its 
   and late completion only updates existing rows. Account export includes `guideAnswerUsage`.
   `ProviderUsageStore.guideAnswerCostUsd(from, until)` sums known ModelPricing costs across all
   guide callers in the half-open creation-time interval, including failed/rejected calls with
-  reported tokens. Null costs (unfinished or unpriced attempts) do not contribute; caps and any
-  reservation for in-flight calls belong to ticket 120. Persistence errors propagate unchanged.
+  reported tokens. Null costs (unfinished or unpriced attempts) do not contribute. Ticket 120's
+  `TotoService` counts those at a worst-case price for its spending ceiling (see the
+  [threat model](hardening-threat-model.md)). Persistence errors propagate unchanged.
 - **Caching.** The entire fixed guide and task instructions occupy one stable system block.
   `ModelTask.cacheInstructions` opts into Anthropic's explicit ephemeral cache control; the
   harness carries that flag to `ModelRequest`. Existing task/request constructors default it to
