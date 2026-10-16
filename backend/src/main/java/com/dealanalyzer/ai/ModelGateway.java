@@ -12,7 +12,13 @@ public interface ModelGateway {
       String instructions,
       Map<String, Object> outputSchema,
       int maxOutputTokens,
-      List<UntrustedInput> inputs) {
+      List<UntrustedInput> inputs,
+      boolean cacheInstructions) {
+    public ModelRequest(String modelId, String instructions, Map<String, Object> outputSchema,
+        int maxOutputTokens, List<UntrustedInput> inputs) {
+      this(modelId, instructions, outputSchema, maxOutputTokens, inputs, false);
+    }
+
     public ModelRequest {
       inputs = List.copyOf(inputs);
       outputSchema = Map.copyOf(outputSchema);
