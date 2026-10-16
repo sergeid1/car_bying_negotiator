@@ -10,6 +10,11 @@ free, so every answer is paid for by the operator, and the caps below keep that 
 
 **Status:** open — filed on 2026-10-14. No migration unless the daily counters need a table; if so,
 the coordinator reserves the number after the ticket 115–116 integration (V56 and V57 are taken).
+Ticket 119 (2026-10-16) leaves usage persistence here: `ProviderUsageStore.startModel` requires an active case and
+V57's `provider_usage_scope` check rejects case-free rows, so `TotoAnswerTask` fails before calling the provider
+against the real store. This ticket adds `GUIDE_ANSWER` usage with no case and an optional account (clients without
+an account use Toto too, and the spending ceiling sums all usage), passes any scope separately from model inputs,
+and therefore needs a migration; V58 is taken by ticket 126.
 
 ## Scope
 

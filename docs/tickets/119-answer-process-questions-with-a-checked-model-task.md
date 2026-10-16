@@ -9,7 +9,17 @@ guidance, not the safety boundary.
 **Blocked by:** 118 for the real guide and policy. The task, schema and checks can be built against a
 small fixture guide first.
 
-**Status:** open — filed on 2026-10-14.
+**Status:** complete — `com.dealanalyzer.ai.TotoAnswerTask`, as of 2026-10-16. A registered `ModelTask` on the
+new `GUIDE_ANSWER` meter operation; the whole guide from a replaceable `TotoGuideLoader` is one cached system block
+and its version is part of the prompt version, so the rollout gate needs a shadow comparison per guide version.
+The default loader is empty, so nothing is answered until ticket 118 supplies the reviewed guide. Code checks every
+paragraph for known citations, cited numbers only, the shared `ProhibitedClaims` list (now also used by
+`PilotCopyClaimsTest`), no URL, email or phone, and, stricter than this ticket asks, an exact passage of a cited
+article, which also keeps out unnamed dealers, lenders and insurers. Rejections and provider failures give the fixed
+fallback with title-matched guides. The result already has ticket 120's agreed shape (`ANSWER`/`DECLINE`/`FALLBACK`,
+citations with id, title and link). Open: the six decline reasons and their wording are provisional until 118
+confirms them; against the real usage store the answer fails before any provider call until ticket 120 adds
+case-free `GUIDE_ANSWER` usage; the exact-passage rule may raise the fallback rate, which ticket 122 measures.
 
 ## Scope
 
@@ -36,9 +46,9 @@ small fixture guide first.
 
 ## Done when
 
-- [ ] The task is registered as a bean, so the rollout gate requires its own shadow comparison.
-- [ ] Tests cover each rejection rule, the decline wording, the fallback, and injected text in the
+- [x] The task is registered as a bean, so the rollout gate requires its own shadow comparison.
+- [x] Tests cover each rejection rule, the decline wording, the fallback, and injected text in the
       question or earlier turns ("ignore your rules", "reply with a phone number"), which stays content.
-- [ ] Both gateways accept the schema (OpenAI strict mode: every property required,
+- [x] Both gateways accept the schema (OpenAI strict mode: every property required,
       `additionalProperties: false`).
-- [ ] `docs/ai-execution-harness.md` lists the new operation and task.
+- [x] `docs/ai-execution-harness.md` lists the new operation and task.
