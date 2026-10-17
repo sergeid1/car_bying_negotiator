@@ -1,7 +1,8 @@
 # State vehicle tax and fee rules
 
 Research for the `jurisdiction-pack` prerequisite in
-[the pilot readiness record](../pilot-readiness-record.md). As of 2026-10-10.
+[the pilot readiness record](../pilot-readiness-record.md). As of 2026-10-10; nine rows rechecked against
+official pages on 2026-10-16 (see [Official-source check](#official-source-check-2026-10-16)).
 
 This is research, not legal advice, and not a jurisdiction pack. Every value needs a check against
 the state's own publication before it ships.
@@ -61,36 +62,36 @@ and registering it there.
 | Hawaii | 4% general excise tax | County surcharge | No | None | Dealers often pass on about 4.7% | Secondary |
 | Idaho | 6% | Few resort cities | Yes | None | | Secondary |
 | [Illinois](https://www.chicagoautoshow.com/new-illinois-law-removes-trade-in-tax-credit-cap-news/) | 6.25% | Yes | Yes, full since 2022 | $377.63, indexed | A $10,000 trade-in cap ran 2020 to 2021 | Secondary |
-| Indiana | 7% | No | Yes | About $262, indexed | Sources give $251 or $262 | Secondary |
+| [Indiana](https://www.in.gov/dor/files/sib28s.pdf) | 7% | No | Yes, car for car | $245.28 from July 1, 2024, indexed each July 1 | Secretary of State sets the amount; the current year's figure is not yet confirmed | Sourced (tax, 2024 doc fee) |
 | Iowa | 5% fee for new registration | No | Yes | $180 | | Secondary |
 | Kansas | 6.5% | Yes | Yes | None | | Secondary |
 | [Kentucky](https://letchercountyclerk.ky.gov/motor/taxes-information/) | 6% usage tax | No | Used cars only | None | New cars taxed on total consideration or 90% of MSRP | Sourced |
 | Louisiana | 5% | Yes, parish | Yes | About $436, indexed | State rate rose from 4.45% in 2025 | Secondary |
 | Maine | 5.5% | No | Yes | None | | Secondary |
 | [Maryland](https://mva.maryland.gov/your-mva-guide/businesses/bulletins-businesses/taxable-price) | 6.5% excise | No | Yes | $800 | Rose from 6% on July 1, 2025; cars 7+ years old taxed on at least $640 | Sourced |
-| Massachusetts | 6.25% | No | Yes | None | | Secondary |
-| [Michigan](https://archive.legislature.mi.gov/documents/2015-2016/billanalysis/Senate/htm/2015-SFA-0010-F.htm) | 6% | No | Capped, $12,000 in 2026 | $280 or 5%, lesser | Cap rises $1,000 a year until removed | Secondary |
-| [Minnesota](https://dps.mn.gov/divisions/dvs/vehicle/vehicle-fees/vehicle-sales-tax) | 6.875% | No | Yes | $350 | | Sourced (tax); Secondary (doc fee) |
+| [Massachusetts](https://www.mass.gov/guides/motor-vehicle-and-trailer-sales-and-use-tax) | 6.25% | No | Yes, dealer sales, if tax was paid on the trade | None | No credit on a private sale | Sourced |
+| [Michigan](https://www.michigan.gov/taxes/-/media/Project/Websites/taxes/Forms/SUW/TY2026/485_11-25.pdf) | 6% | No | Capped, $12,000 in 2026, licensed dealer only | $280 or 5%, lesser | Cap rises $1,000 a year until removed; doc fee per DIFS Bulletin 2025-03-CF | Sourced |
+| [Minnesota](https://www.revenue.state.mn.us/guide/motor-vehicle-sales) | 6.875% | $20 flat in 17 counties and 3 cities | Yes | $350 or 10%, lesser | Doc fee cap in statute 168.27 subd. 31 | Sourced |
 | [Mississippi](https://www.law.cornell.edu/regulations/mississippi/30-Miss-Code-R-SS-1301-8-1) | 5% | Some cities | Yes | $425 (franchised dealers) | Several fee sites wrongly say no cap | Sourced (doc fee); Secondary (tax) |
 | [Missouri](https://dor.mo.gov/resources/official-final-rules/documents/12_CSR_10-26_231_Maximum_Dealer_Administrative_Fee.pdf) | 4.225% | Yes | Yes | $620.79, reset each Feb 1 | | Sourced (doc fee); Secondary (tax) |
 | Montana | None | No | Not applicable | None | Registration fees depend on vehicle age | Secondary |
 | Nebraska | 5.5% | Yes | Yes | None | | Secondary |
 | Nevada | 6.85% | Yes | Yes | None | | Secondary |
 | New Hampshire | None | No | Not applicable | None | Town permit fee based on MSRP and age | Secondary |
-| New Jersey | 6.625% | No | Yes | None | | Secondary |
+| [New Jersey](https://www.nj.gov/treasury/taxation/moveqa.shtml) | 6.625% | No | Yes | None | | Sourced |
 | [New Mexico](https://www.mvd.newmexico.gov/?p=3868) | 4% motor vehicle excise tax | No | Yes | None | | Sourced |
 | New York | 4% | Yes, county and city | Yes | $175 | | Secondary |
-| North Carolina | 3% highway use tax | No | Yes | None | | Secondary |
+| [North Carolina](https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/ByArticle/Chapter_105/Article_5A.html) | 3% highway use tax | No | Yes, dealer sales | None | $2,000 maximum applies only to commercial and recreational vehicles | Sourced |
 | North Dakota | 5% motor vehicle excise tax | No | Yes | None | | Secondary |
 | [Ohio](https://codes.ohio.gov/ohio-revised-code/section-5739.01) | 5.75% | Yes, county | New cars only | Lesser of indexed amount or 10% | Dealer sites say used cars too; statute says new only | Sourced |
 | [Oklahoma](https://oksenate.gov/press-releases/senate-approves-bill-eliminating-motor-vehicle-sales-tax) | 3.25% excise | No | Unclear | None | 1.25% sales tax repealed July 1, 2025 | Unverified (trade-in) |
 | Oregon | None; 0.5% privilege tax on new cars | No | Not applicable | $250 ($200 without e-titling) | | Secondary |
-| Pennsylvania | 6% | +1% Allegheny, +2% Philadelphia | Yes | $490 online, $409 manual | | Secondary |
+| [Pennsylvania](https://www.pa.gov/agencies/revenue/resources/tax-rates) | 6% | +1% Allegheny, +2% Philadelphia | Yes | Conflicting: $490 online, $409 manual, or none | A PennDOT fact sheet calls the fee negotiable; the Board of Vehicles publishes an annual fee notice | Sourced (tax); Unverified (doc fee) |
 | [Rhode Island](https://tax.ri.gov/sites/g/files/xkgbur541/files/regulations/salestax/11-109.pdf) | 7% | No | Car for car only | $400, plus $20 title prep | Trading in a truck earns no credit | Sourced |
 | South Carolina | 5% infrastructure maintenance fee | No | Yes | None | Capped at $500 total | Secondary |
 | South Dakota | 4% motor vehicle excise tax | No | Yes | None | | Secondary |
 | [Tennessee](https://www.tn.gov/content/tn/revenue/taxes/sales-and-use-tax/single-article-special-tax-rates.html) | 7% | On first $1,600 only | Yes | None | Plus 2.75% on the $1,600 to $3,200 slice | Sourced |
-| [Texas](https://occc.texas.gov/sites/default/files/2024-06/mvsf-docfee-adoption-fc-071124.pdf) | 6.25% | No | Yes | $225 safe harbor, not a cap | Above $225 needs a cost filing with the OCCC | Sourced (doc fee); Secondary (tax) |
+| [Texas](https://comptroller.texas.gov/taxes/motor-vehicle/sales-use.php) | 6.25% | No | Yes, licensed dealer takes the trade | $225 safe harbor, not a cap | Above $225 needs a cost filing with the [OCCC](https://occc.texas.gov/sites/default/files/2024-06/mvsf-docfee-adoption-fc-071124.pdf) | Sourced |
 | Utah | 4.85% | Yes | Yes | None | | Secondary |
 | Vermont | 6% purchase and use tax | No | Yes | None | | Secondary |
 | [Virginia](https://www.dmv.virginia.gov/vehicles/taxes-fees/sut) | 4.15% | No | No | None | Minimum $75; dealer processing fee is taxed | Sourced |
@@ -143,9 +144,10 @@ sources conflict.
 | Oklahoma | Does a trade-in reduce the 3.25% excise tax since the July 2025 repeal? Sources disagree. | Oklahoma Tax Commission, motor vehicle excise guidance |
 | Ohio | The statute limits the trade-in credit to new cars, but dealers advertise it on used cars too. | Ohio Department of Taxation vehicle FAQ; ORC 5739.01(H)(2) |
 | Michigan | Which year the trade-in cap ends: sources say 2027 or 2029. | Michigan Department of Treasury |
-| Indiana, Illinois, Louisiana, Pennsylvania, West Virginia | This year's indexed doc fee amounts. | Each state's dealer licensing agency bulletin |
+| Pennsylvania | Whether the doc fee is capped, and at what amount. | Board of Vehicles annual fee notice |
+| Indiana | This year's indexed doc fee amount. | Secretary of State Auto Dealer Services Division |
+| Illinois, Louisiana, West Virginia | This year's indexed doc fee amounts. | Each state's dealer licensing agency bulletin |
 | Ohio | The current dollar doc fee cap after the September 2026 reset. | Ohio BMV dealer notice under ORC 4517.261 |
-| Minnesota | Whether the $350 doc fee cap also has a percentage limit. | Minnesota statute on dealer doc fees |
 | Delaware | Effective date of the 5.25% rate. | Delaware DMV fee page |
 | DC | Whether a trade-in reduces the excise base. | DC DMV vehicle title page |
 | All Secondary rows | Local rate tables by ZIP code or county. | Each state's revenue department rate lookup |
@@ -172,10 +174,50 @@ data entry. The six patterns above are what the format has to grow to hold.
 Indexed doc fee caps and county rates change on fixed dates, so each state also needs a review date
 in the pack.
 
+## Official-source check (2026-10-16)
+
+On 2026-10-16 the product owner made the pilot three states: Florida, Texas and North Carolina
+(specification 2.4, ticket 137). Nine rows were rechecked against state agency or statute pages to find
+the states whose every value has an official source and that fit the current pack format.
+
+Search results returned these values from official pages, but nobody has read the pages in full yet.
+Read each one in full before a pack ships, as ticket 108 did for Florida.
+
+**Ready for the current format** (one statewide rate, no county table, full trade-in credit):
+
+| State | Why it fits | Wrinkle |
+| --- | --- | --- |
+| Texas | 6.25% on price less trade, Comptroller pages; no local motor vehicle tax | Trade credit only when a licensed dealer takes the trade |
+| North Carolina | 3% highway use tax on value less trade, G.S. 105 Article 5A | Paid at titling, not always an invoice line; replaces synthetic `US-NC.cash.v1` |
+| New Jersey | 6.625% on price less trade, Division of Taxation | None found |
+| Massachusetts | 6.25% on price less trade, DOR guide | Credit needs tax paid on the trade-in |
+| Indiana | 7% on price less trade, DOR SIB 28S | Doc fee cap indexed each July 1 |
+| Maryland | 6.5% excise on price plus processing charge, less trade, MVA | Floor value for cars 7+ years old needs a value-floor base |
+
+**Fully sourced, but needing one format extension:** Michigan (trade credit cap), Minnesota (flat $20
+county tax plus a county lookup), Pennsylvania (two-county local table; doc fee sources conflict).
+
+**Chosen for the pilot:** Texas and North Carolina, ticket 137. Texas is the largest market and the
+simplest rule; North Carolina replaces the synthetic development pack with a sourced one.
+
 ## Sources
 
 Official:
 
+- [Texas Comptroller motor vehicle sales and use tax](https://comptroller.texas.gov/taxes/motor-vehicle/sales-use.php)
+- [Texas Motor Vehicle Tax Guide, credit](https://comptroller.texas.gov/taxes/publications/96-254/credit.php)
+- [North Carolina G.S. 105 Article 5A](https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/ByArticle/Chapter_105/Article_5A.html)
+- [NCDOT highway use tax brief](https://www.ncdot.gov/about-us/how-we-operate/finance-budget/nc-first/Documents/nc-first-brief-edition-3.pdf)
+- [New Jersey Division of Taxation motor vehicle Q&A](https://www.nj.gov/treasury/taxation/moveqa.shtml)
+- [Massachusetts DOR motor vehicle sales and use tax](https://www.mass.gov/guides/motor-vehicle-and-trailer-sales-and-use-tax)
+- [Indiana DOR SIB 28S](https://www.in.gov/dor/files/sib28s.pdf)
+- [Indiana Secretary of State doc fees 2024](https://www.in.gov/sos/dealer/files/Doc-Fees-in-2024.pdf)
+- [Michigan Treasury Form 485, 2026](https://www.michigan.gov/taxes/-/media/Project/Websites/taxes/Forms/SUW/TY2026/485_11-25.pdf)
+- [Michigan DIFS Bulletin 2025-03-CF](https://www.michigan.gov/difs/-/media/Project/Websites/difs/Bulletins/2025/Bulletin_2025-03-CF.pdf)
+- [Minnesota Revenue motor vehicle sales](https://www.revenue.state.mn.us/guide/motor-vehicle-sales)
+- [Minnesota $20 vehicle excise tax](https://www.revenue.state.mn.us/guide/vehicle-excise-tax)
+- [Minnesota statute 168.27](https://www.revisor.mn.gov/statutes/cite/168.27)
+- [Pennsylvania Revenue tax rates](https://www.pa.gov/agencies/revenue/resources/tax-rates)
 - [Florida DOR GT-800019](https://floridarevenue.com/Forms_library/current/gt800019.pdf)
 - [Georgia DOR TAVT](https://dor.georgia.gov/motor-vehicles/vehicle-taxes-title-ad-valorem-tax-tavt-and-annual-ad-valorem-tax)
 - [Maryland MVA taxable price](https://mva.maryland.gov/your-mva-guide/businesses/bulletins-businesses/taxable-price)

@@ -1,9 +1,12 @@
 # otdog — Product and Development Specification
 
 Status: Phase 1 (document analysis) built; Phases 2–4 largely built, Phase 3 moving to Buyer-sent email (tickets 82–84); public pilot gated by Section 18 prerequisites; Phase 5 (insurance and loan quotes) specified, not built  
-Version: 2.3  
-Date: 2026-10-14  
-Supersedes: version 2.2 (2026-10-09), which excluded insurance quoting and lender pre-approval and named
+Version: 2.4  
+Date: 2026-10-16  
+Supersedes: version 2.3 (2026-10-14), which named Florida as the only pilot state. Version 2.4 makes the pilot
+three states: Florida, Texas and North Carolina. Each state's rules are sourced from statute and agency
+publications, and each is its own versioned jurisdiction pack.
+Version 2.3 superseded version 2.2 (2026-10-09), which excluded insurance quoting and lender pre-approval and named
 Buyers as the only payers. Version 2.3 adds insurance and loan shopping: the Buyer fills in one
 application with a licensed comparison partner and sees quotes from many insurers or lenders side by
 side as options. Insurers, lenders, or the partner may pay the platform a fee, which keeps the tool free
@@ -16,7 +19,8 @@ tool: it drafts and checks, and the Buyer sends every dealer email from the Buye
 approving it. Version 2.0 superseded 1.0 (2026-08-25), which specified Phase 1 only. Phase 1
 requirements are unchanged unless a section says otherwise. Sources consolidated: `PROPOSED_CONTEXT.md`,
 `PROPOSED_PRODUCT_SPEC.md`, `.scratch/ai-deal-analyzer-mvp/spec.md`, and the product owner's vision of
-2026-10-03 and 2026-10-05. The pilot state is Florida (product owner decision, 2026-10-05).
+2026-10-03 and 2026-10-05. The pilot states are Florida (product owner decision, 2026-10-05), Texas and North
+Carolina (2026-10-16).
 
 ## 1. Product contract
 
@@ -156,7 +160,7 @@ Phase 1 (document analysis, built):
 
 - Responsive web application.
 - Used passenger vehicles sold by licensed dealers.
-- One configured pilot jurisdiction; jurisdiction behavior must be versioned configuration rather than hard-coded branching.
+- Three pilot states, Florida, Texas and North Carolina, each with its own sourced jurisdiction pack; jurisdiction behavior must be versioned configuration rather than hard-coded branching.
 - VIN/manual vehicle entry and a listing URL as Buyer-supplied evidence.
 - Licensed vehicle, inventory, and valuation data through replaceable adapters.
 - PDF, JPEG, PNG, and HEIC dealer documents within configured limits.
@@ -998,7 +1002,7 @@ The following defaults resolve prior scope ambiguity:
 
 Development may begin on provider-independent modules and synthetic jurisdiction fixtures immediately. The following must be resolved before claims or integrations enter a public pilot:
 
-1. Select the pilot state (Florida, chosen 2026-10-05) and source its jurisdiction rules from statute and agency publications, with citations.
+1. Select the pilot states (Florida, chosen 2026-10-05; Texas and North Carolina, added 2026-10-16) and source each state's jurisdiction rules from statute and agency publications, with citations.
 2. Obtain written automotive provider terms covering consumer display, caching, attribution, derived values, retention, deletion, and pricing.
 3. Acquire at least 100 permissioned representative dealer documents and freeze a held-out evaluation subset.
 4. Have a consumer-side automotive expert validate the opening/target/walk-away policy against retrospective deals.
@@ -1016,7 +1020,8 @@ Before Phase 2 and 3 reach Buyers outside moderated testing:
 11. Execute terms with a licensed trade-in valuation provider covering consumer display, caching, and
     pricing before trade value ranges reach Buyers outside moderated testing.
 12. Before Phase 5 reaches Buyers: counsel confirms the licensing route for insurance quotes and loan
-    applications in Florida, including whether the platform is a loan broker; partner terms are executed
+    applications in each pilot state (Florida, Texas and North Carolina), including whether the platform
+    is a loan broker; partner terms are executed
     and forbid reselling an application or contacting the Buyer beyond the quote without the Buyer's
     consent; and counsel approves the "how otdog makes money" wording, FCRA authorization, GLBA privacy
     notice, and TCPA consent wording.
@@ -1026,11 +1031,12 @@ Open decisions for the product owner:
 - **Dealer reputation.** Whether to show Buyers cross-journey evidence about dealers (for example,
   "added fees at the desk in 3 of 5 journeys"). Currently excluded for fairness, privacy, and
   defamation risk; a Buyer still sees their own dealer's conduct.
-- **Licensed route for Phase 5.** Whether ClearSight Labs gets its own Florida insurance agency license
-  or works through a licensed insurance marketplace, and whether pre-approvals come directly from lenders
+- **Licensed route for Phase 5.** Whether ClearSight Labs gets its own insurance agency license in each
+  pilot state or works through a licensed insurance marketplace, and whether pre-approvals come directly from lenders
   or through a licensed lending marketplace. The route decides how fees may be paid: Fla. Stat.
   626.112(8) bars paying an unlicensed referrer a fee that depends on a policy being bought, and loan
-  application handling may need its own license.
+  application handling may need its own license. Texas and North Carolina licensing rules are not yet
+  researched; the route must be confirmed for each pilot state.
 - **Automatic reply import.** Whether to read dealer replies from a connected mailbox. It needs mailbox
   read access, which Google treats as a restricted scope requiring an annual third-party security
   assessment.

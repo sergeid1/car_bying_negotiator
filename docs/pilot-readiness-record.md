@@ -17,7 +17,7 @@ CI runs `clean verify` so results cannot be inherited from an earlier build.
 
 | # | Prerequisite | Status | Evidence or blocker |
 | --- | --- | --- | --- |
-| 1 | `jurisdiction-pack` | **BLOCKED** | Florida `US-FL.cash.2026.v1` county packs, effective 2026-01-01, checked 2026-10-12, review 2027-01-01: 2026 F.S. 212.05/212.054/212.09, DOR DR-15DSS 2026 R.11/25, GT-800019 R.10/25 and GT-800030 R.08/22; [pack format and source URLs](jurisdiction-tax-packs.md). Operator status decision remains pending. |
+| 1 | `jurisdiction-pack` | **BLOCKED** | Florida `US-FL.cash.2026.v1` county packs, effective 2026-01-01, checked 2026-10-12, review 2027-01-01: 2026 F.S. 212.05/212.054/212.09, DOR DR-15DSS 2026 R.11/25, GT-800019 R.10/25 and GT-800030 R.08/22; [pack format and source URLs](jurisdiction-tax-packs.md). Texas and North Carolina packs: ticket 137, not yet shipped. Operator status decision remains pending. |
 | 2 | `provider-terms` | **BLOCKED** | No provider terms executed |
 | 3 | `document-corpus` | **BLOCKED** | No permissioned Dealer documents acquired |
 | 4 | `expert-policy-validation` | **BLOCKED** | No automotive-expert review of boundary policy |
@@ -219,3 +219,13 @@ evidence each blocked prerequisite needs:
   provider for each case's reply-intake address.
 - Specification §18 adds published Terms of Service and a Privacy Policy before the pilot, and a
   legal review before charging Buyers.
+
+## Specification 2.4 update — 2026-10-16
+
+The product owner widened the pilot to three states: Florida, Texas and North Carolina. Both new states
+tax a dealer car sale with one statewide rate and no county table: Texas 6.25% motor vehicle sales tax and
+North Carolina 3% highway use tax, each on the price after the trade-in. Ticket 137 ships their packs and
+retires the synthetic `US-NC.cash.v1` as what a North Carolina Buyer gets.
+
+This changes no prerequisite status. `jurisdiction-pack` now needs a sourced pack for each of the three
+states, and the Phase 5 licensing route (specification §18 item 12) must be confirmed for each state.

@@ -44,10 +44,10 @@ should guide the next conversation?*
 
 ## Status
 
-The journey above is built and tested end to end against synthetic data and test adapters. Florida is
-the first pilot state. A public pilot stays blocked until its prerequisites are met: executed
-market-data and inventory provider terms, a permissioned set of real dealer documents, expert review
-of the price-limit policy, and a reviewed Florida jurisdiction pack. The application refuses to start
+The journey above is built and tested end to end against synthetic data and test adapters. The pilot
+states are Florida, Texas and North Carolina. A public pilot stays blocked until its prerequisites are
+met: executed market-data and inventory provider terms, a permissioned set of real dealer documents,
+expert review of the price-limit policy, and a reviewed jurisdiction pack for each pilot state. The application refuses to start
 under the `pilot` profile while any prerequisite is unmet; see the
 [pilot readiness record](docs/pilot-readiness-record.md).
 
