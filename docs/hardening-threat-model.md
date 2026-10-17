@@ -136,7 +136,8 @@ from one resolver, `ClientAddress`. Behind the Cloudflare Worker and the pilot p
 proxy, so a request whose `X-Origin-Verify` matches `security.client-address.origin-secret` is keyed
 by `X-Otdog-Client-Address`, which the Worker sets from Cloudflare's `CF-Connecting-IP` after deleting
 any client copy. Any other request, an unset secret, or a missing, repeated or malformed address
-falls back to the peer. IPv6 keys are the /64 prefix. The key lives only in in-memory quotas.
+falls back to the peer. A pilot/production start with no secret is refused
+(`ClientAddressProductionGuard`). IPv6 keys are the /64 prefix. The key lives only in in-memory quotas.
 Sign-in requests, case recovery enrollment and public recovery requests share a default quota
 of five requests per peer per 15 minutes (`security.request-email.peer-requests`,
 `security.request-email.peer-window`), with at most 10,000 peer buckets

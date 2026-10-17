@@ -50,7 +50,8 @@ Cloudflare's own `CF-Connecting-IP`. Nginx passes that header and the verificati
 on requests carrying the secret, and clears `Forwarded` and `X-Forwarded-*`. Spring reads the
 same `ORIGIN_SECRET` (from `backend.env`, as `security.client-address.origin-secret`) and keys
 its per-client quotas on the visitor address only when the request carries it; otherwise it keys
-on the loopback peer. `server.forward-headers-strategy=none` stays, so forwarding headers never
+on the loopback peer. A pilot or production start without that secret refuses to start
+(`ClientAddressProductionGuard`). `server.forward-headers-strategy=none` stays, so forwarding headers never
 select a key. IPv6 visitors share a bucket per /64. The address is an in-memory quota key only,
 never stored or logged. Nginx's own `limit_req` zones still key on the Cloudflare egress address.
 

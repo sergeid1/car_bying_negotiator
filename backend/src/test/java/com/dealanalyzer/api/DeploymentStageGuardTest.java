@@ -66,6 +66,10 @@ class DeploymentStageGuardTest {
         .run(context -> assertThat(context).hasNotFailed());
     refuses(runner.withPropertyValues("case.recovery.from=sender@example.com", "spring.mail.host=mailpit"),
         "recovery.RecoveryEmailProductionGuard", "real SMTP host");
+    refuses(runner, "api.ClientAddressProductionGuard", "security.client-address.origin-secret");
+    runner.withPropertyValues("security.client-address.origin-secret=" + "d".repeat(64))
+        .withUserConfiguration(type("api.ClientAddressProductionGuard"))
+        .run(context -> assertThat(context).hasNotFailed());
     refuses(runner, "buyingcase.SyntheticIntakeAffordance", "intake.synthetic.enabled=false");
     refuses(runner, "pilot.PilotReadiness", "unmet readiness prerequisites");
     refuses(runner, "document.DocumentParserProcess", "container");
@@ -87,7 +91,8 @@ class DeploymentStageGuardTest {
 
     // The real application must also wire the refusal, rather than only passing isolated checks.
     assertThatThrownBy(() -> new HttpAcceptanceHarness(temporaryDirectory).start("stage", false,
-        "--" + declaration)).hasStackTraceContaining("DOCUMENT_STORAGE_ENCRYPTION_KEY");
+        "--" + declaration, "--security.client-address.origin-secret=" + "d".repeat(64)))
+        .hasStackTraceContaining("DOCUMENT_STORAGE_ENCRYPTION_KEY");
   }
 
   @Test void developmentRetainsLazyKeyValidationAndLocalAdapters() throws Exception {
