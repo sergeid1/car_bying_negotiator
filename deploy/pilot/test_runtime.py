@@ -23,7 +23,8 @@ class RuntimeTest(unittest.TestCase):
             self.assertEqual(target.stat().st_mode & 0o777, 0o700)
             for file in target.iterdir():
                 self.assertEqual(file.stat().st_mode & 0o777, 0o600)
-            self.assertEqual((target / "backend.env").read_text(), "DATABASE_PASSWORD=literal $ # ' quotes\n")
+            self.assertEqual((target / "backend.env").read_text(),
+                             "DATABASE_PASSWORD=literal $ # ' quotes\nORIGIN_SECRET=" + "a" * 64 + "\n")
             self.assertIn('"' + "a" * 64 + '" 1;', (target / "nginx.conf").read_text())
             self.assertNotIn("@ORIGIN_SECRET@", (target / "nginx.conf").read_text())
 

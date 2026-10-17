@@ -21,6 +21,8 @@ def render(values, target, source):
         if not re.fullmatch(r"[A-Z][A-Z0-9_]*", key) or not isinstance(value, str) or any(c in value for c in "\r\n\x00"):
             raise ValueError("Invalid runtime environment entry")
         lines.append(f"{key}={value}")
+    # The service checks it again before keying quotas on the Worker's visitor address (ticket 136).
+    lines.append(f"ORIGIN_SECRET={secret}")
     files["backend.env"] = "\n".join(lines) + "\n"
     target.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(target, 0o700)

@@ -47,3 +47,14 @@ test('HTTP redirects before processing credentials; bad origin config and outage
   assert.equal(response.status, 502);
   assert.equal(await response.text(), '');
 });
+test('visitor address comes only from Cloudflare connecting address, replacing any client copy', async () => {
+  const seen = [];
+  const forward = async (request) => { seen.push(request.headers.get('X-Otdog-Client-Address')); return new Response(null); };
+  await handle(new Request('https://otdog.com/api/v1/toto/answers', {
+    method: 'POST', body: '{}', headers: { 'CF-Connecting-IP': '2001:db8::1', 'X-Otdog-Client-Address': '192.0.2.9', 'X-Forwarded-For': '192.0.2.8' }
+  }), env, forward);
+  await handle(new Request('https://otdog.com/api/v1/toto', { headers: { 'CF-Connecting-IP': '198.51.100.7' } }), env, forward);
+  // Without Cloudflare's address the forged copy is still removed, so the origin keys on its peer.
+  await handle(new Request('https://otdog.com/api/v1/toto', { headers: { 'X-Otdog-Client-Address': '192.0.2.9' } }), env, forward);
+  assert.deepEqual(seen, ['2001:db8::1', '198.51.100.7', null]);
+});

@@ -26,6 +26,10 @@ export async function handle(request, env, originFetch = fetch) {
     headers.delete('X-Forwarded-For');
     headers.delete('X-Forwarded-Host');
     headers.set('X-Forwarded-Proto', 'https');
+    // The visitor's address for per-client quotas, only from Cloudflare's own connecting address.
+    headers.delete('X-Otdog-Client-Address');
+    const visitor = request.headers.get('CF-Connecting-IP');
+    if (visitor) headers.set('X-Otdog-Client-Address', visitor);
     let upstream;
     try {
       upstream = await originFetch(new Request(url, {

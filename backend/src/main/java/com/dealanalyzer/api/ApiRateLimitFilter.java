@@ -18,13 +18,16 @@ import org.springframework.web.filter.OncePerRequestFilter;
 class ApiRateLimitFilter extends OncePerRequestFilter {
   private final PeerQuota api;
   private final PeerQuota email;
+  private final ClientAddress clients;
 
-  ApiRateLimitFilter(@Value("${security.rate-limit.requests:600}") int requests,
+  ApiRateLimitFilter(ClientAddress clients,
+      @Value("${security.rate-limit.requests:600}") int requests,
       @Value("${security.rate-limit.window:PT1M}") Duration window,
       @Value("${security.rate-limit.max-clients:10000}") int maxClients,
       @Value("${security.request-email.peer-requests:5}") int emailRequests,
       @Value("${security.request-email.peer-window:PT15M}") Duration emailWindow,
       @Value("${security.request-email.max-peers:10000}") int emailMaxPeers) {
+    this.clients = clients;
     api = new PeerQuota(requests, window, maxClients);
     email = new PeerQuota(emailRequests, emailWindow, emailMaxPeers);
   }
@@ -34,8 +37,9 @@ class ApiRateLimitFilter extends OncePerRequestFilter {
     if (request.getServletPath().startsWith("/api/")) {
       // Never trust client-supplied forwarding headers or use attacker-selected tokens as keys.
       long now = System.nanoTime();
-      long retry = api.acquire(request.getRemoteAddr(), now);
-      if (retry == 0 && isEmailRequest(request)) retry = email.acquire(request.getRemoteAddr(), now);
+      String client = clients.of(request);
+      long retry = api.acquire(client, now);
+      if (retry == 0 && isEmailRequest(request)) retry = email.acquire(client, now);
       if (retry > 0) {
         response.setStatus(429);
         response.setHeader("Retry-After", Long.toString(retry));

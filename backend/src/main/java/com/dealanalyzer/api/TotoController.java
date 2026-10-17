@@ -24,9 +24,10 @@ import org.springframework.web.bind.annotation.*;
 public class TotoController {
   private final TotoService toto;
   private final AccountJourneyAccess accounts;
+  private final ClientAddress clients;
 
-  TotoController(TotoService toto, AccountJourneyAccess accounts) {
-    this.toto = toto; this.accounts = accounts;
+  TotoController(TotoService toto, AccountJourneyAccess accounts, ClientAddress clients) {
+    this.toto = toto; this.accounts = accounts; this.clients = clients;
   }
 
   public record Availability(boolean available) {}
@@ -48,8 +49,8 @@ public class TotoController {
       throw new Problem(HttpStatus.BAD_REQUEST, "TOTO_QUESTION_INVALID",
           "Ask Toto a question of up to 1,000 characters.");
     var turns = turns(input.turns());
-    // Never trust client-supplied forwarding headers, as the API peer limit does not.
-    var answer = toto.answer(account(session), request.getRemoteAddr(), question, turns);
+    // The same client key as the API peer limit; client-supplied forwarding headers are never trusted.
+    var answer = toto.answer(account(session), clients.of(request), question, turns);
     // Provenance stays server-side; the client gets the agreed shape only.
     return new Response(answer.kind(), answer.paragraphs(), answer.message(), answer.suggestions());
   }

@@ -14,6 +14,11 @@ http {
     default 0;
     "@ORIGIN_SECRET@" 1;
   }
+  # The Worker's visitor address (ticket 136) passes only on requests carrying the origin secret.
+  map $origin_verified $otdog_client_address {
+    default "";
+    1 $http_x_otdog_client_address;
+  }
   server {
     listen 443 ssl;
     ssl_certificate /run/tls.crt;
