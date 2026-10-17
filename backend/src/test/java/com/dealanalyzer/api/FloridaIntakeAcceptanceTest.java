@@ -21,9 +21,10 @@ class FloridaIntakeAcceptanceTest {
     try (var app = new HttpAcceptanceHarness(directory).start("synthetic-florida-intake")) {
       var client = app.client();
       var supported = app.context().getBean(SupportedJurisdictions.class);
-      assertThat(supported.all()).containsExactly("US-FL", "US-NC");
+      assertThat(supported.all()).containsExactly("US-FL", "US-NC", "US-TX");
       assertThat(supported.supports("US-FL")).isTrue();
-      assertThat(supported.supports("US-TX")).isFalse();
+      assertThat(supported.supports("US-GA")).isFalse();
+      assertThat(supported.supports("SYNTHETIC-FIXTURE")).isFalse();
       var created = post(client, "/api/v1/cases", intake("32003", null), "single");
       assertThat(created.at("/case/buyerJurisdiction").asText()).isEqualTo("US-FL:Clay");
       String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();
@@ -61,8 +62,8 @@ class FloridaIntakeAcceptanceTest {
         });
       }
       // Merely adding a future pack does not enable a new state today.
-      database.update("insert into jurisdiction_policies select 'future-test', 'US-TX', currency, tax_rate, taxable_line_types, trade_tax_credit_enabled, currency_scale, rounding_mode, reconciliation_tolerance, policy_json, timestamp with time zone '2099-01-01 00:00:00+00' from jurisdiction_policies where policy_version = 'US-NC.cash.v1'");
-      assertThat(supported.supports("US-TX")).isFalse();
+      database.update("insert into jurisdiction_policies select 'future-test', 'US-GA', currency, tax_rate, taxable_line_types, trade_tax_credit_enabled, currency_scale, rounding_mode, reconciliation_tolerance, policy_json, timestamp with time zone '2099-01-01 00:00:00+00' from jurisdiction_policies where policy_version = 'US-TX.cash.2026.v1'");
+      assertThat(supported.supports("US-GA")).isFalse();
     }
   }
 

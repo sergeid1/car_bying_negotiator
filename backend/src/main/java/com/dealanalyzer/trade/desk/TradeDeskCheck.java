@@ -66,9 +66,11 @@ public class TradeDeskCheck {
   /**
    * The sales tax a trade-in removes under the case's jurisdiction policy, which selling the car elsewhere
    * would not. status: AVAILABLE, NOT_APPLICABLE (the policy gives no trade credit) or UNAVAILABLE.
+   * taxName is what the state calls the tax ("sales tax" when the pack does not name it, or before ticket 137).
    */
   public record TaxCredit(String status, String reason, String jurisdiction, String policyVersion, BigDecimal rate,
-      Long creditMinor) {}
+      Long creditMinor, String taxName) {}
+  static final String DEFAULT_TAX_NAME = "sales tax";
   /**
    * position: BELOW, WITHIN or ABOVE the range, or null when unavailable. Every amount is an estimate from the source.
    * basis (v2): PROVIDER for ticket 101's adapter, or BUYER_ESTIMATE for a value the Buyer looked up and entered
@@ -315,7 +317,7 @@ public class TradeDeskCheck {
   private static String taxSentence(TaxCredit tax, Long gapAfterTax) {
     if ("UNAVAILABLE".equals(tax.status())) return " " + tax.reason();
     if (!"AVAILABLE".equals(tax.status()) || tax.creditMinor() == 0 || gapAfterTax == null) return "";
-    return " Trading in lowers the sales tax on this car by about " + money(tax.creditMinor()) + " under "
+    return " Trading in lowers the " + tax.taxName() + " on this car by about " + money(tax.creditMinor()) + " under "
         + tax.jurisdiction() + " tax rules, which selling it elsewhere would not, so after tax the offer is "
         + (gapAfterTax > 0 ? "about " + money(gapAfterTax) + " ahead of this allowance."
             : gapAfterTax == 0 ? "even with this allowance." : "about " + money(-gapAfterTax) + " behind this allowance.");
@@ -376,13 +378,15 @@ public class TradeDeskCheck {
   private TaxCredit taxCredit(String jurisdiction, long allowance, Long sellingPrice) {
     if (jurisdiction == null || !policies.hasPolicy(jurisdiction))
       return new TaxCredit("UNAVAILABLE", "The sales tax a trade-in removes is not calculated because no tax rules are "
-          + "configured for " + (jurisdiction == null ? "your state" : jurisdiction) + " yet.", jurisdiction, null, null, null);
+          + "configured for " + (jurisdiction == null ? "your state" : jurisdiction) + " yet.", jurisdiction, null, null, null,
+          DEFAULT_TAX_NAME);
     var policy = policies.requirePolicy(jurisdiction);
+    String name = policy.taxRules().taxName() == null ? DEFAULT_TAX_NAME : policy.taxRules().taxName();
     if (!policy.tradeTaxCreditEnabled() || !policy.taxableLineTypes().contains(LineType.SELLING_PRICE))
-      return new TaxCredit("NOT_APPLICABLE", null, jurisdiction, policy.version(), policy.taxRate(), 0L);
+      return new TaxCredit("NOT_APPLICABLE", null, jurisdiction, policy.version(), policy.taxRate(), 0L, name);
     if (sellingPrice == null)
-      return new TaxCredit("UNAVAILABLE", "The sales tax a trade-in removes is not calculated because the paperwork's "
-          + "selling price is missing.", jurisdiction, policy.version(), policy.taxRate(), null);
+      return new TaxCredit("UNAVAILABLE", "The " + name + " a trade-in removes is not calculated because the paperwork's "
+          + "selling price is missing.", jurisdiction, policy.version(), policy.taxRate(), null, name);
     // The credit is capped at the taxable basis; the selling price is its lower bound on desk paperwork.
     BigDecimal basis = BigDecimal.valueOf(Math.max(0, sellingPrice), 2);
     BigDecimal withTrade = basis.subtract(BigDecimal.valueOf(allowance, 2)).max(BigDecimal.ZERO);
@@ -394,8 +398,14 @@ public class TradeDeskCheck {
     String explanation = jurisdiction.startsWith("US-FL:")
         ? "Florida state tax plus " + jurisdiction.substring(6)
             + " County surtax on the first $5,000 of the taxable price after the trade-in."
-        : null;
-    return new TaxCredit("AVAILABLE", explanation, jurisdiction, policy.version(), policy.taxRate(), credit);
+        : policy.taxRules().taxName() == null ? null
+        : "The " + name + " is " + percent(policy.taxRate()) + " of the taxable price less the trade-in allowance when "
+            + "the dealer takes your car in trade. A car sold elsewhere gives no such credit.";
+    return new TaxCredit("AVAILABLE", explanation, jurisdiction, policy.version(), policy.taxRate(), credit, name);
+  }
+
+  private static String percent(BigDecimal rate) {
+    return rate.movePointRight(2).stripTrailingZeros().toPlainString() + "%";
   }
 
   /**

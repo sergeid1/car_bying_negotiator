@@ -56,12 +56,11 @@ public final class CashDealEconomicsCalculator {
     BigDecimal netDue = otd.subtract(netTradeCredit).subtract(downPayment).subtract(credits);
 
     Amount recomputed = amount(otd, policy);
-    Reconciliation reconciliation = reconcile(offer, policy, recomputed);
     List<ClassifiedLineItem> classified = new ArrayList<>();
     for (LineItem item : offer.lineItems()) {
       classified.add(new ClassifiedLineItem(
           item.evidence(), item.label(), item.type(), amount(item.amount().amount(), policy),
-          item.taxTreatment(), item.eligibility(), treatmentReason(item)));
+          item.taxTreatment(), item.eligibility(), treatmentReason(item, policy)));
     }
 
     return new Result(
@@ -74,10 +73,11 @@ public final class CashDealEconomicsCalculator {
         new PriceReductions(amount(discounts, policy), amount(verifiedRebates, policy),
             amount(excludedRebates, policy), amount(discounts.add(verifiedRebates), policy)),
         new TaxCalculation(taxableCharges, availableTaxCredit, appliedTaxCredit, taxableBasis,
-            policy.taxRate(), unroundedTax, policy.taxComponents()),
+            policy.taxRate(), unroundedTax, policy.taxComponents(), policy.taxRules().taxName(),
+            policy.taxRules().buyerNote()),
         new RoundingDisclosure(policy.currencyScale(), policy.roundingMode(),
             "TAX_AND_FINAL_MONETARY_OUTPUTS"),
-        reconciliation, List.copyOf(classified));
+        reconcile(offer, policy, recomputed, taxes), List.copyOf(classified));
   }
 
   /** Shared by economics and the outside trade-offer comparison. */
@@ -95,7 +95,8 @@ public final class CashDealEconomicsCalculator {
           && item.type() != LineType.SELLING_PRICE
           && item.type() != LineType.DEALER_DISCOUNT
           && item.type() != LineType.REBATE
-          && item.type() != LineType.QUOTED_TAX) {
+          && item.type() != LineType.QUOTED_TAX
+          && policy.taxRules().nonTaxableTerm(item.type(), item.label()) == null) {
         total = total.add(item.amount().amount());
       }
     }
@@ -114,7 +115,7 @@ public final class CashDealEconomicsCalculator {
         .map(item -> item.amount().amount()).reduce(ZERO, BigDecimal::add);
   }
 
-  private static Reconciliation reconcile(Offer offer, Policy policy, Amount recomputed) {
+  private static Reconciliation reconcile(Offer offer, Policy policy, Amount recomputed, BigDecimal taxes) {
     if (offer.quotedOutTheDoorTotal() == null) {
       Amount unavailable = new Amount(0, policy.currency().getCurrencyCode());
       return new Reconciliation(null, recomputed, unavailable,
@@ -129,6 +130,13 @@ public final class CashDealEconomicsCalculator {
     String reason = within
         ? "Quoted total is within the policy reconciliation tolerance"
         : "Quoted total differs from the policy recomputation; no favorable classification inferred";
+    // A tax paid when the car is titled may be left off the dealer's total; it is still owed and still counted.
+    if (!within && policy.taxRules().paidAtTitling() && taxes.signum() > 0
+        && discrepancyValue.add(taxes).abs().compareTo(policy.reconciliationTolerance()) <= 0) {
+      within = true;
+      reason = "Quoted total leaves out the " + policy.taxRules().taxName() + ", which is paid when the car is "
+          + "titled; the recomputed total includes it";
+    }
     return new Reconciliation(quoted, recomputed, discrepancy,
         amount(policy.reconciliationTolerance(), policy), within,
         offer.quotedTotalEvidence(), reason);
@@ -142,6 +150,14 @@ public final class CashDealEconomicsCalculator {
     BigDecimal rounded = value.setScale(policy.currencyScale(), policy.roundingMode());
     long minor = rounded.movePointRight(policy.currencyScale()).longValueExact();
     return new Amount(minor, policy.currency().getCurrencyCode());
+  }
+
+  private static String treatmentReason(LineItem item, Policy policy) {
+    String term = policy.taxRules().nonTaxableTerm(item.type(), item.label());
+    if (term != null && policy.taxableLineTypes().contains(item.type()) && item.type() != LineType.SELLING_PRICE) {
+      return "Not taxable under " + policy.version() + ": a separately stated charge matching \"" + term + "\"";
+    }
+    return treatmentReason(item);
   }
 
   private static String treatmentReason(LineItem item) {

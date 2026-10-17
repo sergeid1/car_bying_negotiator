@@ -252,8 +252,7 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
 
       <p className="muted">
         {supported.length > 0
-          ? `Supported during the pilot: ${supported.map(value => value === "US-NC"
-              ? "North Carolina (synthetic development fixture)" : stateName(value)).join(", ")}.`
+          ? `Supported during the pilot: ${supported.map(stateName).join(", ")}.`
           : "Enter the vehicle you are negotiating for."}
       </p>
 

@@ -329,7 +329,7 @@ class DocumentExtractionAcceptanceTest {
           application.client(), "/api/v1/cases/" + caseId + "/cash-economics",
           Map.of(), "calculate-cash-economics-again", token);
       assertThat(economics.get("dealerOfferId").asText()).isEqualTo(offer.get("id").asText());
-      assertThat(economics.get("policyVersion").asText()).isEqualTo("US-NC.cash.v1");
+      assertThat(economics.get("policyVersion").asText()).isEqualTo("US-NC.cash.2026.v1");
       assertThat(economics.at("/result/vehicleSubtotal/minorUnits").asLong()).isEqualTo(2_450_000);
       assertThat(economics.at("/result/unknownCharges/minorUnits").asLong()).isEqualTo(89_900);
       assertThat(economics.at("/result/taxes/minorUnits").asLong()).isEqualTo(73_500);

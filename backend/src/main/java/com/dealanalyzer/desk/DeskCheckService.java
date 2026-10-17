@@ -48,16 +48,28 @@ public class DeskCheckService {
   private final TradeDeskCheck trade;
   private final com.dealanalyzer.desk.tactic.DeskTacticService tactics;
   private final com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice;
+  private final com.dealanalyzer.economics.persistence.CashEconomicsPersistence policies;
 
   public DeskCheckService(EphemeralBuyingCaseService cases, PricePlanService plans, DealerOfferPersistence offers,
       DocumentExtractionPersistence extractions, JdbcTemplate jdbc, ObjectMapper json,
       com.dealanalyzer.purchase.PurchaseService purchases, TradeDeskCheck trade,
       com.dealanalyzer.desk.tactic.DeskTacticService tactics,
-      com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice) {
+      com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice,
+      com.dealanalyzer.economics.persistence.CashEconomicsPersistence policies) {
     this.listingPrice = listingPrice;
+    this.policies = policies;
     this.cases = cases; this.plans = plans; this.offers = offers; this.extractions = extractions;
     this.jdbc = jdbc; this.json = json; this.purchases = purchases; this.trade = trade;
     this.tactics = tactics;
+  }
+
+  /** The case's pack rules when its tax is paid at titling (ticket 137); null otherwise or without a pack. */
+  private com.dealanalyzer.economics.CashDealEconomics.TaxRules titlingTax(String caseId) {
+    String jurisdiction = jdbc.queryForList("select buyer_jurisdiction from analysis_cases where id = ?", String.class, caseId)
+        .stream().filter(java.util.Objects::nonNull).findFirst().orElse(null);
+    if (jurisdiction == null || !policies.hasPolicy(jurisdiction)) return null;
+    var rules = policies.requirePolicy(jurisdiction).taxRules();
+    return rules.paidAtTitling() ? rules : null;
   }
 
   public record View(String policyVersion, String status, String source, Agreed agreedPrice, Paperwork paperwork,
@@ -170,6 +182,7 @@ public class DeskCheckService {
       for (var row : policy.compare("BASELINE", agreedTerms, deskTerms)) discrepancies.add(json.valueToTree(row));
     }
     List<Finding> lead = new ArrayList<>(), other = new ArrayList<>();
+    var titlingTax = titlingTax(caseId);
     int differing = 0;
     long added = 0;
     boolean addedKnown = true;
@@ -202,9 +215,17 @@ public class DeskCheckService {
           added = Math.addExact(added, observed.path("amountMinor").longValue());
         else addedKnown = false;
       }
+      String severity = row.path("severity").asText(), action = row.path("buyerAction").asText(null);
+      // A tax paid when the car is titled may be missing from desk paperwork without anything being wrong.
+      if (titlingTax != null && kind.equals("MISSING") && (line ? "TAX".equals(expected.path("category").asText())
+          : "TAX_TOTAL".equals(field))) {
+        group = "OTHER"; severity = "INFORMATIONAL";
+        action = titlingTax.buyerNote() + " Ask whether the dealer is collecting the " + titlingTax.taxName()
+            + " or you will pay it when you title the car.";
+      }
       var finding = new Finding(group, term, label, kind, nullable(expected), nullable(observed), decimal(row.path("delta")),
-          row.path("unit").asText(null), row.path("severity").asText(), verified,
-          nullable(row.at("/observedEvidence/evidence")), row.path("buyerAction").asText(null));
+          row.path("unit").asText(null), severity, verified,
+          nullable(row.at("/observedEvidence/evidence")), action);
       (group.equals("OTHER") ? other : lead).add(finding);
     }
     // The trade check (ticket 103) leads the TRADE group, ahead of totals; its terms rest on the same source.

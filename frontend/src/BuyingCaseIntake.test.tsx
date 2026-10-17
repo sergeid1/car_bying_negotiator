@@ -323,3 +323,12 @@ test("every intake control is reachable by keyboard in a single forward traversa
   await user.tab();
   expect(screen.getByRole("button", { name: /start my case/i })).toHaveFocus();
 });
+
+test("the pilot states are named plainly, with no North Carolina fixture label (ticket 137)", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify({
+    ...OPTIONS, supported: ["US-FL", "US-NC", "US-TX"], buyerState: null,
+  }), { status: 200, headers: { "Content-Type": "application/json" } }));
+  render(<BuyingCaseIntake onCaseOpened={vi.fn()} />);
+  expect(await screen.findByText("Supported during the pilot: Florida, North Carolina, Texas.")).toBeInTheDocument();
+  expect(screen.queryByText(/synthetic development fixture/i)).not.toBeInTheDocument();
+});

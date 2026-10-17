@@ -269,7 +269,8 @@ public class CoreReportService {
     analysis.set("limitations", json.valueToTree(List.of(
         financeCase ? "Financing checks cover Buyer-confirmed inputs and the declared schedule as of " + now + "; approved financing limits and independent purchase-charge reconciliation are not covered."
             : "Checks cover the frozen verified offer, approved limits, identity evidence and recorded cash calculation as of " + now + ".",
-        "Jurisdiction coverage: " + (cash == null ? "unavailable" : cash.jurisdiction() + " using " + cash.policyVersion()) + ".",
+        "Jurisdiction coverage: " + (cash == null ? "unavailable" : cash.jurisdiction() + " using " + cash.policyVersion()) + "."
+            + (cash == null || cash.taxCalculation().buyerNote() == null ? "" : " " + cash.taxCalculation().buyerNote()),
         "Tax and fee rules are recorded estimates; unresolved classifications prevent a matching verdict.",
         "Market provider: " + (assessment == null ? "unavailable" : assessment.provider().source() + "; " + assessment.limitation()),
         "Financing covers only the recorded standard monthly schedule. Mechanical condition, title, legal compliance and purchase safety are excluded. Savings are not guaranteed.")));

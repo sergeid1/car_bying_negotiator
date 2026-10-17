@@ -59,9 +59,115 @@ is $50, total $2,150. A $4,000 trade on an $8,000 vehicle leaves $4,000 taxable:
 $40 county tax. A trade on a vehicle whose taxable price remains above $5,000 removes state tax
 without removing any county tax.
 
-`US-NC.cash.v1` is retained for deterministic development and acceptance fixtures and explicitly
-labelled **synthetic development fixture**, including in intake. It is not a sourced North Carolina
-pack. Retiring it would break existing fixtures; enabling production remains operator-controlled.
-
 Out of scope: title, registration, plate, tire and battery fee schedules; non-resident purchases;
 out-of-state purchases registered in Florida. Those need separate sourced rule passes.
+
+## Pack rules beyond components (ticket 137)
+
+Texas and North Carolina tax a different set of dealer charges than Florida does, and neither the
+line type alone (`DEALER_FEE`, `ADD_ON`) nor the shared calculation can tell a documentary fee from
+dealer preparation, or an attached accessory from a service contract. The pack data carries the
+difference instead, as optional `policy_json` fields read into `CashDealEconomics.TaxRules`:
+
+- `taxName`: what the state calls the tax. Buyer-facing copy uses it; packs without it read "sales tax".
+- `nonTaxableCharges`: per taxable line type, label terms for a **separately stated** charge the state
+  does not tax. A term matches the line's label case-insensitively at a word start, so `doc` matches
+  "Doc fee" and "Documentary fee" but not "Paddock". A matching line stays in the out-the-door total but
+  not in the taxable price, and its `treatmentReason` names the pack and term. `SELLING_PRICE` cannot be
+  excluded, and empty, blank or unknown-line-type entries fail loading.
+- `paidAtTitling` with `buyerNote`: the tax is collected when the car is titled rather than always on the
+  dealer's invoice. The total still includes it. A quoted total that equals the recomputed total less the
+  tax, within tolerance, reconciles with a reason naming the tax; the report's jurisdiction limitation and
+  the Desk Check carry the note (see [desk check](desk-check.md)).
+
+`TaxCalculation` freezes `taxName` and `buyerNote` with the components. A lump `DEALER_CHARGES_TOTAL` or
+`ADD_ON_TOTAL` has no itemized labels, so it is taxed by its line type; itemized paperwork is needed for
+an exclusion to apply.
+
+## Texas 2026
+
+`US-TX.cash.2026.v1`, jurisdiction `US-TX`, scope a Texas resident buying from a Texas licensed dealer:
+one component, Texas motor vehicle sales tax at 6.25% on `TAXABLE_PRICE_AFTER_TRADE`, no cap and no
+local motor vehicle tax. Taxable line types are `SELLING_PRICE,DEALER_FEE,ADD_ON`, with
+`nonTaxableCharges` for a documentary fee and vehicle inventory tax reimbursement (`DEALER_FEE`) and for
+a service contract, warranty, maintenance agreement, roadside assistance, GAP or other debt cancellation
+agreement, insurance and auto club membership (`ADD_ON`). Dealer preparation and other dealer charges
+are part of total consideration; accessories attached at the sale are taxable. The trade-in credit
+applies because the trade is on the dealer's paperwork, which is a licensed dealer taking it in the same
+transaction. The selling price after dealer discounts and verified rebates is the vehicle base, as the
+Comptroller deducts separately stated cash discounts and rebates.
+
+Sources read in full and checked **2026-10-16**:
+
+- [Texas Tax Code chapter 152](https://statutes.capitol.texas.gov/Docs/TX/htm/TX.152.htm), s.152.002
+  (total consideration, including the trade-in exclusion in (b)(5)), s.152.021 (6-1/4% rate) and
+  s.152.0411 (licensed dealers collect the tax). The page is a script shell; the text was read from
+  [the same document on the Legislative Council host](https://tcss.legis.texas.gov/resources/TX/htm/TX.152.htm).
+- Comptroller Motor Vehicle Tax Guide 96-254 (3/2026): [Tax Rates](https://comptroller.texas.gov/taxes/publications/96-254/tax-rates.php)
+  (6.25% since 09/1/91), [Motor Vehicle Sales Tax](https://comptroller.texas.gov/taxes/publications/96-254/mv-sales.php)
+  (price less trade-in and dealer discounts on licensed-dealer sales),
+  [Total Consideration](https://comptroller.texas.gov/taxes/publications/96-254/total-consideration.php)
+  (the taxable and deducted charges above), [Trade-Ins](https://comptroller.texas.gov/taxes/publications/96-254/trade-ins.php)
+  (same transaction, directly to the seller; no credit for a private sale or a sale to a different dealer)
+  and [Accessories and Equipment](https://comptroller.texas.gov/taxes/publications/96-254/accessories-equipment.php).
+- [Comptroller motor vehicle sales and use tax](https://comptroller.texas.gov/taxes/motor-vehicle/sales-use.php).
+
+The ticket expected the sales section to list taxable dealer charges; it does not. The list is on the
+guide's Total Consideration page, which also shows that Texas, unlike Florida, does not tax a
+separately stated documentary fee.
+
+Synthetic worked examples, checked in `TexasNorthCarolinaTaxPacksAcceptanceTest`: a $30,000 price and no
+trade-in is $1,875.00 tax; a $12,000 trade-in leaves $18,000 taxable, $1,125.00; an $8,000 car with a
+$10,000 trade-in is $0. The Comptroller's own example, $42,000 less a $15,000 trade-in, is $1,687.50. On
+$30,000 with a $150 documentary fee, $300 dealer prep, $400 window tint, a $2,000 service contract and
+a $700 GAP waiver, $30,700 is taxable: $1,918.75. Trading in the $12,000 car instead of selling it
+elsewhere keeps $750.00 of tax.
+
+## North Carolina 2026
+
+`US-NC.cash.2026.v1`, jurisdiction `US-NC`, scope a North Carolina resident buying a passenger vehicle
+from a North Carolina retailer: one component, North Carolina highway use tax at 3% on
+`TAXABLE_PRICE_AFTER_TRADE`, no cap and no local tax. The $2,000 maximum in G.S. 105-187.3(a1) applies
+only to Class A or B commercial motor vehicles and recreational vehicles, so it is not in the pack.
+Taxable line types are `SELLING_PRICE,DEALER_FEE,ADD_ON`: retail value is the sales price including
+accessories attached at delivery, plus any administrative, documentary or similar fee regulated by
+G.S. 20-101.1. `nonTaxableCharges` excludes a separately stated online registration fee
+(20-101.1(d)) and, as add-ons, a service contract, warranty, maintenance agreement, roadside assistance,
+GAP and insurance, which are not the vehicle or an attached accessory. `paidAtTitling` is true: the tax
+is paid when the certificate of title is applied for, and a retailer may collect it (105-187.4).
+
+Sources read in full and checked **2026-10-16**:
+
+- [G.S. 105 Article 5A](https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/ByArticle/Chapter_105/Article_5A.html):
+  105-187.3 (base, 3% rate, maximums, retail value less the retailer's trade-in allowance, service
+  contracts excluded when separately stated), 105-187.4 (payment at titling; retailer may collect) and
+  105-187.6 and 105-187.7 (exemptions and credits, out of scope).
+- [G.S. 20-101.1](https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_20/GS_20-101.1.html):
+  which dealer administrative fees are in the base.
+- [NCDMV MVR-106, Rev. 04/26](https://www.ncdot.gov/dmv/downloads/Documents/MVR-106.pdf): "Dealer Sale -
+  3% of sale price plus any Administrative/Document Fee less any trade-in price."
+- [NCDOT highway use tax brief](https://www.ncdot.gov/about-us/how-we-operate/finance-budget/nc-first/Documents/nc-first-brief-edition-3.pdf),
+  August 2020, background only: trade-in value comes off on a dealership purchase; the $2,000 cap is for
+  commercial and recreational vehicles. Its state comparison figure is not used.
+- The [NCDOR highway use tax page](https://www.ncdor.gov/taxes-forms/highway-use-tax) has no dealer-sale
+  guidance; NCDOR administers the alternate tax on leases and rentals.
+
+Synthetic worked examples: $30,000 and no trade-in is $900.00; a $12,000 trade-in leaves $18,000
+taxable, $540.00; an $8,000 car with a $10,000 trade-in is $0. With the same five dealer charges as the
+Texas example, the documentary fee is taxable here: $30,850 taxable, $925.50. A quote of $30,000 on a
+$30,000 car with a $12,000 trade-in leaves out the $540 tax and still reconciles; the total stays
+$30,540. Trading in the $12,000 car keeps $360.00 of tax.
+
+## The synthetic fixture
+
+V61 moves `US-NC.cash.v1` to jurisdiction `SYNTHETIC-FIXTURE`, which no postal code resolves to,
+instead of deleting it: frozen results reference its `policy_version`, and they keep the pack version
+they were made with. `SupportedJurisdictions` and the operator evidence measurement list only `US-`
+jurisdictions. Acceptance tests that used a North Carolina ZIP code now run on the sourced pack; tests
+that need a deterministic flat-rate policy construct one in code.
+
+Out of scope for Texas and North Carolina: title, registration, plate and inspection fees; Texas
+new-resident and even-exchange taxes and standard presumptive value (private sales); private-party
+sales in both states; dealer doc fee caps (Texas has a $225 safe harbor, North Carolina no cap;
+nothing in the product checks doc fee caps yet); non-resident purchases; and vehicles bought out of
+state.

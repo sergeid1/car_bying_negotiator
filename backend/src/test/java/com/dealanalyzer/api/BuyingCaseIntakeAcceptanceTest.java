@@ -52,7 +52,7 @@ class BuyingCaseIntakeAcceptanceTest {
   @Test
   void aRealJurisdictionWithoutAPolicyPackIsRefusedAndNothingIsStored() throws Exception {
     try (RunningApplication application = harness.start("intake-refuses-unsupported")) {
-      Captured refused = capture(application.client(), "shared-key", intake("73960", "27604", null));
+      Captured refused = capture(application.client(), "shared-key", intake("30303", "27604", null));
 
       assertThat(refused.status()).isEqualTo(422);
       JsonNode problem = JSON.readTree(refused.body());
@@ -138,7 +138,7 @@ class BuyingCaseIntakeAcceptanceTest {
           .retrieve()
           .body(JsonNode.class);
 
-      assertThat(view.get("supported").toString()).isEqualTo("[\"US-FL\",\"US-NC\"]");
+      assertThat(view.get("supported").toString()).isEqualTo("[\"US-FL\",\"US-NC\",\"US-TX\"]");
       assertThat(view.at("/consentPolicies/serviceProcessing").asText())
           .isEqualTo("service-processing.v1");
     }

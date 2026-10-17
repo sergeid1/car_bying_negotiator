@@ -142,3 +142,15 @@ test("a stored v1 result without a basis renders its range as before", () => {
   render(<TradeCheckPanel result={tradeCheckFixture()} />);
   expect(screen.getByText("Trade-in range, an estimate from SYNTHETIC_TRADE_VALUATION")).toBeInTheDocument();
 });
+
+test("the tax a trade-in removes is named the way the state names it (ticket 137)", () => {
+  const result = tradeCheckFixture();
+  render(<TradeCheckPanel result={{ ...result, taxCredit: { status: "AVAILABLE", jurisdiction: "US-TX",
+    policyVersion: "US-TX.cash.2026.v1", creditMinor: 71875, taxName: "Texas motor vehicle sales tax",
+    reason: "The Texas motor vehicle sales tax is 6.25% of the taxable price less the trade-in allowance when the dealer takes your car in trade. A car sold elsewhere gives no such credit." } }} />);
+  expect(screen.getByText("Texas motor vehicle sales tax a trade-in removes")).toBeInTheDocument();
+  expect(screen.getByText(/About \$718\.75 under US-TX rules \(US-TX\.cash\.2026\.v1\)/)).toBeInTheDocument();
+  cleanup();
+  render(<TradeCheckPanel result={result} />);
+  expect(screen.getByText("Sales tax a trade-in removes")).toBeInTheDocument();
+});
