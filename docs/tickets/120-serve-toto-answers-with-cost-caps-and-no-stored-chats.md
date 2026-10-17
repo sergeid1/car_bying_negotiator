@@ -14,8 +14,9 @@ counts from the existing in-process peer quota. `TotoController` and `TotoServic
 guide-answer row without a known cost (in flight, failed or unpriced) and every call admitted in the process, so
 unknown cost only overstates spend. Days are UTC days; the client cap is a rolling 24 hours. Defaults: 30 account
 and 10 client questions a day, a $20.00 daily ceiling (`TOTO_DAILY_SPENDING_CEILING_USD`; the operator confirms it).
-Known limits: behind the Cloudflare Worker and the pilot nginx proxy every visitor shares the proxy's address, so
-the client cap is one deployment-wide bucket until the deployment passes a trusted client address (ticket 136); admission is
+Known limits: the client cap counts per visitor behind the Cloudflare Worker and the pilot nginx proxy only through
+ticket 136's verified visitor address (an IPv6 visitor per /64); without the origin secret configured in the service it
+falls back to one bucket for the proxy's address. Admission is
 per process, so several replicas can overshoot the ceiling by a few worst-case calls.
 
 ## Scope

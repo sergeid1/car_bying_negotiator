@@ -45,9 +45,14 @@ for the origin; a Cloudflare Origin CA certificate alone is not this setup's TLS
 The Worker and origin share no browser cross-origin calls. `account_session` retains its
 Secure/SameSite=Strict/Path=/api/v1 behavior. Workers preview URLs and workers.dev are disabled.
 Logs/traces at the Worker and Nginx ingress are disabled to avoid recording request content.
-Application peer quotas consequently share the loopback peer across Buyers; no forwarded-IP
-trust is introduced. Measure that aggregate limit against bounded-pilot enrollment and upload
-polling, and review quota changes explicitly rather than trusting client-supplied peer headers.
+The Worker also deletes any client copy of `X-Otdog-Client-Address` and sets it from
+Cloudflare's own `CF-Connecting-IP`. Nginx passes that header and the verification header only
+on requests carrying the secret, and clears `Forwarded` and `X-Forwarded-*`. Spring reads the
+same `ORIGIN_SECRET` (from `backend.env`, as `security.client-address.origin-secret`) and keys
+its per-client quotas on the visitor address only when the request carries it; otherwise it keys
+on the loopback peer. `server.forward-headers-strategy=none` stays, so forwarding headers never
+select a key. IPv6 visitors share a bucket per /64. The address is an in-memory quota key only,
+never stored or logged. Nginx's own `limit_req` zones still key on the Cloudflare egress address.
 
 ## Offline review
 
