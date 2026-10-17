@@ -24,7 +24,10 @@ import org.springframework.web.client.RestClient;
 class TradeDeskCheckAcceptanceTest {
   private static final String TRADE_VIN = TradeVehicleAcceptanceTest.TRADE_VIN;
   private static final String OTHER_TRADE_VIN = TradeVehicleAcceptanceTest.OTHER_VIN;
-  /** AGREED (the accepted quote), TRADE (desk paperwork with an $11,500 allowance and a $19,200 payoff) or OTHER_TRADE. */
+  /**
+   * AGREED (the accepted quote), TRADE (desk paperwork with an $11,500 allowance and a $19,200 payoff), OTHER_TRADE,
+   * or NO_TAX (TRADE without the tax line, as North Carolina paperwork may be when the tax is paid at titling).
+   */
   static volatile String paperwork = "AGREED";
 
   @org.springframework.boot.test.context.TestConfiguration
@@ -45,6 +48,7 @@ class TradeDeskCheckAcceptanceTest {
               extracted.expectedPageCount(), candidates, extracted.lineItems(), extracted.documentWarnings());
         }
         for (var candidate : extracted.candidates()) {
+          if (paperwork.equals("NO_TAX") && candidate.field().equals("TAX_TOTAL")) continue;
           // The financed amount as agreed, so only the trade differs.
           if (candidate.field().equals("AMOUNT_FINANCED"))
             candidate = new Candidate("AMOUNT_FINANCED", "Amount financed $26,800", "2680000", "USD_MINOR", candidate.evidence(), .98, true);
@@ -64,22 +68,29 @@ class TradeDeskCheckAcceptanceTest {
 
   @TempDir Path directory;
 
+  /** Ticket 137: the sourced North Carolina pack, highway use tax at 3% of the price less the trade. */
   @Test void deskPaperworkLeadsTheTradeFindingsWithTheShortfallFlagsThePayoffAndReachesAFreshCaseReport() throws Exception {
-    checkDeskWorkflow(false);
+    checkDeskWorkflow("US-NC");
   }
 
   @Test void syntheticFloridaAgreedPriceAndFreshDeskCasesUseTheCountyPackForTheTradeAndCashEconomics() throws Exception {
-    checkDeskWorkflow(true);
+    checkDeskWorkflow("US-FL");
   }
 
-  private void checkDeskWorkflow(boolean florida) throws Exception {
+  /** Ticket 137: Texas motor vehicle sales tax at 6.25% of the price less the trade a licensed dealer takes. */
+  @Test void syntheticTexasAgreedPriceAndFreshDeskCasesUseTheTexasPackForTheTradeAndCashEconomics() throws Exception {
+    checkDeskWorkflow("US-TX");
+  }
+
+  private void checkDeskWorkflow(String state) throws Exception {
+    boolean florida = state.equals("US-FL");
     paperwork = "AGREED";
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("tradedesk", true,
         Configuration.class, "--case.deletion.delay=PT1H",
         "--document.storage.path=" + directory.resolve("objects"),
         "--document.storage.encryption-key=0123456789abcdef0123456789abcdef")) {
       var client = app.client();
-      var created = post(client, "/api/v1/cases", caseRequest(florida), "case");
+      var created = post(client, "/api/v1/cases", caseRequest(state), "case");
       String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
       String base = "/api/v1/cases/" + caseId, desk = base + "/desk-check";
       TestDriveAcceptanceTest.agree(app, client, base, caseId, token);
@@ -105,10 +116,21 @@ class TradeDeskCheckAcceptanceTest {
       assertThat(trade.path("payoffDifferenceMinor").asLong()).isEqualTo(120_000);
       assertThat(find(trade.path("findings"), "code", "PAYOFF_DIFFERS").path("summary").asText()).contains("$1,200 more");
       assertThat(trade.path("equityMinor").asLong()).isEqualTo(1_150_000 - 1_920_000);
-      assertThat(trade.at("/taxCredit/jurisdiction").asText()).isEqualTo(florida ? "US-FL:Broward" : "US-NC");
+      assertThat(trade.at("/taxCredit/jurisdiction").asText()).isEqualTo(florida ? "US-FL:Broward" : state);
+      // The tax the Buyer loses by selling the car elsewhere: the rate times the $11,500 allowance, no cap.
       assertThat(trade.at("/taxCredit/creditMinor").asLong()).as("trade credit: both Florida surtax bases exceed the cap")
-          .isEqualTo(florida ? 69_000 : 34_500);
+          .isEqualTo(switch (state) { case "US-FL" -> 69_000L; case "US-TX" -> 71_875L; default -> 34_500L; });
       if (florida) assertThat(trade.at("/taxCredit/reason").asText()).contains("Broward County", "$5,000");
+      if (state.equals("US-TX")) {
+        assertThat(trade.at("/taxCredit/taxName").asText()).isEqualTo("Texas motor vehicle sales tax");
+        assertThat(trade.at("/taxCredit/reason").asText()).contains("6.25%", "takes your car in trade");
+        assertThat(shortfall.path("summary").asText()).contains("lowers the Texas motor vehicle sales tax on this car by about $718.75");
+      }
+      if (state.equals("US-NC")) {
+        assertThat(trade.at("/taxCredit/policyVersion").asText()).isEqualTo("US-NC.cash.2026.v1");
+        assertThat(trade.at("/taxCredit/taxName").asText()).isEqualTo("North Carolina highway use tax");
+        assertThat(shortfall.path("summary").asText()).contains("lowers the North Carolina highway use tax on this car by about $345");
+      }
       assertThat(trade.at("/valuation/source").asText()).isEqualTo("SYNTHETIC_TRADE_VALUATION");
       // The trade group sits ahead of totals, and the trade never reduces the price findings (DEAL-09).
       List<String> groups = new ArrayList<>();
@@ -153,6 +175,21 @@ class TradeDeskCheckAcceptanceTest {
       assertThat(other.at("/trade/findings").findValuesAsText("code")).containsExactly("TRADE_VIN_DIFFERENT");
       assertThat(other.at("/trade/equityMinor").isNull()).isTrue();
 
+      // Ticket 137: North Carolina collects its highway use tax at titling, so paperwork without the tax line is a
+      // note, not a lead finding. Florida and Texas dealers collect the tax, so its absence still leads.
+      paperwork = "NO_TAX";
+      upload(app, base, token, "desk-no-tax");
+      var noTax = get(client, desk, token);
+      boolean leads = noTax.path("findings").findValuesAsText("term").contains("candidate:TAX_TOTAL#1");
+      if (state.equals("US-NC")) {
+        assertThat(leads).isFalse();
+        var note = find(noTax.path("otherDifferences"), "term", "candidate:TAX_TOTAL#1");
+        assertThat(note.path("kind").asText()).isEqualTo("MISSING");
+        assertThat(note.path("severity").asText()).isEqualTo("INFORMATIONAL");
+        assertThat(note.path("buyerAction").asText()).contains("when the car is titled", "still owed",
+            "collecting the North Carolina highway use tax");
+      } else assertThat(leads).isTrue();
+
       // Ticket 106: without a licensed range, the Buyer's own estimate stands in, named by where and when it was
       // looked up; the written offer is still the only offer.
       paperwork = "TRADE";
@@ -170,7 +207,7 @@ class TradeDeskCheckAcceptanceTest {
 
       // A fresh desk case without a journey holds its own trade, and its report leads with the trade.
       paperwork = "TRADE";
-      var fresh = post(client, "/api/v1/cases", caseRequest(florida), "fresh-case");
+      var fresh = post(client, "/api/v1/cases", caseRequest(state), "fresh-case");
       String freshId = fresh.at("/case/id").asText(), freshToken = fresh.path("accessToken").asText();
       String freshBase = "/api/v1/cases/" + freshId;
       recordTrade(client, freshId, freshToken, "fresh");
@@ -182,6 +219,12 @@ class TradeDeskCheckAcceptanceTest {
         assertThat(cash.path("policyVersion").asText()).isEqualTo("US-FL.cash.2026.v1:Broward");
         assertThat(cash.at("/result/taxCalculation/components/1/baseCap").decimalValue()).isEqualByComparingTo("5000");
         assertThat(cash.at("/result/taxCalculation/components/1/name").asText()).contains("Broward County", "$5,000");
+      } else {
+        // One state component on $24,500 plus the $899 dealer fee, less the $11,500 allowance; the fee is taxable in both.
+        assertThat(cash.path("policyVersion").asText()).isEqualTo(state + ".cash.2026.v1");
+        assertThat(cash.at("/result/taxCalculation/components")).hasSize(1);
+        assertThat(cash.at("/result/taxCalculation/taxableBasis").decimalValue()).isEqualByComparingTo("13899");
+        assertThat(cash.at("/result/taxes/minorUnits").asLong()).isEqualTo(state.equals("US-TX") ? 86_869 : 41_697);
       }
       post(client, freshBase + "/market-assessments", Map.of(), "fresh-market", freshToken);
       post(client, freshBase + "/analyses", Map.of(), "fresh-analysis", freshToken);
@@ -226,12 +269,13 @@ class TradeDeskCheckAcceptanceTest {
     return started.at("/document/id").asText();
   }
 
-  private static Map<String, Object> caseRequest(boolean florida) {
+  private static Map<String, Object> caseRequest(String state) {
     var request = new HashMap<>(validCase());
-    if (florida) {
+    if (state.equals("US-FL")) {
       request.put("buyerPostalCode", "33301"); request.put("dealerPostalCode", "33301");
       request.put("buyerCounty", "Broward");
     }
+    if (state.equals("US-TX")) { request.put("buyerPostalCode", "75201"); request.put("dealerPostalCode", "75201"); }
     return request;
   }
 

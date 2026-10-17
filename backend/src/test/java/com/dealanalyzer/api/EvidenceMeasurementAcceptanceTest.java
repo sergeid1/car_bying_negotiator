@@ -110,13 +110,13 @@ class EvidenceMeasurementAcceptanceTest {
       assertThat(operator(app, PATH, ServiceOperationsAcceptanceTest.SUPPORT).at("/observed/latencyComparison").asText())
           .isEqualTo("NOT_MEASURABLE");
       // Another policy version must not multiply cases; another jurisdiction must retain zero samples.
-      mutate(app, "insert into jurisdiction_policies select 'US-NC.cash.v2', jurisdiction, currency, tax_rate, taxable_line_types, trade_tax_credit_enabled, currency_scale, rounding_mode, reconciliation_tolerance, policy_json, effective_at from jurisdiction_policies where policy_version = 'US-NC.cash.v1'");
+      mutate(app, "insert into jurisdiction_policies select 'US-NC.cash.v2', jurisdiction, currency, tax_rate, taxable_line_types, trade_tax_credit_enabled, currency_scale, rounding_mode, reconciliation_tolerance, policy_json, effective_at from jurisdiction_policies where policy_version = 'US-NC.cash.2026.v1'");
       mutate(app, "insert into jurisdiction_policies select 'US-VA.test.v1', 'US-VA', currency, tax_rate, taxable_line_types, trade_tax_credit_enabled, currency_scale, rounding_mode, reconciliation_tolerance, policy_json, effective_at from jurisdiction_policies where policy_version = 'US-NC.cash.v1'");
       var noAssessment = post(app.client(), "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase());
       events.record(noAssessment.at("/case/id").asText(), PilotEvents.Type.MARKET_COVERAGE, PilotEvents.Category.UNAVAILABLE, null);
       post(app.client(), "/api/v1/cases", CasePortabilityAcceptanceTest.buyingCase()); // No attempt, excluded.
       report = operator(app, PATH, ServiceOperationsAcceptanceTest.SUPPORT);
-      assertThat(report.path("jurisdictions").findValuesAsText("jurisdiction")).containsExactly("US-FL", "US-NC", "US-VA");
+      assertThat(report.path("jurisdictions").findValuesAsText("jurisdiction")).containsExactly("US-FL", "US-NC", "US-TX", "US-VA");
       assertThat(jurisdiction(report, "US-NC").at("/casesAttempted").asInt()).isEqualTo(4);
       assertThat(jurisdiction(report, "US-NC").at("/casesWithAssessment").asInt()).isEqualTo(3);
       assertThat(jurisdiction(report, "US-NC").at("/casesWithoutAssessment").asInt()).isEqualTo(1);

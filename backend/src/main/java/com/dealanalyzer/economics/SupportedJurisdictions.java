@@ -18,12 +18,17 @@ public class SupportedJurisdictions {
   }
 
   public boolean supports(String jurisdiction) {
-    return jurisdiction != null && (persistence.hasPolicy(jurisdiction)
+    return buyerLocation(jurisdiction) && (persistence.hasPolicy(jurisdiction)
         || all().contains(jurisdiction));
   }
 
   public List<String> all() {
     return persistence.policyJurisdictions().stream().map(value -> value.split(":", 2)[0])
-        .distinct().sorted().toList();
+        .filter(SupportedJurisdictions::buyerLocation).distinct().sorted().toList();
+  }
+
+  /** Fixture-only packs, such as the synthetic {@code SYNTHETIC-FIXTURE}, are never a Buyer's location. */
+  private static boolean buyerLocation(String jurisdiction) {
+    return jurisdiction != null && jurisdiction.startsWith("US-");
   }
 }

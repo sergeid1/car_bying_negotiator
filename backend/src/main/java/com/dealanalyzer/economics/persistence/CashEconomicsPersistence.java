@@ -62,7 +62,43 @@ public class CashEconomicsPersistence {
         value.taxRate, Arrays.stream(value.taxableLineTypes.split(","))
             .map(LineType::valueOf).collect(Collectors.toUnmodifiableSet()),
         value.tradeTaxCreditEnabled, value.currencyScale, RoundingMode.valueOf(value.roundingMode),
-        value.reconciliationTolerance, components(value.policyJson));
+        value.reconciliationTolerance, components(value.policyJson), rules(value.policyJson));
+  }
+
+  /** Optional pack fields from ticket 137; a malformed value fails loading rather than being ignored. */
+  private com.dealanalyzer.economics.CashDealEconomics.TaxRules rules(String policyJson) {
+    try {
+      JsonNode node = json.readTree(policyJson);
+      JsonNode charges = node.path("nonTaxableCharges");
+      var terms = new java.util.EnumMap<LineType, java.util.List<String>>(LineType.class);
+      if (!charges.isMissingNode()) {
+        if (!charges.isObject()) throw new IllegalStateException("nonTaxableCharges must be an object");
+        for (var entry : charges.properties()) {
+          if (!entry.getValue().isArray()) throw new IllegalStateException("nonTaxableCharges values must be arrays");
+          var list = new java.util.ArrayList<String>();
+          for (JsonNode term : entry.getValue()) {
+            if (!term.isTextual()) throw new IllegalStateException("nonTaxableCharges terms must be text");
+            list.add(term.asText());
+          }
+          terms.put(LineType.valueOf(entry.getKey()), list);
+        }
+      }
+      JsonNode titling = node.path("paidAtTitling");
+      if (!titling.isMissingNode() && !titling.isBoolean()) throw new IllegalStateException("paidAtTitling must be a boolean");
+      String taxName = text(node, "taxName"), note = text(node, "buyerNote");
+      if (titling.asBoolean(false) && (taxName == null || note == null))
+        throw new IllegalStateException("A tax paid at titling needs a taxName and a buyerNote");
+      return new com.dealanalyzer.economics.CashDealEconomics.TaxRules(taxName, terms, titling.asBoolean(false), note);
+    } catch (JsonProcessingException | IllegalArgumentException exception) {
+      throw new IllegalStateException("Unable to read jurisdiction tax rules", exception);
+    }
+  }
+
+  private static String text(JsonNode node, String field) {
+    JsonNode value = node.path(field);
+    if (value.isMissingNode() || value.isNull()) return null;
+    if (!value.isTextual() || value.asText().isBlank()) throw new IllegalStateException(field + " must be text");
+    return value.asText();
   }
 
   private java.util.List<com.dealanalyzer.economics.CashDealEconomics.TaxComponent> components(String policyJson) {

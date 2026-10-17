@@ -17,7 +17,7 @@ CI runs `clean verify` so results cannot be inherited from an earlier build.
 
 | # | Prerequisite | Status | Evidence or blocker |
 | --- | --- | --- | --- |
-| 1 | `jurisdiction-pack` | **BLOCKED** | Florida `US-FL.cash.2026.v1` county packs, effective 2026-01-01, checked 2026-10-12, review 2027-01-01: 2026 F.S. 212.05/212.054/212.09, DOR DR-15DSS 2026 R.11/25, GT-800019 R.10/25 and GT-800030 R.08/22; [pack format and source URLs](jurisdiction-tax-packs.md). Operator status decision remains pending. |
+| 1 | `jurisdiction-pack` | **BLOCKED** | Florida `US-FL.cash.2026.v1` county packs, effective 2026-01-01, checked 2026-10-12, review 2027-01-01: 2026 F.S. 212.05/212.054/212.09, DOR DR-15DSS 2026 R.11/25, GT-800019 R.10/25 and GT-800030 R.08/22; [pack format and source URLs](jurisdiction-tax-packs.md). Texas `US-TX.cash.2026.v1` and North Carolina `US-NC.cash.2026.v1` (ticket 137), effective 2026-01-01, checked 2026-10-16, review 2027-01-01: Texas Tax Code ch. 152 and Comptroller Motor Vehicle Tax Guide 96-254 (3/2026); N.C.G.S. 105 Article 5A, G.S. 20-101.1 and NCDMV MVR-106 Rev. 04/26. The synthetic `US-NC.cash.v1` is now fixture-only. Operator status decision remains pending. |
 | 2 | `provider-terms` | **BLOCKED** | No provider terms executed |
 | 3 | `document-corpus` | **BLOCKED** | No permissioned Dealer documents acquired |
 | 4 | `expert-policy-validation` | **BLOCKED** | No automotive-expert review of boundary policy |
@@ -33,7 +33,9 @@ CI runs `clean verify` so results cannot be inherited from an earlier build.
 
 No pilot state has been selected and no jurisdiction pack has been reviewed by qualified counsel.
 The economics engine already reads effective-dated, versioned packs from `jurisdiction_policies`,
-so the mechanism exists; the shipped values are synthetic development fixtures, not sourced law.
+so the mechanism exists. Sourced packs now ship for Florida (ticket 108), Texas and North Carolina
+(ticket 137), each with citations, checked dates and a review date; the synthetic `US-NC.cash.v1` remains
+only as a fixture-only pack that no Buyer location resolves to. Counsel review is still outstanding.
 
 Counsel review of Buyer-facing legal copy sits inside this blocked scope. Prerequisite 7 verifies
 only the mechanical claim properties of that copy, never its legal adequacy.
@@ -219,3 +221,13 @@ evidence each blocked prerequisite needs:
   provider for each case's reply-intake address.
 - Specification §18 adds published Terms of Service and a Privacy Policy before the pilot, and a
   legal review before charging Buyers.
+
+## Specification 2.4 update — 2026-10-16
+
+The product owner widened the pilot to three states: Florida, Texas and North Carolina. Both new states
+tax a dealer car sale with one statewide rate and no county table: Texas 6.25% motor vehicle sales tax and
+North Carolina 3% highway use tax, each on the price after the trade-in. Ticket 137 ships their packs and
+retires the synthetic `US-NC.cash.v1` as what a North Carolina Buyer gets.
+
+This changes no prerequisite status. `jurisdiction-pack` now needs a sourced pack for each of the three
+states, and the Phase 5 licensing route (specification §18 item 12) must be confirmed for each state.

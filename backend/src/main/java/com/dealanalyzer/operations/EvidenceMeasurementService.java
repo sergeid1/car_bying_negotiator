@@ -89,7 +89,7 @@ public class EvidenceMeasurementService {
             case when position(':' in jurisdiction) > 0
               then substring(jurisdiction from 1 for position(':' in jurisdiction) - 1)
               else jurisdiction end as jurisdiction
-          from jurisdiction_policies where effective_at < :to) j
+          from jurisdiction_policies where effective_at < :to and jurisdiction like 'US-%') j
         left join analysis_cases c on c.buyer_jurisdiction = j.scope
         left join attempts a on a.case_id = c.id
         left join latest_assessment m on m.case_id = a.case_id

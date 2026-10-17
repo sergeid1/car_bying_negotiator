@@ -1,5 +1,7 @@
 package com.dealanalyzer.trade.desk;
 
+import com.dealanalyzer.economics.CashDealEconomics;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -417,6 +419,26 @@ class TradeDeskCheckTest {
     jurisdiction = "US-FL";
     recorded(MoneyOwed.NO, null, null, false, offer);
     all.addAll(desk.check("case", "token", terms("TRADE_ALLOWANCE", 1_150_000, "SELLING_PRICE", 2_500_000), null).findings());
+    // Ticket 137: the states' own tax names, the credit explanation and North Carolina's titling note.
+    List<String> copy = new ArrayList<>();
+    for (var pack : List.of(named("US-TX", "0.0625", "Texas motor vehicle sales tax", false),
+        named("US-NC", "0.03", "North Carolina highway use tax", true))) {
+      jurisdiction = pack.jurisdiction();
+      when(policies.hasPolicy(pack.jurisdiction())).thenReturn(true);
+      when(policies.requirePolicy(pack.jurisdiction())).thenReturn(pack);
+      recorded(MoneyOwed.NO, null, null, false, offer);
+      var named = desk.check("case", "token", terms("TRADE_ALLOWANCE", 1_150_000, "SELLING_PRICE", 2_500_000), null);
+      assertThat(named.taxCredit().taxName()).isEqualTo(pack.taxRules().taxName());
+      assertThat(named.findings().stream().map(TradeDeskCheck.Finding::summary))
+          .anyMatch(text -> text.contains("lowers the " + pack.taxRules().taxName() + " on this car"));
+      all.addAll(named.findings());
+      copy.add(named.taxCredit().reason());
+      if (pack.taxRules().buyerNote() != null) copy.add(pack.taxRules().buyerNote());
+    }
+    for (String text : copy) {
+      @SuppressWarnings("unchecked") var terms = ((List<Object>) termsOf.invoke(null, text)).stream().map(Object::toString).toList();
+      assertThat(terms).as(text).doesNotContain("STRONG", "FAIR", "POOR", "EXACT", "AVAILABLE", "DIFFERS", "UNAVAILABLE");
+    }
 
     assertThat(all.stream().map(TradeDeskCheck.Finding::code).distinct().count()).isGreaterThanOrEqualTo(15);
     for (var finding : all) {
@@ -434,6 +456,17 @@ class TradeDeskCheckTest {
       if (code.endsWith("SAME")) assertThat(terms).as(finding.summary()).contains("MATCH");
       if (code.endsWith("DIFFERS")) assertThat(terms).as(finding.summary()).containsAnyOf("ABOVE", "BELOW", "DIFFERS");
     }
+  }
+
+  /** A pack that names its tax, as V61's US-TX and US-NC packs do. */
+  private static Policy named(String place, String rate, String taxName, boolean titling) {
+    return new Policy(place + ".synthetic-named.v1", place, Currency.getInstance("USD"), new BigDecimal(rate),
+        Set.of(LineType.SELLING_PRICE, LineType.DEALER_FEE, LineType.ADD_ON), true, 2, RoundingMode.HALF_UP, BigDecimal.ONE,
+        List.of(new CashDealEconomics.TaxComponent(taxName, new BigDecimal(rate), CashDealEconomics.TaxBase.TAXABLE_PRICE_AFTER_TRADE,
+            null, "synthetic fixture", "2026-10-16")),
+        new CashDealEconomics.TaxRules(taxName, java.util.Map.of(), titling,
+            titling ? "North Carolina collects the highway use tax when the car is titled. The dealer may collect it with the sale, "
+                + "or you pay it when you title the car, so a quote can leave it out. It is still owed, and the total here includes it." : null));
   }
 
   private static Policy policy(String version, String place, String rate) {

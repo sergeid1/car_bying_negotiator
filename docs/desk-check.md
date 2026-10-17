@@ -68,10 +68,14 @@ blocking findings lead the `TRADE` group, ahead of totals, and the first one lea
   "Trade VIN"). A different VIN is one `BLOCKING` finding and nothing else about the trade is compared.
 - **Written offer.** The best unexpired written offer (`bestOfferId`); a shortfall is shown in dollars with the
   offer it is measured against. Expired offers are never used.
-- **Sales tax.** The trade-in tax credit comes from the case's jurisdiction policy pack (`tradeTaxCreditEnabled`,
-  `taxRate`, rounding), capped at the paperwork's selling price, and is added to the offer comparison
-  (`offerGapAfterTaxMinor`). Without a pack for the jurisdiction it is `UNAVAILABLE`, never estimated. No US-FL
-  pack exists yet, so Florida cases show it as unavailable until the jurisdiction pack is sourced.
+- **Sales tax.** The trade-in tax credit comes from the case's jurisdiction policy pack (its tax components,
+  `tradeTaxCreditEnabled`, rounding), capped at the paperwork's selling price, and is added to the offer
+  comparison (`offerGapAfterTaxMinor`). Without a pack for the jurisdiction it is `UNAVAILABLE`, never estimated.
+  `taxCredit.taxName` is what the state calls the tax ("Texas motor vehicle sales tax", "North Carolina highway
+  use tax"; "sales tax" when a pack does not name it), and the copy uses it.
+- **Tax paid at titling (ticket 137).** When the case's pack has `paidAtTitling` (North Carolina), a tax line or
+  `TAX_TOTAL` missing from desk paperwork is an `INFORMATIONAL` note under `otherDifferences`, with the pack's
+  `buyerNote`, rather than a lead finding: the tax may be paid when the car is titled and is still owed.
 - **Valuation range.** From `TradeValuationService` (ticket 101) for the dealer ZIP, labelled as an estimate
   from the named source; unavailability is stated and nothing is substituted. One available result per trade
   revision is reused in memory for ten minutes so repeated reads do not meter repeated calls; nothing is stored.

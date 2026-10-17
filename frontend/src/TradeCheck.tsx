@@ -17,7 +17,7 @@ export type TradeCheckResult = {
   bestOffer: null | { id: string; amountMinor: number; source: string; offerDate: string; expiresOn: string; label: string };
   shortfallToOfferMinor: number | null;
   taxCredit: null | { status: "AVAILABLE" | "NOT_APPLICABLE" | "UNAVAILABLE"; reason: string | null; jurisdiction: string | null;
-    policyVersion: string | null; creditMinor: number | null };
+    policyVersion: string | null; creditMinor: number | null; taxName?: string | null };
   offerGapAfterTaxMinor: number | null;
   valuation: null | { availability: string; notice: string | null; source: string | null; synthetic: boolean; retrievedAt: string | null;
     conditionAssumption: string | null; lowMinor: number | null; typicalMinor: number | null; highMinor: number | null; position: string | null;
@@ -34,6 +34,12 @@ function money(minor: number) {
 const PAYOFF_STATE: Record<string, string> = {
   CURRENT: "", STALE: " (past its valid-through date; get a current payoff quote)", UNKNOWN: "Unknown", NOT_OWED: "Nothing owed",
 };
+
+/** The state's own name for the tax, such as "North Carolina highway use tax"; "Sales tax" before ticket 137. */
+function taxHeading(name: string | null | undefined) {
+  const tax = name ?? "sales tax";
+  return `${tax.charAt(0).toUpperCase()}${tax.slice(1)} a trade-in removes`;
+}
 
 function yourPayoff(payoff: NonNullable<TradeCheckResult["buyerPayoff"]>) {
   if (payoff.state === "UNKNOWN" || payoff.state === "NOT_OWED") return PAYOFF_STATE[payoff.state];
@@ -84,7 +90,7 @@ export function TradeCheckPanel({ result, heading = "Trade-in check", tactics = 
           && cost.scheduledPaymentsIncreaseMinor !== null && cost.interestMinor !== null
           ? `: ${money(cost.paymentIncreaseMinor)} a month, ${money(cost.scheduledPaymentsIncreaseMinor)} in scheduled payments for ${cost.termMonths} months, ${money(cost.interestMinor)} of it interest`
           : cost?.reason ? `. ${cost.reason}` : ""}</dd></div>}
-      {tax && <div><dt>Sales tax a trade-in removes</dt>
+      {tax && <div><dt>{taxHeading(tax.taxName)}</dt>
         <dd>{tax.status === "AVAILABLE" && tax.creditMinor !== null ? `About ${money(tax.creditMinor)} under ${tax.jurisdiction} rules (${tax.policyVersion})`
           : tax.status === "NOT_APPLICABLE" ? `None under ${tax.jurisdiction} rules` : tax.reason}
           {tax.status === "AVAILABLE" && tax.reason && <>. {tax.reason}</>}</dd></div>}
