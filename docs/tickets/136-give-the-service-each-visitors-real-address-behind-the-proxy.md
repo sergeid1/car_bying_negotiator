@@ -8,7 +8,13 @@ the visitor's address from the edge in a way a client cannot forge, and use it f
 
 **Blocked by:** none. Toto stays off until tickets 118 and 122, but this must land before it is enabled.
 
-**Status:** open — filed on 2026-10-16.
+**Status:** complete — 2026-10-16. No migration. The Worker sets `X-Otdog-Client-Address` from `CF-Connecting-IP`
+after deleting any client copy; the pilot nginx passes it, and now `X-Origin-Verify`, only on verified requests.
+`api.ClientAddress` is the one resolver for the API, request-email, Toto and password sign-in limits: it trusts the
+header only with exactly one `X-Origin-Verify` matching `security.client-address.origin-secret` (`ORIGIN_SECRET`,
+compared in constant time) and one literal address, keys IPv6 by /64, and otherwise uses the peer.
+`ClientAddressProductionGuard` refuses a pilot or production start without the secret. Remaining limits: nginx's own
+`limit_req` zones still key on Cloudflare's address, and visitors behind one NAT or one IPv6 /64 share a bucket.
 
 ## Scope
 
@@ -25,7 +31,7 @@ the visitor's address from the edge in a way a client cannot forge, and use it f
 
 ## Done when
 
-- [ ] Worker tests show a client-supplied copy of the header is replaced, and the header carries Cloudflare's address.
-- [ ] Acceptance tests show two visitors behind the proxy get separate quotas, a forged header without origin
+- [x] Worker tests show a client-supplied copy of the header is replaced, and the header carries Cloudflare's address.
+- [x] Acceptance tests show two visitors behind the proxy get separate quotas, a forged header without origin
       verification is ignored, and the Toto client cap counts per visitor.
-- [ ] No test or log line shows the address persisted or logged.
+- [x] No test or log line shows the address persisted or logged.
