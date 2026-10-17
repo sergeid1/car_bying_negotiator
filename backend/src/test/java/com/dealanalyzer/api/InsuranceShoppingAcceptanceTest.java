@@ -86,6 +86,18 @@ class InsuranceShoppingAcceptanceTest {
       assertThat(empty.at("/consent/version").asText()).isEqualTo(InsuranceShoppingService.CONSENT_VERSION);
       assertThat(empty.at("/consent/text/0").asText()).contains("goes to no one else");
       assertThat(empty.path("coverageGuide").findValuesAsText("explanation")).hasSize(6).allMatch(text -> text.length() > 40);
+      // Ticket 138: the form's defaults follow the case's state, and the guide carries every pilot state's cited minimums.
+      assertThat(empty.path("buyerState").asText()).isEqualTo("NC");
+      assertThat(empty.path("coverageGuide").findValuesAsText("explanation"))
+          .noneMatch(text -> text.contains("Florida") || text.contains("Texas") || text.contains("North Carolina"));
+      assertThat(empty.at("/stateMinimums/version").asText()).isEqualTo("insurance-state-minimums.2026-10.v1");
+      assertThat(empty.at("/stateMinimums/states").findValuesAsText("state")).containsExactly("FL", "TX", "NC");
+      var northCarolina = empty.at("/stateMinimums/states/2/lines");
+      assertThat(northCarolina).hasSize(6);
+      assertThat(northCarolina.get(0).path("type").asText()).isEqualTo("BODILY_INJURY_LIABILITY");
+      assertThat(northCarolina.get(0).path("perPersonLimitMinor").asLong()).isEqualTo(5000000L);
+      assertThat(northCarolina.get(0).path("perAccidentLimitMinor").asLong()).isEqualTo(10000000L);
+      assertThat(northCarolina.get(0).path("text").asText()).isEqualTo("North Carolina requires at least $50,000 per person and $100,000 per accident.");
 
       // Field errors name the correction and never echo the input; nothing is stored.
       var invalid = call(client, "PUT", base, Map.of("drivers", List.of(Map.of("ageYears", 12, "licenceState", "Florida",
@@ -254,7 +266,10 @@ class InsuranceShoppingAcceptanceTest {
       String base = "/api/v1/journeys/" + journeyId + "/insurance";
 
       // On its own: the journey holds the application without any case.
-      assertThat(account(client, "GET", base, null, session, null).body().path("holder").asText()).isEqualTo("JOURNEY");
+      var journeyView = account(client, "GET", base, null, session, null).body();
+      assertThat(journeyView.path("holder").asText()).isEqualTo("JOURNEY");
+      // Without a case, the state comes from the journey's Shopping Brief.
+      assertThat(journeyView.path("buyerState").asText()).isEqualTo("NC");
       var stored = account(client, "PUT", base, application(null, null), session, null);
       assertThat(stored.status()).isEqualTo(200);
       assertThat(stored.body().path("caseVehicle").isNull()).isTrue();

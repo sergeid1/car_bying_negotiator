@@ -1,0 +1,96 @@
+{
+  "version": "insurance-state-minimums.2026-10.v1",
+  "description": "The coverage each pilot state requires of a private passenger car policy (ticket 138). Each value was checked against the official text on checkedOn and is reviewed again by reviewOn. A changed value is a new version.",
+  "states": [
+    {
+      "state": "FL",
+      "name": "Florida",
+      "checkedOn": "2026-10-16",
+      "reviewOn": "2027-01-01",
+      "lines": [
+        {
+          "type": "PERSONAL_INJURY_PROTECTION",
+          "rule": "REQUIRED",
+          "perPersonLimitMinor": 1000000,
+          "perAccidentLimitMinor": null,
+          "citation": "FLHSMV Insurance Requirements, https://www.flhsmv.gov/insurance/ (\"a minimum of $10,000 in PIP AND a minimum of $10,000 in PDL\"); F.S. 627.736 and 324.022"
+        },
+        {
+          "type": "PROPERTY_DAMAGE_LIABILITY",
+          "rule": "REQUIRED",
+          "perPersonLimitMinor": null,
+          "perAccidentLimitMinor": 1000000,
+          "citation": "FLHSMV Insurance Requirements, https://www.flhsmv.gov/insurance/; F.S. 324.022"
+        },
+        {
+          "type": "BODILY_INJURY_LIABILITY",
+          "rule": "NOT_REQUIRED",
+          "note": "Florida does not require it of most drivers. A driver can be required to carry it after some crashes or convictions.",
+          "citation": "FLHSMV Insurance Requirements, https://www.flhsmv.gov/insurance/; F.S. 324.021 and 324.023"
+        }
+      ]
+    },
+    {
+      "state": "TX",
+      "name": "Texas",
+      "checkedOn": "2026-10-16",
+      "reviewOn": "2027-01-01",
+      "lines": [
+        {
+          "type": "BODILY_INJURY_LIABILITY",
+          "rule": "REQUIRED",
+          "perPersonLimitMinor": 3000000,
+          "perAccidentLimitMinor": 6000000,
+          "citation": "TDI Auto insurance guide (updated 12/11/2025), https://www.tdi.texas.gov/pubs/consumer/cb020.html (\"30/60/25 coverage\"); OPIC Auto Insurance Basics, https://www.opic.texas.gov/auto-insurance/basics/; Transportation Code 601.072"
+        },
+        {
+          "type": "PROPERTY_DAMAGE_LIABILITY",
+          "rule": "REQUIRED",
+          "perPersonLimitMinor": null,
+          "perAccidentLimitMinor": 2500000,
+          "citation": "TDI Auto insurance guide (updated 12/11/2025), https://www.tdi.texas.gov/pubs/consumer/cb020.html; Transportation Code 601.072"
+        },
+        {
+          "type": "PERSONAL_INJURY_PROTECTION",
+          "rule": "INCLUDED_UNLESS_REJECTED",
+          "citation": "Insurance Code 1952.152, https://statutes.capitol.texas.gov/Docs/IN/htm/IN.1952.htm; TDI guide (\"All auto policies in Texas include PIP coverage. If you don't want it, you must tell the company in writing.\")"
+        },
+        {
+          "type": "UNINSURED_MOTORIST",
+          "rule": "INCLUDED_UNLESS_REJECTED",
+          "citation": "Insurance Code 1952.101, https://statutes.capitol.texas.gov/Docs/IN/htm/IN.1952.htm; OPIC (\"If you choose not to buy UM/UIM, you must reject it in writing.\")"
+        }
+      ]
+    },
+    {
+      "state": "NC",
+      "name": "North Carolina",
+      "checkedOn": "2026-10-16",
+      "reviewOn": "2027-01-01",
+      "lines": [
+        {
+          "type": "BODILY_INJURY_LIABILITY",
+          "rule": "REQUIRED",
+          "perPersonLimitMinor": 5000000,
+          "perAccidentLimitMinor": 10000000,
+          "citation": "G.S. 20-279.21(b)(2), https://www.ncleg.gov/enactedlegislation/statutes/html/bysection/chapter_20/gs_20-279.21.html; NCDOI, https://www.ncdoi.gov/changes-rating-automobile-insurance-policies-effective-july-1-2025 (policies written or renewed on or after 2025-07-01); NCDMV insurance requirements. NCDMV MVR-106 Rev. 04/26 still prints 30/60/25 and is not used."
+        },
+        {
+          "type": "PROPERTY_DAMAGE_LIABILITY",
+          "rule": "REQUIRED",
+          "perPersonLimitMinor": null,
+          "perAccidentLimitMinor": 5000000,
+          "citation": "G.S. 20-279.21(b)(2), https://www.ncleg.gov/enactedlegislation/statutes/html/bysection/chapter_20/gs_20-279.21.html; NCDOI 2025 changes"
+        },
+        {
+          "type": "UNINSURED_MOTORIST",
+          "rule": "REQUIRED",
+          "perPersonLimitMinor": 5000000,
+          "perAccidentLimitMinor": 10000000,
+          "note": "Every new or renewed North Carolina policy also includes underinsured motorist coverage.",
+          "citation": "G.S. 20-279.21(b)(3) (uninsured motorist limits \"shall not be less than the bodily injury liability limits required pursuant to subdivision (2)\") and (b)(4) (underinsured motorist coverage), https://www.ncleg.gov/enactedlegislation/statutes/html/bysection/chapter_20/gs_20-279.21.html; NCDOI 2025 changes"
+        }
+      ]
+    }
+  ]
+}

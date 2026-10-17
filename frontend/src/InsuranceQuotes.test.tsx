@@ -65,7 +65,7 @@ test("the consent is shown in plain words and nothing is sent until the Buyer ag
   expect((posted[1]!.headers as Record<string, string>)["Case-Access-Token"]).toBe("token");
 });
 
-test("a new application starts from the case's car and Florida's required coverage, and field errors are shown by the field", async () => {
+test("a new application starts from the case's car and its Florida minimums, and field errors are shown by the field", async () => {
   const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => init?.method === "PUT"
     ? respond({ detail: "Check the highlighted insurance details.", errors: [
       { field: "drivers[0].ageYears", message: "Enter the driver's age, from 15 to 120." },
@@ -94,6 +94,99 @@ test("a new application starts from the case's car and Florida's required covera
   expect(body.drivers).toEqual([{ ageYears: -1, licenceState: "FL", yearsLicensed: null, atFaultAccidents: 0, violations: 0 }]);
   expect(body.coverage.map((line: { type: string }) => line.type)).toEqual(["PROPERTY_DAMAGE_LIABILITY", "PERSONAL_INJURY_PROTECTION", "COLLISION"]);
   expect(body.currentPolicy).toBeNull();
+});
+
+// Ticket 138: each pilot state's minimums, from the server's cited data.
+async function startApplication(overrides: Parameters<typeof insuranceView>[1]) {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => respond(insuranceView("EMPTY", overrides)));
+  render(<InsuranceQuotes caseId="case" token="token" />);
+  await userEvent.click(await screen.findByRole("button", { name: "Start an insurance application" }));
+}
+
+test("a Texas application starts at 30/60/25 and leaves PIP and uninsured motorist to the Buyer", async () => {
+  await startApplication({ buyerState: "TX" });
+  expect(screen.getByLabelText("State")).toHaveValue("TX");
+  expect(screen.getByLabelText("State that issued the licence")).toHaveValue("TX");
+  expect(screen.getByLabelText("Bodily injury liability: limit per person")).toHaveValue("3000000");
+  expect(screen.getByLabelText("Bodily injury liability: limit per accident")).toHaveValue("6000000");
+  expect(screen.getByLabelText("Property damage liability: limit per accident")).toHaveValue("2500000");
+  for (const name of ["Personal injury protection (PIP)", "Uninsured motorist"]) {
+    expect(screen.getByRole("checkbox", { name })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name })).toHaveAccessibleDescription(
+      expect.stringContaining("Texas policies include it unless you reject it in writing. Whether to keep it is your choice."));
+  }
+  expect(screen.getByRole("checkbox", { name: "Bodily injury liability" }))
+    .toHaveAccessibleDescription(expect.stringContaining("Texas requires at least $30,000 per person and $60,000 per accident."));
+  expect(screen.queryByText(/below Texas's minimum/)).not.toBeInTheDocument();
+});
+
+test("a North Carolina application starts at 50/100/50 with uninsured motorist at the liability minimum", async () => {
+  await startApplication({ buyerState: "NC" });
+  expect(screen.getByLabelText("State")).toHaveValue("NC");
+  expect(screen.getByLabelText("Bodily injury liability: limit per person")).toHaveValue("5000000");
+  expect(screen.getByLabelText("Bodily injury liability: limit per accident")).toHaveValue("10000000");
+  expect(screen.getByLabelText("Property damage liability: limit per accident")).toHaveValue("5000000");
+  expect(screen.getByLabelText("Uninsured motorist: limit per person")).toHaveValue("5000000");
+  expect(screen.getByLabelText("Uninsured motorist: limit per accident")).toHaveValue("10000000");
+  expect(screen.getByRole("checkbox", { name: "Personal injury protection (PIP)" })).not.toBeChecked();
+  expect(screen.getByText(/also includes underinsured motorist coverage/)).toBeInTheDocument();
+});
+
+test("without a known state nothing defaults to Florida, and a state outside the pilot gets no invented minimum", async () => {
+  await startApplication({ buyerState: null });
+  expect(screen.getByLabelText("State")).toHaveValue("");
+  expect(screen.getByLabelText("State that issued the licence")).toHaveValue("");
+  expect(screen.getAllByRole("checkbox").filter(box => (box as HTMLInputElement).checked)).toHaveLength(0);
+  await userEvent.selectOptions(screen.getByLabelText("State"), "GA");
+  expect(screen.getByText("Minimums for GA are not listed here yet.")).toBeInTheDocument();
+  expect(screen.queryByText(/requires at least/)).not.toBeInTheDocument();
+  expect(screen.getAllByRole("checkbox").filter(box => (box as HTMLInputElement).checked)).toHaveLength(0);
+  // Before the Buyer edits coverage, choosing a pilot state starts from its minimums.
+  await userEvent.selectOptions(screen.getByLabelText("State"), "TX");
+  expect(screen.getByLabelText("Bodily injury liability: limit per person")).toHaveValue("3000000");
+});
+
+test("changing the state after editing coverage keeps the Buyer's choices and offers a reset", async () => {
+  await startApplication({ buyerState: "FL" });
+  await userEvent.click(screen.getByRole("checkbox", { name: "Collision" }));
+  await userEvent.selectOptions(screen.getByLabelText("State"), "NC");
+  expect(screen.getByRole("checkbox", { name: "Collision" })).toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "Personal injury protection (PIP)" })).toBeChecked();
+  expect(screen.getByText("The state changed, and your coverage choices are kept.")).toBeInTheDocument();
+  // The kept coverage falls short of North Carolina's, and the warning says so before anything is sent.
+  const warning = screen.getByRole("status");
+  expect(warning).toHaveTextContent("This coverage is below North Carolina's minimum:");
+  expect(warning).toHaveTextContent("Bodily injury liability: North Carolina requires at least $50,000 per person, $100,000 per accident, and it is not chosen.");
+  expect(warning).toHaveTextContent("Property damage liability: North Carolina requires at least $50,000 per accident, and less is chosen.");
+  await userEvent.click(screen.getByRole("button", { name: "Reset coverage to North Carolina's minimums" }));
+  expect(screen.getByRole("checkbox", { name: "Collision" })).not.toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "Personal injury protection (PIP)" })).not.toBeChecked();
+  expect(screen.getByLabelText("Property damage liability: limit per accident")).toHaveValue("5000000");
+  expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  expect(screen.queryByRole("button", { name: /Reset coverage/ })).not.toBeInTheDocument();
+});
+
+test.each([
+  ["FL", "Personal injury protection (PIP)", "Florida requires at least $10,000 per person, and it is not chosen."],
+  ["TX", "Bodily injury liability: limit per person", "Texas requires at least $30,000 per person, $60,000 per accident, and less is chosen."],
+  ["NC", "Uninsured motorist", "North Carolina requires at least $50,000 per person, $100,000 per accident, and it is not chosen."],
+])("coverage below the %s minimum is warned about in the form", async (state, control, message) => {
+  await startApplication({ buyerState: state });
+  if (control.includes(":")) await userEvent.selectOptions(screen.getByLabelText(control), "2500000");
+  else await userEvent.click(screen.getByRole("checkbox", { name: control }));
+  expect(screen.getByRole("status")).toHaveTextContent(message);
+});
+
+test("the consent step warns when the saved coverage is below the garaging state's minimum", async () => {
+  const saved = insuranceView("APPLIED").application!;
+  const application = { ...saved, garaging: { zip: "75201", state: "TX" }, coverage: saved.coverage.map(line =>
+    line.type === "PROPERTY_DAMAGE_LIABILITY" ? { ...line, perAccidentLimitMinor: 2000000 } : line) };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => respond(insuranceView("APPLIED", { application })));
+  render(<InsuranceQuotes caseId="case" token="token" />);
+  await userEvent.click(await screen.findByRole("button", { name: "Get quotes" }));
+  expect(screen.getByText("This coverage is below Texas's minimum:")).toBeInTheDocument();
+  expect(screen.getByText("Property damage liability: Texas requires at least $25,000 per accident, and less is chosen.")).toBeInTheDocument();
+  expect(screen.queryByText(/Bodily injury liability: Texas/)).not.toBeInTheDocument();
 });
 
 test("a Buyer adds a quote they already have, for different coverage, and removes one they entered", async () => {

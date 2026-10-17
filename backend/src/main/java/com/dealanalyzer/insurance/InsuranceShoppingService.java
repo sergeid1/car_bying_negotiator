@@ -91,12 +91,21 @@ public class InsuranceShoppingService {
   public record Application(List<DriverInput> drivers, GaragingInput garaging, VehicleInput vehicle, List<CoverageInput> coverage,
       CurrentPolicyInput currentPolicy) {}
 
+  /**
+   * {@code buyerState} is the case's or journey's state when one is known, for the form's defaults;
+   * {@code stateMinimums} is every state with listed minimums, so the guide follows the garaging state as it changes.
+   */
   public record View(String holder, CaseVehicle caseVehicle, Integer revision, Instant changedAt, Application application,
-      Consent consent, List<CoverageGuide> coverageGuide, Results results) {}
+      Consent consent, List<CoverageGuide> coverageGuide, String buyerState, Minimums stateMinimums, Results results) {}
   public record CaseVehicle(String vin, Integer modelYear, String make, String model, String trim, Long mileage) {}
   public record Consent(String version, String partner, boolean synthetic, List<String> text) {}
   public record CoverageGuide(Coverage.Type type, String label, String explanation, boolean perPersonLimit,
       boolean perAccidentLimit, boolean deductible) {}
+  /** {@code rule} is null when the state's list does not name the coverage; {@code text} says what the state requires. */
+  public record MinimumLine(Coverage.Type type, StateMinimums.Rule rule, Long perPersonLimitMinor, Long perAccidentLimitMinor,
+      String text) {}
+  public record StateMinimum(String state, String name, LocalDate checkedOn, LocalDate reviewOn, List<MinimumLine> lines) {}
+  public record Minimums(String version, List<StateMinimum> states) {}
   /**
    * {@code sameCoverage} is ordered by yearly premium; {@code differentCoverage}, {@code expired} and
    * {@code withoutQuote} are listed by insurer name and carry no rank.
@@ -122,10 +131,10 @@ public class InsuranceShoppingService {
           "Pays for injuries you cause to other people in a crash, up to a limit for each person and a limit for each accident.",
           true, true, false),
       new CoverageGuide(Coverage.Type.PROPERTY_DAMAGE_LIABILITY, "Property damage liability",
-          "Pays for damage you cause to other people's cars and property, up to the limit. Florida requires at least $10,000.",
+          "Pays for damage you cause to other people's cars and property, up to the limit.",
           false, true, false),
       new CoverageGuide(Coverage.Type.PERSONAL_INJURY_PROTECTION, "Personal injury protection (PIP)",
-          "Pays part of your own medical bills and lost income after a crash, whoever caused it. Florida requires $10,000. "
+          "Pays part of your own medical bills and lost income after a crash, whoever caused it. "
               + "The deductible is what you pay before it pays.", true, false, true),
       new CoverageGuide(Coverage.Type.UNINSURED_MOTORIST, "Uninsured motorist",
           "Pays for your injuries when the driver who caused the crash has no insurance or too little.", true, true, false),
@@ -144,11 +153,14 @@ public class InsuranceShoppingService {
   private final ObjectMapper json;
   private final TransactionTemplate reads;
   private final TransactionTemplate writes;
+  private final Minimums minimums;
 
   InsuranceShoppingService(EphemeralBuyingCaseService cases, AccountJourneyAccess accounts, InsuranceQuoteService quotes,
-      InsuranceQuoteAdapter adapter, JdbcTemplate jdbc, ObjectMapper json, PlatformTransactionManager transactions) {
+      InsuranceQuoteAdapter adapter, JdbcTemplate jdbc, ObjectMapper json, PlatformTransactionManager transactions,
+      StateMinimums stateMinimums) {
     this.cases = cases; this.accounts = accounts; this.quotes = quotes; this.adapter = adapter; this.jdbc = jdbc;
     this.json = json;
+    this.minimums = minimums(stateMinimums);
     this.reads = new TransactionTemplate(transactions); this.reads.setReadOnly(true);
     this.writes = new TransactionTemplate(transactions);
   }
@@ -332,9 +344,62 @@ public class InsuranceShoppingService {
   private View render(Holder holder) {
     var row = application(holder);
     return new View(holder.journey() ? "JOURNEY" : "CASE", caseVehicle(holder), row.map(Row::revision).orElse(null),
-        row.map(Row::changedAt).orElse(null), row.map(Row::application).orElse(null), consent(), GUIDE,
-        row.map(this::results).orElse(null));
+        row.map(Row::changedAt).orElse(null), row.map(Row::application).orElse(null), consent(), GUIDE, buyerState(holder),
+        minimums, row.map(this::results).orElse(null));
   }
+
+  /** The case's state, or else the journey's from its latest Shopping Brief; null when neither is known. */
+  private String buyerState(Holder holder) {
+    var jurisdiction = holder.caseId() != null
+        ? jdbc.queryForList("select buyer_jurisdiction from analysis_cases where id = ?", String.class, holder.caseId())
+        : List.<String>of();
+    if ((jurisdiction.isEmpty() || jurisdiction.getFirst() == null) && holder.journey())
+      jurisdiction = jdbc.queryForList("""
+          select jurisdiction from shopping_brief_versions where journey_id = ? order by version desc limit 1
+          """, String.class, holder.journeyId());
+    String value = jurisdiction.isEmpty() ? null : jurisdiction.getFirst();
+    return value != null && value.matches("US-[A-Z]{2}(:.*)?") ? value.substring(3, 5) : null;
+  }
+
+  /**
+   * Every guide line for every listed state, worded from the data alone. A REQUIRED line must carry exactly the limits
+   * its coverage has, so an application can start from it.
+   */
+  static Minimums minimums(StateMinimums data) {
+    var states = new ArrayList<StateMinimum>();
+    for (var state : data.data().states()) {
+      var lines = new ArrayList<MinimumLine>();
+      for (var guide : GUIDE) {
+        var line = state.lines().stream().filter(entry -> entry.type() == guide.type()).findFirst().orElse(null);
+        if (line != null && line.rule() == StateMinimums.Rule.REQUIRED
+            && !(present(guide.perPersonLimit(), line.perPersonLimitMinor(), MAX_LIMIT_MINOR)
+                && present(guide.perAccidentLimit(), line.perAccidentLimitMinor(), MAX_LIMIT_MINOR)))
+          throw new IllegalStateException("Insurance state minimums do not fit " + guide.type() + " for " + state.state());
+        lines.add(line == null ? new MinimumLine(guide.type(), null, null, null, state.name() + " does not require it.")
+            : new MinimumLine(guide.type(), line.rule(), line.perPersonLimitMinor(), line.perAccidentLimitMinor(),
+                minimumText(state.name(), line)));
+      }
+      states.add(new StateMinimum(state.state(), state.name(), state.checkedOn(), state.reviewOn(), List.copyOf(lines)));
+    }
+    return new Minimums(data.version(), List.copyOf(states));
+  }
+
+  private static String minimumText(String name, StateMinimums.Line line) {
+    String note = line.note() == null ? "" : " " + line.note();
+    return switch (line.rule()) {
+      case REQUIRED -> {
+        String amounts = line.perPersonLimitMinor() != null && line.perAccidentLimitMinor() != null
+            ? dollars(line.perPersonLimitMinor()) + " per person and " + dollars(line.perAccidentLimitMinor()) + " per accident"
+            : dollars(line.perPersonLimitMinor() != null ? line.perPersonLimitMinor() : line.perAccidentLimitMinor());
+        yield name + " requires at least " + amounts + "." + note;
+      }
+      case INCLUDED_UNLESS_REJECTED -> name + " policies include it unless you reject it in writing. Whether to keep it is "
+          + "your choice." + note;
+      case NOT_REQUIRED -> line.note();
+    };
+  }
+
+  private static String dollars(long minor) { return String.format(Locale.US, "$%,d", minor / 100); }
 
   private Results results(Row row) {
     var request = jdbc.query("""

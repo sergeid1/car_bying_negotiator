@@ -1,14 +1,43 @@
-import type { CoverageLine, InsuranceApplication, InsuranceQuote, InsuranceView } from "./InsuranceQuotes";
+import type { CoverageLine, InsuranceApplication, InsuranceQuote, InsuranceView, StateMinimum } from "./InsuranceQuotes";
 
 /** Synthetic insurance views for client, axe and browser tests (ticket 126). No real insurer or person. */
 export const insuranceGuide: InsuranceView["coverageGuide"] = [
   { type: "BODILY_INJURY_LIABILITY", label: "Bodily injury liability", explanation: "Pays for injuries you cause to other people in a crash, up to a limit for each person and a limit for each accident.", perPersonLimit: true, perAccidentLimit: true, deductible: false },
-  { type: "PROPERTY_DAMAGE_LIABILITY", label: "Property damage liability", explanation: "Pays for damage you cause to other people's cars and property, up to the limit. Florida requires at least $10,000.", perPersonLimit: false, perAccidentLimit: true, deductible: false },
-  { type: "PERSONAL_INJURY_PROTECTION", label: "Personal injury protection (PIP)", explanation: "Pays part of your own medical bills and lost income after a crash, whoever caused it. Florida requires $10,000. The deductible is what you pay before it pays.", perPersonLimit: true, perAccidentLimit: false, deductible: true },
+  { type: "PROPERTY_DAMAGE_LIABILITY", label: "Property damage liability", explanation: "Pays for damage you cause to other people's cars and property, up to the limit.", perPersonLimit: false, perAccidentLimit: true, deductible: false },
+  { type: "PERSONAL_INJURY_PROTECTION", label: "Personal injury protection (PIP)", explanation: "Pays part of your own medical bills and lost income after a crash, whoever caused it. The deductible is what you pay before it pays.", perPersonLimit: true, perAccidentLimit: false, deductible: true },
   { type: "UNINSURED_MOTORIST", label: "Uninsured motorist", explanation: "Pays for your injuries when the driver who caused the crash has no insurance or too little.", perPersonLimit: true, perAccidentLimit: true, deductible: false },
   { type: "COLLISION", label: "Collision", explanation: "Pays to repair or replace your car after a crash, minus your deductible. A lender or lease usually requires it.", perPersonLimit: false, perAccidentLimit: false, deductible: true },
   { type: "COMPREHENSIVE", label: "Comprehensive", explanation: "Pays for theft, flood, hail, fire, hitting an animal and falling objects, minus your deductible. A lender or lease usually requires it.", perPersonLimit: false, perAccidentLimit: false, deductible: true },
 ];
+
+type Line = StateMinimum["lines"][number];
+const none = (name: string, type: Line["type"]): Line => ({ type, rule: null, perPersonLimitMinor: null, perAccidentLimitMinor: null,
+  text: `${name} does not require it.` });
+const required = (type: Line["type"], perPersonLimitMinor: number | null, perAccidentLimitMinor: number | null, text: string): Line =>
+  ({ type, rule: "REQUIRED", perPersonLimitMinor, perAccidentLimitMinor, text });
+const included = (type: Line["type"]): Line => ({ type, rule: "INCLUDED_UNLESS_REJECTED", perPersonLimitMinor: null,
+  perAccidentLimitMinor: null, text: "Texas policies include it unless you reject it in writing. Whether to keep it is your choice." });
+
+/** The server's wording of ticket 138's state minimums, in guide order. */
+export const stateMinimums: InsuranceView["stateMinimums"] = { version: "insurance-state-minimums.2026-10.v1", states: [
+  { state: "FL", name: "Florida", checkedOn: "2026-10-16", reviewOn: "2027-01-01", lines: [
+    { type: "BODILY_INJURY_LIABILITY", rule: "NOT_REQUIRED", perPersonLimitMinor: null, perAccidentLimitMinor: null,
+      text: "Florida does not require it of most drivers. A driver can be required to carry it after some crashes or convictions." },
+    required("PROPERTY_DAMAGE_LIABILITY", null, 1000000, "Florida requires at least $10,000."),
+    required("PERSONAL_INJURY_PROTECTION", 1000000, null, "Florida requires at least $10,000."),
+    none("Florida", "UNINSURED_MOTORIST"), none("Florida", "COLLISION"), none("Florida", "COMPREHENSIVE")] },
+  { state: "TX", name: "Texas", checkedOn: "2026-10-16", reviewOn: "2027-01-01", lines: [
+    required("BODILY_INJURY_LIABILITY", 3000000, 6000000, "Texas requires at least $30,000 per person and $60,000 per accident."),
+    required("PROPERTY_DAMAGE_LIABILITY", null, 2500000, "Texas requires at least $25,000."),
+    included("PERSONAL_INJURY_PROTECTION"), included("UNINSURED_MOTORIST"), none("Texas", "COLLISION"), none("Texas", "COMPREHENSIVE")] },
+  { state: "NC", name: "North Carolina", checkedOn: "2026-10-16", reviewOn: "2027-01-01", lines: [
+    required("BODILY_INJURY_LIABILITY", 5000000, 10000000, "North Carolina requires at least $50,000 per person and $100,000 per accident."),
+    required("PROPERTY_DAMAGE_LIABILITY", null, 5000000, "North Carolina requires at least $50,000."),
+    none("North Carolina", "PERSONAL_INJURY_PROTECTION"),
+    required("UNINSURED_MOTORIST", 5000000, 10000000, "North Carolina requires at least $50,000 per person and $100,000 per accident. "
+      + "Every new or renewed North Carolina policy also includes underinsured motorist coverage."),
+    none("North Carolina", "COLLISION"), none("North Carolina", "COMPREHENSIVE")] },
+] };
 
 const chosen: CoverageLine[] = [
   { type: "BODILY_INJURY_LIABILITY", perPersonLimitMinor: 10000000, perAccidentLimitMinor: 30000000, deductibleMinor: null },
@@ -47,6 +76,8 @@ export function insuranceView(state: "EMPTY" | "APPLIED" | "QUOTED", overrides: 
       "Getting quotes does not buy a policy. To take one, you continue on that insurer's own site, which may ask for more details, such as names and dates of birth, before giving a final price. otdog never buys, accepts or binds a policy.",
     ] },
     coverageGuide: insuranceGuide,
+    buyerState: "FL",
+    stateMinimums,
     results: state !== "QUOTED" ? null : {
       request: { id: "request-1", requestedAt: "2026-10-16T12:00:00Z", retrievedAt: "2026-10-16T12:00:00Z", partner: "SYNTHETIC_INSURANCE_PARTNER",
         synthetic: true, availability: "AVAILABLE", notice: "Synthetic insurance quotes for development only.", outdated: false },

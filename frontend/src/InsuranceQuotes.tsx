@@ -25,6 +25,10 @@ export type InsuranceQuote = { id: string; insurer: string; source: "PARTNER" | 
   yearlyPremiumMinor: number; quotedAt: string; expiresAt: string | null; continueUrl: string | null; differences: Difference[];
   yearlyDifference: YearlyDifference | null };
 type Outcome = "OFFERED" | "DECLINED" | "NEEDS_MORE_INFORMATION" | "UNAVAILABLE" | "TIMED_OUT";
+/** A state's minimum for one coverage; {@code rule} is null when the state's list does not name it. */
+type MinimumLine = { type: CoverageType; rule: "REQUIRED" | "INCLUDED_UNLESS_REJECTED" | "NOT_REQUIRED" | null;
+  perPersonLimitMinor: number | null; perAccidentLimitMinor: number | null; text: string };
+export type StateMinimum = { state: string; name: string; checkedOn: string; reviewOn: string; lines: MinimumLine[] };
 export type InsuranceView = {
   holder: "JOURNEY" | "CASE";
   caseVehicle: { vin: string | null; modelYear: number | null; make: string | null; model: string | null; trim: string | null } | null;
@@ -32,6 +36,8 @@ export type InsuranceView = {
   consent: { version: string; partner: string; synthetic: boolean; text: string[] };
   coverageGuide: { type: CoverageType; label: string; explanation: string; perPersonLimit: boolean; perAccidentLimit: boolean;
     deductible: boolean }[];
+  buyerState: string | null;
+  stateMinimums: { version: string; states: StateMinimum[] };
   results: null | {
     request: null | { id: string; requestedAt: string; retrievedAt: string; partner: string; synthetic: boolean;
       availability: string; notice: string | null; outdated: boolean };
@@ -56,13 +62,58 @@ const OUTCOMES: Record<Outcome, string> = {
   OFFERED: "Quoted", DECLINED: "Declined to quote", NEEDS_MORE_INFORMATION: "Needs more information before quoting",
   UNAVAILABLE: "Unavailable", TIMED_OUT: "Did not answer in time" };
 const dollars = (values: number[]) => values.map(value => value * 100);
-const PER_PERSON = dollars([10000, 25000, 50000, 100000, 250000, 500000]);
-const PER_ACCIDENT = dollars([10000, 20000, 25000, 50000, 100000, 300000, 500000]);
+/** Every pilot state's minimum is a choice; the server's state minimums are the source of those amounts. */
+const PER_PERSON = dollars([10000, 25000, 30000, 50000, 100000, 250000, 500000]);
+const PER_ACCIDENT = dollars([10000, 20000, 25000, 50000, 60000, 100000, 300000, 500000]);
 const DEDUCTIBLES = dollars([0, 250, 500, 1000, 1500, 2000, 2500]);
-/** Florida requires personal injury protection and property damage liability of at least $10,000 each. */
-const STARTING_COVERAGE: CoverageLine[] = [
-  { type: "PROPERTY_DAMAGE_LIABILITY", perPersonLimitMinor: null, perAccidentLimitMinor: 1000000, deductibleMinor: null },
-  { type: "PERSONAL_INJURY_PROTECTION", perPersonLimitMinor: 1000000, perAccidentLimitMinor: null, deductibleMinor: 0 }];
+type Guide = InsuranceView["coverageGuide"][number];
+
+const minimumsOf = (view: InsuranceView, state: string) => view.stateMinimums.states.find(entry => entry.state === state);
+
+/** A newly chosen coverage line, at the state's minimum when the state requires the coverage. */
+function newLine(entry: Guide, minimum?: MinimumLine): CoverageLine {
+  const required = minimum?.rule === "REQUIRED" ? minimum : undefined;
+  return { type: entry.type,
+    perPersonLimitMinor: entry.perPersonLimit
+      ? required?.perPersonLimitMinor ?? (entry.type === "PERSONAL_INJURY_PROTECTION" ? 1000000 : 10000000) : null,
+    perAccidentLimitMinor: entry.perAccidentLimit ? required?.perAccidentLimitMinor ?? (entry.perPersonLimit ? 30000000 : 1000000) : null,
+    deductibleMinor: entry.deductible ? (entry.type === "PERSONAL_INJURY_PROTECTION" ? 0 : 50000) : null };
+}
+
+/** The coverage a state requires, at its minimums; nothing for a state without listed minimums. */
+export function startingCoverage(guide: Guide[], minimums?: StateMinimum): CoverageLine[] {
+  if (!minimums) return [];
+  return guide.flatMap(entry => {
+    const minimum = minimums.lines.find(line => line.type === entry.type);
+    return minimum?.rule === "REQUIRED" ? [newLine(entry, minimum)] : [];
+  });
+}
+
+/** Each required coverage that is missing or below the state's minimum, in plain words. */
+export function shortfalls(lines: CoverageLine[], guide: Guide[], minimums?: StateMinimum): string[] {
+  if (!minimums) return [];
+  return minimums.lines.flatMap(minimum => {
+    if (minimum.rule !== "REQUIRED") return [];
+    const label = guide.find(entry => entry.type === minimum.type)?.label ?? minimum.type;
+    const line = lines.find(item => item.type === minimum.type);
+    const least = amounts({ ...minimum, deductibleMinor: null });
+    if (!line) return [`${label}: ${minimums.name} requires at least ${least}, and it is not chosen.`];
+    const below = (minimum.perPersonLimitMinor != null && (line.perPersonLimitMinor ?? 0) < minimum.perPersonLimitMinor)
+      || (minimum.perAccidentLimitMinor != null && (line.perAccidentLimitMinor ?? 0) < minimum.perAccidentLimitMinor);
+    return below ? [`${label}: ${minimums.name} requires at least ${least}, and less is chosen.`] : [];
+  });
+}
+
+function MinimumWarning({ gaps, minimums, live = false }: { gaps: string[]; minimums?: StateMinimum; live?: boolean }) {
+  const content = gaps.length > 0 && minimums && <>
+    <p>This coverage is below {minimums.name}'s minimum:</p>
+    <ul>{gaps.map(gap => <li key={gap}>{gap}</li>)}</ul>
+    <p>You can still save and send the application. The choice is yours.</p>
+  </>;
+  // The live region stays mounted so a new warning is announced while the Buyer edits.
+  return live ? <div className={content ? "notice insurance-minimum-warning" : undefined} role="status">{content}</div>
+    : content ? <div className="notice insurance-minimum-warning">{content}</div> : null;
+}
 
 function money(minor: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: minor % 100 ? 2 : 0 })
@@ -245,7 +296,16 @@ function amounts(line: CoverageLine) {
 }
 
 type DriverDraft = { ageYears: string; licenceState: string; yearsLicensed: string; atFaultAccidents: string; violations: string };
-const emptyDriver = (): DriverDraft => ({ ageYears: "", licenceState: "FL", yearsLicensed: "", atFaultAccidents: "0", violations: "0" });
+const emptyDriver = (state: string | null): DriverDraft =>
+  ({ ageYears: "", licenceState: state ?? "", yearsLicensed: "", atFaultAccidents: "0", violations: "0" });
+
+function StateSelect({ label, name, value, onChange, described }: { label: string; name?: string; value: string;
+  onChange: (state: string) => void; described: object }) {
+  return <label>{label}<select name={name} value={value} onChange={event => onChange(event.target.value)} {...described}>
+    {value === "" && <option value="">Choose a state</option>}
+    {STATES.map(state => <option key={state} value={state}>{state}</option>)}
+  </select></label>;
+}
 
 function useFieldErrors(prefix: string, problem?: Problem) {
   const message = (field: string) => problem?.errors.find(error => error.field === field)?.message;
@@ -264,18 +324,24 @@ function ApplicationForm({ view, busy, Sub, onCancel, onSave }: { view: Insuranc
   const fromCase = view.caseVehicle;
   const [drivers, setDrivers] = useState<DriverDraft[]>(application ? application.drivers.map(driver => ({
     ageYears: String(driver.ageYears), licenceState: driver.licenceState, yearsLicensed: String(driver.yearsLicensed),
-    atFaultAccidents: String(driver.atFaultAccidents), violations: String(driver.violations) })) : [emptyDriver()]);
+    atFaultAccidents: String(driver.atFaultAccidents), violations: String(driver.violations) })) : [emptyDriver(view.buyerState)]);
   const startVehicle = application?.vehicle ?? null;
   const [vehicle, setVehicle] = useState({
     vin: startVehicle?.vin ?? fromCase?.vin ?? "", modelYear: String(startVehicle?.modelYear ?? fromCase?.modelYear ?? ""),
     make: startVehicle?.make ?? fromCase?.make ?? "", model: startVehicle?.model ?? fromCase?.model ?? "",
     trim: startVehicle?.trim ?? fromCase?.trim ?? "", usage: startVehicle?.usage ?? "", annualMileage:
       startVehicle?.annualMileage == null ? "" : String(startVehicle.annualMileage) });
-  const [coverage, setCoverage] = useState<CoverageLine[]>(application?.coverage ?? STARTING_COVERAGE);
+  const [garagingState, setGaragingState] = useState(application?.garaging.state ?? view.buyerState ?? "");
+  const [coverage, setCoverage] = useState<CoverageLine[]>(() =>
+    application?.coverage ?? startingCoverage(view.coverageGuide, minimumsOf(view, garagingState)));
+  // A saved application's coverage is the Buyer's own choice, so a change of state never replaces it silently.
+  const [coverageChosen, setCoverageChosen] = useState(Boolean(application));
+  const [resetOffered, setResetOffered] = useState(false);
   const current = application?.currentPolicy ?? null;
   const [hasCurrent, setHasCurrent] = useState(Boolean(current));
   const [currentCoverage, setCurrentCoverage] = useState(current?.coverage ?? "SAME_AS_CHOSEN");
-  const [currentLines, setCurrentLines] = useState<CoverageLine[]>(current?.lines ?? application?.coverage ?? STARTING_COVERAGE);
+  const [currentLines, setCurrentLines] = useState<CoverageLine[]>(current?.lines ?? coverage);
+  const minimums = minimumsOf(view, garagingState);
   const [problem, setProblem] = useState<Problem>();
   const summary = useRef<HTMLParagraphElement>(null);
   const { described, errorFor, describedBy } = useFieldErrors(prefix, problem);
@@ -292,7 +358,7 @@ function ApplicationForm({ view, busy, Sub, onCancel, onSave }: { view: Insuranc
       await onSave({
         drivers: drivers.map(driver => ({ ageYears: number(driver.ageYears), licenceState: driver.licenceState,
           yearsLicensed: number(driver.yearsLicensed), atFaultAccidents: number(driver.atFaultAccidents), violations: number(driver.violations) })),
-        garaging: { zip: text("zip"), state: text("garagingState") },
+        garaging: { zip: text("zip"), state: garagingState },
         vehicle: { vin: vehicle.vin.trim() || null, modelYear: number(vehicle.modelYear), make: vehicle.make, model: vehicle.model,
           trim: vehicle.trim.trim() || null, usage: vehicle.usage || null, annualMileage: number(vehicle.annualMileage) },
         coverage,
@@ -307,6 +373,11 @@ function ApplicationForm({ view, busy, Sub, onCancel, onSave }: { view: Insuranc
 
   const setDriver = (index: number, field: keyof DriverDraft, value: string) =>
     setDrivers(list => list.map((driver, at) => at === index ? { ...driver, [field]: value } : driver));
+  function changeGaragingState(state: string) {
+    setGaragingState(state);
+    if (!coverageChosen) { setCoverage(startingCoverage(view.coverageGuide, minimumsOf(view, state))); setResetOffered(false); }
+    else setResetOffered(Boolean(minimumsOf(view, state)));
+  }
 
   return <form className="insurance-form" onSubmit={event => void submit(event)} noValidate aria-label="Insurance application">
     <p className="muted">Only what insurers use to price a quote. No names, dates of birth, licence numbers or Social Security
@@ -322,10 +393,8 @@ function ApplicationForm({ view, busy, Sub, onCancel, onSave }: { view: Insuranc
           <label>Age<input inputMode="numeric" autoComplete="off" value={driver.ageYears}
             onChange={event => setDriver(index, "ageYears", event.target.value)} {...described(field("ageYears"))} /></label>
           {errorFor(field("ageYears"))}
-          <label>State that issued the licence<select value={driver.licenceState}
-            onChange={event => setDriver(index, "licenceState", event.target.value)} {...described(field("licenceState"))}>
-            {STATES.map(state => <option key={state} value={state}>{state}</option>)}
-          </select></label>
+          <StateSelect label="State that issued the licence" value={driver.licenceState}
+            onChange={state => setDriver(index, "licenceState", state)} described={described(field("licenceState"))} />
           {errorFor(field("licenceState"))}
           <label>Years licensed<input inputMode="numeric" autoComplete="off" value={driver.yearsLicensed}
             onChange={event => setDriver(index, "yearsLicensed", event.target.value)} {...described(field("yearsLicensed"))} /></label>
@@ -340,7 +409,7 @@ function ApplicationForm({ view, busy, Sub, onCancel, onSave }: { view: Insuranc
             onClick={() => setDrivers(list => list.filter((_, at) => at !== index))}>Remove driver {index + 1}</button>}
         </div>;
       })}
-      {drivers.length < 6 && <button type="button" className="btn-secondary" onClick={() => setDrivers(list => [...list, emptyDriver()])}>
+      {drivers.length < 6 && <button type="button" className="btn-secondary" onClick={() => setDrivers(list => [...list, emptyDriver(view.buyerState)])}>
         Add another driver</button>}
     </fieldset>
 
@@ -349,10 +418,15 @@ function ApplicationForm({ view, busy, Sub, onCancel, onSave }: { view: Insuranc
       <label>ZIP code<input name="zip" inputMode="numeric" autoComplete="postal-code" maxLength={5}
         defaultValue={application?.garaging.zip ?? ""} {...described("garaging.zip")} /></label>
       {errorFor("garaging.zip")}
-      <label>State<select name="garagingState" defaultValue={application?.garaging.state ?? "FL"} {...described("garaging.state")}>
-        {STATES.map(state => <option key={state} value={state}>{state}</option>)}
-      </select></label>
+      <StateSelect label="State" name="garagingState" value={garagingState} onChange={changeGaragingState}
+        described={described("garaging.state")} />
       {errorFor("garaging.state")}
+      {resetOffered && minimums && <div className="insurance-reset">
+        <p className="muted">The state changed, and your coverage choices are kept.</p>
+        <button type="button" className="btn-secondary" onClick={() => {
+          setCoverage(startingCoverage(view.coverageGuide, minimums)); setCoverageChosen(false); setResetOffered(false);
+        }}>Reset coverage to {minimums.name}'s minimums</button>
+      </div>}
     </fieldset>
 
     <fieldset className="insurance-group">
@@ -390,8 +464,10 @@ function ApplicationForm({ view, busy, Sub, onCancel, onSave }: { view: Insuranc
       {errorFor("vehicle.annualMileage")}
     </fieldset>
 
-    <CoverageEditor legend="Coverage you want" guide={view.coverageGuide} lines={coverage} onChange={setCoverage}
-      field="coverage" errors={{ errorFor, describedBy }} explain />
+    <CoverageEditor legend="Coverage you want" guide={view.coverageGuide} lines={coverage}
+      onChange={lines => { setCoverage(lines); setCoverageChosen(true); }} field="coverage" errors={{ errorFor, describedBy }}
+      explain={{ state: garagingState, minimums }} />
+    <MinimumWarning gaps={shortfalls(coverage, view.coverageGuide, minimums)} minimums={minimums} live />
 
     <fieldset className="insurance-group">
       <legend>Your current policy (optional)</legend>
@@ -443,31 +519,35 @@ function AmountSelect({ label, value, options, onChange, describedBy }: { label:
   </select></label>;
 }
 
-function CoverageEditor({ legend, guide, lines, onChange, field, errors, explain = false }: {
-  legend: string; guide: InsuranceView["coverageGuide"]; lines: CoverageLine[]; onChange: (lines: CoverageLine[]) => void;
-  field: string; errors: { errorFor: (field: string) => ReactNode; describedBy: (field: string) => string | undefined }; explain?: boolean;
+/** With {@code explain}, each coverage is explained with what the garaging state requires of it. */
+function CoverageEditor({ legend, guide, lines, onChange, field, errors, explain }: {
+  legend: string; guide: Guide[]; lines: CoverageLine[]; onChange: (lines: CoverageLine[]) => void;
+  field: string; errors: { errorFor: (field: string) => ReactNode; describedBy: (field: string) => string | undefined };
+  explain?: { state: string; minimums?: StateMinimum };
 }) {
   const id = useId();
-  function toggle(entry: InsuranceView["coverageGuide"][number], on: boolean) {
+  const minimums = explain?.minimums;
+  function toggle(entry: Guide, on: boolean) {
     if (!on) { onChange(lines.filter(line => line.type !== entry.type)); return; }
-    onChange([...lines, { type: entry.type,
-      perPersonLimitMinor: entry.perPersonLimit ? (entry.type === "PERSONAL_INJURY_PROTECTION" ? 1000000 : 10000000) : null,
-      perAccidentLimitMinor: entry.perAccidentLimit ? (entry.perPersonLimit ? 30000000 : 1000000) : null,
-      deductibleMinor: entry.deductible ? (entry.type === "PERSONAL_INJURY_PROTECTION" ? 0 : 50000) : null }]);
+    onChange([...lines, newLine(entry, minimums?.lines.find(line => line.type === entry.type))]);
   }
   const update = (type: CoverageType, change: Partial<CoverageLine>) =>
     onChange(lines.map(line => line.type === type ? { ...line, ...change } : line));
   return <fieldset className="insurance-group insurance-coverage" aria-describedby={errors.describedBy(field)}>
     <legend>{legend}</legend>
     {errors.errorFor(field)}
+    {explain && explain.state !== "" && !minimums && <p className="muted">Minimums for {explain.state} are not listed here yet.</p>}
     {guide.map(entry => {
       const line = lines.find(item => item.type === entry.type);
       const lineField = `${field}.${entry.type}`;
       const explanation = `${id}-${entry.type}-explanation`;
+      const minimum = minimums?.lines.find(item => item.type === entry.type);
       return <div key={entry.type} className="insurance-coverage-line">
         <label><input type="checkbox" checked={Boolean(line)} onChange={event => toggle(entry, event.target.checked)}
-          aria-describedby={explain ? explanation : undefined} />{entry.label}</label>
+          aria-describedby={explain ? [explanation, minimum && `${explanation}-minimum`].filter(Boolean).join(" ") : undefined} />
+          {entry.label}</label>
         {explain && <p className="muted insurance-explanation" id={explanation}>{entry.explanation}</p>}
+        {explain && minimum && <p className="insurance-explanation insurance-minimum" id={`${explanation}-minimum`}>{minimum.text}</p>}
         {line && entry.perPersonLimit && <AmountSelect label={`${entry.label}: limit per person`} value={line.perPersonLimitMinor}
           options={entry.type === "PERSONAL_INJURY_PROTECTION" ? [1000000] : PER_PERSON} describedBy={errors.describedBy(lineField)}
           onChange={value => update(entry.type, { perPersonLimitMinor: value })} />}
@@ -488,6 +568,8 @@ function ConsentStep({ view, busy, Sub, onCancel, onAgree }: { view: InsuranceVi
   const heading = useId();
   return <section className="insurance-consent" aria-labelledby={heading}>
     <Sub id={heading}>Before your application is sent</Sub>
+    {view.application && <MinimumWarning minimums={minimumsOf(view, view.application.garaging.state)}
+      gaps={shortfalls(view.application.coverage, view.coverageGuide, minimumsOf(view, view.application.garaging.state))} />}
     {view.consent.text.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
     <p><a href={howOtdogMakesMoneyLink}>How otdog makes money</a></p>
     <label><input type="checkbox" checked={agreed} onChange={event => setAgreed(event.target.checked)} />
@@ -572,7 +654,7 @@ function OwnQuoteForm({ view, busy, onAdd }: { view: InsuranceView; busy: boolea
   const prefix = useId();
   const [open, setOpen] = useState(false);
   const [same, setSame] = useState(true);
-  const [lines, setLines] = useState<CoverageLine[]>(view.application?.coverage ?? STARTING_COVERAGE);
+  const [lines, setLines] = useState<CoverageLine[]>(view.application?.coverage ?? []);
   const [problem, setProblem] = useState<Problem>();
   const { described, errorFor, describedBy } = useFieldErrors(prefix, problem);
   if (!open) return <button type="button" className="btn-secondary" onClick={() => setOpen(true)}>Add a quote I already have</button>;

@@ -55,6 +55,16 @@ test("the insurance application with field errors and a different current covera
   await expectUsableAtNarrowWidth(page, panel);
 });
 
+test("a state's minimums, the reset offer and the below-minimum warning work one-handed at 360 px", async ({ page }) => {
+  const panel = await openCase(page, insuranceView("APPLIED"));
+  await panel.getByRole("button", { name: "Edit application" }).click();
+  await panel.locator("select[name=garagingState]").selectOption("NC");
+  await expect(panel.getByText("North Carolina requires at least $50,000 per person and $100,000 per accident.").first()).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Reset coverage to North Carolina's minimums" })).toBeVisible();
+  await expect(panel.getByText("This coverage is below North Carolina's minimum:")).toBeVisible();
+  await expectUsableAtNarrowWidth(page, panel);
+});
+
 test("the partner's consent works one-handed at 360 px", async ({ page }) => {
   const panel = await openCase(page, insuranceView("APPLIED"));
   await expect(panel.getByText("Gulfside Mutual Assurance of Northeast Florida, $910 for 6 months")).toBeVisible();

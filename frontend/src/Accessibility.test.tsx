@@ -913,6 +913,25 @@ test.each(["EMPTY", "EDITING", "CONSENT", "QUOTED", "JOURNEY"])("the insurance q
 });
 // End ticket 126.
 
+// Ticket 138: a state's minimums in the guide, the reset offer after a change of state, and the below-minimum warning.
+test.each(["FORM", "CONSENT"])("the insurance state minimums and warning (%s) have no automated AA violations", async state => {
+  const saved = insuranceView("APPLIED").application!;
+  const application = { ...saved, garaging: { zip: "75201", state: "TX" }, coverage: saved.coverage.map(line =>
+    line.type === "PROPERTY_DAMAGE_LIABILITY" ? { ...line, perAccidentLimitMinor: 2000000 } : line) };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify(insuranceView("APPLIED", { application }))));
+  const { container } = render(<main><h1>Buying Case</h1><InsuranceQuotes caseId="case" token="token" /></main>);
+  if (state === "FORM") {
+    await userEvent.click(await screen.findByRole("button", { name: "Edit application" }));
+    await userEvent.selectOptions(screen.getByLabelText("State"), "NC");
+    await screen.findByRole("button", { name: "Reset coverage to North Carolina's minimums" });
+  } else {
+    await userEvent.click(await screen.findByRole("button", { name: "Get quotes" }));
+  }
+  await screen.findByText(/This coverage is below/);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+// End ticket 138.
+
 // Ticket 129: loan pre-approvals — the start, the application with field errors, the authorization, the ordered offers with
 // an offer of the Buyer's own, the chosen pre-approval, the journey panel, the dealer-wins desk finding and the outside
 // financing filled from the chosen pre-approval.

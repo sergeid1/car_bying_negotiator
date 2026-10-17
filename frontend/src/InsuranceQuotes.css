@@ -52,3 +52,11 @@ ol.insurance-quote-list > li .insurance-quote-insurer::before {
 .insurance-differences { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
 .insurance-continue { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; }
 .insurance-outcomes > li { padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+/* Ticket 138: the garaging state's minimum for each coverage, the reset offer and the below-minimum warning. */
+.insurance-minimum { font-weight: 600; }
+.insurance-reset { display: grid; gap: 8px; }
+.insurance-reset > p { margin: 0; }
+.insurance-reset > button { justify-self: start; }
+.insurance-minimum-warning { display: grid; gap: 6px; }
+.insurance-minimum-warning > p, .insurance-minimum-warning > ul { margin: 0; }
+.insurance-minimum-warning > ul { padding-left: 1.2em; }

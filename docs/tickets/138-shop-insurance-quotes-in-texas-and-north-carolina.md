@@ -15,7 +15,30 @@ required limit can be chosen. Today the journey is written for Florida only. The
 **Blocked by:** none for the journey against the ticket 125 fake. Quotes from a real partner still wait on 123 and 127,
 and the Phase 5 licensing route must be confirmed for each pilot state (specification §18 item 12).
 
-**Status:** open — filed on 2026-10-16.
+**Status:** complete on 2026-10-16 against the ticket 125 fake. Real partner quotes still wait on 123 and 127, and the
+Phase 5 licensing route per state (specification §18 item 12) is unchanged. Operator decisions recorded below.
+
+**Implementation notes:**
+
+- `backend/src/main/resources/insurance/state-minimums.v1.json` (`insurance-state-minimums.2026-10.v1`) holds each
+  state's lines with a rule (`REQUIRED`, `INCLUDED_UNLESS_REJECTED`, `NOT_REQUIRED`), limits, citation, `checkedOn`
+  2026-10-16 and `reviewOn` 2027-01-01. `StateMinimums` refuses data that lacks citations, repeats a coverage, or gives a
+  `REQUIRED` line limits its coverage does not have. `InsuranceShoppingService` words every guide line for every state
+  from the data alone and returns it as `stateMinimums`, with `buyerState` from the case's jurisdiction or else the
+  journey's latest Shopping Brief. The guide's explanations no longer name a state.
+- Checked on 2026-10-16 against the full text: FLHSMV (PIP $10,000, PDL $10,000); TDI cb020 (updated 12/11/2025) and OPIC
+  (30/60/25; PIP and UM/UIM included or offered unless rejected in writing), Insurance Code 1952.101 and 1952.152;
+  G.S. 20-279.21(b)(2) to (b)(4) and NCDOI (50/100/50; uninsured motorist bodily injury limits no lower than the (b)(2)
+  liability minimums, so at least 50/100; underinsured motorist coverage in every policy). North Carolina's required
+  uninsured motorist property damage coverage has no line in the application's coverage model and is not shown.
+- No Texas PIP amount ships: the official pages read give none, so the line says only that it is included unless
+  rejected in writing. Texas PIP and uninsured motorist are not pre-selected; the Buyer chooses them.
+- The client starts the application at the garaging state's `REQUIRED` lines, defaults the garaging and licence states
+  to `buyerState` or to no selection, keeps edited coverage when the state changes and offers "Reset coverage to …'s
+  minimums", and says "Minimums for GA are not listed here yet." for a state outside the list. The limit choices add
+  $30,000 per person and $60,000 per accident.
+- **Operator decision, recorded:** coverage below the garaging state's minimum is a warning, not a block. It shows in the
+  form (a live status region) and on the consent step before sending; the Buyer can still send.
 
 **State minimums to confirm against the official text before they ship** (from official pages via search on
 2026-10-16; read each in full, as ticket 137 did for tax):
@@ -55,12 +78,12 @@ and the Phase 5 licensing route must be confirmed for each pilot state (specific
 
 ## Done when
 
-- [ ] Florida, Texas and North Carolina minimums ship as cited data, each value checked against its official source,
+- [x] Florida, Texas and North Carolina minimums ship as cited data, each value checked against its official source,
       with a review date; no Buyer-facing copy hard-codes a state's minimum.
-- [ ] A Texas, a North Carolina and a Florida application each start at that state's minimums, and the coverage guide
+- [x] A Texas, a North Carolina and a Florida application each start at that state's minimums, and the coverage guide
       names them. A Buyer outside the pilot sees no invented minimum.
-- [ ] No form field defaults to `FL` unless the case or journey is in Florida.
-- [ ] Coverage below the garaging state's minimum shows a warning before sending; tests cover each pilot state.
-- [ ] The Texas $30,000 / $60,000 limits can be chosen, and the insurance pages still pass the axe sweep in
+- [x] No form field defaults to `FL` unless the case or journey is in Florida.
+- [x] Coverage below the garaging state's minimum shows a warning before sending; tests cover each pilot state.
+- [x] The Texas $30,000 / $60,000 limits can be chosen, and the insurance pages still pass the axe sweep in
       `Accessibility.test.tsx` and the 360 px browser gate.
-- [ ] Copy passes `ClaimVocabulary` and `PilotCopyClaimsTest`.
+- [x] Copy passes `ClaimVocabulary` and `PilotCopyClaimsTest`.
