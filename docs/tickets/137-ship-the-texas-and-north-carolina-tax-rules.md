@@ -17,7 +17,19 @@ fixture, and a Texas Buyer is told the state is not supported. Research:
 **Blocked by:** none in the dependency graph. Like ticket 108, it touches tax calculation, the trade check (103, 106)
 and case intake, so do not run it in parallel with another ticket that changes those.
 
-**Status:** open — filed on 2026-10-16.
+**Status:** complete — migration V61, as of 2026-10-16. `US-TX.cash.2026.v1` and `US-NC.cash.2026.v1` ship effective
+2026-01-01, checked 2026-10-16, review 2027-01-01, each read in full from Tax Code ch. 152 and Comptroller guide 96-254
+(3/2026), and G.S. 105-187.3, 105-187.4, 20-101.1 and NCDMV MVR-106 Rev. 04/26. The sources refine the ticket: Texas
+does not tax a separately stated documentary fee, service contract, GAP, roadside, insurance or inventory-tax
+reimbursement; North Carolina taxes the dealer's administrative or documentary fee but not a separately stated service
+contract. Optional pack fields carry this as data (`taxName`, `nonTaxableCharges` label terms, `paidAtTitling` with a
+`buyerNote`), read by the shared calculator. A North Carolina quote or desk paperwork that leaves out only the highway
+use tax reconciles or shows an informational note, and totals still include it. The synthetic `US-NC.cash.v1` moved to
+the fixture-only `SYNTHETIC-FIXTURE` jurisdiction; frozen results keep its version. Limits: non-taxable charges are
+recognised by label on itemized lines, so a lump or unusually labelled charge is taxed. Out of scope: title,
+registration, plate and inspection fees; Texas new-resident, even-trade and gift taxes and standard presumptive value;
+doc fee caps; non-resident and out-of-state purchases. The Florida-specific insurance copy and defaults found here are
+ticket 138.
 
 **Sources to read in full, not from search excerpts** (the 2026-10-16 check used search excerpts of these pages;
 each value is checked against the publication before it ships):
@@ -57,18 +69,18 @@ each value is checked against the publication before it ships):
 
 ## Done when
 
-- [ ] `US-TX` and `US-NC` packs ship with citations, checked dates and review dates, and
+- [x] `US-TX` and `US-NC` packs ship with citations, checked dates and review dates, and
       `docs/jurisdiction-tax-packs.md` has a section for each with its sources and worked examples.
-- [ ] Tests cover, with labelled synthetic cases, for each state: no trade-in; a trade-in that reduces the taxable
+- [x] Tests cover, with labelled synthetic cases, for each state: no trade-in; a trade-in that reduces the taxable
       price; a trade-in larger than the price (tax floors at zero); an Agreed Price and a fresh desk case; and the
       trade comparison showing the tax the Buyer would lose by selling the car elsewhere.
-- [ ] An acceptance test opens a Texas case and a North Carolina case end to end without asking for a county, and a
+- [x] An acceptance test opens a Texas case and a North Carolina case end to end without asking for a county, and a
       Buyer in a state with no pack still gets the existing "not supported yet" message.
-- [ ] No North Carolina Buyer location resolves to the synthetic fixture, and the choice made for it is recorded.
-- [ ] `docs/pilot-readiness-record.md` updates the `jurisdiction-pack` prerequisite with both packs' versions and
+- [x] No North Carolina Buyer location resolves to the synthetic fixture, and the choice made for it is recorded.
+- [x] `docs/pilot-readiness-record.md` updates the `jurisdiction-pack` prerequisite with both packs' versions and
       sources. Its status changes only by the operator.
-- [ ] Buyer-facing copy passes `ClaimVocabulary` and `PilotCopyClaimsTest`.
-- [ ] Out of scope, and said in the ticket's notes when it closes: title, registration, plate and inspection fees;
+- [x] Buyer-facing copy passes `ClaimVocabulary` and `PilotCopyClaimsTest`.
+- [x] Out of scope, and said in the ticket's notes when it closes: title, registration, plate and inspection fees;
       Texas new-resident and even-trade taxes and standard presumptive value (private sales); dealer doc fee caps (Texas
       has a $225 safe harbor, North Carolina no cap; nothing in the product checks doc fee caps yet); non-resident
       purchases; vehicles bought out of state; and the non-tax Florida-specific copy found above.
