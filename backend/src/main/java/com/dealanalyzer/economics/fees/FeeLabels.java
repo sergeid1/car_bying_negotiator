@@ -13,8 +13,9 @@ import java.util.TreeSet;
  * or slashed abbreviation such as "T.T.&L.", "D.M.V." or "Lic." is closed up ("ttl", "dmv", "lic"). A term matches a run
  * of label tokens when every term token matches in order. One token matches another when it is the same word,
  * when one starts the other (so "regist" and "registrations" both read as "registration"), or when it is a
- * misspelling one edit away, two for words of eight letters or more ("registeration", "liscense", "titel").
- * Tokens of one or two letters must match exactly.
+ * misspelling one edit away, two for words of eight letters or more ("registeration", "liscense", "titel"), with the
+ * same first letter. Tokens of one or two letters must match exactly. The government fee, documentary fee and
+ * dealer add-on checks all read labels this way (tickets 139, 140 and 142).
  */
 final class FeeLabels {
   private FeeLabels() {}
@@ -62,7 +63,8 @@ final class FeeLabels {
     if (label.startsWith(term)) return true;
     // An abbreviation of the term: "insp", "regis", "batt".
     if (label.length() >= 4 && term.startsWith(label)) return true;
-    if (term.length() < 5 || label.length() < 4) return false;
+    // A misspelling keeps its first letter, so "maint" is not read as "paint" nor "retail" as "detail" (ticket 142).
+    if (term.length() < 5 || label.length() < 4 || label.charAt(0) != term.charAt(0)) return false;
     int allowed = term.length() >= 8 ? 2 : 1;
     // Compare a longer label word on the term's length too, so "registerations" reads as "registration".
     return distance(label, term) <= allowed

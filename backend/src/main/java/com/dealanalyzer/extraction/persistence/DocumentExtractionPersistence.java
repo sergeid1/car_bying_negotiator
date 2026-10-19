@@ -1,6 +1,7 @@
 package com.dealanalyzer.extraction.persistence;
 
 import com.dealanalyzer.buyingcase.ResourceNotFoundException;
+import com.dealanalyzer.economics.fees.DealerAddOnCatalogue;
 import com.dealanalyzer.extraction.DealTermsExtractionProvider.EvidenceRegion;
 import com.dealanalyzer.extraction.DealTermsValidator.ValidatedExtraction;
 import com.dealanalyzer.extraction.DealTermsValidator.ValidationIssue;
@@ -25,6 +26,7 @@ public class DocumentExtractionPersistence {
   private final ExtractionValidationIssueRepository issues;
   private final DealerOfferPersistence dealerOffers;
   private final ObjectMapper json;
+  private final DealerAddOnCatalogue charges;
 
   DocumentExtractionPersistence(
       DocumentExtractionRepository extractions,
@@ -32,7 +34,9 @@ public class DocumentExtractionPersistence {
       QuoteLineItemRepository lineItems,
       ExtractionValidationIssueRepository issues,
       DealerOfferPersistence dealerOffers,
-      ObjectMapper json) {
+      ObjectMapper json,
+      DealerAddOnCatalogue charges) {
+    this.charges = charges;
     this.extractions = extractions;
     this.candidates = candidates;
     this.lineItems = lineItems;
@@ -154,7 +158,8 @@ public class DocumentExtractionPersistence {
             reviewState(extraction.id, "LINE_ITEM", value.id, value.verificationState),
             value.normalizedCategory.equals("UNKNOWN") ? "ASK_DEALER_TO_CLARIFY" : "NONE",
             dealerOffers.currentCorrection(extraction.id, "LINE_ITEM", value.id).orElse(null),
-            dealerOffers.correctionHistory(extraction.id, "LINE_ITEM", value.id)))
+            dealerOffers.correctionHistory(extraction.id, "LINE_ITEM", value.id),
+            charges.charge(value.suggestedChargeId).orElse(null)))
         .toList();
     List<ValidationIssue> issueViews = issues.findByExtractionIdOrderById(extraction.id).stream()
         .map(value -> new ValidationIssue(
@@ -208,11 +213,23 @@ public class DocumentExtractionPersistence {
       String normalizedUnit, EvidenceRegion evidence, double confidence,
       boolean material, String verificationState, CorrectionView currentCorrection,
       List<CorrectionView> correctionHistory) {}
+  /**
+   * suggestedCharge is a model's suggestion of which catalogue charge the line is, when the catalogue knows the
+   * id (ticket 142). It is shown for the Buyer to confirm or change and has no effect until the Buyer confirms it.
+   */
   public record LineItemView(
       String id, String originalLabel, String category, long amountMinor, String currency,
       String taxClaim, String optionalityClaim, EvidenceRegion evidence, double confidence,
       String verificationState, String clarificationAction, CorrectionView currentCorrection,
-      List<CorrectionView> correctionHistory) {}
+      List<CorrectionView> correctionHistory, DealerAddOnCatalogue.Charge suggestedCharge) {
+    public LineItemView(String id, String originalLabel, String category, long amountMinor, String currency,
+        String taxClaim, String optionalityClaim, EvidenceRegion evidence, double confidence,
+        String verificationState, String clarificationAction, CorrectionView currentCorrection,
+        List<CorrectionView> correctionHistory) {
+      this(id, originalLabel, category, amountMinor, currency, taxClaim, optionalityClaim, evidence, confidence,
+          verificationState, clarificationAction, currentCorrection, correctionHistory, null);
+    }
+  }
   public record ExtractionView(
       String id, String caseId, String documentId, int version, String status,
       String extractorVersion, String modelVersion, String schemaVersion,

@@ -8,6 +8,7 @@ import { TradeValueLinks } from "./TradeValueChecks";
 import type { DeskTacticFinding } from "./DeskTactics";
 import { ListingCapture, ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
 import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
+import { DealerAddOnsNote, type DealerAddOnCheck } from "./DealerAddOns";
 
 type Credentials = { caseId: string; token: string };
 type Route = "AGREED_CAR" | "THIS_CASE";
@@ -31,6 +32,7 @@ export type FirstResult = {
   tacticFindings?: DeskTacticFinding[];
   listingPrice?: ListingPriceCheck | null;
   governmentFees?: GovernmentFeeCheck | null;
+  addOns?: DealerAddOnCheck | null;
 };
 type Typed = { vin?: string; sellingPriceMinor?: number; tradeAllowanceMinor?: number; cashDownMinor?: number;
   monthlyPaymentMinor?: number; termMonths?: number; aprPercent?: number; outTheDoorMinor?: number };
@@ -587,6 +589,9 @@ function ResultView({ result, headingRef, elapsed, onDeskCheck, onType, onClose 
       question={!result.findings.some(finding => finding.code.startsWith("LISTING_"))} />}
     {/* Its questions are already among the findings to ask about. */}
     {result.governmentFees && <GovernmentFeeNote check={result.governmentFees} question={false} />}
+    {/* Every add-on and extra dealer charge, named; added charges are also among the findings to ask about. */}
+    {result.addOns && <DealerAddOnsNote check={result.addOns}
+      question={!result.findings.some(finding => finding.code === "ADD_ON" || finding.code === "ADDED_CHARGE")} />}
     {more.length > 0 && <details>
       <summary>{more.length} more to ask about</summary>
       <ul className="dealer-more">{more.map((finding, index) => <li key={`${finding.code}-${index}`}>

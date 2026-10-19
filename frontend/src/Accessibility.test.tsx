@@ -381,7 +381,11 @@ test("term verification with source pages, trade terms, corrections and version 
         evidence: evidence(1), confidence: 0.97, material: true, verificationState: "UNVERIFIED", currentCorrection: null, correctionHistory: [] },
     ],
     lineItems: [{ id: "l1", originalLabel: "Mystery", category: "UNKNOWN", amountMinor: 89900, currency: "USD", evidence: evidence(2),
-      confidence: 0.9, verificationState: "UNVERIFIED", currentCorrection: null, correctionHistory: [] }],
+      confidence: 0.9, verificationState: "UNVERIFIED", currentCorrection: null, correctionHistory: [] },
+      // Ticket 142: a suggested charge for the Buyer to confirm or change.
+      { id: "l2", originalLabel: "Gold Package", category: "ADD_ON", amountMinor: 99500, currency: "USD", evidence: evidence(2),
+        confidence: 0.9, verificationState: "UNVERIFIED", currentCorrection: null, correctionHistory: [],
+        suggestedCharge: { id: "paint-protection", name: "paint protection", category: "ADD_ON" } }],
   };
   const offer = (version: number, price: string) => ({ id: `o${version}`, version, status: "VERIFIED", createdAt: "",
     terms: { candidates: [{ field: "SELLING_PRICE", value: price, unit: "USD_MINOR" }], lineItems: [] } });
@@ -1106,6 +1110,20 @@ test("the state fee note has no automated AA violations", async () => {
     <section aria-label="Unchecked"><h2>Desk Check</h2><GovernmentFeeNote check={uncheckedFees} /></section></main>);
   expect((await axe.run(container, AA)).violations).toEqual([]);
   for (const summary of container.querySelectorAll("summary")) await userEvent.click(summary);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
+// Ticket 142: named add-ons, a possible add-on and an unrecognised charge, in the report, a Deal Review and the Desk
+// Check, with unread and unverified lines.
+test("the add-on and extra dealer charge note has no automated AA violations", async () => {
+  const { DealerAddOnsNote } = await import("./DealerAddOns");
+  const { RevisedOfferReview } = await import("./RevisedOfferReview");
+  const { namedAddOns, readAddOns } = await import("./DealerAddOns.fixture");
+  const { container } = render(<main><h1>Synthetic case</h1>
+    <section aria-label="Report"><h2>Report</h2><DealerAddOnsNote check={namedAddOns} /></section>
+    <section aria-label="Deal Review"><h2>Deal Review</h2><RevisedOfferReview review={{ version: 1, baselineVersion: 1,
+      previousOfferVersion: 1, currentOfferVersion: 2, status: "REVIEW_REQUIRED", checkedAt: "2026-10-19", tolerancePolicy: "USD 1.00",
+      scope: "Verified document terms", discrepancies: [], cashDeltas: {}, dealerAddOns: namedAddOns }} /></section>
+    <section aria-label="Desk"><h2>Desk Check</h2><DealerAddOnsNote check={readAddOns} question={false} /></section></main>);
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
 // Ticket 115: the Buyer's copy of the dealer's ad, its confirmation form with a source page, a VIN conflict, and the

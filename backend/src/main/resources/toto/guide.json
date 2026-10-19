@@ -2,7 +2,7 @@
   "version": "toto-guide.v1",
   "released": false,
   "description": "Toto's code-owned guide (ticket 118). Articles are listed in the order Toto is given them. released stays false until the operator has reviewed every article (reviewed_by and reviewed_on in its front matter); until then Toto serves no articles. digest covers what the model sees, so any article change needs a new digest, a version bump and a new shadow comparison (ticket 122).",
-  "digest": "sha256:f770aabef1a33fa748ebb56b1a851838c9d89fa46c475d85f38b4944253ec76f",
+  "digest": "sha256:9dbe45de262f17b9c5b71379ef3f8bbaa044368270f3a0e2d8b49e385fdfd898",
   "articles": [
     "about-toto",
     "otdog-is-on-your-side",

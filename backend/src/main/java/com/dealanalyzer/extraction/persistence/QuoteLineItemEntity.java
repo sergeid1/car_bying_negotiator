@@ -26,6 +26,7 @@ class QuoteLineItemEntity {
   @Column(name = "region_height", nullable = false, precision = 8, scale = 7) BigDecimal regionHeight;
   @Column(nullable = false, precision = 6, scale = 5) BigDecimal confidence;
   @Column(name = "verification_state", nullable = false, length = 32) String verificationState;
+  @Column(name = "suggested_charge_id", length = 64) String suggestedChargeId;
   @Column(name = "created_at", nullable = false) Instant createdAt;
 
   protected QuoteLineItemEntity() {}
@@ -46,6 +47,7 @@ class QuoteLineItemEntity {
     this.regionHeight = BigDecimal.valueOf(value.evidence().height());
     this.confidence = BigDecimal.valueOf(value.confidence());
     this.verificationState = value.verificationState();
+    this.suggestedChargeId = value.suggestedChargeId();
     this.createdAt = now;
   }
 }

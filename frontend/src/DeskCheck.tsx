@@ -5,6 +5,7 @@ import { TradeCheckPanel, type TradeCheckResult } from "./TradeCheck";
 import { DeskTactics, type DeskTacticFinding } from "./DeskTactics";
 import { ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
 import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
+import { DealerAddOnsNote, type DealerAddOnCheck } from "./DealerAddOns";
 
 type Credentials = { caseId: string; token: string };
 type Term = { value?: string | null; unit?: string; amountMinor?: number; currency?: string; category?: string } | number;
@@ -12,6 +13,8 @@ export type DeskFinding = {
   group: string; term: string; label: string; kind: string; agreed: Term | null; desk: Term | null;
   delta: number | null; unit: string | null; severity: string; verified: boolean;
   evidence: { pageNumber?: number } | null; buyerAction: string | null;
+  /** The add-on catalogue's name for a charge line (ticket 142). */
+  chargeName?: string | null;
 };
 export type DeskCheckView = {
   status: "NO_AGREED_PRICE" | "AWAITING_PAPERWORK" | "READING" | "DIFFERENT_VIN" | "DIFFERENCES" | "NO_DIFFERENCES";
@@ -30,6 +33,8 @@ export type DeskCheckView = {
   listingPrice?: ListingPriceCheck | null;
   /** The state fee lines against the state's fee schedule (ticket 139). */
   governmentFees?: GovernmentFeeCheck | null;
+  /** Each add-on and extra dealer charge on the paperwork, named from the catalogue (ticket 142). */
+  addOns?: DealerAddOnCheck | null;
 };
 export type FreshDeskCase = Credentials & { agreed: Credentials; agreedVin: string | null; vin: string; files: File[] };
 
@@ -71,7 +76,7 @@ export function describeFinding(finding: DeskFinding) {
   if (finding.kind === "DOC_FEE_CHECK") return `${label} identification on the paperwork.`;
   switch (finding.group) {
     case "VEHICLE": return `This paperwork is for VIN ${show(finding.desk)}, but your Agreed Price is for VIN ${show(finding.agreed)}.`;
-    case "ADDED": return `Added: ${label}, ${show(finding.desk)}. It is not in your Agreed Price.`;
+    case "ADDED": return `Added: ${label}${finding.chargeName ? ` (${finding.chargeName})` : ""}, ${show(finding.desk)}. It is not in your Agreed Price.`;
     case "REMOVED": return `Missing: ${label}, ${show(finding.agreed)} in your Agreed Price, is not on this paperwork.`;
     case "LIMIT": return `${label} of ${show(finding.agreed)} is exceeded by ${money(finding.delta ?? 0)}.`;
     default:
@@ -187,6 +192,7 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
         {view.trade && <TradeCheckPanel result={view.trade} tactics={view.tacticFindings} />}
         {view.listingPrice && <ListingPriceNote check={view.listingPrice} title="The ad you saved" />}
         {view.governmentFees && <GovernmentFeeNote check={view.governmentFees} />}
+        {view.addOns && <DealerAddOnsNote check={view.addOns} />}
         {view.otherDifferences.length > 0 && <details>
           <summary>{view.otherDifferences.some(finding => finding.kind === "DOC_FEE_CHECK")
             ? "Other paperwork notes and state fee checks"
