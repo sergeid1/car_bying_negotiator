@@ -135,11 +135,14 @@ disabled. Its prompt version is `toto-answer-prompt.v1.<guide-version>` and its 
 - **Guide boundary.** A code-owned `TotoGuideLoader` bean returns one immutable `Guide(version,
   articles)`, with each article carrying `id`, `title`, `text` and optional `link`. A link is
   `?guide=<existing-client-guide-id>` or null, set only by the reviewed loader. The guide is loaded once at
-  startup and shared by the registered task and `TotoAnswerTask.Answerer`. Ticket 118 can supply
-  its reviewed Markdown loader through this interface without changing the task. Until then,
-  the default loader has no articles (`toto-guide.unavailable`); no fixture ships as a real guide
-  and no provider is called with that empty context. The synthetic development guide lives only
-  in test resources. Ticket 118 still owns review metadata, guide content and the written policy.
+  startup and shared by the registered task and `TotoAnswerTask.Answerer`. The default loader is
+  ticket 118's `ReviewedTotoGuide`, which reads the Markdown articles listed in
+  `toto/guide.json` and serves them as version `<manifest version>.<12 hex digits of the content
+  digest>`, so any article change changes the prompt version. Until the operator has reviewed
+  every article and the manifest marks the guide released, it serves no articles
+  (`toto-guide.unavailable`), and no provider is called with that empty context. The synthetic
+  development guide lives only in test resources. Front matter, review and release rules are in
+  the [Toto answer policy](toto-answer-policy.md).
 - **Request API.** Inject `TotoAnswerTask.Answerer` and call `answer(question, recentTurns)`.
   Each recent `Turn` has a `BUYER` or `TOTO` role and text. The question and the last six turns
   become separately framed `UntrustedInput.Text` values; roles select code-owned frame labels,

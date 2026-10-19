@@ -10,7 +10,7 @@ whose search appears to come from its own crawl of dealer websites.
 1. **Spec amendment.** Spec 2.2 excludes "inventory discovery from unlicensed sources or scraping" (section
    2.2) and allows a Listing Snapshot only "when licensed access supports it" (section 5.2). A single
    Buyer-requested fetch is not inventory discovery, but the spec must say so explicitly in an amendment
-   before this is built (the next spec version after 2.3, which another branch uses for insurance and loan quotes).
+   before this is built (the next spec version after 2.5: 2.3 added insurance and loan quotes, 2.4 the three pilot states and 2.5 Toto, ticket 118).
 2. **Terms review.** Dealer sites' and listing portals' terms of use, and whether storing the fetched
    facts (not photos or description text) is acceptable, recorded in `docs/provider-inventory.md`.
 Also 115 (the snapshot source and price check this reuses).
