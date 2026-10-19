@@ -10,16 +10,17 @@ import java.util.Set;
 
 /**
  * The recorded evidence a model-backed path needs before it may run: validated vendor retention and
- * training terms, and shadow comparisons produced by the Python evaluation harness (ticket 28)
- * against the frozen corpus. Both are code-reviewed classpath records, not runtime settings.
+ * training terms, and shadow comparisons produced by the extraction or Toto evaluation harness
+ * against its frozen set. Both are code-reviewed classpath records, not runtime settings.
  */
 public record ModelObligations(List<VendorTerms> vendorTerms, List<ShadowComparison> comparisons) {
   static final String VENDOR_TERMS = "/ai/model-vendor-terms.json";
   static final String SHADOW_COMPARISONS = "/ai/shadow-comparisons.json";
   static final String TERMS_SCHEMA = "model-vendor-terms.v2";
   static final String COMPARISONS_SCHEMA = "shadow-comparisons.v2";
-  /** The only producer whose comparisons count; a hand-written record is not evidence. */
+  /** Code-owned evaluation producers; a hand-written record is not evidence. */
   public static final String EVALUATION_HARNESS = "python-evaluation-harness";
+  public static final String TOTO_EVALUATION_HARNESS = "java-toto-evaluation-harness";
 
   public ModelObligations {
     vendorTerms = List.copyOf(vendorTerms);
@@ -77,7 +78,8 @@ public record ModelObligations(List<VendorTerms> vendorTerms, List<ShadowCompari
     public ShadowComparison {
       if (!present(id) || !present(operation) || candidate == null || !present(baseline)
           || !present(evaluationSetVersion) || !present(thresholdSetVersion)
-          || !"HELD_OUT".equals(corpusSplit) || !EVALUATION_HARNESS.equals(executedBy)
+          || !"HELD_OUT".equals(corpusSplit)
+          || !("GUIDE_ANSWER".equals(operation) ? TOTO_EVALUATION_HARNESS : EVALUATION_HARNESS).equals(executedBy)
           || !present(harnessVersion) || executedAt == null || !OUTCOMES.contains(outcome) || !present(report)) {
         throw new IllegalArgumentException("Shadow comparison " + id + " is incomplete or not from the evaluation harness");
       }

@@ -1,0 +1,6 @@
+{
+  "version": "toto-questions.v1",
+  "sha256": "7313c46c9c84f434e5bc6ac7cf71f36f601496d1e60a50ce65ca8962918af808",
+  "thresholdSetVersion": "toto-thresholds.v1",
+  "minimumUsefulPercent": 90
+}
