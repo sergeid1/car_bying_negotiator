@@ -51,6 +51,7 @@ public class DeskCheckService {
   private final com.dealanalyzer.economics.persistence.CashEconomicsPersistence policies;
   private final com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees;
   private final com.dealanalyzer.economics.fees.DocFeeCheck docFees;
+  private final com.dealanalyzer.economics.fees.DealerAddOnCheck addOns;
 
   public DeskCheckService(EphemeralBuyingCaseService cases, PricePlanService plans, DealerOfferPersistence offers,
       DocumentExtractionPersistence extractions, JdbcTemplate jdbc, ObjectMapper json,
@@ -59,9 +60,11 @@ public class DeskCheckService {
       com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice,
       com.dealanalyzer.economics.persistence.CashEconomicsPersistence policies,
       com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees,
-      com.dealanalyzer.economics.fees.DocFeeCheck docFees) {
+      com.dealanalyzer.economics.fees.DocFeeCheck docFees,
+      com.dealanalyzer.economics.fees.DealerAddOnCheck addOns) {
     this.governmentFees = governmentFees;
     this.docFees = docFees;
+    this.addOns = addOns;
     this.listingPrice = listingPrice;
     this.policies = policies;
     this.cases = cases; this.plans = plans; this.offers = offers; this.extractions = extractions;
@@ -83,13 +86,23 @@ public class DeskCheckService {
       FreshCase freshCase, Integer dealReviewVersion, TradeDeskCheck.Result trade,
       List<com.dealanalyzer.desk.tactic.DeskTacticPolicy.Finding> tacticFindings,
       com.dealanalyzer.listing.capture.ListingPriceCheck.Result listingPrice,
-      com.dealanalyzer.economics.fees.GovernmentFeeCheck.Result governmentFees) {}
+      com.dealanalyzer.economics.fees.GovernmentFeeCheck.Result governmentFees,
+      com.dealanalyzer.economics.fees.DealerAddOnCheck.Result addOns) {}
   public record Agreed(int offerVersion, int baselineVersion, String vin, Long sellingPriceMinor,
       Long outTheDoorMinor, Instant acceptedAt) {}
   public record Paperwork(String documentId, Instant uploadedAt, String extractionId, Integer offerVersion, String vin) {}
-  /** One difference from the Agreed Price; {@code verified} only when it rests on Buyer-verified evidence. */
+  /**
+   * One difference from the Agreed Price; {@code verified} only when it rests on Buyer-verified evidence.
+   * chargeName is the add-on catalogue's name for a charge line (ticket 142), or null.
+   */
   public record Finding(String group, String term, String label, String kind, JsonNode agreed, JsonNode desk,
-      BigDecimal delta, String unit, String severity, boolean verified, JsonNode evidence, String buyerAction) {}
+      BigDecimal delta, String unit, String severity, boolean verified, JsonNode evidence, String buyerAction,
+      String chargeName) {
+    public Finding(String group, String term, String label, String kind, JsonNode agreed, JsonNode desk,
+        BigDecimal delta, String unit, String severity, boolean verified, JsonNode evidence, String buyerAction) {
+      this(group, term, label, kind, agreed, desk, delta, unit, severity, verified, evidence, buyerAction, null);
+    }
+  }
   /** basis: CALCULATED (saved review), QUOTED (totals on the paperwork) or UNAVAILABLE. Missing is never zero. */
   public record TotalEffect(String basis, String currency, Long outTheDoorDeltaMinor, Long preTaxDeltaMinor,
       Long taxEffectMinor, Long addedChargesMinor) {}
@@ -145,7 +158,7 @@ public class DeskCheckService {
     try { extraction = extractions.requireLatest(caseId, document.id()); }
     catch (com.dealanalyzer.buyingcase.ResourceNotFoundException reading) {
       return new View(VERSION, "READING", null, agreed, new Paperwork(document.id(), document.createdAt(), null, null, null),
-          List.of(), List.of(), 0, unavailable(), null, null, null, List.of(), null, null);
+          List.of(), List.of(), 0, unavailable(), null, null, null, List.of(), null, null, null);
     }
     String deskVin = extraction.candidates().stream().filter(c -> c.field().equals("VEHICLE_VIN")).findFirst()
         .map(c -> c.currentCorrection() == null ? c.normalizedValue() : c.currentCorrection().normalizedValue()).orElse(null);
@@ -164,7 +177,7 @@ public class DeskCheckService {
           null, "VIN", "BLOCKING", false, evidence(extraction, "VEHICLE_VIN"),
           "Start a separate case for this car. Nothing on this paperwork is compared with or added to the agreed car.");
       return new View(VERSION, "DIFFERENT_VIN", "READ_FROM_PAPERWORK", agreed, paperwork, List.of(vin), List.of(), 0,
-          unavailable(), new FreshCase(deskVin, place.dealerLocation(), place.purchaseMethod()), null, null, List.of(), null, null);
+          unavailable(), new FreshCase(deskVin, place.dealerLocation(), place.purchaseMethod()), null, null, List.of(), null, null, null);
     }
     String source;
     List<JsonNode> discrepancies = new ArrayList<>();
@@ -230,9 +243,11 @@ public class DeskCheckService {
         action = titlingTax.buyerNote() + " Ask whether the dealer is collecting the " + titlingTax.taxName()
             + " or you will pay it when you title the car.";
       }
+      // An added charge keeps its ADDED finding, with the catalogue's name for it (ticket 142).
+      String chargeName = line && !group.equals("REMOVED") ? addOns.nameFor(nullable(row.path("observedEvidence"))) : null;
       var finding = new Finding(group, term, label, kind, nullable(expected), nullable(observed), decimal(row.path("delta")),
           row.path("unit").asText(null), severity, verified,
-          nullable(row.at("/observedEvidence/evidence")), action);
+          nullable(row.at("/observedEvidence/evidence")), action, chargeName);
       (group.equals("OTHER") ? other : lead).add(finding);
     }
     for (var fee : docFees.findings(caseId, deskTerms))
@@ -260,14 +275,17 @@ public class DeskCheckService {
           ? new TotalEffect("UNAVAILABLE", "USD", null, null, null, addedCharges)
           : new TotalEffect("QUOTED", "USD", Math.subtractExact(desk, agreed.outTheDoorMinor()), null, null, addedCharges);
     }
+    var listing = listingPrice.check(caseId, deskTerms, "DESK_PAPERWORK", !"READ_FROM_PAPERWORK".equals(source));
     return new View(VERSION, lead.isEmpty() ? "NO_DIFFERENCES" : "DIFFERENCES", source, agreed, paperwork,
         List.copyOf(lead), List.copyOf(other), Math.max(0, count(agreedTerms) - differing), effect, null, reviewVersion,
         "NO_ALLOWANCE".equals(tradeCheck.status()) ? null : tradeCheck,
         tactics.findings(caseId, deskTerms, agreedTerms, null, tradeCheck),
         // The advertised price (ticket 115) is shown beside the check; it is not a difference from the Agreed Price.
-        listingPrice.check(caseId, deskTerms, "DESK_PAPERWORK", !"READ_FROM_PAPERWORK".equals(source)),
+        listing,
         // The state fee lines against the state's fee schedule (ticket 139), beside the comparison.
-        governmentFees.check(caseId, deskTerms, !"READ_FROM_PAPERWORK".equals(source)));
+        governmentFees.check(caseId, deskTerms, !"READ_FROM_PAPERWORK".equals(source)),
+        // Each add-on and extra dealer charge, named from the catalogue (ticket 142).
+        addOns.check(caseId, deskTerms, listing));
   }
 
   /** The extraction in the verified-offer term shape, every value marked as not yet verified by the Buyer. */
@@ -298,12 +316,14 @@ public class DeskCheckService {
       term.put("confidence", line.confidence());
       term.set("evidence", json.valueToTree(line.evidence()));
       term.put("buyerVerified", false);
+      // Carried as read; a suggestion never names the line until the Buyer confirms it (ticket 142).
+      if (line.suggestedCharge() != null) term.put("suggestedChargeId", line.suggestedCharge().id());
     }
     return terms;
   }
 
   private View empty(String status, Agreed agreed) {
-    return new View(VERSION, status, null, agreed, null, List.of(), List.of(), 0, unavailable(), null, null, null, List.of(), null, null);
+    return new View(VERSION, status, null, agreed, null, List.of(), List.of(), 0, unavailable(), null, null, null, List.of(), null, null, null);
   }
   private static TotalEffect unavailable() { return new TotalEffect("UNAVAILABLE", "USD", null, null, null, null); }
   private JsonNode evidence(ExtractionView extraction, String field) {

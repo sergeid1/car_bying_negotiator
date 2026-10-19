@@ -141,6 +141,25 @@ public class StoredReportRenderer {
         lines.add(new Line("From " + fees.path("stateName").asText() + "'s published fees, checked "
             + fees.path("checkedOn").asText() + ".", false));
     }
+    // Reports before ticket 142 have no add-on check, and render as they did.
+    var addOns = analysis.path("dealerAddOns");
+    if (addOns.isObject()) {
+      lines.add(new Line("Add-ons and extra dealer charges", true));
+      lines.add(new Line(addOns.path("summary").asText(), false));
+      for (var line : addOns.path("lines")) {
+        String amount = line.path("amountMinor").isIntegralNumber()
+            ? com.dealanalyzer.economics.fees.DealerAddOnCheck.money(line.path("amountMinor").longValue()) : "amount not read";
+        String name = switch (line.path("status").asText()) {
+          case "RECOGNISED" -> line.path("name").asText() + ". " + line.path("kindWording").asText();
+          case "POSSIBLE" -> "Possibly " + line.path("name").asText() + ".";
+          default -> "Unrecognised charge — ask what it is.";
+        };
+        lines.add(new Line(line.path("label").asText() + ", " + amount + ": " + name
+            + (line.path("note").isTextual() && "RECOGNISED".equals(line.path("status").asText()) ? " " + line.path("note").asText() : ""), false));
+        lines.add(new Line("Question to ask: " + line.path("question").asText(), false));
+      }
+      if (addOns.path("listingNote").isTextual()) lines.add(new Line(addOns.path("listingNote").asText(), false));
+    }
     for (var fee : analysis.path("docFeeFindings")) {
       lines.add(new Line("Dealer documentary fee", true));
       lines.add(new Line(fee.path("reason").asText(), false));

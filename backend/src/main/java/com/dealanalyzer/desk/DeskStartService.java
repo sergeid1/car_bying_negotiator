@@ -46,6 +46,7 @@ public class DeskStartService {
   private final com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice;
   private final com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees;
   private final com.dealanalyzer.economics.fees.DocFeeCheck docFees;
+  private final com.dealanalyzer.economics.fees.DealerAddOnCheck addOns;
   private final FinancingCalculator financing = new FinancingCalculator();
 
   DeskStartService(EphemeralBuyingCaseService cases, DeskCheckService desk, DocumentExtractionPersistence extractions,
@@ -53,8 +54,10 @@ public class DeskStartService {
       com.dealanalyzer.desk.tactic.DeskTacticService tactics,
       com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice,
       com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees,
-      com.dealanalyzer.economics.fees.DocFeeCheck docFees) {
+      com.dealanalyzer.economics.fees.DocFeeCheck docFees,
+      com.dealanalyzer.economics.fees.DealerAddOnCheck addOns) {
     this.docFees = docFees;
+    this.addOns = addOns;
     this.listingPrice = listingPrice;
     this.governmentFees = governmentFees;
     this.cases = cases; this.desk = desk; this.extractions = extractions; this.trades = trades;
@@ -94,7 +97,8 @@ public class DeskStartService {
       List<Finding> findings, TradeDeskCheck.Result trade,
       List<com.dealanalyzer.desk.tactic.DeskTacticPolicy.Finding> tacticFindings,
       com.dealanalyzer.listing.capture.ListingPriceCheck.Result listingPrice,
-      com.dealanalyzer.economics.fees.GovernmentFeeCheck.Result governmentFees) {}
+      com.dealanalyzer.economics.fees.GovernmentFeeCheck.Result governmentFees,
+      com.dealanalyzer.economics.fees.DealerAddOnCheck.Result addOns) {}
   /** amountMinor is null when the paperwork shows no out-the-door total; it is never treated as zero. */
   public record OutTheDoor(Long amountMinor, Long agreedMinor, Long differenceMinor) {}
   /** amountMinor is the finding's dollar effect when it can be calculated, otherwise null. */
@@ -205,6 +209,8 @@ public class DeskStartService {
     var fees = governmentFees.check(caseId, terms, false);
     if (fees != null) for (var fee : fees.findings()) if ("MATERIAL".equals(fee.severity()))
       findings.add(new Finding("GOVERNMENT_FEE_" + fee.code(), fee.summary(), null, fee.deskQuestion(), fee.evidence()));
+    // Every add-on and extra dealer charge, named from the catalogue (ticket 142), shown beside the findings.
+    var addOnCheck = addOns.check(caseId, terms, listing);
     // A different trade-in VIN leads; then the largest calculable dollar effect; findings without an amount
     // keep their rule order after those.
     findings.sort(Comparator.comparing((Finding finding) -> !finding.code().equals("TRADE_VIN_DIFFERENT"))
@@ -214,7 +220,7 @@ public class DeskStartService {
     var total = new OutTheDoor(otd, agreedOtd, otd == null || agreedOtd == null ? null : Math.subtractExact(otd, agreedOtd));
     return new FirstResult(VERSION, request.route(), source, total, findings.isEmpty() ? null : findings.get(0),
         List.copyOf(findings), "NO_ALLOWANCE".equals(trade.status()) ? null : trade,
-        tacticFindings, listing, fees);
+        tacticFindings, listing, fees, addOnCheck);
   }
 
   private static String route(String vin, String agreedVin, String caseVin) {
@@ -314,8 +320,10 @@ public class DeskStartService {
         String label = row.observedEvidence() != null ? row.observedEvidence().path("originalLabel").asText()
             : row.expectedEvidence().path("originalLabel").asText();
         Long was = minor(row.expected()), now = minor(row.observed());
+        String name = row.kind().equals("ADDED") ? addOns.nameFor(row.observedEvidence()) : null;
         if (row.kind().equals("ADDED") && now != null && now > 0)
-          findings.add(new Finding("ADDED_CHARGE", "Added: " + label + ", " + money(now) + ". It is not in your Agreed Price.", now,
+          findings.add(new Finding("ADDED_CHARGE", "Added: " + label + (name == null ? "" : " (" + name + ")") + ", " + money(now)
+              + ". It is not in your Agreed Price.", now,
               "The " + label + " for " + money(now) + " was not in the price we agreed. Will you take it off?", evidence));
         else if (row.kind().equals("MISSING") && was != null && was < 0)
           findings.add(new Finding("CREDIT_REMOVED", "Missing: the " + label + " of " + money(-was) + " in your Agreed Price.", -was,
@@ -365,15 +373,26 @@ public class DeskStartService {
     return findings;
   }
 
-  /** Without an Agreed Price: each dealer add-on and fee as read, largest first once sorted. */
+  /**
+   * Without an Agreed Price: each dealer add-on and fee as read, largest first once sorted. A line the add-on
+   * catalogue names says what it is and asks its question (ticket 142).
+   */
   private List<Finding> fromTermsAlone(JsonNode terms) {
     List<Finding> findings = new ArrayList<>();
+    var named = addOns.evaluate(terms, null, null);
     for (JsonNode line : terms.path("lineItems")) {
       long amount = line.path("amountMinor").asLong(0);
       String label = line.path("originalLabel").asText();
       JsonNode evidence = nullable(line.path("evidence"));
       if (amount <= 0) continue;
-      if (line.path("category").asText().equals("ADD_ON"))
+      var addOn = named == null || addOns.nameFor(line) == null ? null : named.lines().stream()
+          .filter(item -> item.label().equals(label.strip()) && Long.valueOf(amount).equals(item.amountMinor()))
+          .findFirst().orElse(null);
+      if (addOn != null)
+        findings.add(new Finding("ADD_ON", label + ", " + money(amount) + ": "
+            + ("POSSIBLE".equals(addOn.status()) ? "possibly " + addOn.name() : addOn.name()) + ". " + addOn.kindWording(),
+            amount, addOn.question(), evidence));
+      else if (line.path("category").asText().equals("ADD_ON"))
         findings.add(new Finding("ADD_ON", label + ", " + money(amount) + ", is an add-on.", amount,
             "Is the " + label + " optional? Please show me the price without it.", evidence));
       else if (line.path("category").asText().equals("DEALER_FEE"))

@@ -1,13 +1,16 @@
 {
-  "version": "doc-fee-rules.2026-10.v2",
+  "version": "doc-fee-rules.2026-10.v3",
   "recognition": {
     "DOC_FEE": {
-      "labels": ["doc fee", "doc fees", "document fee", "documentary fee", "documentation fee", "dealer doc fee", "dealer documentation fee", "administrative fee", "admin fee", "dealer administrative fee", "processing fee", "document processing fee", "dealer processing fee"],
-      "patterns": ["\\b(doc|docs|document|documentary|documentation|admin|administrative|administration|processing)\\b"]
+      "terms": ["doc", "docs", "document", "documentary", "documentation", "admin", "administrative", "administration",
+        "processing", "doc fee", "document fee", "documentary fee", "documentation fee", "dealer doc fee",
+        "administrative fee", "admin fee", "processing fee"],
+      "unless": []
     },
     "POSSIBLE_DOC_FEE": {
-      "labels": ["dealer service fee", "dealer services fee", "dealer handling fee", "clerical fee", "procurement fee", "origination fee", "paperwork fee", "conveyance fee", "e-filing fee", "electronic filing fee", "service and handling"],
-      "patterns": ["\\b(handling|clerical|procurement|origination|paperwork|conveyance)\\b", "\\b(e\\s*filing|electronic\\s+filing)\\b", "\\bdealer\\s+(service|services|svc)\\b", "\\bservice\\s+and\\s+handling\\b"]
+      "terms": ["handling", "clerical", "procurement", "origination", "paperwork", "conveyance", "e filing", "efiling",
+        "electronic filing", "dealer service", "dealer services", "dealer svc", "service and handling"],
+      "unless": ["contract", "agreement", "warranty", "plan"]
     }
   },
   "rules": [

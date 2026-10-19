@@ -278,3 +278,44 @@ test("differences include added and removed terms, not only changed values", () 
     { term: "Line item “Doc fee”", before: "$699.00 · Dealer fee", after: "Not in this version" },
   ]);
 });
+
+// Ticket 142: a model's suggestion of which charge a line is counts only once the Buyer confirms it.
+test("a suggested charge is shown to confirm or change, and is sent only when the Buyer confirms it", async () => {
+  const user = userEvent.setup();
+  extraction.lineItems[1] = { ...extraction.lineItems[1], originalLabel: "Gold Package", category: "ADD_ON",
+    suggestedCharge: { id: "paint-protection", name: "paint protection", category: "ADD_ON" } } as typeof extraction.lineItems[number];
+  await renderPanel();
+  const gold = term(/gold package/i);
+  expect(within(gold).getByText("This looks like paint protection; confirm or change it.")).toBeInTheDocument();
+  expect(within(gold).queryByText(/ask the dealer to explain it/i)).toBeNull();
+  const named = within(gold).getByRole("button", { name: "Confirm “Gold Package” is paint protection" });
+  expect(named).toHaveAttribute("aria-pressed", "false");
+  for (const name of [/^selling price$/i, /^apr$/i, /^dealer name$/i, /^trade-in allowance$/i, /“vehicle”/i, /trade payoff/i])
+    await user.click(within(term(name)).getByRole("button", { name: /^confirm/i }));
+  await user.click(named);
+  expect(named).toHaveAttribute("aria-pressed", "true");
+  expect(within(gold).getByText("Named by you")).toBeInTheDocument();
+  await user.click(within(term(/^amount financed$/i)).getByRole("button", { name: /correct amount financed/i }));
+  await user.type(screen.getByLabelText(/amount financed as shown on page 2/i), "26,800.00");
+  await user.click(screen.getByRole("button", { name: /save correction/i }));
+  const freeze = screen.getByRole("button", { name: /freeze this dealer offer/i });
+  await waitFor(() => expect(freeze).toBeEnabled());
+  await user.click(freeze);
+  await screen.findByText(/dealer offer version 1 is frozen/i);
+  const posted = calls.find(call => call.url.endsWith("/dealer-offers") && call.method === "POST")!;
+  expect(posted.body).toMatchObject({ confirmedLineItemIds: ["l-vehicle", "l-mystery", "l-trade"],
+    confirmedSuggestionLineItemIds: ["l-mystery"] });
+});
+
+test("an unconfirmed suggestion is not sent, and a correction replaces it", async () => {
+  const user = userEvent.setup();
+  extraction.lineItems[1] = { ...extraction.lineItems[1], originalLabel: "Gold Package", category: "ADD_ON",
+    suggestedCharge: { id: "paint-protection", name: "paint protection", category: "ADD_ON" } } as typeof extraction.lineItems[number];
+  await renderPanel();
+  const gold = term(/gold package/i);
+  await user.click(within(gold).getByRole("button", { name: /correct line item/i }));
+  await user.selectOptions(within(gold).getByLabelText("Kind of charge"), "DEALER_FEE");
+  await user.click(within(gold).getByRole("button", { name: /save correction/i }));
+  await within(gold).findByText("Your value");
+  expect(within(gold).queryByText(/this looks like paint protection/i)).toBeNull();
+});

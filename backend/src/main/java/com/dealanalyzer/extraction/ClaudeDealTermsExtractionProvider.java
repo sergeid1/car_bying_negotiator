@@ -145,7 +145,8 @@ public final class ClaudeDealTermsExtractionProvider implements DealTermsExtract
       if (!amount.canConvertToLong()) throw new IllegalArgumentException("Amount out of range");
       lineItems.add(new LineItem(line.get("originalLabel").asText(), line.get("category").asText(),
           amount.longValue(), line.get("currency").asText(), line.get("taxClaim").asText(),
-          line.get("optionalityClaim").asText(), evidence(line.get("evidence")), number(line.get("confidence"))));
+          line.get("optionalityClaim").asText(), evidence(line.get("evidence")), number(line.get("confidence")),
+          line.hasNonNull("suggestedChargeId") ? line.get("suggestedChargeId").asText() : null));
     }
     List<String> warnings = new ArrayList<>();
     node.get("documentWarnings").forEach(warning -> warnings.add(warning.asText()));

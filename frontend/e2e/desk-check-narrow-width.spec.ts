@@ -16,12 +16,36 @@ function fixture(state: string) {
     tacticFindings: [syntheticTactic],
     findings: [{ group: "ADDED", term: "line:service contract#1", label: "Vehicle service contract with extended powertrain and wear-item coverage", kind: "ADDED",
       agreed: null, desk: { amountMinor: 149500, currency: "USD" }, delta: null, unit: "USD_MINOR", severity: "MATERIAL", verified: false,
-      evidence: { pageNumber: 2 }, buyerAction: "Ask the dealer to clarify and verify this term." },
+      evidence: { pageNumber: 2 }, buyerAction: "Ask the dealer to clarify and verify this term.",
+      chargeName: "service contract or extended warranty" },
     { group: "TOTAL", term: "candidate:OUT_THE_DOOR_TOTAL#1", label: "OUT_THE_DOOR_TOTAL", kind: "CHANGED", agreed: { value: "2680000", unit: "USD_MINOR" },
       desk: { value: "2829500", unit: "USD_MINOR" }, delta: 149500, unit: "USD_MINOR", severity: "MATERIAL", verified: false, evidence: { pageNumber: 2 }, buyerAction: null }],
     otherDifferences: [{ group: "OTHER", term: "candidate:DOCUMENT_NUMBER#1", label: "DOCUMENT_NUMBER", kind: "CHANGED", agreed: { value: "A-42", unit: "TEXT" },
       desk: { value: "A-57", unit: "TEXT" }, delta: null, unit: "TEXT", severity: "MATERIAL", verified: false, evidence: null, buyerAction: null }],
-    totalEffect: { basis: "QUOTED", currency: "USD", outTheDoorDeltaMinor: 149500, preTaxDeltaMinor: null, taxEffectMinor: null, addedChargesMinor: 149500 } };
+    totalEffect: { basis: "QUOTED", currency: "USD", outTheDoorDeltaMinor: 149500, preTaxDeltaMinor: null, taxEffectMinor: null, addedChargesMinor: 149500 },
+    // Ticket 142: named add-ons, a possible one and an unrecognised charge with a long unbroken name.
+    addOns: { policyVersion: "dealer-add-on-check.v1", catalogueVersion: "dealer-add-ons.2026-10.v1", financed: false,
+    optionalTotalMinor: 179400, possibleTotalMinor: 49900, unrecognisedTotalMinor: 99500, unreadAmounts: 0,
+    summary: "This paperwork lists 2 named add-ons and dealer charges, 1 possible add-on and 1 unrecognised charge. Usually optional items total $1,794. Possible add-ons total $499. Unrecognised charges total $995.",
+    listingNote: null,
+    lines: [
+      { label: "Vehicle service contract with extended powertrain and wear-item coverage", amountMinor: 149500, status: "RECOGNISED",
+        chargeIds: ["service-contract"], name: "service contract or extended warranty", family: "Products sold in the finance office",
+        kind: "FINANCE_PRODUCT", what: "A contract that pays for some repairs after the factory warranty, sold for a set price and term.",
+        kindWording: "Optional product; you can decline it or buy it elsewhere.", optional: true, confirmedByBuyer: false, verified: false,
+        note: "This is recorded as a cash purchase, so its price is paid now, with no interest on it.",
+        question: "Is the service contract optional? What is its price on its own, and can I decline it?" },
+      { label: "VIN ETCH", amountMinor: 29900, status: "RECOGNISED", chargeIds: ["vin-etch"], name: "VIN etching", family: "Theft deterrent",
+        kind: "OPTIONAL_ADD_ON", what: "The vehicle identification number etched into the windows to discourage theft.",
+        kindWording: "Usually optional and negotiable.", optional: true, confirmedByBuyer: false, verified: false, note: null,
+        question: "Are the windows already etched? If the etching is optional, will you take it off the price?" },
+      { label: "Exterior Shine", amountMinor: 49900, status: "POSSIBLE", chargeIds: ["paint-protection"], name: "paint protection",
+        family: "Pre-installed protection", kind: "OPTIONAL_ADD_ON", what: null, kindWording: null, optional: false, confirmedByBuyer: false,
+        verified: false, note: "Possibly paint protection.", question: "Is the “Exterior Shine” paint protection? What does it cover, and is it optional?" },
+      { label: "PlatinumPeaceOfMindDealerCertifiedProtectionPackage", amountMinor: 99500, status: "UNRECOGNISED", chargeIds: [], name: null,
+        family: null, kind: null, what: null, kindWording: null, optional: false, confirmedByBuyer: false, verified: false,
+        note: "Unrecognised charge — ask what it is.", question: "What is the “PlatinumPeaceOfMindDealerCertifiedProtectionPackage”, and is it optional?" },
+    ] } };
   if (state !== "TRADE" && state !== "TRADE_OFFSET") return differences;
   // Ticket 103, labelled synthetic: an $11,500 allowance against a $14,000 written offer and a $19,200 payoff.
   const shortfall = "The trade-in allowance of $11,500 is $2,500 below the written offer from Synthetic Coastal Vehicle Exchange and Appraisal Center dated 2026-10-09 for $14,000.";
@@ -92,6 +116,9 @@ for (const state of ["AWAITING", "DIFFERENCES", "OTHER_CAR", "TRADE", "TRADE_OFF
     if (state === "DIFFERENCES") {
       await expect(panel.getByRole("list", { name: "Differences from your Agreed Price" }).getByRole("listitem").first())
         .toContainText("Added: Vehicle service contract");
+      await expect(panel.getByRole("list", { name: "Differences from your Agreed Price" }).getByRole("listitem").first())
+        .toContainText("(service contract or extended warranty)");
+      await expect(panel.getByText("Unrecognised charge — ask what it is.")).toBeVisible();
       await panel.getByText("1 other change on the paperwork").click();
       await expect(panel.getByText("Question wording awaits operator review.")).toBeVisible();
       await panel.getByText("Calculation and evidence", { exact: true }).click();

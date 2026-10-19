@@ -198,7 +198,9 @@ class PilotCopyClaimsTest {
           "backend/src/main/java/com/dealanalyzer/economics/fees/GovernmentFeeCheck.java",
           "backend/src/main/resources/fees/government-fees.v1.json",
           "backend/src/main/java/com/dealanalyzer/economics/fees/DocFeeCheck.java",
-          "backend/src/main/resources/fees/doc-fee-rules.v1.json")) {
+          "backend/src/main/resources/fees/doc-fee-rules.v1.json",
+          "backend/src/main/java/com/dealanalyzer/economics/fees/DealerAddOnCheck.java",
+          "backend/src/main/resources/fees/dealer-add-ons.v1.json")) {
         Path file = REPOSITORY.resolve(generated);
         if (!Files.exists(file)) throw new AssertionError("Missing generated copy at " + file);
         scanned.add(file);

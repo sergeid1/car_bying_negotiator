@@ -124,10 +124,17 @@ public class DealerOfferVerificationService {
     List<Map<String, Object>> lineTerms = new ArrayList<>();
     for (LineItemView line : extraction.lineItems()) {
       CorrectionView correction = line.currentCorrection();
-      if (correction == null && !request.confirmedLineItemIds().contains(line.id())) {
+      // A suggested charge counts only when the Buyer confirms it; confirming it also confirms the line.
+      boolean suggestion = request.confirmedSuggestionLineItemIds().contains(line.id());
+      if (suggestion && (line.suggestedCharge() == null || correction != null)) {
+        throw invalid(line.suggestedCharge() == null ? "This line item has no suggested charge to confirm."
+            : "Confirm the suggested charge or correct the line item, not both.");
+      }
+      if (correction == null && !suggestion && !request.confirmedLineItemIds().contains(line.id())) {
         throw invalid("Confirm every financially material line item.");
       }
-      String category = correction == null ? line.category() : correction.category();
+      String category = suggestion ? line.suggestedCharge().category()
+          : correction == null ? line.category() : correction.category();
       long amount = correction == null ? line.amountMinor() : correction.amountMinor();
       verified.add(new VerifiedTarget("LINE_ITEM", line.id(), Long.toString(amount)));
       Map<String, Object> lineTerm = new java.util.LinkedHashMap<>(Map.of(
@@ -138,6 +145,8 @@ public class DealerOfferVerificationService {
       lineTerm.put("confidence", line.confidence());
       lineTerm.put("evidence", line.evidence());
       lineTerm.put("buyerVerified", true);
+      if (line.suggestedCharge() != null) lineTerm.put("suggestedChargeId", line.suggestedCharge().id());
+      if (suggestion) lineTerm.put("chargeId", line.suggestedCharge().id());
       lineTerms.add(lineTerm);
     }
     Map<String, Object> terms = Map.of(

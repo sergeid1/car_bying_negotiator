@@ -45,6 +45,11 @@ public interface DealTermsExtractionProvider {
       double confidence,
       boolean material) {}
 
+  /**
+   * suggestedChargeId is an optional dealer add-on catalogue id, or a doc fee or state fee id, that a model-backed
+   * provider read from the line's printed text (ticket 142). It is shown to the Buyer to confirm and never sets the
+   * category on its own; the deterministic provider leaves it empty.
+   */
   record LineItem(
       String originalLabel,
       String category,
@@ -53,7 +58,13 @@ public interface DealTermsExtractionProvider {
       String taxClaim,
       String optionalityClaim,
       EvidenceRegion evidence,
-      double confidence) {}
+      double confidence,
+      String suggestedChargeId) {
+    public LineItem(String originalLabel, String category, long amountMinor, String currency, String taxClaim,
+        String optionalityClaim, EvidenceRegion evidence, double confidence) {
+      this(originalLabel, category, amountMinor, currency, taxClaim, optionalityClaim, evidence, confidence, null);
+    }
+  }
 
   record EvidenceRegion(
       int pageNumber, double x, double y, double width, double height) {}

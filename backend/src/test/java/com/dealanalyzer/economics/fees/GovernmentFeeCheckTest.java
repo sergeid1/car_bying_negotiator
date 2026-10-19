@@ -349,4 +349,14 @@ class GovernmentFeeCheckTest {
         .isEqualTo("Is “Title & registration” a state fee the dealer passes through, or the dealer's own charge?");
     assertThat(result.stateFeesMinor()).as("the doc fee stays with the dealer's charges").isEqualTo(95000L);
   }
+
+  /** Ticket 142: a dealer charge the add-on catalogue names is not read as a state fee for a word in its name. */
+  @Test void aNamedAddOnIsNotCheckedAsAStateFee() {
+    var catalogue = new DealerAddOnCatalogue(JSON);
+    for (String label : List.of("Tire & Wheel", "N2 Tires", "Theft Registration", "Addendum sticker"))
+      assertThat(GovernmentFeeCheck.evaluate(DATA, catalogue, "FL", true, paperwork(label, "DEALER_FEE", 29900), true, TODAY))
+          .as(label).isNull();
+    assertThat(GovernmentFeeCheck.evaluate(DATA, catalogue, "FL", true, paperwork("Tire fee", "DEALER_FEE", 200), true, TODAY))
+        .as("a state fee's own name is still checked").isNotNull();
+  }
 }

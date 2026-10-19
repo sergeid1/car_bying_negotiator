@@ -1,0 +1,7 @@
+.dealer-add-ons { display: grid; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.dealer-add-ons > * { margin: 0; }
+.dealer-add-ons h3 { margin: 0; }
+.dealer-add-ons ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 10px; }
+.dealer-add-on { display: grid; gap: 4px; }
+.dealer-add-on > * { margin: 0; }
+.dealer-add-on[data-status="UNRECOGNISED"], .dealer-add-on[data-status="POSSIBLE"] { padding-left: 8px; border-left: 3px solid var(--warn-ink); }

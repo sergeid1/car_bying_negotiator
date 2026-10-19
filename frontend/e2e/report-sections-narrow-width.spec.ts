@@ -9,6 +9,29 @@ const report = { version: 1, asOf: "2026-10-05", status: "COMPLETE", analysis: {
     uncertain: false, observedEvidence: { rule: { citation: "7 TAC 84.205(b)-(d); OCCC Bulletin B16-5 (July 2, 2024)",
       url: "https://occc.texas.gov/wp-content/uploads/2025/11/b16-5-mvsf-doc-fee-filing-instructions-7-2-24_0.pdf" } },
   }],
+  // Ticket 142: the named add-ons sit beside the doc fee check in Amounts and sources.
+  dealerAddOns: { policyVersion: "dealer-add-on-check.v1", catalogueVersion: "dealer-add-ons.2026-10.v1", financed: false,
+    optionalTotalMinor: 179400, possibleTotalMinor: 49900, unrecognisedTotalMinor: 99500, unreadAmounts: 0,
+    summary: "This paperwork lists 2 named add-ons and dealer charges, 1 possible add-on and 1 unrecognised charge. Usually optional items total $1,794. Possible add-ons total $499. Unrecognised charges total $995.",
+    listingNote: null,
+    lines: [
+      { label: "Vehicle service contract with extended powertrain and wear-item coverage", amountMinor: 149500, status: "RECOGNISED",
+        chargeIds: ["service-contract"], name: "service contract or extended warranty", family: "Products sold in the finance office",
+        kind: "FINANCE_PRODUCT", what: "A contract that pays for some repairs after the factory warranty, sold for a set price and term.",
+        kindWording: "Optional product; you can decline it or buy it elsewhere.", optional: true, confirmedByBuyer: false, verified: false,
+        note: "This is recorded as a cash purchase, so its price is paid now, with no interest on it.",
+        question: "Is the service contract optional? What is its price on its own, and can I decline it?" },
+      { label: "VIN ETCH", amountMinor: 29900, status: "RECOGNISED", chargeIds: ["vin-etch"], name: "VIN etching", family: "Theft deterrent",
+        kind: "OPTIONAL_ADD_ON", what: "The vehicle identification number etched into the windows to discourage theft.",
+        kindWording: "Usually optional and negotiable.", optional: true, confirmedByBuyer: false, verified: false, note: null,
+        question: "Are the windows already etched? If the etching is optional, will you take it off the price?" },
+      { label: "Exterior Shine", amountMinor: 49900, status: "POSSIBLE", chargeIds: ["paint-protection"], name: "paint protection",
+        family: "Pre-installed protection", kind: "OPTIONAL_ADD_ON", what: null, kindWording: null, optional: false, confirmedByBuyer: false,
+        verified: false, note: "Possibly paint protection.", question: "Is the “Exterior Shine” paint protection? What does it cover, and is it optional?" },
+      { label: "PlatinumPeaceOfMindDealerCertifiedProtectionPackage", amountMinor: 99500, status: "UNRECOGNISED", chargeIds: [], name: null,
+        family: null, kind: null, what: null, kindWording: null, optional: false, confirmedByBuyer: false, verified: false,
+        note: "Unrecognised charge — ask what it is.", question: "What is the “PlatinumPeaceOfMindDealerCertifiedProtectionPackage”, and is it optional?" },
+    ] },
   marketEvidence: { status: "AVAILABLE", paragraphs: ["Market data retrieved: October 1, 2026."] },
   reviewLabel: "Review required", dealRating: "FAIR", ratingBasis: "Recorded evidence", nextAction: "Review the fees",
   topReasons: ["The documentation fee is above the recorded range.", "Market selling-price evidence is available; it is an estimate.",
@@ -94,6 +117,7 @@ test("the secondary sections start collapsed below an always-open lead, open fro
 
   for (const name of SECTIONS) await section(page, name).locator(":scope > summary").click();
   for (const name of SECTIONS) await expect(section(page, name)).toHaveAttribute("open");
+  await expect(section(page, "Amounts and sources").getByText("Unrecognised charge — ask what it is.")).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expectNoAxeViolations(page);
 });

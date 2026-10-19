@@ -48,6 +48,7 @@ public class CoreReportService {
   private final com.dealanalyzer.listing.persistence.ListingEvidencePersistence listings;
   private final com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees;
   private final com.dealanalyzer.economics.fees.DocFeeCheck docFees;
+  private final com.dealanalyzer.economics.fees.DealerAddOnCheck addOns;
 
   public CoreReportService(EphemeralBuyingCaseService access, AnalysisCaseRepository cases,
       OperationRepository operations, AnalysisReportRepository reports, BuyingCaseStore store,
@@ -60,9 +61,11 @@ public class CoreReportService {
       com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice,
       com.dealanalyzer.listing.persistence.ListingEvidencePersistence listings,
       com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees,
-      com.dealanalyzer.economics.fees.DocFeeCheck docFees) {
+      com.dealanalyzer.economics.fees.DocFeeCheck docFees,
+      com.dealanalyzer.economics.fees.DealerAddOnCheck addOns) {
     this.governmentFees = governmentFees;
     this.docFees = docFees;
+    this.addOns = addOns;
     this.safety = safety;
     this.listingPrice = listingPrice;
     this.listings = listings;
@@ -221,6 +224,10 @@ public class CoreReportService {
     // state fee, so reports without one keep their shape.
     var feeCheck = offer == null ? null : governmentFees.check(caseId, offer.terms(), "VERIFIED".equals(offer.status()));
     if (feeCheck != null) analysis.set("governmentFeeCheck", json.valueToTree(feeCheck));
+    // Each add-on and extra dealer charge named from the catalogue (ticket 142); added only when the offer lists
+    // one, so reports without one keep their shape.
+    var addOnCheck = offer == null ? null : addOns.check(caseId, offer.terms(), listingCheck);
+    if (addOnCheck != null) analysis.set("dealerAddOns", json.valueToTree(addOnCheck));
     analysis.put("financingAvailability", financeAvailability);
     analysis.set("financingTerms", json.valueToTree(finance == null ? null : finance.inputs()));
     analysis.set("financing", json.valueToTree(finance == null ? null : finance.result()));

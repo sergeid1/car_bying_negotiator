@@ -112,9 +112,12 @@ public final class DealTermsValidator {
       String verificationState = confidence < materialConfidenceThreshold
           || DeterministicDealerDocumentProvider.uncertainFigure(line.originalLabel())
           ? "REQUIRES_REVIEW" : "UNVERIFIED";
+      // A suggestion is kept only in the catalogue id shape; whether the catalogue knows it is checked when shown.
+      String suggestion = line.suggestedChargeId() != null && line.suggestedChargeId().matches("[a-z0-9:-]{1,64}")
+          ? line.suggestedChargeId() : null;
       validatedLines.add(new ValidatedLineItem(
           line.originalLabel(), category, line.amountMinor(), line.currency(), line.taxClaim(),
-          line.optionalityClaim(), line.evidence(), confidence, verificationState));
+          line.optionalityClaim(), line.evidence(), confidence, verificationState, suggestion));
     }
     crossFoot(provider, issues);
     financeCheck(provider, issues);
@@ -384,7 +387,14 @@ public final class DealTermsValidator {
       String originalLabel, String category, long amountMinor, String currency,
       String taxClaim, String optionalityClaim,
       DealTermsExtractionProvider.EvidenceRegion evidence, double confidence,
-      String verificationState) {}
+      String verificationState, String suggestedChargeId) {
+    public ValidatedLineItem(String originalLabel, String category, long amountMinor, String currency,
+        String taxClaim, String optionalityClaim, DealTermsExtractionProvider.EvidenceRegion evidence,
+        double confidence, String verificationState) {
+      this(originalLabel, category, amountMinor, currency, taxClaim, optionalityClaim, evidence, confidence,
+          verificationState, null);
+    }
+  }
 
   public record ValidationIssue(String severity, String code, String field, String message) {}
 
