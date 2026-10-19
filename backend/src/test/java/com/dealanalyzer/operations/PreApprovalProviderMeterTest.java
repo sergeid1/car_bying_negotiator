@@ -69,7 +69,9 @@ class PreApprovalProviderMeterTest {
     } finally { meter.close(); }
   }
   @Test void timeoutNullAndExceptionNeverSupplyOffersOrExposeRemoteText() {
-    var store = store(); var meter = new ProviderMeter(store, Duration.ofMillis(50), 1);
+    // Two slots: the timed-out call keeps its slot until its interrupted thread stops, so with one
+    // slot the next call could be refused as unavailable before that happens.
+    var store = store(); var meter = new ProviderMeter(store, Duration.ofMillis(50), 2);
     try {
       var timeout = meter.callPreApproval("case", null, null, provider, application, () -> {
         try { Thread.sleep(5000); } catch (InterruptedException stopped) { Thread.currentThread().interrupt(); }
