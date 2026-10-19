@@ -39,6 +39,13 @@ wiring, so it starts after they merge rather than in parallel with them.
   the "I'm at the dealer" result), list every recognised line with its amount, and give the total of optional
   items. A charge that was not in the Agreed Price keeps the Desk Check's existing `ADDED` finding, with the name
   attached.
+- **Names no keyword can catch** (for example "Gold Package" or "Peace of Mind Plan"): every dealer charge the
+  catalogue does not recognise is still listed for the Buyer as "unrecognised charge — ask what it is", never
+  hidden. The extraction contract gains an optional per-line `suggestedChargeId` (a catalogue id, or a doc fee or
+  government fee category from tickets 139 and 140). The deterministic provider leaves it empty. The model-backed
+  provider (ticket 36) may fill it from the line's printed text and any description on the page. A suggestion is
+  shown as "this looks like <name>; confirm or change it" in the Buyer's verification step, and becomes the line's
+  category only when the Buyer confirms it. Model output never sets the category on its own (ticket 36's rule).
 - Where ticket 115 (paperwork against the advertised listing) has the listing, an add-on missing from the
   advertised price is noted with the existing listing finding; do not duplicate that check.
 - Update the Toto guide's `add-ons` and `other-dealer-charges` articles (ticket 118) to match; they are still
@@ -54,5 +61,7 @@ wiring, so it starts after they merge rather than in parallel with them.
       possible add-on; a line that must not match (for example the selling price, sales tax, title fee); a
       finance-office product on a cash deal and on a financed deal; and two add-ons on one paperwork totalled.
 - [ ] An acceptance test shows named add-ons in the report and the Desk Check.
-- [ ] No recognised line is dropped from what the Buyer sees.
+- [ ] No recognised line is dropped from what the Buyer sees, and an unrecognised dealer charge is listed as one.
+- [ ] A `suggestedChargeId` on a line is shown for the Buyer to confirm, and tests show it has no effect on the
+      findings until the Buyer confirms it.
 - [ ] Buyer-facing copy passes `ClaimVocabulary` and `PilotCopyClaimsTest`.
