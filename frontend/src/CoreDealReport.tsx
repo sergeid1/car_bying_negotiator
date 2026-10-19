@@ -1,4 +1,5 @@
 import { OutcomeFeedback } from "./PilotFeedback";
+import { DocFeeFindings, type DocFeeFinding } from "./DocFeeFindings";
 import { CaseDownloads } from "./CasePortability";
 import { NegotiationLoader } from "./NegotiationDraft";
 import { RevisedOfferReview, type DealReview } from "./RevisedOfferReview";
@@ -25,6 +26,7 @@ export type CoreReport = {
   analysis: {
     tacticFindings?: DeskTacticFinding[];
     dealReview?: DealReview;
+    docFeeFindings?: DocFeeFinding[];
     tradeCheck?: TradeCheckResult | null;
     listingPriceCheck?: ListingPriceCheck | null;
     governmentFeeCheck?: GovernmentFeeCheck | null;
@@ -143,6 +145,7 @@ export function CoreDealReport({ report, caseId, token, redacted, children }: { 
         <VehicleSafetyFacts view={report.vehicleSafety} />
       </ReportSection>}
       <ReportSection id="core-amounts" title="Amounts and sources">
+        {!analysis.dealReview && <DocFeeFindings findings={analysis.docFeeFindings} />}
         <p>Market analysis: {analysis.marketAvailability}. Cash economics: {analysis.cashAvailability}.</p>
         <dl className="money-list">
           {analysis.materialAmounts.map((amount, index) => <div key={index}>

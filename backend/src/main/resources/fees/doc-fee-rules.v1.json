@@ -1,0 +1,39 @@
+{
+  "version": "doc-fee-rules.2026-10.v2",
+  "recognition": {
+    "DOC_FEE": {
+      "labels": ["doc fee", "doc fees", "document fee", "documentary fee", "documentation fee", "dealer doc fee", "dealer documentation fee", "administrative fee", "admin fee", "dealer administrative fee", "processing fee", "document processing fee", "dealer processing fee"],
+      "patterns": ["\\b(doc|docs|document|documentary|documentation|admin|administrative|administration|processing)\\b"]
+    },
+    "POSSIBLE_DOC_FEE": {
+      "labels": ["dealer service fee", "dealer services fee", "dealer handling fee", "clerical fee", "procurement fee", "origination fee", "paperwork fee", "conveyance fee", "e-filing fee", "electronic filing fee", "service and handling"],
+      "patterns": ["\\b(handling|clerical|procurement|origination|paperwork|conveyance)\\b", "\\b(e\\s*filing|electronic\\s+filing)\\b", "\\bdealer\\s+(service|services|svc)\\b", "\\bservice\\s+and\\s+handling\\b"]
+    }
+  },
+  "rules": [
+    {
+      "state": "US-TX", "kind": "SAFE_HARBOR", "amountMinor": 22500,
+      "effectiveFrom": "2024-07-11", "checkedAt": "2026-10-18", "reviewBy": "2027-01-18",
+      "citation": "7 TAC 84.205(b)-(d); OCCC Bulletin B16-5 (July 2, 2024)",
+      "url": "https://occc.texas.gov/wp-content/uploads/2025/11/b16-5-mvsf-doc-fee-filing-instructions-7-2-24_0.pdf",
+      "summary": "Texas has a $225 documentary fee safe harbor. Before charging more, a dealer must file a notification and supporting cost analysis with the OCCC. A higher fee alone does not establish a breach of this rule.",
+      "question": "Has your dealership filed for a doc fee above $225 with the OCCC, including the supporting cost analysis?"
+    },
+    {
+      "state": "US-FL", "kind": "DISCLOSURE", "amountMinor": null,
+      "effectiveFrom": "2026-10-18", "checkedAt": "2026-10-18", "reviewBy": "2027-01-18",
+      "citation": "F.S. 501.976(16), (18)",
+      "url": "https://www.leg.state.fl.us/Statutes/index.cfm?App_mode=Display_Statute&URL=0500-0599/0501/Sections/0501.976.html",
+      "summary": "Florida sets no dollar cap on this dealer fee. Required dealer charges belong in the advertised price, subject to the joint-advertising exception. Documents listing a predelivery service charge must disclose that it covers dealer costs and profit, including document preparation. This check does not assess those disclosures. The fee is negotiable.",
+      "question": "Can you reduce this dealer fee or offset it with a reduction in the vehicle price?"
+    },
+    {
+      "state": "US-NC", "kind": "DISCLOSURE", "amountMinor": null,
+      "effectiveFrom": "2026-10-18", "checkedAt": "2026-10-18", "reviewBy": "2027-01-18",
+      "citation": "G.S. 20-101.1(a)-(b); NCDOJ Car Shopping Terms",
+      "url": "https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_20/GS_20-101.1.html",
+      "summary": "North Carolina sets no dollar cap on this dealer fee. The amount must be posted at the dealership, disclosed in vehicle price advertising and separately identified on the buyer's order, purchase order or bill of sale. This check does not assess those disclosures. The fee is negotiable.",
+      "question": "Can you reduce or remove this administrative or documentary fee?"
+    }
+  ]
+}

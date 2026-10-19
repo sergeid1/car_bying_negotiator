@@ -141,6 +141,12 @@ public class StoredReportRenderer {
         lines.add(new Line("From " + fees.path("stateName").asText() + "'s published fees, checked "
             + fees.path("checkedOn").asText() + ".", false));
     }
+    for (var fee : analysis.path("docFeeFindings")) {
+      lines.add(new Line("Dealer documentary fee", true));
+      lines.add(new Line(fee.path("reason").asText(), false));
+      lines.add(new Line("Question to ask: " + fee.path("buyerAction").asText(), false));
+      lines.add(new Line(fee.at("/observedEvidence/rule/url").asText(), false));
+    }
     lines.add(new Line("Limitations",true));
     for(var limitation:analysis.path("limitations")) lines.add(new Line(limitation.asText(),false));
     lines.add(new Line("Complete saved payload and evidence",true));

@@ -3,6 +3,12 @@ import { expect, Page, test } from "@playwright/test";
 
 // Ticket 71: the report's secondary sections are one collapsible list below the leading section.
 const report = { version: 1, asOf: "2026-10-05", status: "COMPLETE", analysis: {
+  docFeeFindings: [{
+    reason: "Doc fee: $899.00 on the paperwork. Texas has a $225 documentary fee safe harbor. Before charging more, a dealer must file a notification and supporting cost analysis with the OCCC. A higher fee alone does not establish a breach of this rule. Source: 7 TAC 84.205(b)-(d). Checked 2026-10-18; review by 2027-01-18.",
+    buyerAction: "Has your dealership filed for a doc fee above $225 with the OCCC, including the supporting cost analysis?",
+    uncertain: false, observedEvidence: { rule: { citation: "7 TAC 84.205(b)-(d); OCCC Bulletin B16-5 (July 2, 2024)",
+      url: "https://occc.texas.gov/wp-content/uploads/2025/11/b16-5-mvsf-doc-fee-filing-instructions-7-2-24_0.pdf" } },
+  }],
   marketEvidence: { status: "AVAILABLE", paragraphs: ["Market data retrieved: October 1, 2026."] },
   reviewLabel: "Review required", dealRating: "FAIR", ratingBasis: "Recorded evidence", nextAction: "Review the fees",
   topReasons: ["The documentation fee is above the recorded range.", "Market selling-price evidence is available; it is an estimate.",

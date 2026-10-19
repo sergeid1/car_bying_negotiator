@@ -68,6 +68,7 @@ function moneyDelta(finding: DeskFinding) {
 /** One plain sentence per difference, saying what changed relative to the Agreed Price. */
 export function describeFinding(finding: DeskFinding) {
   const label = labelOf(finding);
+  if (finding.kind === "DOC_FEE_CHECK") return `${label} identification on the paperwork.`;
   switch (finding.group) {
     case "VEHICLE": return `This paperwork is for VIN ${show(finding.desk)}, but your Agreed Price is for VIN ${show(finding.agreed)}.`;
     case "ADDED": return `Added: ${label}, ${show(finding.desk)}. It is not in your Agreed Price.`;
@@ -187,9 +188,12 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
         {view.listingPrice && <ListingPriceNote check={view.listingPrice} title="The ad you saved" />}
         {view.governmentFees && <GovernmentFeeNote check={view.governmentFees} />}
         {view.otherDifferences.length > 0 && <details>
-          <summary>{view.otherDifferences.length} other {view.otherDifferences.length === 1 ? "change" : "changes"} on the paperwork</summary>
+          <summary>{view.otherDifferences.some(finding => finding.kind === "DOC_FEE_CHECK")
+            ? "Other paperwork notes and state fee checks"
+            : `${view.otherDifferences.length} other ${view.otherDifferences.length === 1 ? "change" : "changes"} on the paperwork`}</summary>
           <ul>{view.otherDifferences.map(finding => <li key={`${finding.group}-${finding.term}`}>
             {describeFinding(finding)} {finding.verified ? "Verified." : "As read, not verified."}
+            {finding.kind === "DOC_FEE_CHECK" && <p>{finding.buyerAction}</p>}
           </li>)}</ul>
         </details>}
         <p className="muted">{read

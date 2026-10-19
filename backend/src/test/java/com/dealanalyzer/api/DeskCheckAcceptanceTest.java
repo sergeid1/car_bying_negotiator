@@ -158,7 +158,7 @@ class DeskCheckAcceptanceTest {
     }
   }
 
-  private static String upload(RunningApplication app, String base, String token, String key) throws Exception {
+  static String upload(RunningApplication app, String base, String token, String key) throws Exception {
     var parts = new LinkedMultiValueMap<String, Object>();
     parts.add("file", new NamedBytes(key + ".pdf", twoPagePdf()));
     var started = new ObjectMapper().readTree(app.client().post().uri(base + "/documents").contentType(MediaType.MULTIPART_FORM_DATA)
@@ -167,7 +167,7 @@ class DeskCheckAcceptanceTest {
     return started.at("/document/id").asText();
   }
 
-  private static JsonNode verify(RestClient client, String base, String token, String documentId, String key, long financed) throws Exception {
+  static JsonNode verify(RestClient client, String base, String token, String documentId, String key, long financed) throws Exception {
     String document = base + "/documents/" + documentId;
     var extraction = get(client, document + "/extractions/latest", token);
     String corrections = document + "/extractions/" + extraction.path("id").asText() + "/corrections";

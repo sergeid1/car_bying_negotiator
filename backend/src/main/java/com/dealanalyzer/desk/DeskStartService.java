@@ -45,13 +45,16 @@ public class DeskStartService {
   private final com.dealanalyzer.desk.tactic.DeskTacticService tactics;
   private final com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice;
   private final com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees;
+  private final com.dealanalyzer.economics.fees.DocFeeCheck docFees;
   private final FinancingCalculator financing = new FinancingCalculator();
 
   DeskStartService(EphemeralBuyingCaseService cases, DeskCheckService desk, DocumentExtractionPersistence extractions,
       TradeService trades, JdbcTemplate jdbc, ObjectMapper json, TradeDeskCheck tradeCheck,
       com.dealanalyzer.desk.tactic.DeskTacticService tactics,
       com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice,
-      com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees) {
+      com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees,
+      com.dealanalyzer.economics.fees.DocFeeCheck docFees) {
+    this.docFees = docFees;
     this.listingPrice = listingPrice;
     this.governmentFees = governmentFees;
     this.cases = cases; this.desk = desk; this.extractions = extractions; this.trades = trades;
@@ -188,6 +191,8 @@ public class DeskStartService {
       findings.add(new Finding(item.code(), (tactic == null ? "" : tactic.label() + ": ") + item.summary(), item.amountMinor(),
           tactic == null ? item.deskQuestion() : tactic.deskQuestion(), allowanceEvidence, tactic == null ? null : tactic.code()));
     }
+    for (var fee : docFees.findings(caseId, terms))
+      findings.add(new Finding("DOC_FEE_CHECK", fee.reason(), null, fee.buyerAction(), fee.observedEvidence()));
     // The price in the listing the Buyer saved (ticket 115): a higher paperwork price, or another car, is asked about.
     var listing = listingPrice.check(caseId, terms, "DESK_PAPERWORK", false);
     if (listing != null && "HIGHER".equals(listing.status()))
