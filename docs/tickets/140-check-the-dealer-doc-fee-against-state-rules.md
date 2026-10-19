@@ -16,7 +16,11 @@ Filed on 2026-10-18 after the pilot widened to three states (specification 2.4).
 **Blocked by:** none in the dependency graph. It reads the same paperwork lines as ticket 139 (government fees),
 so the two must keep their data and checks in separate files (see Scope).
 
-**Status:** implemented on the branch, pending coordinator integration — 2026-10-18.
+**Status:** complete — 2026-10-18, no migration. `doc-fee-rules.2026-10.v1` ships Texas, Florida and North Carolina
+rules with two recognition tiers; integrated with ticket 139 and verified on the combined result (`mvn clean
+verify`, `npm test`, `npm run build`, `npx playwright test`). The original OCCC adoption PDF and the Texas
+Register archive could not be fetched; the $225 amount rests on OCCC Bulletin B16-5 and 7 TAC 84.205. Moving the
+matcher onto ticket 139's `FeeLabels` is ticket 142.
 
 **Sources to read in full, not from search excerpts:** the
 [Texas OCCC doc fee rule](https://occc.texas.gov/sites/default/files/2024-06/mvsf-docfee-adoption-fc-071124.pdf) and

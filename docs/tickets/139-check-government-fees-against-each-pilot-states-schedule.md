@@ -11,8 +11,10 @@ the pilot widened to three states (specification 2.4).
 **Blocked by:** none in the dependency graph. It reads the same paperwork lines as ticket 140 (doc fees), so the
 two must keep their data and checks in separate files (see Scope).
 
-**Status:** implemented on the branch `feature/government-fee-check`, pending coordinator integration — filed on
-2026-10-18.
+**Status:** complete — 2026-10-18, no migration. `government-fees.2026-10.v1` ships cited Florida, Texas and North
+Carolina schedules; `GovernmentFeeCheck` and `FeeLabels` are integrated with ticket 140 and verified on the combined
+result (`mvn clean verify`, `npm test`, `npm run build`, `npx playwright test`). Open points are listed in the
+implementation notes: the Texas 24-month new-car registration amount is to be confirmed with TxDMV.
 
 **Sources to read in full, not from search excerpts.** Every amount ships with its citation (statute or agency
 publication, edition, URL) and the date it was checked:

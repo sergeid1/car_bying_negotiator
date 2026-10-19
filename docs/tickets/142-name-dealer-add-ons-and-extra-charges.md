@@ -6,7 +6,7 @@ tell the Buyer what each one is, whether it is usually optional, and what to ask
 before deciding" without naming any of them. Operator request on 2026-10-18: different dealers call the same
 charge different things, and the check must recognise as many names as possible.
 
-**Blocked by:** tickets 139 and 140 being integrated. It reuses their label-recognition approach (normalised keyword
+**Blocked by:** none — tickets 139 and 140 are integrated. It reuses their label-recognition approach (normalised keyword
 matching with a "possible" tier) and touches the same report, Deal Review, Desk Check and "I'm at the dealer"
 wiring, so it starts after they merge rather than in parallel with them.
 
