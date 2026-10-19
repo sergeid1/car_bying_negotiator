@@ -1,4 +1,5 @@
 import { DocumentSourceView, formatMoney, type DocumentSource } from "./EvidenceSource";
+import { DocFeeFindings, type DocFeeFinding } from "./DocFeeFindings";
 
 type CashDelta = {
   availability: string; currency?: string; preTaxDeltaMinor?: number;
@@ -16,6 +17,7 @@ export type DealReview = {
     uncertain: boolean; buyerAction: string;
   }[];
   cashDeltas: Record<string, CashDelta>;
+  docFeeFindings?: DocFeeFinding[];
 };
 
 type Fields = Record<string, unknown>;
@@ -99,6 +101,7 @@ export function RevisedOfferReview({ review, redacted }: { review: DealReview; r
     <p>Baseline {review.baselineVersion ?? "unavailable"} · Previous offer {review.previousOfferVersion} · Current offer {review.currentOfferVersion}</p>
     <p>Review {review.version} · {review.status.replaceAll("_", " ")} · Checked {review.checkedAt}</p>
     <p>{review.scope}</p>
+    <DocFeeFindings findings={review.docFeeFindings} />
     <p>All differences are shown, including those below materiality. {review.tolerancePolicy}</p>
     {Object.entries(review.cashDeltas).map(([comparison, delta]) => {
       const money = (minor: number | undefined) => minor == null ? "Unavailable" : formatMoney(minor, delta.currency ?? "USD");

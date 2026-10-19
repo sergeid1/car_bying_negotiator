@@ -22,7 +22,8 @@ import org.springframework.context.annotation.Configuration;
 public class TotoAnswerTask {
   public static final String SCHEMA_VERSION = "toto-answer-schema.v1";
   public static final String FALLBACK = "I can't answer that one well. These guides may help,";
-  private static final Pattern CONTACT = Pattern.compile(
+  /** Package-visible so the guide loader can refuse article text this check would never let Toto quote. */
+  static final Pattern CONTACT = Pattern.compile(
       "(?i)(?:[a-z][a-z0-9+.-]*://|www\\.|[\\p{L}\\p{N}._%+-]+@[\\p{L}\\p{N}.-]+|"
           + "\\b[\\p{L}\\p{N}-]+(?:\\.[\\p{L}\\p{N}-]+)*\\.[\\p{L}]{2,}\\b|(?:\\+?\\d[\\d(). \\-]{5,}\\d))");
   private static final Pattern NUMBER = Pattern.compile(
@@ -68,9 +69,10 @@ public class TotoAnswerTask {
 
   @Bean
   @ConditionalOnMissingBean(TotoGuideLoader.class)
-  public TotoGuideLoader unavailableTotoGuideLoader() {
-    // No unreviewed production guide. Ticket 118 supplies a loader bean for its reviewed resources.
-    return () -> new Guide("toto-guide.unavailable", List.of());
+  public TotoGuideLoader reviewedTotoGuideLoader() {
+    // Ticket 118's code-owned Markdown guide. Until the operator has reviewed every article and the manifest
+    // marks it released, this serves no articles (toto-guide.unavailable), so no unreviewed text reaches a model.
+    return ReviewedTotoGuide::served;
   }
 
   @Bean

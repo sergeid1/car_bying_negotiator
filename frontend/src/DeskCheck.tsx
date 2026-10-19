@@ -4,6 +4,7 @@ import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { TradeCheckPanel, type TradeCheckResult } from "./TradeCheck";
 import { DeskTactics, type DeskTacticFinding } from "./DeskTactics";
 import { ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
+import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
 
 type Credentials = { caseId: string; token: string };
 type Term = { value?: string | null; unit?: string; amountMinor?: number; currency?: string; category?: string } | number;
@@ -27,6 +28,8 @@ export type DeskCheckView = {
   tacticFindings?: DeskTacticFinding[];
   /** The price in the ad the Buyer saved, beside this paperwork's price (ticket 115). */
   listingPrice?: ListingPriceCheck | null;
+  /** The state fee lines against the state's fee schedule (ticket 139). */
+  governmentFees?: GovernmentFeeCheck | null;
 };
 export type FreshDeskCase = Credentials & { agreed: Credentials; agreedVin: string | null; vin: string; files: File[] };
 
@@ -65,6 +68,7 @@ function moneyDelta(finding: DeskFinding) {
 /** One plain sentence per difference, saying what changed relative to the Agreed Price. */
 export function describeFinding(finding: DeskFinding) {
   const label = labelOf(finding);
+  if (finding.kind === "DOC_FEE_CHECK") return `${label} identification on the paperwork.`;
   switch (finding.group) {
     case "VEHICLE": return `This paperwork is for VIN ${show(finding.desk)}, but your Agreed Price is for VIN ${show(finding.agreed)}.`;
     case "ADDED": return `Added: ${label}, ${show(finding.desk)}. It is not in your Agreed Price.`;
@@ -182,10 +186,14 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
         </ol>}
         {view.trade && <TradeCheckPanel result={view.trade} tactics={view.tacticFindings} />}
         {view.listingPrice && <ListingPriceNote check={view.listingPrice} title="The ad you saved" />}
+        {view.governmentFees && <GovernmentFeeNote check={view.governmentFees} />}
         {view.otherDifferences.length > 0 && <details>
-          <summary>{view.otherDifferences.length} other {view.otherDifferences.length === 1 ? "change" : "changes"} on the paperwork</summary>
+          <summary>{view.otherDifferences.some(finding => finding.kind === "DOC_FEE_CHECK")
+            ? "Other paperwork notes and state fee checks"
+            : `${view.otherDifferences.length} other ${view.otherDifferences.length === 1 ? "change" : "changes"} on the paperwork`}</summary>
           <ul>{view.otherDifferences.map(finding => <li key={`${finding.group}-${finding.term}`}>
             {describeFinding(finding)} {finding.verified ? "Verified." : "As read, not verified."}
+            {finding.kind === "DOC_FEE_CHECK" && <p>{finding.buyerAction}</p>}
           </li>)}</ul>
         </details>}
         <p className="muted">{read

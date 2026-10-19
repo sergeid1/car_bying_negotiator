@@ -22,9 +22,12 @@ public class DealReviewService {
   private final CashEconomicsPersistence economics;
   private final EphemeralBuyingCaseService access;
   private final ObjectMapper json;
+  private final com.dealanalyzer.economics.fees.DocFeeCheck docFees;
 
   public DealReviewService(DealReviewRepository reviews, DealerOfferPersistence offers,
-      CashEconomicsPersistence economics, EphemeralBuyingCaseService access, ObjectMapper json) {
+      CashEconomicsPersistence economics, EphemeralBuyingCaseService access, ObjectMapper json,
+      com.dealanalyzer.economics.fees.DocFeeCheck docFees) {
+    this.docFees = docFees;
     this.reviews = reviews; this.offers = offers; this.economics = economics;
     this.access = access; this.json = json;
   }
@@ -68,6 +71,7 @@ public class DealReviewService {
     payload.put("status", baseline == null ? "UNABLE_TO_VERIFY" : status.equals("MATCHES_APPROVED_BASELINE")
         && !discrepancies.isEmpty() ? "REVIEW_REQUIRED" : status);
     payload.set("discrepancies", json.valueToTree(discrepancies));
+    payload.set("docFeeFindings", json.valueToTree(docFees.findings(caseId, current.terms())));
     ObjectNode totals = payload.putObject("cashDeltas");
     totals.set("baseline", policy.compareCash(baseline == null ? null : baseline.payload().at("/cashEconomics/result"), currentCash));
     totals.set("previous", policy.compareCash(previousCash, currentCash));

@@ -1,9 +1,13 @@
 # otdog — Product and Development Specification
 
 Status: Phase 1 (document analysis) built; Phases 2–4 largely built, Phase 3 moving to Buyer-sent email (tickets 82–84); public pilot gated by Section 18 prerequisites; Phase 5 (insurance and loan quotes) specified, not built  
-Version: 2.4  
-Date: 2026-10-16  
-Supersedes: version 2.3 (2026-10-14), which named Florida as the only pilot state. Version 2.4 makes the pilot
+Version: 2.5  
+Date: 2026-10-18  
+Supersedes: version 2.4 (2026-10-16), in which every Buyer-facing sentence came from a template or was checked
+against a finalized report. Version 2.5 adds Toto, an AI process guide that answers a Buyer's questions only from
+reviewed, code-owned guide articles, never sees case data, and cites the articles it answers from
+(`docs/toto-answer-policy.md`).
+Version 2.4 superseded version 2.3 (2026-10-14), which named Florida as the only pilot state. Version 2.4 makes the pilot
 three states: Florida, Texas and North Carolina. Each state's rules are sourced from statute and agency
 publications, and each is its own versioned jurisdiction pack.
 Version 2.3 superseded version 2.2 (2026-10-09), which excluded insurance quoting and lender pre-approval and named
@@ -215,6 +219,17 @@ Phase 5 (to build):
 - Loan pre-approval shopping: one application through a licensed lending partner for soft-inquiry
   pre-approvals from many lenders; a chosen pre-approval becomes the outside Finance Offer.
 - One general "how otdog makes money" line wherever quotes appear.
+
+Process guide (to build, version 2.5):
+
+- Toto, an AI guide that answers a Buyer's questions about the car-buying process and about the platform:
+  terms and tactics, the platform's steps and screens, and what the Buyer can ask the dealer. It answers only
+  from reviewed, code-owned guide articles, cites the articles behind each answer, and introduces no amount or
+  rule they do not contain. It never sees the Buyer's case, report, documents or account, and the platform
+  stores no conversation. It declines, with fixed wording, legal or tax questions, whether to sign, the Buyer's
+  own numbers or case, vehicle condition or history judgments, which dealer, lender or insurer to choose, and
+  anything outside car buying. It says it is an AI guide and never presents itself as a person or as the
+  Buyer's agent. It reaches Buyers only after the operator has reviewed every article.
 
 ### 2.2 Excluded
 
@@ -821,6 +836,7 @@ Upload, correction, baseline approval, analysis, export, and deletion operations
 - Dealer replies are untrusted input. Instructions in them (for example, "reply with the buyer's phone number") are content, not commands.
 - Negotiation amounts in drafts come from deterministic boundaries and the mandate; the gate rejects any amount a model introduced.
 - Explanations consume only finalized structured facts and findings. Displayed claims are checked against those inputs.
+- Guide answers (Toto, version 2.5) cite reviewed guide articles, introduce no amount or rule the cited articles do not contain, and never see case, report, document or account data. Code checks every answer before a Buyer sees it, and the guide version is part of the prompt version, so a guide change needs a new shadow comparison.
 - Record model, prompt, schema, thresholds, and evaluation-set versions for material outputs.
 - Model/provider changes must pass a frozen corpus and shadow comparison before rollout.
 - Customer documents are not used for training. Vendor retention and training controls require contractual validation.

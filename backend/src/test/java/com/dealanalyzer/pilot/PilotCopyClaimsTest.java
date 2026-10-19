@@ -111,7 +111,27 @@ class PilotCopyClaimsTest {
         .anyMatch(file -> file.endsWith("App.tsx"))
         .anyMatch(file -> file.endsWith("GroundedLanguage.java"))
         .anyMatch(file -> file.endsWith("CoreReportService.java"))
-        .anyMatch(file -> file.endsWith("CashDealAnalyzer.java"));
+        .anyMatch(file -> file.endsWith("CashDealAnalyzer.java"))
+        .anyMatch(file -> file.endsWith("toto/guide/doc-fee.md"));
+  }
+
+  /**
+   * Toto quotes guide passages, and its answer check rejects any prohibited claim with no reviewed exception, so a
+   * guide article may not contain one at all, not even a phrase recorded as reviewed elsewhere (ticket 118).
+   */
+  @Test void theTotoGuideContainsNoProhibitedClaimAtAll() throws IOException {
+    List<Path> guide = totoGuide();
+    assertThat(guide).as("the Toto guide must be scanned").hasSizeGreaterThanOrEqualTo(30);
+    List<String> claims = new ArrayList<>();
+    for (Path file : guide) {
+      String copy = normalize(Files.readString(file, StandardCharsets.UTF_8));
+      for (var claim : PROHIBITED.entrySet()) {
+        var matches = claim.getValue().matcher(copy);
+        while (matches.find()) claims.add(REPOSITORY.relativize(file) + " [" + claim.getKey() + "] near: "
+            + copy.substring(Math.max(0, matches.start() - 60), Math.min(copy.length(), matches.end() + 60)));
+      }
+    }
+    assertThat(claims).as("Toto would reject these passages; reword the article").isEmpty();
   }
 
   private static boolean isReviewed(JsonNode reviewed, String file, String pattern, String copy,
@@ -154,7 +174,7 @@ class PilotCopyClaimsTest {
     }
   }
 
-  /** Shipped Buyer-facing surfaces: the web client and the language the product generates. */
+  /** Shipped Buyer-facing surfaces: the web client, the language the product generates, and Toto's guide. */
   private static List<Path> buyerFacingCopy() throws IOException {
     Path frontend = REPOSITORY.resolve("frontend/src");
     if (!Files.isDirectory(frontend)) throw new AssertionError("Missing frontend copy at " + frontend);
@@ -174,12 +194,26 @@ class PilotCopyClaimsTest {
           "backend/src/main/java/com/dealanalyzer/report/CashDealAnalyzer.java",
           "backend/src/main/java/com/dealanalyzer/report/AmountEvidence.java",
           "backend/src/main/java/com/dealanalyzer/report/StoredReportRenderer.java",
-          "backend/src/main/java/com/dealanalyzer/listing/capture/ListingPriceCheck.java")) {
+          "backend/src/main/java/com/dealanalyzer/listing/capture/ListingPriceCheck.java",
+          "backend/src/main/java/com/dealanalyzer/economics/fees/GovernmentFeeCheck.java",
+          "backend/src/main/resources/fees/government-fees.v1.json",
+          "backend/src/main/java/com/dealanalyzer/economics/fees/DocFeeCheck.java",
+          "backend/src/main/resources/fees/doc-fee-rules.v1.json")) {
         Path file = REPOSITORY.resolve(generated);
         if (!Files.exists(file)) throw new AssertionError("Missing generated copy at " + file);
         scanned.add(file);
       }
+      scanned.addAll(totoGuide());
       return scanned;
+    }
+  }
+
+  /** Toto's reviewed guide articles, which reach Buyers as quoted answer passages. */
+  private static List<Path> totoGuide() throws IOException {
+    Path guide = REPOSITORY.resolve("backend/src/main/resources/toto/guide");
+    if (!Files.isDirectory(guide)) throw new AssertionError("Missing Toto guide at " + guide);
+    try (Stream<Path> files = Files.list(guide)) {
+      return files.filter(file -> file.toString().endsWith(".md")).sorted().toList();
     }
   }
 

@@ -8,6 +8,25 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.Test;
 
 class StoredReportRendererTest {
+  @Test void bothExportsShowTheSavedDocumentaryFeeRuleAndQuestion() throws Exception {
+    var json = new ObjectMapper();
+    var terms = json.readTree("""
+        {"lineItems":[{"originalLabel":"Doc fee","category":"DEALER_FEE","amountMinor":30000,
+          "currency":"USD","buyerVerified":true}]}
+        """);
+    var findings = new com.dealanalyzer.economics.fees.DocFeeCheck(null, null, json)
+        .evaluate("US-TX", terms, java.time.LocalDate.of(2026, 10, 18));
+    var payload = json.createObjectNode();
+    payload.putObject("analysis").set("docFeeFindings", json.valueToTree(findings));
+    var renderer = new StoredReportRenderer();
+    String html = new String(renderer.html(payload), StandardCharsets.UTF_8);
+    try (var document = Loader.loadPDF(renderer.pdf(payload))) {
+      String pdf = new PDFTextStripper().getText(document).replaceAll("\\s+", " ");
+      for (String output : new String[] {html, pdf})
+        assertThat(output.substring(0, output.indexOf("Complete saved payload")))
+            .contains("Dealer documentary fee", "$300.00", "$225", "cost analysis", "OCCC", "2026-10-18");
+    }
+  }
   @Test void linkedTacticsNameTheTradeLineOnceWhileV1KeepsItsWorksheetSection() throws Exception {
     var json = new ObjectMapper();
     var payload = json.readTree("""

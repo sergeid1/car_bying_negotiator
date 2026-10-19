@@ -1,0 +1,377 @@
+{
+  "version": "government-fees.2026-10.v1",
+  "description": "The title, registration, plate and other state fees each pilot state charges when a Florida, Texas or North Carolina resident buys a passenger car or light truck from a dealer in their own state (ticket 139). Each amount was read in the official text on checkedOn and is reviewed again by reviewOn; after reviewOn the schedule is not used. A changed amount is a new version. Ranges run from the least the fee can be to the most, and dependsOn names the fact that decides it. maxMinor null means the fee has no upper bound this schedule can state.",
+  "labels": [
+    { "terms": ["title", "titling", "lien", "lein", "lienholder", "elt"], "groups": ["TITLE"] },
+    { "terms": ["registration", "register", "regis", "reg", "rego", "renewal", "license", "licence", "lic", "license tax",
+        "inspection", "insp", "safety inspection", "emission", "emissions", "smog", "electric vehicle", "ev", "plug in",
+        "texassure", "insurance verification", "local fee", "county", "local", "road and bridge", "child safety",
+        "processing and handling", "vehicle tax", "transit", "highway fund"], "groups": ["REGISTRATION"] },
+    { "terms": ["tag", "tags", "tag agency"], "groups": ["REGISTRATION", "PLATE"], "unless": ["temp", "temporary", "paper tag", "buyer tag"] },
+    { "terms": ["ttl", "tt", "tl", "tt and l", "t t and l", "tag title license", "tag and title", "title and tag"],
+      "groups": ["TITLE", "REGISTRATION", "PLATE"] },
+    { "terms": ["plate", "plates", "decal", "sticker", "validation"], "groups": ["PLATE"] },
+    { "terms": ["temp", "temporary", "paper tag", "buyer tag", "buyers tag", "temp tag", "transit permit"], "groups": ["TEMPORARY_TAG"] },
+    { "terms": ["tire", "tires", "tyre", "waste tire", "battery", "batt", "lead acid"], "groups": ["ENVIRONMENTAL"] },
+    { "terms": ["property tax", "tax", "ad valorem"], "groups": ["PROPERTY_TAX"] },
+    { "terms": ["dmv", "mvd", "bmv", "dhsmv", "flhsmv", "txdmv", "ncdmv", "state", "government", "govt", "gov",
+        "official", "tax collector", "tax assessor", "assessor collector", "public fees"],
+      "groups": ["TITLE", "REGISTRATION", "PLATE", "TEMPORARY_TAG", "ENVIRONMENTAL", "PROPERTY_TAX"] }
+  ],
+  "states": [
+    {
+      "state": "FL",
+      "name": "Florida",
+      "effectiveOn": "2026-01-01",
+      "checkedOn": "2026-10-18",
+      "reviewOn": "2027-01-01",
+      "scope": "A Florida resident buying a private-use automobile, or a truck of 5,000 pounds or less, from a Florida dealer. Heavy trucks, specialty and personalized plates, leases and vehicles registered outside Florida are not covered.",
+      "note": "A Florida tax collector or private tag agency may add its own service charges, which it must itemize (F.S. 319.32(2)(c) and 320.04(3)). They are not in this schedule.",
+      "dealerChargeLabels": ["doc", "docs", "documentary", "documentation", "dealer", "dlr", "electronic filing", "elec filing", "e filing", "efiling", "e file", "efile", "administrative", "admin", "predelivery", "pre delivery", "pdi", "prep", "convenience", "compliance fee",
+        "electronic registration", "erf", "ert", "private tag agency"],
+      "taxPackLabels": ["sales tax", "surtax", "discretionary", "use tax", "sales and use"],
+      "fees": [
+        {
+          "id": "FL_TITLE",
+          "group": "TITLE",
+          "name": "Certificate of title",
+          "purpose": "Puts the car's ownership in your name in the state's records.",
+          "minMinor": 7525,
+          "maxMinor": 8525,
+          "dependsOn": "whether the car is new, already titled in Florida, or last titled in another state",
+          "citation": "FLHSMV fee schedule, https://www.flhsmv.gov/motor-vehicles-tags-titles/fees/ (Original New $77.25, Original Used $85.25, Transfer $75.25, electronic titles); F.S. 319.32(1), (2)(a) and (3) (2026), https://www.flsenate.gov/Laws/Statutes/2026/319.32"
+        },
+        {
+          "id": "FL_LIEN",
+          "group": "TITLE",
+          "name": "Lien recording",
+          "purpose": "Records your lender on the title when the car is financed.",
+          "minMinor": 0,
+          "maxMinor": 200,
+          "onlyWhen": "FINANCED",
+          "dependsOn": "whether the car is financed",
+          "citation": "F.S. 319.32(1) (2026), https://www.flsenate.gov/Laws/Statutes/2026/319.32; FLHSMV fee schedule, https://www.flhsmv.gov/motor-vehicles-tags-titles/fees/"
+        },
+        {
+          "id": "FL_PAPER_TITLE",
+          "group": "TITLE",
+          "name": "Paper title mailing",
+          "purpose": "Prints and mails a paper title instead of keeping it electronic.",
+          "minMinor": 0,
+          "maxMinor": 250,
+          "dependsOn": "whether a paper title is printed",
+          "citation": "F.S. 319.32(1) (2026), https://www.flsenate.gov/Laws/Statutes/2026/319.32; FLHSMV fee schedule, https://www.flhsmv.gov/motor-vehicles-tags-titles/fees/"
+        },
+        {
+          "id": "FL_FAST_TITLE",
+          "group": "TITLE",
+          "name": "Fast title",
+          "purpose": "Issues the title the same day, if someone asks for it.",
+          "minMinor": 0,
+          "maxMinor": 1000,
+          "dependsOn": "whether a fast title is requested",
+          "citation": "FLHSMV fee schedule, https://www.flhsmv.gov/motor-vehicles-tags-titles/fees/ (Fast Title $10.00); F.S. 319.32(7) (2026), https://www.flsenate.gov/Laws/Statutes/2026/319.32"
+        },
+        {
+          "id": "FL_BRANCH",
+          "group": "TITLE",
+          "name": "Tax collector branch office charge",
+          "purpose": "An extra charge a county tax collector may add at a branch office.",
+          "minMinor": 0,
+          "maxMinor": 50,
+          "dependsOn": "where the title is processed",
+          "citation": "F.S. 320.04(1)(c) (2026), https://www.flsenate.gov/Laws/Statutes/2026/320.04"
+        },
+        {
+          "id": "FL_REGISTRATION",
+          "group": "REGISTRATION",
+          "name": "Registration",
+          "purpose": "The yearly license tax that lets the car use Florida roads, with the small state fees added to every registration.",
+          "minMinor": 2610,
+          "maxMinor": 8820,
+          "dependsOn": "the car's weight and whether it is registered for 12 or 24 months",
+          "citation": "F.S. 320.08(2)(b)-(d) and (3)(a)-(c) license tax $14.50, $22.50 or $32.50 by weight; per registration F.S. 320.0801(1) $0.10, 320.0802 $1, 320.0804 $2, 320.08046 $1, 320.03(5) $0.50, 320.03(6) $1, 320.03(9) $1.50, 320.06(3)(b) $0.50, 320.04(1)(a) $2.50, 320.04(1)(b) $1 and 320.04(1)(c) up to $0.50, a total of $26.10 to $44.10 for 12 months; 24 months at the 2-year cumulative total under 320.07(2)(b) and 320.01(19)(b) (2026), https://www.flsenate.gov/Laws/Statutes/2026/Chapter320/All; FLHSMV fee schedule, https://www.flhsmv.gov/motor-vehicles-tags-titles/fees/"
+        },
+        {
+          "id": "FL_INITIAL_REGISTRATION",
+          "group": "REGISTRATION",
+          "name": "Initial registration fee",
+          "purpose": "A one-time Florida fee when a car gets a new plate instead of one moved from a car you no longer have.",
+          "minMinor": 0,
+          "maxMinor": 22500,
+          "dependsOn": "whether you get a new plate or move a plate from a car you no longer have",
+          "citation": "F.S. 320.072(1) and (2)(b) (2026), https://www.flsenate.gov/Laws/Statutes/2026/320.072; FLHSMV fee schedule (Initial Registration Fee $225.00), https://www.flhsmv.gov/motor-vehicles-tags-titles/fees/"
+        },
+        {
+          "id": "FL_PLATE",
+          "group": "PLATE",
+          "name": "License plate",
+          "purpose": "The metal plate itself, when a new one is issued.",
+          "minMinor": 0,
+          "maxMinor": 2800,
+          "dependsOn": "whether a new plate is issued",
+          "citation": "F.S. 320.0607(5) (2026), https://www.flsenate.gov/Laws/Statutes/2026/320.0607; FLHSMV fee schedule (Original/Replacement License Plate Fee $28.00), https://www.flhsmv.gov/motor-vehicles-tags-titles/fees/"
+        },
+        {
+          "id": "FL_PLATE_TRANSFER",
+          "group": "PLATE",
+          "name": "Plate transfer",
+          "purpose": "Moves your current plate to this car.",
+          "minMinor": 0,
+          "maxMinor": 650,
+          "dependsOn": "whether a plate is moved from a car you no longer have",
+          "citation": "F.S. 320.0609 (2026) transfer fee $4.50 and up to $2 more, https://www.flsenate.gov/Laws/Statutes/2026/Chapter320/All"
+        },
+        {
+          "id": "FL_TEMPORARY_TAG",
+          "group": "TEMPORARY_TAG",
+          "name": "Temporary tag",
+          "purpose": "The paper tag you drive on until the plate arrives.",
+          "minMinor": 0,
+          "maxMinor": 200,
+          "dependsOn": "whether a temporary tag is issued",
+          "citation": "F.S. 320.131(2) (2026), https://www.flsenate.gov/Laws/Statutes/2026/Chapter320/All"
+        },
+        {
+          "id": "FL_TIRE",
+          "group": "ENVIRONMENTAL",
+          "name": "New tire fee",
+          "purpose": "A $1 state fee for each new tire sold with the car, which pays for waste tire cleanup.",
+          "minMinor": 0,
+          "maxMinor": 500,
+          "dependsOn": "how many new tires come with the car, up to five with the spare",
+          "citation": "F.S. 403.718(1) (2026), https://www.flsenate.gov/Laws/Statutes/2026/403.718"
+        },
+        {
+          "id": "FL_BATTERY",
+          "group": "ENVIRONMENTAL",
+          "name": "Lead-acid battery fee",
+          "purpose": "A $1.50 state fee on a new lead-acid battery, which pays for water quality cleanup.",
+          "minMinor": 0,
+          "maxMinor": 150,
+          "dependsOn": "whether the car comes with a new lead-acid battery",
+          "citation": "F.S. 403.7185(1) (2026), https://www.flsenate.gov/Laws/Statutes/2026/403.7185"
+        }
+      ]
+    },
+    {
+      "state": "TX",
+      "name": "Texas",
+      "effectiveOn": "2026-01-01",
+      "checkedOn": "2026-10-18",
+      "reviewOn": "2027-01-01",
+      "scope": "A Texas resident buying a passenger car or light truck of 10,000 pounds or less from a Texas dealer. Heavier vehicles, specialty plates, leases, new-resident fees and vehicles registered outside Texas are not covered.",
+      "note": "For a new car the dealer collects 24 months of registration. The TxDMV pages read do not state the 24-month amount, so this schedule allows two years of the base and county fees.",
+      "dealerChargeLabels": ["doc", "docs", "documentary", "documentation", "dealer", "dlr", "electronic filing", "elec filing", "e filing", "efiling", "e file", "efile", "administrative", "admin", "predelivery", "pre delivery", "pdi", "prep", "convenience", "compliance fee",
+        "inventory tax", "vit", "deputy fee"],
+      "taxPackLabels": ["sales tax", "motor vehicle tax", "motor vehicle sales", "use tax", "sales and use"],
+      "fees": [
+        {
+          "id": "TX_TITLE",
+          "group": "TITLE",
+          "name": "Title application",
+          "purpose": "Puts the car's ownership in your name in the state's records.",
+          "minMinor": 2800,
+          "maxMinor": 3300,
+          "dependsOn": "your county: $33 in counties with air quality programs, $28 elsewhere",
+          "citation": "Transportation Code 501.138(a), https://statutes.capitol.texas.gov/Docs/TN/htm/TN.501.htm"
+        },
+        {
+          "id": "TX_REGISTRATION",
+          "group": "REGISTRATION",
+          "name": "Registration",
+          "purpose": "The base fee that lets the car use Texas roads, paid into the State Highway Fund.",
+          "minMinor": 5075,
+          "maxMinor": 10800,
+          "dependsOn": "the car's weight and whether it is new, which gets 24 months of registration",
+          "citation": "Transportation Code 502.252 ($50.75, 6,000 pounds or less), 502.253 ($54, 6,001 to 10,000 pounds) and 502.044(a-1) (24 months for a new car), https://statutes.capitol.texas.gov/Docs/TN/htm/TN.502.htm; TxDMV Texas Registration Fees, effective January 1, 2026, https://www.txdmv.gov/sites/default/files/body-files/FeeChart_1C.pdf; TxDMV Motor Vehicle Registration Manual (August 2026) 17.3 and 22.9, https://www.txdmv.gov/sites/default/files/body-files/Motor_Vehicle_Registration_Manual_Book_298.pdf"
+        },
+        {
+          "id": "TX_INSURANCE_VERIFICATION",
+          "group": "REGISTRATION",
+          "name": "Insurance verification fees",
+          "purpose": "Two $1 fees that pay for TexasSure, the state's insurance check, on a dealer sale.",
+          "minMinor": 200,
+          "maxMinor": 200,
+          "dependsOn": "nothing; both apply to a dealer sale",
+          "citation": "Transportation Code 502.357(a), https://statutes.capitol.texas.gov/Docs/TN/htm/TN.502.htm; TxDMV Motor Vehicle Registration Manual (August 2026) 8.4, https://www.txdmv.gov/sites/default/files/body-files/Motor_Vehicle_Registration_Manual_Book_298.pdf"
+        },
+        {
+          "id": "TX_PROCESSING",
+          "group": "REGISTRATION",
+          "name": "Processing and handling",
+          "purpose": "Covers the state's and county's cost of processing the registration.",
+          "minMinor": 475,
+          "maxMinor": 475,
+          "dependsOn": "nothing; it applies when registration fees are collected",
+          "citation": "Transportation Code 502.1911, https://statutes.capitol.texas.gov/Docs/TN/htm/TN.502.htm; TxDMV Motor Vehicle Registration Manual (August 2026) 1.1, Processing and Handling (P&H) Fee $4.75, https://www.txdmv.gov/sites/default/files/body-files/Motor_Vehicle_Registration_Manual_Book_298.pdf"
+        },
+        {
+          "id": "TX_LOCAL",
+          "group": "REGISTRATION",
+          "name": "County fees",
+          "purpose": "Fees your county adds to registration for roads and bridges, transportation projects and child safety.",
+          "minMinor": 0,
+          "maxMinor": 4300,
+          "dependsOn": "your county ($0 to $21.50 a year in 2026) and whether the car gets 24 months of registration",
+          "citation": "TxDMV Texas Registration Fees, effective January 1, 2026 (county local fees, highest $21.50), https://www.txdmv.gov/sites/default/files/body-files/FeeChart_1C.pdf; Transportation Code 502.401, 502.402 and 502.403, https://statutes.capitol.texas.gov/Docs/TN/htm/TN.502.htm"
+        },
+        {
+          "id": "TX_INSPECTION",
+          "group": "REGISTRATION",
+          "name": "Inspection program replacement fee",
+          "purpose": "The state's share of the old inspection fee, now collected with registration: $7.50 a year, or $16.75 once for a new car's first two years.",
+          "minMinor": 750,
+          "maxMinor": 1675,
+          "dependsOn": "whether the car is new",
+          "citation": "Transportation Code 548.510(a) and (b), https://statutes.capitol.texas.gov/Docs/TN/htm/TN.548.htm; TxDMV Register Your Vehicle, https://www.txdmv.gov/motorists/register-your-vehicle"
+        },
+        {
+          "id": "TX_EMISSIONS",
+          "group": "REGISTRATION",
+          "name": "Emissions inspection fee",
+          "purpose": "The state's share of an emissions test in the 17 counties that require one.",
+          "minMinor": 0,
+          "maxMinor": 275,
+          "dependsOn": "your county and whether the car is used",
+          "citation": "TxDMV Register Your Vehicle ($2.75 Emissions Inspection Fee), https://www.txdmv.gov/motorists/register-your-vehicle; TxDMV Motor Vehicle Registration Manual (August 2026) 22.11, https://www.txdmv.gov/sites/default/files/body-files/Motor_Vehicle_Registration_Manual_Book_298.pdf"
+        },
+        {
+          "id": "TX_ELECTRIC",
+          "group": "REGISTRATION",
+          "name": "Electric vehicle fee",
+          "purpose": "Paid by fully electric cars instead of the fuel tax they do not pay: $200 a year, or $400 for a new car's first two years.",
+          "minMinor": 0,
+          "maxMinor": 40000,
+          "dependsOn": "whether the car is fully electric, and whether it is new",
+          "citation": "Transportation Code 502.360(b), https://statutes.capitol.texas.gov/Docs/TN/htm/TN.502.htm; TxDMV Register Your Vehicle, https://www.txdmv.gov/motorists/register-your-vehicle"
+        },
+        {
+          "id": "TX_PLATE",
+          "group": "PLATE",
+          "name": "License plate",
+          "purpose": "The metal plate a Texas dealer must issue on every retail sale.",
+          "minMinor": 1000,
+          "maxMinor": 1000,
+          "dependsOn": "nothing; it applies to every retail sale",
+          "citation": "TxDMV Motor Vehicle Registration Manual (August 2026) 17.2 (\"A Texas dealer must issue a $10 license plate for all retail vehicle sales\"), https://www.txdmv.gov/sites/default/files/body-files/Motor_Vehicle_Registration_Manual_Book_298.pdf; Transportation Code 503.063(g), https://statutes.capitol.texas.gov/Docs/TN/htm/TN.503.htm"
+        },
+        {
+          "id": "TX_PLATE_DATABASE",
+          "group": "PLATE",
+          "name": "Plate database charge",
+          "purpose": "A charge Texas lets the dealer add, up to $20, for entering your plate in the state's database.",
+          "minMinor": 0,
+          "maxMinor": 2000,
+          "dependsOn": "whether the dealer charges it",
+          "citation": "Transportation Code 503.0631(f), https://statutes.capitol.texas.gov/Docs/TN/htm/TN.503.htm"
+        }
+      ]
+    },
+    {
+      "state": "NC",
+      "name": "North Carolina",
+      "effectiveOn": "2024-07-01",
+      "checkedOn": "2026-10-18",
+      "reviewOn": "2027-01-01",
+      "scope": "A North Carolina resident buying a private passenger vehicle, or a pickup registered at up to 9,000 pounds, from a North Carolina dealer. The highway use tax stays with the tax check. Heavier trucks, specialty plates, leases and vehicles registered outside North Carolina are not covered.",
+      "note": "G.S. 20-85 prints $25.00 for a plate transfer and a lien; NCDOT's 2024 fee adjustment lists $25.50. This schedule uses $25.50.",
+      "dealerChargeLabels": ["doc", "docs", "documentary", "documentation", "dealer", "dlr", "electronic filing", "elec filing", "e filing", "efiling", "e file", "efile", "administrative", "admin", "predelivery", "pre delivery", "pdi", "prep", "convenience", "compliance fee",
+        "online registration", "electronic registration"],
+      "taxPackLabels": ["highway use tax", "hwy use tax", "hut", "use tax", "sales tax", "sales and use"],
+      "fees": [
+        {
+          "id": "NC_TITLE",
+          "group": "TITLE",
+          "name": "Certificate of title",
+          "purpose": "Puts the car's ownership in your name in the state's records.",
+          "minMinor": 6675,
+          "maxMinor": 6675,
+          "dependsOn": "nothing; it applies to every title",
+          "citation": "G.S. 20-85(a)(1), https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_20/GS_20-85.html; NCDOT 2024 DMV Quadrennial Fee Adjustment (revised 5/9/2024), https://www.ncdot.gov/news/press-releases/Documents/2024-04-02-dmv-fees-increasing.pdf"
+        },
+        {
+          "id": "NC_LIEN",
+          "group": "TITLE",
+          "name": "Lien recording",
+          "purpose": "Records your lender on the title when the car is financed.",
+          "minMinor": 0,
+          "maxMinor": 2550,
+          "onlyWhen": "FINANCED",
+          "dependsOn": "whether the car is financed",
+          "citation": "G.S. 20-85(a)(7), https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_20/GS_20-85.html; NCDOT 2024 DMV Quadrennial Fee Adjustment, https://www.ncdot.gov/news/press-releases/Documents/2024-04-02-dmv-fees-increasing.pdf"
+        },
+        {
+          "id": "NC_ONE_DAY_TITLE",
+          "group": "TITLE",
+          "name": "One-day title",
+          "purpose": "Prepares the title in one day, if someone asks for it.",
+          "minMinor": 0,
+          "maxMinor": 12600,
+          "dependsOn": "whether the one-day title service is used",
+          "citation": "G.S. 20-85(a)(12), https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_20/GS_20-85.html"
+        },
+        {
+          "id": "NC_REGISTRATION",
+          "group": "REGISTRATION",
+          "name": "Registration",
+          "purpose": "The yearly fee that lets the car use North Carolina roads.",
+          "minMinor": 4625,
+          "maxMinor": 12200,
+          "dependsOn": "whether the vehicle is a passenger vehicle ($46.25) or a pickup, whose fee goes by its declared weight",
+          "citation": "G.S. 20-87(5), https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_20/GS_20-87.html; G.S. 20-88(b) and (i) ($1.30 per 100 pounds from 4,001 to 9,000 pounds, plus $5), https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_20/GS_20-88.html"
+        },
+        {
+          "id": "NC_ELECTRIC",
+          "group": "REGISTRATION",
+          "name": "Electric vehicle fee",
+          "purpose": "Paid by plug-in cars instead of the fuel tax they do not pay: $214.50 a year for a fully electric car, $107.25 for a plug-in hybrid.",
+          "minMinor": 0,
+          "maxMinor": 21450,
+          "dependsOn": "whether the car is fully electric or a plug-in hybrid",
+          "citation": "G.S. 20-87(13) and (13a), https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_20/GS_20-87.html"
+        },
+        {
+          "id": "NC_LOCAL",
+          "group": "REGISTRATION",
+          "name": "Local vehicle taxes",
+          "purpose": "Yearly amounts your city, county or regional transit authority may add to registration: up to $30, $7 and $10.",
+          "minMinor": 0,
+          "maxMinor": 4700,
+          "dependsOn": "where you live",
+          "citation": "G.S. 20-97(b1), https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_20/GS_20-97.html; G.S. 105-561(a), https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/ByArticle/Chapter_105/Article_51.html; G.S. 105-570(a), https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/ByArticle/Chapter_105/Article_52.html"
+        },
+        {
+          "id": "NC_PLATE_TRANSFER",
+          "group": "PLATE",
+          "name": "Plate transfer",
+          "purpose": "Moves your current plate and registration to this car.",
+          "minMinor": 0,
+          "maxMinor": 2550,
+          "dependsOn": "whether a plate is moved from a car you no longer have",
+          "citation": "G.S. 20-85(a)(4), https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_20/GS_20-85.html; NCDOT 2024 DMV Quadrennial Fee Adjustment, https://www.ncdot.gov/news/press-releases/Documents/2024-04-02-dmv-fees-increasing.pdf"
+        },
+        {
+          "id": "NC_TEMPORARY_TAG",
+          "group": "TEMPORARY_TAG",
+          "name": "Temporary tag",
+          "purpose": "The temporary plate you drive on until the registration is done; the dealer pays the state $1 for it.",
+          "minMinor": 0,
+          "maxMinor": 100,
+          "dependsOn": "whether a temporary tag is issued",
+          "citation": "G.S. 20-79.1(a), https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_20/GS_20-79.1.html"
+        },
+        {
+          "id": "NC_PROPERTY_TAX",
+          "group": "PROPERTY_TAX",
+          "name": "County vehicle property tax",
+          "purpose": "Your county's and city's property tax on the car, collected with registration. It goes by the car's value and your local tax rates, and you can put it off 60 days with a limited registration.",
+          "minMinor": 0,
+          "maxMinor": null,
+          "dependsOn": "the car's value and your county and city tax rates",
+          "citation": "G.S. 105-330.4(a) and 105-330.5(a) and (a1), https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_105/GS_105-330.5.html; NCDMV Vehicle Property Taxes, https://www.ncdot.gov/dmv/title-registration/Pages/vehicle-property-tax.aspx"
+        }
+      ]
+    }
+  ]
+}

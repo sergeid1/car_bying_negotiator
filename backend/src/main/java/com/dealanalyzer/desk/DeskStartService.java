@@ -44,13 +44,19 @@ public class DeskStartService {
   private final TradeDeskCheck tradeCheck;
   private final com.dealanalyzer.desk.tactic.DeskTacticService tactics;
   private final com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice;
+  private final com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees;
+  private final com.dealanalyzer.economics.fees.DocFeeCheck docFees;
   private final FinancingCalculator financing = new FinancingCalculator();
 
   DeskStartService(EphemeralBuyingCaseService cases, DeskCheckService desk, DocumentExtractionPersistence extractions,
       TradeService trades, JdbcTemplate jdbc, ObjectMapper json, TradeDeskCheck tradeCheck,
       com.dealanalyzer.desk.tactic.DeskTacticService tactics,
-      com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice) {
+      com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice,
+      com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees,
+      com.dealanalyzer.economics.fees.DocFeeCheck docFees) {
+    this.docFees = docFees;
     this.listingPrice = listingPrice;
+    this.governmentFees = governmentFees;
     this.cases = cases; this.desk = desk; this.extractions = extractions; this.trades = trades;
     this.jdbc = jdbc; this.json = json; this.tradeCheck = tradeCheck;
     this.tactics = tactics;
@@ -87,7 +93,8 @@ public class DeskStartService {
   public record FirstResult(String policyVersion, String route, String source, OutTheDoor outTheDoor, Finding lead,
       List<Finding> findings, TradeDeskCheck.Result trade,
       List<com.dealanalyzer.desk.tactic.DeskTacticPolicy.Finding> tacticFindings,
-      com.dealanalyzer.listing.capture.ListingPriceCheck.Result listingPrice) {}
+      com.dealanalyzer.listing.capture.ListingPriceCheck.Result listingPrice,
+      com.dealanalyzer.economics.fees.GovernmentFeeCheck.Result governmentFees) {}
   /** amountMinor is null when the paperwork shows no out-the-door total; it is never treated as zero. */
   public record OutTheDoor(Long amountMinor, Long agreedMinor, Long differenceMinor) {}
   /** amountMinor is the finding's dollar effect when it can be calculated, otherwise null. */
@@ -184,6 +191,8 @@ public class DeskStartService {
       findings.add(new Finding(item.code(), (tactic == null ? "" : tactic.label() + ": ") + item.summary(), item.amountMinor(),
           tactic == null ? item.deskQuestion() : tactic.deskQuestion(), allowanceEvidence, tactic == null ? null : tactic.code()));
     }
+    for (var fee : docFees.findings(caseId, terms))
+      findings.add(new Finding("DOC_FEE_CHECK", fee.reason(), null, fee.buyerAction(), fee.observedEvidence()));
     // The price in the listing the Buyer saved (ticket 115): a higher paperwork price, or another car, is asked about.
     var listing = listingPrice.check(caseId, terms, "DESK_PAPERWORK", false);
     if (listing != null && "HIGHER".equals(listing.status()))
@@ -192,6 +201,10 @@ public class DeskStartService {
     else if (listing != null && "DIFFERENT_VIN".equals(listing.status()))
       findings.add(new Finding("LISTING_VIN_DIFFERENT", listing.summary(), null, listing.deskQuestion(),
           evidence(terms, "VEHICLE_VIN")));
+    // State fee lines above the state's fee schedule, or a dealer charge listed as a state fee (ticket 139).
+    var fees = governmentFees.check(caseId, terms, false);
+    if (fees != null) for (var fee : fees.findings()) if ("MATERIAL".equals(fee.severity()))
+      findings.add(new Finding("GOVERNMENT_FEE_" + fee.code(), fee.summary(), null, fee.deskQuestion(), fee.evidence()));
     // A different trade-in VIN leads; then the largest calculable dollar effect; findings without an amount
     // keep their rule order after those.
     findings.sort(Comparator.comparing((Finding finding) -> !finding.code().equals("TRADE_VIN_DIFFERENT"))
@@ -201,7 +214,7 @@ public class DeskStartService {
     var total = new OutTheDoor(otd, agreedOtd, otd == null || agreedOtd == null ? null : Math.subtractExact(otd, agreedOtd));
     return new FirstResult(VERSION, request.route(), source, total, findings.isEmpty() ? null : findings.get(0),
         List.copyOf(findings), "NO_ALLOWANCE".equals(trade.status()) ? null : trade,
-        tacticFindings, listing);
+        tacticFindings, listing, fees);
   }
 
   private static String route(String vin, String agreedVin, String caseVin) {
