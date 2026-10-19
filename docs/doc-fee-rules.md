@@ -52,12 +52,16 @@ minor-unit amounts. It does not interpret generic protection packages, title fee
 government fees or electronic registration fees as documentary fees. Unrecognised
 labels remain in the existing charge findings and do not receive a state-rule claim.
 
-For a Texas dealer's paperwork, `Doc fee $150` plus `Clerical fee $150` becomes one
+For a Texas dealer's paperwork, `Doc fee $150` plus `Document processing fee $150` becomes one
 question about a **$300** combined documentary charge. Both source lines and evidence
 regions survive in `observedEvidence.lines`. A single $225 fee or a $224.99 fee produces
 no finding. At $225.01 the Buyer sees the safe harbor, OCCC filing requirement and
 a question asking whether the dealer filed the notification and cost analysis.
 The check does not look up the filing or decide that the dealer breached a rule.
+
+Origination, procurement, dealer handling and clerical fees are not recognised as
+documentary fees. For example, a $199 doc fee plus a $300 origination fee produces
+no Texas documentary fee finding; the origination charge is not added to the threshold.
 
 A Florida `Dealer service fee $999` or North Carolina `Administrative fee $899`
 produces information about disclosure and negotiability. The check does not inspect

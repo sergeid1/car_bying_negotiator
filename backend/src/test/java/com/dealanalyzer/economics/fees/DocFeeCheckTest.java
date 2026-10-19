@@ -42,16 +42,25 @@ class DocFeeCheckTest {
   }
 
   @Test void recognitionIsExplicitAndKeepsEveryLineForTheCombinedFee() {
-    var terms = terms("  CLERICAL-FEE ", 15000);
+    var terms = terms("  DOCUMENT-PROCESSING-FEE ", 15000);
     ((com.fasterxml.jackson.databind.node.ArrayNode) terms.path("lineItems"))
         .add(terms("Doc fee", 15000).path("lineItems").get(0));
     var finding = check.evaluate("US-TX", terms, today).getFirst();
     assertThat(finding.observed().path("amountMinor").asLong()).isEqualTo(30000);
     assertThat(finding.observedEvidence().path("lines")).hasSize(2);
-    assertThat(finding.reason()).contains("CLERICAL-FEE", "Doc fee", "$300.00");
+    assertThat(finding.reason()).contains("DOCUMENT-PROCESSING-FEE", "Doc fee", "$300.00");
     assertThat(check.evaluate("US-TX", terms("Office convenience package", 99900), today)).isEmpty();
     assertThat(check.evaluate("US-CA", terms("Doc fee", 99900), today)).isEmpty();
     assertThat(check.evaluate(null, terms("Doc fee", 99900), today)).isEmpty();
+  }
+
+  @Test void unrelatedChargesDoNotPushTheDocumentaryFeeAboveTheTexasSafeHarbor() {
+    for (String label : java.util.List.of("Origination fee", "Procurement fee", "Dealer handling fee", "Clerical fee")) {
+      var terms = terms("Doc fee", 19900);
+      ((com.fasterxml.jackson.databind.node.ArrayNode) terms.path("lineItems"))
+          .add(terms(label, 30000).path("lineItems").get(0));
+      assertThat(check.evaluate("US-TX", terms, today)).as(label).isEmpty();
+    }
   }
 
   @Test void staleRulesAndUnusableAmountsCannotSupportAComparison() {
