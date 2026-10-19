@@ -7,7 +7,14 @@ and guide version pass this evaluation.
 **Blocked by:** 118 (the reviewed guide), 119 (the task), and the operator for grading. Enabling Toto
 in production also needs the executed model-provider terms that the harness already requires.
 
-**Status:** open — filed on 2026-10-14.
+**Status:** open — the harness is built (2026-10-19); operator grading, the reviewed and released guide (ticket
+118), executed provider terms and a live passing run remain. `toto-questions.v1` freezes 150 questions (90 to
+answer, 55 to decline or fall back, 5 in another language, which fall back while Toto is English-only per ticket
+148). The test-scoped `TotoEvaluation` runs offline against fakes, records model, prompt, schema, guide, question
+and threshold versions with per-answer tokens and cost, and scores the thresholds now in
+`docs/toto-answer-policy.md`; grades bind to a run digest and ship as an empty template. A live run refuses an
+unreleased guide or missing terms, and only a passing live run can produce a comparison record; the gate does not
+admit `TotoAnswerTask` yet. Measured cost per answer is pending a live run.
 
 ## Scope
 
