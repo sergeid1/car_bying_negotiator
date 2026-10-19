@@ -125,6 +125,22 @@ public class StoredReportRenderer {
       for (var condition : listing.path("priceConditions")) lines.add(new Line("The ad's fine print: " + condition.asText(), false));
       lines.add(new Line("From your own capture of the dealer's listing.", false));
     }
+    // Reports before ticket 139 have no state fee check, and render as they did.
+    var fees = analysis.path("governmentFeeCheck");
+    if (fees.isObject()) {
+      lines.add(new Line("State fees", true));
+      lines.add(new Line(fees.path("summary").asText(), false));
+      for (var finding : fees.path("findings")) {
+        if (!finding.path("summary").asText().equals(fees.path("summary").asText()))
+          lines.add(new Line(finding.path("summary").asText(), false));
+        if (finding.path("deskQuestion").isTextual()) lines.add(new Line("Question to ask: " + finding.path("deskQuestion").asText(), false));
+      }
+      for (var fee : fees.path("fees"))
+        lines.add(new Line(fee.path("name").asText() + ": " + fee.path("purpose").asText(), false));
+      if (fees.path("checkedOn").isTextual())
+        lines.add(new Line("From " + fees.path("stateName").asText() + "'s published fees, checked "
+            + fees.path("checkedOn").asText() + ".", false));
+    }
     lines.add(new Line("Limitations",true));
     for(var limitation:analysis.path("limitations")) lines.add(new Line(limitation.asText(),false));
     lines.add(new Line("Complete saved payload and evidence",true));

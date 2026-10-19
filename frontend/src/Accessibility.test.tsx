@@ -1097,6 +1097,17 @@ test("model recalls, rating variants and VIN copy have no automated AA violation
   </section></main>);
   expect((await axe.run(container, AA)).violations).toEqual([]);
 });
+// Ticket 139: the state fee check, with a question to ask, notes and what each fee is for, opened.
+test("the state fee note has no automated AA violations", async () => {
+  const { GovernmentFeeNote } = await import("./GovernmentFees");
+  const { paddedFeeCheck, uncheckedFees } = await import("./GovernmentFees.fixture");
+  const { container } = render(<main><h1>Synthetic case</h1>
+    <section aria-label="Report"><h2>Report</h2><GovernmentFeeNote check={paddedFeeCheck} /></section>
+    <section aria-label="Unchecked"><h2>Desk Check</h2><GovernmentFeeNote check={uncheckedFees} /></section></main>);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  for (const summary of container.querySelectorAll("summary")) await userEvent.click(summary);
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+});
 // Ticket 115: the Buyer's copy of the dealer's ad, its confirmation form with a source page, a VIN conflict, and the
 // price check in the Desk Check style note.
 test("the listing capture, its confirmation form, a VIN conflict and the price note have no automated AA violations", async () => {

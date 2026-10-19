@@ -1,0 +1,6 @@
+.government-fee-check { display: grid; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.government-fee-check > *, .government-fee-finding > * { margin: 0; }
+.government-fee-check h3 { margin: 0; }
+.government-fee-finding { display: grid; gap: 6px; }
+.government-fee-check[data-status="ASK"] { padding-left: 12px; border-left: 3px solid var(--warn-ink); }
+.government-fee-check ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 4px; }

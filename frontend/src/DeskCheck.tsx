@@ -4,6 +4,7 @@ import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import { TradeCheckPanel, type TradeCheckResult } from "./TradeCheck";
 import { DeskTactics, type DeskTacticFinding } from "./DeskTactics";
 import { ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
+import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
 
 type Credentials = { caseId: string; token: string };
 type Term = { value?: string | null; unit?: string; amountMinor?: number; currency?: string; category?: string } | number;
@@ -27,6 +28,8 @@ export type DeskCheckView = {
   tacticFindings?: DeskTacticFinding[];
   /** The price in the ad the Buyer saved, beside this paperwork's price (ticket 115). */
   listingPrice?: ListingPriceCheck | null;
+  /** The state fee lines against the state's fee schedule (ticket 139). */
+  governmentFees?: GovernmentFeeCheck | null;
 };
 export type FreshDeskCase = Credentials & { agreed: Credentials; agreedVin: string | null; vin: string; files: File[] };
 
@@ -182,6 +185,7 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
         </ol>}
         {view.trade && <TradeCheckPanel result={view.trade} tactics={view.tacticFindings} />}
         {view.listingPrice && <ListingPriceNote check={view.listingPrice} title="The ad you saved" />}
+        {view.governmentFees && <GovernmentFeeNote check={view.governmentFees} />}
         {view.otherDifferences.length > 0 && <details>
           <summary>{view.otherDifferences.length} other {view.otherDifferences.length === 1 ? "change" : "changes"} on the paperwork</summary>
           <ul>{view.otherDifferences.map(finding => <li key={`${finding.group}-${finding.term}`}>

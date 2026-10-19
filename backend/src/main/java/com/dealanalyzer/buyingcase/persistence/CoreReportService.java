@@ -46,6 +46,7 @@ public class CoreReportService {
   private final com.dealanalyzer.vehicle.safety.VehicleSafetyService safety;
   private final com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice;
   private final com.dealanalyzer.listing.persistence.ListingEvidencePersistence listings;
+  private final com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees;
 
   public CoreReportService(EphemeralBuyingCaseService access, AnalysisCaseRepository cases,
       OperationRepository operations, AnalysisReportRepository reports, BuyingCaseStore store,
@@ -56,7 +57,9 @@ public class CoreReportService {
       com.dealanalyzer.desk.tactic.DeskTacticService tactics,
       com.dealanalyzer.vehicle.safety.VehicleSafetyService safety,
       com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice,
-      com.dealanalyzer.listing.persistence.ListingEvidencePersistence listings) {
+      com.dealanalyzer.listing.persistence.ListingEvidencePersistence listings,
+      com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees) {
+    this.governmentFees = governmentFees;
     this.safety = safety;
     this.listingPrice = listingPrice;
     this.listings = listings;
@@ -210,6 +213,10 @@ public class CoreReportService {
       analysis.set("listingPriceCheck", json.valueToTree(listingCheck));
       evidence.set("listingCapture", json.valueToTree(listings.findById(listingCheck.listingSnapshotId()).orElse(null)));
     }
+    // The state fee lines against the Buyer's state's fee schedule (ticket 139); added only when the offer lists a
+    // state fee, so reports without one keep their shape.
+    var feeCheck = offer == null ? null : governmentFees.check(caseId, offer.terms(), "VERIFIED".equals(offer.status()));
+    if (feeCheck != null) analysis.set("governmentFeeCheck", json.valueToTree(feeCheck));
     analysis.put("financingAvailability", financeAvailability);
     analysis.set("financingTerms", json.valueToTree(finance == null ? null : finance.inputs()));
     analysis.set("financing", json.valueToTree(finance == null ? null : finance.result()));
