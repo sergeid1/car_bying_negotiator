@@ -1,7 +1,7 @@
 # Dealer documentary fee rules
 
 Ticket 140 uses `backend/src/main/resources/fees/doc-fee-rules.v1.json`, version
-`doc-fee-rules.2026-10.v2`. All entries were checked on **2026-10-18** and are due for
+`doc-fee-rules.2026-10.v3` (v3, ticket 142, moved recognition onto the shared fee label matcher). All entries were checked on **2026-10-18** and are due for
 review on **2027-01-18**. No database migration is needed.
 
 ## Sources and scope
@@ -47,16 +47,21 @@ the rule snapshot, citation, checked date and review date.
 
 ## Recognition and worked examples
 
-The code-owned `recognition` object keeps explicit labels and word-boundary keyword
-patterns in two tiers. Matching normalises punctuation, case and spaces, with
-`DOC_FEE` taking precedence when both tiers match a dealer fee line:
+The code-owned `recognition` object keeps keyword terms, and `unless` terms that cancel a
+tier, in two tiers. Since ticket 142 the terms are read with `economics.fees.FeeLabels`, the
+matcher the government fee check and the dealer add-on check use: it folds case, punctuation
+and dotted abbreviations, reads a word that starts with a term as that term, and tolerates a
+misspelling with the same first letter (`Docuemntary fee`, `Adminstrative fee`). `DOC_FEE`
+takes precedence when both tiers match a dealer fee line, and a line the Buyer confirmed as
+`doc-fee` is a doc fee whatever its label:
 
 - `DOC_FEE`: doc, docs, document, documentary, documentation, admin, administrative,
   administration and processing. This recognises variants such as `Doc. Fee`,
   `DOCUMENTARY SVC FEE` and `Admin-Fee` without requiring an exact label.
 - `POSSIBLE_DOC_FEE`: handling, clerical, procurement, origination, paperwork,
   conveyance, e-filing/electronic filing, dealer service and service-and-handling
-  wording. For example, `Dealer Paperwork Charge` may be a documentary fee under
+  wording, unless the label also says contract, agreement, warranty or plan (a dealer
+  service contract is a finance-office product). For example, `Dealer Paperwork Charge` may be a documentary fee under
   another name. Each such line gets a question about what it covers and whether it
   is the documentary fee. These are identification heuristics, not legal findings
   that loan origination, lease procurement or electronic filing charges are doc fees.

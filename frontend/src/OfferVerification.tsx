@@ -17,6 +17,8 @@ type LineItem = {
   id: string; originalLabel: string; category: string; amountMinor: number; currency: string;
   evidence: EvidenceRegion; confidence: number; verificationState: string;
   currentCorrection: Correction | null; correctionHistory: Correction[];
+  /** What a model-backed reader thinks the charge is (ticket 142); it counts only once the Buyer confirms it. */
+  suggestedCharge?: { id: string; name: string; category: string } | null;
 };
 
 type Extraction = {
@@ -33,7 +35,7 @@ type DealerOffer = {
   terms: { candidates: OfferCandidate[]; lineItems: OfferLineItem[] };
 };
 
-type Decision = "CONFIRMED" | "CORRECTED";
+type Decision = "CONFIRMED" | "CORRECTED" | "SUGGESTION";
 
 /** Terms read with less confidence than this are flagged for a closer look at the source page. */
 const LOW_CONFIDENCE = 0.85;
@@ -310,9 +312,9 @@ export function OfferVerification({
     }
   }
 
-  function confirm(id: string) {
+  function confirm(id: string, decision: Decision = "CONFIRMED") {
     setFrozen(undefined);
-    setDecisions(current => ({ ...current, [id]: "CONFIRMED" }));
+    setDecisions(current => ({ ...current, [id]: decision }));
   }
 
   const terms = extraction ? [...extraction.candidates, ...extraction.lineItems] : [];
@@ -325,6 +327,8 @@ export function OfferVerification({
     setError(undefined);
     const confirmedCandidateIds = extraction.candidates.map(item => item.id).filter(id => decisions[id]);
     const confirmedLineItemIds = extraction.lineItems.map(item => item.id).filter(id => decisions[id]);
+    const confirmedSuggestionLineItemIds = extraction.lineItems
+      .filter(item => decisions[item.id] === "SUGGESTION" && item.suggestedCharge && !item.currentCorrection).map(item => item.id);
     const corrections = terms.map(item => item.currentCorrection?.id ?? "").filter(Boolean);
     const latestVersion = String(offers.at(-1)?.version ?? 0);
     try {
@@ -333,9 +337,11 @@ export function OfferVerification({
         headers: {
           ...headers,
           "Content-Type": "application/json",
-          "Idempotency-Key": freezeKey(extraction.id, [latestVersion, ...confirmedCandidateIds, ...confirmedLineItemIds, ...corrections]),
+          "Idempotency-Key": freezeKey(extraction.id, [latestVersion, ...confirmedCandidateIds, ...confirmedLineItemIds, ...corrections,
+            ...confirmedSuggestionLineItemIds.map(id => `suggestion:${id}`)]),
         },
-        body: JSON.stringify({ extractionId: extraction.id, confirmedCandidateIds, confirmedLineItemIds }),
+        body: JSON.stringify({ extractionId: extraction.id, confirmedCandidateIds, confirmedLineItemIds,
+          ...(confirmedSuggestionLineItemIds.length > 0 ? { confirmedSuggestionLineItemIds } : {}) }),
       });
       if (!response.ok) {
         setError(await detail(response, "The Dealer Offer was not frozen. Try again."));
@@ -486,7 +492,7 @@ type RowProps = {
   filename: string;
   decisions: Record<string, Decision>;
   pageFor: (item: { evidence: EvidenceRegion }) => string | undefined;
-  onConfirm: (id: string) => void;
+  onConfirm: (id: string, decision?: Decision) => void;
   onCorrect: (targetType: "CANDIDATE" | "LINE_ITEM", id: string, body: Record<string, unknown>) => Promise<boolean>;
 };
 
@@ -517,7 +523,8 @@ function DecisionBadge({ decision, lowConfidence, missing }: { decision?: Decisi
       {missing && <span className="verify-flag">Missing</span>}
       {lowConfidence && !missing && <span className="verify-flag">Low confidence</span>}
       <span className={decision ? "verify-state verify-done" : "verify-state"}>
-        {decision === "CONFIRMED" ? "Confirmed" : decision === "CORRECTED" ? "Corrected by you" : "Needs your decision"}
+        {decision === "CONFIRMED" ? "Confirmed" : decision === "CORRECTED" ? "Corrected by you"
+          : decision === "SUGGESTION" ? "Named by you" : "Needs your decision"}
       </span>
     </p>
   );
@@ -623,8 +630,18 @@ function LineItemRow({ item, busy, filename, decisions, pageFor, onConfirm, onCo
           <div><dt>Confidence</dt><dd>{Math.round(item.confidence * 100)}%</dd></div>
           <div><dt>Source</dt><dd>Page {item.evidence.pageNumber} of “{filename}”</dd></div>
         </dl>
-        {item.category === "UNKNOWN" && !correction && (
+        {item.category === "UNKNOWN" && !correction && !item.suggestedCharge && (
           <p className="notice">The paperwork does not say what this charge is. Ask the Dealer to explain it.</p>
+        )}
+        {item.suggestedCharge && !correction && (
+          <div className="notice verify-suggestion">
+            <p>This looks like {item.suggestedCharge.name}; confirm or change it.</p>
+            <p className="muted">It is named only if you confirm it. To change it, correct the kind of charge below.</p>
+            <button type="button" className="btn-secondary" disabled={busy} aria-pressed={decision === "SUGGESTION"}
+              onClick={() => onConfirm(item.id, "SUGGESTION")}>
+              Confirm “{item.originalLabel}” is {item.suggestedCharge.name}
+            </button>
+          </div>
         )}
         <CorrectionHistory history={item.correctionHistory}
           show={value => `${money(value.amountMinor ?? 0, item.currency)} · ${humanize(value.category ?? item.category)}`} />

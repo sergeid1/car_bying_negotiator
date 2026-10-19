@@ -34,15 +34,16 @@ public class GovernmentFeeCheck {
   private static final ZoneId ZONE = ZoneId.of("America/New_York");
 
   private final GovernmentFeeSchedule schedule;
+  private final DealerAddOnCatalogue addOns;
   private final JdbcTemplate jdbc;
   private final Clock clock;
 
-  @Autowired GovernmentFeeCheck(GovernmentFeeSchedule schedule, JdbcTemplate jdbc) {
-    this(schedule, jdbc, Clock.system(ZONE));
+  @Autowired GovernmentFeeCheck(GovernmentFeeSchedule schedule, DealerAddOnCatalogue addOns, JdbcTemplate jdbc) {
+    this(schedule, addOns, jdbc, Clock.system(ZONE));
   }
 
-  GovernmentFeeCheck(GovernmentFeeSchedule schedule, JdbcTemplate jdbc, Clock clock) {
-    this.schedule = schedule; this.jdbc = jdbc; this.clock = clock;
+  GovernmentFeeCheck(GovernmentFeeSchedule schedule, DealerAddOnCatalogue addOns, JdbcTemplate jdbc, Clock clock) {
+    this.schedule = schedule; this.addOns = addOns; this.jdbc = jdbc; this.clock = clock;
   }
 
   /**
@@ -68,7 +69,7 @@ public class GovernmentFeeCheck {
     var place = jdbc.query("select buyer_jurisdiction, purchase_method from analysis_cases where id = ?",
         (r, n) -> new String[] {r.getString(1), r.getString(2)}, caseId).stream().findFirst().orElse(new String[2]);
     Boolean financed = place[1] == null ? null : "FINANCE".equals(place[1]);
-    return evaluate(schedule, stateOf(place[0]), financed, terms, verified, LocalDate.now(clock));
+    return evaluate(schedule, addOns, stateOf(place[0]), financed, terms, verified, LocalDate.now(clock));
   }
 
   /** "US-FL:Miami-Dade" and "US-TX" name FL and TX; anything else names no state. */
@@ -85,7 +86,12 @@ public class GovernmentFeeCheck {
 
   static Result evaluate(GovernmentFeeSchedule schedule, String stateCode, Boolean financed, JsonNode terms,
       boolean verified, LocalDate today) {
-    var lines = feeLines(schedule, terms, verified);
+    return evaluate(schedule, null, stateCode, financed, terms, verified, today);
+  }
+
+  static Result evaluate(GovernmentFeeSchedule schedule, DealerAddOnCatalogue addOns, String stateCode, Boolean financed,
+      JsonNode terms, boolean verified, LocalDate today) {
+    var lines = feeLines(schedule, addOns, terms, verified);
     if (lines.isEmpty()) return null;
     long total = 0;
     for (var line : lines) if (line.amountMinor() != null) total = Math.addExact(total, line.amountMinor());
@@ -209,9 +215,11 @@ public class GovernmentFeeCheck {
   /**
    * GOVERNMENT_CHARGE lines, and UNKNOWN or DEALER_FEE lines whose label names a state fee, such as a lump
    * "TT&L" line the reader could not classify or a "Title fee" listed with the dealer's charges. A line whose
-   * amount cannot be read is kept, so it is asked about rather than dropped.
+   * amount cannot be read is kept, so it is asked about rather than dropped. A dealer fee or unclassified line the
+   * add-on catalogue names, such as "Tire & Wheel" or "N2 Tires", is left to the add-on check (ticket 142).
    */
-  private static List<FeeLine> feeLines(GovernmentFeeSchedule schedule, JsonNode terms, boolean verified) {
+  private static List<FeeLine> feeLines(GovernmentFeeSchedule schedule, DealerAddOnCatalogue addOns, JsonNode terms,
+      boolean verified) {
     List<FeeLine> lines = new ArrayList<>();
     if (terms == null) return lines;
     for (JsonNode line : terms.path("lineItems")) {
@@ -220,6 +228,7 @@ public class GovernmentFeeCheck {
       boolean government = "GOVERNMENT_CHARGE".equals(category);
       if (!government && !(("UNKNOWN".equals(category) || "DEALER_FEE".equals(category))
           && !groups(schedule, FeeLabels.tokens(label)).isEmpty())) continue;
+      if (!government && addOns != null && named(addOns, line)) continue;
       Long amount = line.path("amountMinor").isIntegralNumber() && "USD".equals(line.path("currency").asText("USD"))
           ? line.path("amountMinor").longValue() : null;
       lines.add(new FeeLine(label.isEmpty() ? "State fees" : label, amount,
@@ -228,6 +237,12 @@ public class GovernmentFeeCheck {
           category));
     }
     return lines;
+  }
+
+  private static boolean named(DealerAddOnCatalogue addOns, JsonNode line) {
+    if (line.hasNonNull("chargeId")) return addOns.entry(line.path("chargeId").asText()).isPresent();
+    var match = addOns.match(line.path("originalLabel").asText(""));
+    return match != null && "RECOGNISED".equals(match.tier());
   }
 
   /** The fee groups a label names; empty when it names none. */

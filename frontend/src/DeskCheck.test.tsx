@@ -197,3 +197,19 @@ test("an unpurchased case explains the payment point instead of failing silently
   render(<DeskCheck caseId="case" token="token" />);
   expect(await screen.findByRole("alert")).toHaveTextContent("needs the one-time purchase first");
 });
+
+// Ticket 142: an added charge keeps its finding with the catalogue's name, and every add-on is listed beside it.
+test("an added add-on is named, and the add-on note lists every recognised line with its question", async () => {
+  const { namedAddOns } = await import("./DealerAddOns.fixture");
+  const view = deskFixture("REVIEWED");
+  view.findings = [{ ...view.findings[0], label: "Ext. Warranty", term: "line:ext. warranty#1",
+    chargeName: "service contract or extended warranty" }, view.findings[1]];
+  view.addOns = namedAddOns;
+  stub([view]);
+  render(<DeskCheck caseId="case" token="token" />);
+  expect(await screen.findByText(/Added: Ext\. Warranty \(service contract or extended warranty\), \$1,495\.00\. It is not in your Agreed Price\./))
+    .toBeVisible();
+  const note = screen.getByRole("generic", { name: "Add-ons and extra dealer charges" });
+  expect(within(note).getByText(namedAddOns.summary)).toBeVisible();
+  expect(within(note).getByText(/Unrecognised charge — ask what it is\./)).toBeVisible();
+});

@@ -10,13 +10,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /** Dealer-state disclosure and documentary fee questions; never a dealer filing determination. */
 @Component
 public class DocFeeCheck {
+  /** The catalogue id a Buyer confirms for a doc fee line (ticket 142). */
+  public static final String DOC_FEE_ID = "doc-fee";
   private final JdbcTemplate jdbc;
   private final PostalJurisdictionResolver postal;
   private final ObjectMapper json;
@@ -56,7 +57,7 @@ public class DocFeeCheck {
     List<String> questions = new ArrayList<>();
     for (var line : terms.path("lineItems")) {
       String label = line.path("originalLabel").asText();
-      String tier = recognition(label);
+      String tier = recognition(line);
       if (tier == null || !"DEALER_FEE".equals(line.path("category").asText())) continue;
       Long amount = line.path("amountMinor").isIntegralNumber() && line.path("amountMinor").canConvertToLong()
           && "USD".equals(line.path("currency").asText()) && line.path("amountMinor").longValue() >= 0
@@ -102,15 +103,26 @@ public class DocFeeCheck {
         null, evidence, null, !verified, String.join(" ", questions)));
   }
 
-  private String recognition(String label) {
-    String normalized = normalize(label);
+  /**
+   * DOC_FEE, POSSIBLE_DOC_FEE or null, read with {@link FeeLabels} like the other fee checks (ticket 142). A clear
+   * term takes precedence over a possible alias; a Buyer-confirmed {@code chargeId} of {@code doc-fee} is a doc fee.
+   */
+  String recognition(JsonNode line) {
+    if (DOC_FEE_ID.equals(line.path("chargeId").asText(null))) return "DOC_FEE";
+    if (line.hasNonNull("chargeId")) return null;
+    var tokens = FeeLabels.tokens(line.path("originalLabel").asText());
     for (String tier : List.of("DOC_FEE", "POSSIBLE_DOC_FEE")) {
       var rules = data.at("/recognition/" + tier);
-      for (var known : rules.path("labels")) if (normalize(known.asText()).equals(normalized)) return tier;
-      for (var pattern : rules.path("patterns"))
-        if (java.util.regex.Pattern.compile(pattern.asText()).matcher(normalized).find()) return tier;
+      if (!FeeLabels.match(tokens, strings(rules.path("terms"))).isEmpty()
+          && FeeLabels.match(tokens, strings(rules.path("unless"))).isEmpty()) return tier;
     }
     return null;
+  }
+
+  private static List<String> strings(JsonNode array) {
+    List<String> values = new ArrayList<>();
+    array.forEach(value -> values.add(value.asText()));
+    return values;
   }
 
   private static Long sum(Long first, Long second) {
@@ -123,7 +135,4 @@ public class DocFeeCheck {
     return amount == null ? "unavailable for a USD comparison" : "$" + BigDecimal.valueOf(amount, 2).toPlainString();
   }
 
-  private static String normalize(String label) {
-    return label.strip().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ").strip();
-  }
 }

@@ -10,7 +10,12 @@ charge different things, and the check must recognise as many names as possible.
 matching with a "possible" tier) and touches the same report, Deal Review, Desk Check and "I'm at the dealer"
 wiring, so it starts after they merge rather than in parallel with them.
 
-**Status:** open — filed on 2026-10-18.
+**Status:** complete — 2026-10-19, migration `V62` (nullable `quote_line_items.suggested_charge_id`).
+`dealer-add-ons.2026-10.v1` names 32 add-ons and extra charges in six families through the shared `FeeLabels`
+matcher, which the doc fee check now also uses; findings show in the report, Deal Review, Desk Check and "I'm at the
+dealer", and every unnamed dealer charge is listed. Verified on the integrated result with ticket 122's harness.
+The model prompt does not request `suggestedChargeId` yet; that needs a new prompt and schema version and its shadow
+comparison (ticket 36).
 
 ## Scope
 
@@ -59,14 +64,35 @@ wiring, so it starts after they merge rather than in parallel with them.
 
 ## Done when
 
-- [ ] The catalogue ships with each family above and its label variants, and `docs/dealer-add-ons.md` describes the
+- [x] The catalogue ships with each family above and its label variants, and `docs/dealer-add-ons.md` describes the
       kinds and the wording rules.
-- [ ] Tests cover, with labelled synthetic lines: several spellings per family (for example "Paint Prot.",
+- [x] Tests cover, with labelled synthetic lines: several spellings per family (for example "Paint Prot.",
       "PAINT/FABRIC PKG", "Etch", "Theft Deterrent Sys", "N2 Tires", "Mkt Adj", "ADM"); an uncertain match shown as a
       possible add-on; a line that must not match (for example the selling price, sales tax, title fee); a
       finance-office product on a cash deal and on a financed deal; and two add-ons on one paperwork totalled.
-- [ ] An acceptance test shows named add-ons in the report and the Desk Check.
-- [ ] No recognised line is dropped from what the Buyer sees, and an unrecognised dealer charge is listed as one.
-- [ ] A `suggestedChargeId` on a line is shown for the Buyer to confirm, and tests show it has no effect on the
+- [x] An acceptance test shows named add-ons in the report and the Desk Check.
+- [x] No recognised line is dropped from what the Buyer sees, and an unrecognised dealer charge is listed as one.
+- [x] A `suggestedChargeId` on a line is shown for the Buyer to confirm, and tests show it has no effect on the
       findings until the Buyer confirms it.
-- [ ] Buyer-facing copy passes `ClaimVocabulary` and `PilotCopyClaimsTest`.
+- [x] Buyer-facing copy passes `ClaimVocabulary` and `PilotCopyClaimsTest`.
+
+## Implementation notes
+
+- Catalogue `fees/dealer-add-ons.v1.json` (`dealer-add-ons.2026-10.v1`): 32 entries in the six families,
+  each with terms, possible terms, unless terms, examples, a kind, a category and a question; `otherCharges` lists
+  `doc-fee` and the `government-fee:<group>` ids. `DealerAddOnCatalogue` loads and validates it; `DealerAddOnCheck`
+  (`dealer-add-on-check.v1`) produces the findings. See [the add-on rules](../dealer-add-ons.md).
+- One matcher: `DocFeeCheck` now reads its two tiers with `FeeLabels` (`doc-fee-rules.2026-10.v3`), keeping every
+  existing test. `FeeLabels` tolerates a misspelling only with the same first letter, so "maint" is not "paint". The
+  government fee check leaves a dealer fee line the catalogue names ("Tire & Wheel", "N2 Tires") to the add-on check.
+- Findings: `analysis.dealerAddOns` in the report and both exports, `dealerAddOns` in the Deal Review, `addOns` in
+  the Desk Check and the "I'm at the dealer" result; `ADDED` Desk Check findings carry `chargeName`. Every add-on
+  or dealer fee line no check names is listed as an unrecognised charge. With a saved listing, one note asks whether
+  the advertised price included the add-ons; the price comparison stays with ticket 115's check.
+- `suggestedChargeId`: optional on the provider and validated line items, stored by migration `V62`, shown in the
+  extraction view as `suggestedCharge` and in the verification step as "This looks like <name>; confirm or change
+  it." It becomes the line's `chargeId` and category only through `confirmedSuggestionLineItemIds` when the Buyer
+  freezes the Dealer Offer; the checks read only `chargeId`. The current model prompt and schema do not ask for a
+  suggestion yet; that needs a new prompt and schema version and its shadow comparison.
+- Toto guide: `add-ons` and `other-dealer-charges` rewritten (article version 2, still unreviewed); the manifest
+  records the new digest.

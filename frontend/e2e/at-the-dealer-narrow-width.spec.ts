@@ -14,7 +14,20 @@ const lead = { code: "ADD_ON", summary: "Vehicle service contract with extended 
   amountMinor: 149500, deskQuestion: "Is the Vehicle service contract with extended powertrain and wear-item coverage optional? Please show me the price without it." };
 const result = { route: "THIS_CASE", source: "READ_FROM_PAPERWORK", outTheDoor: { amountMinor: 2829500, agreedMinor: null, differenceMinor: null },
   lead, findings: [lead, { code: "APR_ABOVE_OWN_OFFER", summary: "The dealer's APR of 7.9% is above your own lender's 5.9%, about $2,140 more in payments over the loan.",
-    amountMinor: 214000, deskQuestion: "My own lender offered 5.9% APR. Will you match it?" }] };
+    amountMinor: 214000, deskQuestion: "My own lender offered 5.9% APR. Will you match it?" }],
+  // Ticket 142: every add-on and extra dealer charge, named, with an unrecognised one under a long unbroken name.
+  addOns: { policyVersion: "dealer-add-on-check.v1", catalogueVersion: "dealer-add-ons.2026-10.v1", financed: null,
+    optionalTotalMinor: 149500, possibleTotalMinor: 0, unrecognisedTotalMinor: 99500, unreadAmounts: 0, listingNote: null,
+    summary: "This paperwork lists 1 named add-on or dealer charge and 1 unrecognised charge. Usually optional items total $1,495. Unrecognised charges total $995.",
+    lines: [{ label: "Vehicle service contract with extended powertrain and wear-item coverage", amountMinor: 149500, status: "RECOGNISED",
+      chargeIds: ["service-contract"], name: "service contract or extended warranty", family: "Products sold in the finance office",
+      kind: "FINANCE_PRODUCT", what: "A contract that pays for some repairs after the factory warranty, sold for a set price and term.",
+      kindWording: "Optional product; you can decline it or buy it elsewhere.", optional: true, confirmedByBuyer: false, verified: false,
+      note: "If it is financed with the car, it also adds interest for the whole loan term.",
+      question: "Is the service contract optional? What is its price on its own, and can I decline it?" },
+    { label: "PlatinumPeaceOfMindDealerCertifiedProtectionPackage", amountMinor: 99500, status: "UNRECOGNISED", chargeIds: [], name: null,
+      family: null, kind: null, what: null, kindWording: null, optional: false, confirmedByBuyer: false, verified: false,
+      note: "Unrecognised charge — ask what it is.", question: "What is the “PlatinumPeaceOfMindDealerCertifiedProtectionPackage”, and is it optional?" }] } };
 
 async function stub(page: Page, state: string) {
   await page.route("**/api/v1/**", route => route.fulfill({ status: 204, body: "" }));

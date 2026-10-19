@@ -27,6 +27,27 @@ class StoredReportRendererTest {
             .contains("Dealer documentary fee", "$300.00", "$225", "cost analysis", "OCCC", "2026-10-18");
     }
   }
+  @Test void bothExportsNameTheSavedAddOnsAndListTheUnrecognisedCharge() throws Exception {
+    var json = new ObjectMapper();
+    var payload = json.readTree("""
+        {"analysis":{"dealerAddOns":{"summary":"This paperwork lists 1 named add-on or dealer charge and 1 unrecognised charge.",
+          "listingNote":null,"lines":[
+          {"label":"VIN ETCH","amountMinor":29900,"status":"RECOGNISED","name":"VIN etching",
+           "kindWording":"Usually optional and negotiable.","note":null,
+           "question":"Are the windows already etched? If the etching is optional, will you take it off the price?"},
+          {"label":"Gold Package","amountMinor":99500,"status":"UNRECOGNISED","name":null,"kindWording":null,
+           "note":"Unrecognised charge — ask what it is.","question":"What is the Gold Package, and is it optional?"}]}}}
+        """);
+    var renderer = new StoredReportRenderer();
+    String html = new String(renderer.html(payload), StandardCharsets.UTF_8);
+    try (var document = Loader.loadPDF(renderer.pdf(payload))) {
+      String pdf = new PDFTextStripper().getText(document).replaceAll("\\s+", " ");
+      for (String output : new String[] {html, pdf})
+        assertThat(output.substring(0, output.indexOf("Complete saved payload")))
+            .contains("Add-ons and extra dealer charges", "VIN ETCH, $299: VIN etching. Usually optional and negotiable.",
+                "Are the windows already etched", "Gold Package, $995", "What is the Gold Package");
+    }
+  }
   @Test void linkedTacticsNameTheTradeLineOnceWhileV1KeepsItsWorksheetSection() throws Exception {
     var json = new ObjectMapper();
     var payload = json.readTree("""

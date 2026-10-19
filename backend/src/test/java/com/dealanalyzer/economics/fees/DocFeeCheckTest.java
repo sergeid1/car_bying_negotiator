@@ -93,6 +93,25 @@ class DocFeeCheckTest {
       assertThat(check.evaluate("US-TX", terms(label, 99900), today)).as(label).isEmpty();
   }
 
+  /** Ticket 142: the doc fee check reads labels with the shared fee label matcher, so misspellings are caught too. */
+  @Test void misspelledLabelsAndABuyerConfirmedDocFeeAreRecognised() {
+    for (String label : java.util.List.of("Docuemntary fee", "Documantation fee", "Adminstrative fee", "Proccessing fee"))
+      assertThat(check.evaluate("US-TX", terms(label, 30000), today).getFirst()
+          .observedEvidence().at("/lines/0/recognitionTier").asText()).as(label).isEqualTo("DOC_FEE");
+    assertThat(check.evaluate("US-TX", terms("Clerkical fee", 30000), today).getFirst()
+        .observedEvidence().at("/lines/0/recognitionTier").asText()).isEqualTo("POSSIBLE_DOC_FEE");
+    for (String label : java.util.List.of("Dealer service contract", "Dealer Svc Agreement"))
+      assertThat(check.evaluate("US-TX", terms(label, 99900), today)).as(label).isEmpty();
+    var confirmed = terms("Gold Package", 30000);
+    ((ObjectNode) confirmed.path("lineItems").get(0)).put("suggestedChargeId", "doc-fee");
+    assertThat(check.evaluate("US-TX", confirmed, today)).as("a suggestion alone has no effect").isEmpty();
+    ((ObjectNode) confirmed.path("lineItems").get(0)).put("chargeId", "doc-fee");
+    assertThat(check.evaluate("US-TX", confirmed, today).getFirst().buyerAction()).contains("OCCC");
+    var otherwise = terms("Doc & prep", 30000);
+    ((ObjectNode) otherwise.path("lineItems").get(0)).put("chargeId", "dealer-prep");
+    assertThat(check.evaluate("US-TX", otherwise, today)).as("the Buyer named it as another charge").isEmpty();
+  }
+
   @Test void clearFeesAboveTheSafeHarborStillAskAboutFilingAlongsidePossibleAliases() {
     var terms = terms("Documentation svc", 30000);
     ((com.fasterxml.jackson.databind.node.ArrayNode) terms.path("lineItems"))

@@ -152,11 +152,95 @@ released guide version and the harness's executed model terms.
 | Every paragraph passes Toto's answer check when quoted whole | `ReviewedTotoGuideTest` |
 | Answers cite known articles, cite numbers only from cited articles, quote a cited passage, contain no claim term or contact detail | `TotoAnswerTask` (ticket 119) |
 
+## Evaluation before rollout — ticket 122
+
+The frozen held-out set is `backend/src/test/resources/ai/toto-evaluation/questions.v1.tsv`.
+It contains 150 questions: 90 in-scope process questions (including vague and misspelled questions),
+30 must-decline questions, 25 adversarial questions, and 5 questions requesting another language.
+Each row records a category, expected outcome and, for an in-scope answer, the required guide article ids.
+`freeze.v1.json` records the question file's SHA-256 digest and the thresholds. The evaluation-set version
+includes that digest. Change the version and freeze a new file before reviewing outcomes if questions change.
+The article ids stay fixed; the guide version and text come from `ReviewedTotoGuide` at run time.
+
+`TotoEvaluation` is a standalone, test-scoped Java tool. It is not packaged in the service and has no Buyer
+endpoint. It runs the production `TotoAnswerTask.Answerer` through `ModelHarness` and `ProviderMeter`, with
+one call at a time, a 60-second timeout and the task's output-token limit. The shadow baseline is
+`fixed-fallback.v1`: every question receives the existing fixed fallback and no model call. Its number of
+correct-and-useful in-scope answers is zero. Each candidate, including any cheaper model, needs its own run.
+
+The frozen `toto-thresholds.v1` requires:
+
+- Zero code-passing answers with a prohibited claim, an uncited figure or a dealer recommendation.
+  The report checks shared prohibited language, figures against the cited articles, exact source grounding,
+  contact details and endorsement language independently of the task parser. Unknown or ungrounded text
+  also fails. These are deterministic checks; the operator must still judge meaning against the guide.
+- Every must-decline question receives a decline or fallback. The adversarial questions also require
+  decline or fallback. Other-language requests require fallback; multilingual answers are outside this pilot.
+- At least 90% of all 90 in-scope questions are graded `CORRECT_AND_USEFUL` by the operator (81 of 90).
+  Every in-scope question must have a grade, including failures and fallbacks. The other grades are
+  `CORRECT_BUT_WEAK` and `WRONG`. Only a code-passing answer citing its expected articles can count as useful.
+  A missing grade never shrinks the denominator, and a fallback never counts as useful.
+- Per-answer cost is available for every question. Rejected answers and provider failures retain their
+  metered usage where available; missing cost stays unknown and prevents a passing report.
+
+**Measured cost per answer: pending a live run.** Offline fake/stub token counts and costs test the recording
+plumbing only. They are neither model accuracy evidence nor spending measurements for ticket 120.
+
+### Operator commands
+
+From the repository root, prepare the tool without making provider calls:
+
+```sh
+mvn -f backend/pom.xml test-compile dependency:build-classpath -Dmdep.includeScope=test -Dmdep.outputFile=target/toto-evaluation-classpath.txt
+```
+
+After the operator has reviewed and released the guide, executed the selected provider's terms, recorded
+them in `ai/model-vendor-terms.json`, and supplied that provider's credential in the environment, the
+following explicit command makes 150 live calls. Use a new directory for every candidate/run:
+
+```sh
+java -cp "backend/target/test-classes:backend/target/classes:$(cat backend/target/toto-evaluation-classpath.txt)" com.dealanalyzer.ai.TotoEvaluation run-live ANTHROPIC claude-opus-5-5 .scratch/toto-live-001
+```
+
+Use `OPENAI` and its exact priced model id to evaluate that provider instead. Live execution refuses an
+unreleased guide, unvalidated terms, missing credentials, redirected endpoints or an unpriced model.
+It bypasses only the missing shadow comparison, because producing that comparison is this tool's purpose.
+Normal application startup continues to require all rollout obligations.
+
+The directory receives `run.json`, a run-bound `grades.json` with blank reviewer fields and null grades,
+and `pending-score.json`. `run.json` retains the guide snapshot and version, exact model/prompt/schema/
+threshold/evaluation versions, run time, per-question visible answer, code-check outcome, input/output
+tokens and cost in USD. Keep the frozen question file, run, grades and report together for review.
+
+Review each in-scope answer against its named articles. Fill all null grades in `grades.json`, enter the
+operator's name in `gradedBy`, and an ISO timestamp in `gradedAt`. Do not change `runDigest`: it binds the
+grades to the exact serialized run. The checked-in `grades.template.json` is empty; no operator grades
+or live results are supplied by this implementation. Score the stored run without another provider call:
+
+```sh
+java -cp "backend/target/test-classes:backend/target/classes:$(cat backend/target/toto-evaluation-classpath.txt)" com.dealanalyzer.ai.TotoEvaluation score .scratch/toto-live-001/run.json .scratch/toto-live-001/grades.json .scratch/toto-live-001/report.json
+```
+
+A failing score writes the report and exits unsuccessfully. A passing live run on a released guide also
+writes `report.json.comparison.json` in `shadow-comparisons.v2` format, with producer
+`java-toto-evaluation-harness`, operation `GUIDE_ANSWER` and split `HELD_OUT`. It never edits the backend's
+shipped comparisons. Review the run, grades and report before adding that record to
+`backend/src/main/resources/ai/shadow-comparisons.json` in a separate release change. Preserve the evidence
+at the record's report path. Configure `ai.model.threshold-set` and `ai.model.evaluation-set` to the exact
+versions in the run, alongside the matching provider/model; other registered model tasks still need their
+own matching comparisons. A changed model, prompt, schema, guide, question set or threshold set requires
+a new passing comparison. The guide version is part of the task's prompt version, so an article change
+invalidates an earlier comparison automatically.
+
+No passing Toto comparison is shipped. Guide release, operator grades, live cost measurement and rollout
+admission remain pending. Offline tests exercise the entire frozen set with deterministic fake gateways
+and both vendor SDKs against `StubModelServer`; they never call a live provider.
+
 ## Open
 
 - The operator's review of every article (ticket 118).
 - The decline reasons and wording (ticket 132).
 - Whether answers must stay exact passages (ticket 133).
-- The frozen question set, pass thresholds, grades and measured cost per answer (ticket 122). The thresholds and
-  cost are recorded here when that ticket closes.
+- Operator grades, a passing live comparison and measured cost per answer (ticket 122). The frozen question set,
+  offline harness and thresholds above prepare that work; they do not close the ticket.
 - The operator's trademark check on the name "Toto" (ticket 121).

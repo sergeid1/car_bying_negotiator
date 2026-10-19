@@ -1,5 +1,6 @@
 import { OutcomeFeedback } from "./PilotFeedback";
 import { DocFeeFindings, type DocFeeFinding } from "./DocFeeFindings";
+import { DealerAddOnsNote, type DealerAddOnCheck } from "./DealerAddOns";
 import { CaseDownloads } from "./CasePortability";
 import { NegotiationLoader } from "./NegotiationDraft";
 import { RevisedOfferReview, type DealReview } from "./RevisedOfferReview";
@@ -27,6 +28,7 @@ export type CoreReport = {
     tacticFindings?: DeskTacticFinding[];
     dealReview?: DealReview;
     docFeeFindings?: DocFeeFinding[];
+    dealerAddOns?: DealerAddOnCheck | null;
     tradeCheck?: TradeCheckResult | null;
     listingPriceCheck?: ListingPriceCheck | null;
     governmentFeeCheck?: GovernmentFeeCheck | null;
@@ -146,6 +148,7 @@ export function CoreDealReport({ report, caseId, token, redacted, children }: { 
       </ReportSection>}
       <ReportSection id="core-amounts" title="Amounts and sources">
         {!analysis.dealReview && <DocFeeFindings findings={analysis.docFeeFindings} />}
+        {!analysis.dealReview && analysis.dealerAddOns && <DealerAddOnsNote check={analysis.dealerAddOns} />}
         <p>Market analysis: {analysis.marketAvailability}. Cash economics: {analysis.cashAvailability}.</p>
         <dl className="money-list">
           {analysis.materialAmounts.map((amount, index) => <div key={index}>
