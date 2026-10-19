@@ -32,6 +32,11 @@ wiring, so it starts after they merge rather than in parallel with them.
   - **Products sold in the finance office:** service contract or extended warranty, GAP, tire and wheel, key
     replacement, dent and ding, windshield, maintenance plans, credit life or disability. Ticket 12 already calculates
     their financed cost; this ticket names them and says they are optional.
+- **One matcher for every fee check.** Ticket 139's `economics.fees.FeeLabels` folds case, punctuation and
+  abbreviations and tolerates misspellings ("registeration", "liscense"); ticket 140's `DocFeeCheck` uses regular
+  expressions without misspelling tolerance, so "Docuemntary fee" is missed. Move `DocFeeCheck` onto `FeeLabels`
+  (keeping its two tiers and its tests) and use `FeeLabels` for the add-on catalogue, so all three checks recognise
+  labels the same way.
 - **Kinds drive the wording**, never a legal claim: "usually optional and negotiable", "a price increase on the car,
   not a service", "may repeat a charge already on the paperwork", "optional product; you can decline it or buy it
   elsewhere". Copy states what the line is and asks; it never says the dealer is not allowed to charge it.
