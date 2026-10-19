@@ -1,6 +1,15 @@
 {
-  "version": "doc-fee-rules.2026-10.v1",
-  "labels": ["doc fee", "doc fees", "document fee", "documentary fee", "documentation fee", "dealer doc fee", "dealer documentation fee", "administrative fee", "admin fee", "dealer administrative fee", "processing fee", "document processing fee", "dealer processing fee", "dealer service fee", "dealer services fee"],
+  "version": "doc-fee-rules.2026-10.v2",
+  "recognition": {
+    "DOC_FEE": {
+      "labels": ["doc fee", "doc fees", "document fee", "documentary fee", "documentation fee", "dealer doc fee", "dealer documentation fee", "administrative fee", "admin fee", "dealer administrative fee", "processing fee", "document processing fee", "dealer processing fee"],
+      "patterns": ["\\b(doc|docs|document|documentary|documentation|admin|administrative|administration|processing)\\b"]
+    },
+    "POSSIBLE_DOC_FEE": {
+      "labels": ["dealer service fee", "dealer services fee", "dealer handling fee", "clerical fee", "procurement fee", "origination fee", "paperwork fee", "conveyance fee", "e-filing fee", "electronic filing fee", "service and handling"],
+      "patterns": ["\\b(handling|clerical|procurement|origination|paperwork|conveyance)\\b", "\\b(e\\s*filing|electronic\\s+filing)\\b", "\\bdealer\\s+(service|services|svc)\\b", "\\bservice\\s+and\\s+handling\\b"]
+    }
+  },
   "rules": [
     {
       "state": "US-TX", "kind": "SAFE_HARBOR", "amountMinor": 22500,

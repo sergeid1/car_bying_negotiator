@@ -1,7 +1,7 @@
 # Dealer documentary fee rules
 
 Ticket 140 uses `backend/src/main/resources/fees/doc-fee-rules.v1.json`, version
-`doc-fee-rules.2026-10.v1`. All entries were checked on **2026-10-18** and are due for
+`doc-fee-rules.2026-10.v2`. All entries were checked on **2026-10-18** and are due for
 review on **2027-01-18**. No database migration is needed.
 
 ## Sources and scope
@@ -35,7 +35,8 @@ review on **2027-01-18**. No database migration is needed.
   [dealer licensing article, G.S. 20-285 onward](https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/ByArticle/Chapter_20/Article_12.html).
   [NCDOJ Car Shopping Terms](https://ncdoj.gov/protecting-consumers/automobiles/car-shopping-terms/),
   read in full, explicitly describes documentary fees as negotiable. The online
-  registration fee exception in 20-101.1(d) is excluded by the explicit label list.
+  registration fee exception in 20-101.1(d) is why electronic filing aliases receive
+  a clarification question rather than an assertion that documentary fee rules apply.
 
 Florida and North Carolina use `DISCLOSURE`, with no threshold. “No cap” does not
 mean “no rule.” `effectiveFrom` for these two entries records the date of this
@@ -46,35 +47,58 @@ the rule snapshot, citation, checked date and review date.
 
 ## Recognition and worked examples
 
-The explicit `labels` array is code owned. Matching ignores punctuation, case and
-extra spaces, and only accepts dealer fee lines in USD with readable nonnegative
-minor-unit amounts. It does not interpret generic protection packages, title fees,
-government fees or electronic registration fees as documentary fees. Unrecognised
-labels remain in the existing charge findings and do not receive a state-rule claim.
+The code-owned `recognition` object keeps explicit labels and word-boundary keyword
+patterns in two tiers. Matching normalises punctuation, case and spaces, with
+`DOC_FEE` taking precedence when both tiers match a dealer fee line:
+
+- `DOC_FEE`: doc, docs, document, documentary, documentation, admin, administrative,
+  administration and processing. This recognises variants such as `Doc. Fee`,
+  `DOCUMENTARY SVC FEE` and `Admin-Fee` without requiring an exact label.
+- `POSSIBLE_DOC_FEE`: handling, clerical, procurement, origination, paperwork,
+  conveyance, e-filing/electronic filing, dealer service and service-and-handling
+  wording. For example, `Dealer Paperwork Charge` may be a documentary fee under
+  another name. Each such line gets a question about what it covers and whether it
+  is the documentary fee. These are identification heuristics, not legal findings
+  that loan origination, lease procurement or electronic filing charges are doc fees.
+
+Every recognised dealer fee line is retained and described, including zero charges
+and unreadable amounts. Only readable nonnegative USD amounts support totals; a
+missing, unsupported or overflowing amount makes its tier total unavailable without
+discarding that line. Generic protection packages, `window tint`, `nitrogen tires`
+and `GAP` do not match. Unsupported states and expired rules retain the existing
+no-state-finding behavior.
 
 For a Texas dealer's paperwork, `Doc fee $150` plus `Document processing fee $150` becomes one
 question about a **$300** combined documentary charge. Both source lines and evidence
-regions survive in `observedEvidence.lines`. A single $225 fee or a $224.99 fee produces
-no finding. At $225.01 the Buyer sees the safe harbor, OCCC filing requirement and
+regions survive in `observedEvidence.lines`, with each line's `recognitionTier`.
+A single $225 fee or a $224.99 fee is reported informationally without a filing
+question. At $225.01 the Buyer sees the safe harbor, OCCC filing requirement and
 a question asking whether the dealer filed the notification and cost analysis.
 The check does not look up the filing or decide that the dealer breached a rule.
 
-Origination, procurement, dealer handling and clerical fees are not recognised as
-documentary fees. For example, a $199 doc fee plus a $300 origination fee produces
-no Texas documentary fee finding; the origination charge is not added to the threshold.
+A $199 doc fee plus a $300 origination fee shows an identified documentary fee total
+of **$199**, a possible-alias subtotal of **$300**, and a combined total including
+possible aliases of **$499**. The combined total is not presented as an established
+doc fee. The Buyer is asked what the origination fee covers and whether it is a doc
+fee under another name. Texas's filing question is triggered only by the `DOC_FEE`
+total above $225. Possible aliases alone never trigger it, even if their combined
+amount exceeds $225. If the clear doc fees themselves exceed $225, the filing question
+appears alongside any questions about possible aliases.
 
 A Florida `Dealer service fee $999` or North Carolina `Administrative fee $899`
 produces information about disclosure and negotiability. The check does not inspect
 the advertisement, dealership sign or contractual disclosure. Unsupported dealer
-states, ambiguous dealer ZIP codes, expired rules and unreadable fee amounts produce
-no state-rule finding. Buyer tax jurisdiction never substitutes for dealer state.
+states, ambiguous dealer ZIP codes and expired rules produce no state-rule finding.
+Buyer tax jurisdiction never substitutes for dealer state.
 
 ## Integration
 
 `DocFeeCheck` resolves a dealer ZIP using the existing postal reference, or uses the
 state from city/state intake. It returns the existing `RevisedOfferPolicy.Discrepancy`
 shape, with `comparison=STATE_RULE`, `kind=DOC_FEE_CHECK`, no change delta, and frozen
-rule evidence. It is exposed as additive `docFeeFindings` arrays in saved core reports
+rule evidence. `observed.amountMinor` is the identified `DOC_FEE` total;
+`possibleDocFeeAmountMinor` and `combinedAmountMinor` are separate totals, each nullable
+when it cannot be calculated. It is exposed as additive `docFeeFindings` arrays in saved core reports
 and revised Deal Reviews. The report UI and saved HTML/PDF present the question.
 Desk Check uses its existing `otherDifferences` list so an unchanged fee is not counted
 as a change from the Agreed Price. The at-dealer first result uses its existing findings.

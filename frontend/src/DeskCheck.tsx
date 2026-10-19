@@ -65,7 +65,7 @@ function moneyDelta(finding: DeskFinding) {
 /** One plain sentence per difference, saying what changed relative to the Agreed Price. */
 export function describeFinding(finding: DeskFinding) {
   const label = labelOf(finding);
-  if (finding.kind === "DOC_FEE_CHECK") return `${label} on the paperwork: ${show(finding.desk)}.`;
+  if (finding.kind === "DOC_FEE_CHECK") return `${label} identification on the paperwork.`;
   switch (finding.group) {
     case "VEHICLE": return `This paperwork is for VIN ${show(finding.desk)}, but your Agreed Price is for VIN ${show(finding.agreed)}.`;
     case "ADDED": return `Added: ${label}, ${show(finding.desk)}. It is not in your Agreed Price.`;

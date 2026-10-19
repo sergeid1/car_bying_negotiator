@@ -113,7 +113,7 @@ test("an unchanged documentary fee shows the state-rule question without calling
   render(<DeskCheck caseId="case" token="token" />);
   await userEvent.click(await screen.findByText("Other paperwork notes and state fee checks"));
   expect(screen.getByText(question)).toBeVisible();
-  expect(screen.getByText(/Dealer documentary fee on the paperwork: \$899.00/)).toBeVisible();
+  expect(screen.getByText(/Dealer documentary fee identification on the paperwork/)).toBeVisible();
   expect(screen.queryByText(/documentary fee is new/)).not.toBeInTheDocument();
 });
 

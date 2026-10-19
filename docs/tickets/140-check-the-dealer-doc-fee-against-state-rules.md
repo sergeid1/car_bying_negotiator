@@ -37,7 +37,9 @@ checked.
 - **The check, per rule kind:**
   - safe harbor (Texas): above the amount, a finding that states the safe-harbor amount, says a dealer can charge
     more only after an OCCC filing, and gives the Buyer a question to ask ("Has your dealership filed for a doc fee
-    above $225 with the OCCC?"). At or under it, no finding.
+    above $225 with the OCCC?"). At or under it, report the identified fee informationally without the filing
+    question. Possible aliases are always reported with clarification questions and separate totals; only clear
+    documentary fee lines are compared with the safe harbor (operator correction after coordinator review).
   - disclosure (Florida, if confirmed): an informational line saying what the state requires and that the fee is
     negotiable, never that the dealer broke the rule unless the paperwork shows it, which this ticket does not try
     to detect.
@@ -77,8 +79,18 @@ against market data was corrected: both have disclosure duties, and North Caroli
 G.S. 20-101.1 also explicitly permits reducing or waiving the fee.
 
 The dealer's state controls this check, independently of the Buyer's tax jurisdiction.
-Matched fee lines are combined for the threshold while all original lines and evidence
-are retained. Saved core reports and Deal Reviews contain `docFeeFindings` in the existing
+Recognition version `doc-fee-rules.2026-10.v2` uses explicit labels and keyword patterns
+in `DOC_FEE` and `POSSIBLE_DOC_FEE` tiers. Every recognised line is reported, including
+clear fees at or below the safe harbor, possible aliases and unreadable amounts.
+Only the identified `DOC_FEE` total triggers the Texas filing question above $225.
+Possible aliases get questions about what they cover and whether they are the doc fee;
+their subtotal and the combined total are shown separately without treating the
+combined amount as an established doc fee. The $199 doc fee plus $300 origination
+example reports $199 identified, $300 possible and $499 combined, with no filing
+question. Restored aliases include origination, procurement, handling and clerical;
+variants such as `DOCUMENTARY SVC FEE` and `Dealer Paperwork Charge` are recognised.
+All original lines, their recognition tiers and evidence are retained.
+Saved core reports and Deal Reviews contain `docFeeFindings` in the existing
 discrepancy shape. Desk Check presents the rule under paperwork notes, without counting
 it as an Agreed Price difference; the at-dealer first result uses its existing findings.
 Existing report views and HTML/PDF exports display the rule and question. Browser checks
