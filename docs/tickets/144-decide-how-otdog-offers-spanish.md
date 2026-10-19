@@ -4,55 +4,57 @@
 them part of it. Section 2.2 currently excludes "multilingual support". Operator decision on 2026-10-19: the app
 must be usable in Spanish. Russian, French and Haitian Creole may follow; they are not part of this ticket.
 
+The goal, in the operator's words: Spanish speakers need to understand what is going on in the app and how to use
+it. Screens and findings come first. Dealer-facing text and the remaining open points are settled later.
+
 Why Spanish first: Census American Community Survey data (2024, via USAFacts) puts Spanish at about 73% of
 non-English home speakers in Florida (5.2M people), 79% in Texas (8.3M) and 64% in North Carolina (957k). It is the
 first non-English language in every pilot state. Haitian Creole is the second in Florida (about 512k speakers) and
 is the strongest candidate for a later language.
 
-**Blocked by:** the operator, for the decisions below.
+**Blocked by:** none for the decisions recorded below. The open points do not block tickets 145–147.
 
-**Status:** open — operator decision, filed on 2026-10-19.
+**Status:** open — decisions 1, 5 and 8 recorded on 2026-10-19; specification 2.6 not yet written.
 
-## Decisions needed
+## Decided on 2026-10-19
 
-Each has a recommended default. Record the choice here and in specification version 2.6.
+1. **Who translates.** The implementing agent writes the Spanish copy, following decisions 2 and 3. A separate
+   human review is not required before release. The operator may add one later, for example before the public
+   pilot. Spanish claim rules (ticket 146) still apply, so no Spanish string can make a claim the English copy may not.
+5. **Dealer paperwork.** English only. Extraction does not support Spanish-language dealer paperwork. A
+   Spanish-speaking Buyer sees English paperwork's terms explained in Spanish, with each label shown as printed.
+8. **How the language is chosen.** The header's existing appearance button (the moon/sun/monitor icon,
+   `ThemeMenu.tsx`) opens one menu with two groups: **Theme** (System, Light, Dark) and **Language** (English,
+   Español). No separate language button is added. On the first visit the language follows the browser when Spanish
+   comes first. The choice is remembered in the browser and on the Buyer Account. Each Buying Case records the
+   language for its emails and report.
 
-1. **Who reviews Spanish copy.** Machine or model translation can produce drafts, but every Spanish string a Buyer
-   sees needs review by a fluent speaker before release, just as the English guide articles need operator
-   review (ticket 118). Credo 1.3.5 requires the reviewer to be independent of dealers, lenders and insurers.
-   *Default:* a paid professional translator plus a fluent reviewer who knows car buying.
-2. **Register and variety.** *Default:* neutral US Latin American Spanish that addresses the Buyer as "usted", the
-   register used on US government and bank sites. One Spanish, not one per country.
-3. **Terms dealers use in English.** Many Spanish-speaking Buyers hear "out-the-door", "doc fee" and "four-square"
-   in English at the dealership. *Default:* a code-owned glossary that gives the Spanish term and shows the English
-   term the dealer uses next to it the first time it appears, for example "precio total final (out-the-door)".
-4. **Dealer email language.** Drafts to dealers (quote requests, counteroffers, test-drive requests) go out from
-   the Buyer's own email. *Default:* drafts are in English unless the Buyer picks Spanish for that dealer. The
-   Buyer reads a Spanish translation of an English draft before approving it, and approves the exact text that is
-   sent.
-5. **Dealer paperwork.** Paperwork stays in whatever language the dealer prints. *Default:* Spanish-language
-   paperwork is out of scope for extraction for now. A Spanish-speaking Buyer still sees the English paperwork's
-   terms explained in Spanish.
-6. **Legal documents.** *Default:* the Terms of Service and Privacy Policy get Spanish translations reviewed by
-   counsel. Until then, the Spanish site links to the English versions and says so.
-7. **Toto.** *Default:* Toto answers in Spanish only from reviewed Spanish articles (ticket 148). Until those exist,
-   the Spanish site either hides Toto or Toto says, in Spanish, that it answers in English for now.
-8. **How the language is chosen.** *Default:* the first visit follows the browser's language when it is Spanish. A
-   language switch in the header ("English" / "Español", each named in its own language) overrides it. The choice is
-   remembered in the browser and on the Buyer Account, and each Buying Case records the language for its emails and
-   report.
+## Working defaults, to revisit later
+
+The operator deferred these on 2026-10-19. The implementing tickets use the default until a decision is recorded.
+
+2. **Register and variety.** Neutral US Latin American Spanish that addresses the Buyer as "usted". One Spanish, not
+   one per country.
+3. **Terms dealers use in English.** A code-owned glossary that gives the Spanish term and, the first time it appears
+   on a screen, the English term the dealer uses, for example "precio total final (out-the-door)".
+4. **Dealer email language.** Drafts to dealers stay in English. A Spanish Buyer sees a Spanish reading copy of
+   each draft and approves the exact English text that is sent. Spanish drafts to dealers are not offered yet.
+6. **Legal documents.** The Spanish site links to the English Terms of Service and Privacy Policy and says they are
+   in English. Translations wait for counsel.
+7. **Toto.** Toto stays English-only for now (ticket 148 is deferred). On the Spanish site, Toto's panel says in
+   Spanish that it answers in English for now.
 
 ## Scope
 
-- Record the decisions in this ticket.
 - Specification version 2.6: move Spanish from Section 2.2 (Excluded) to Section 2.1 (Included); add the decisions
-  above; extend Section 13's accessibility line with "the page declares its language"; and note that further
-  languages need a decision ticket of their own.
+  and working defaults above; extend Section 13's accessibility line with "the page declares its language"; and note
+  that further languages need a decision ticket of their own.
 - Note in `docs/grounded-language-policy.md` that claim rules apply in every language a Buyer sees (ticket 145 makes
   the check enforce it).
 
 ## Done when
 
-- [ ] Each decision above is recorded with its date.
+- [x] Decisions 1, 5 and 8 are recorded with their date.
 - [ ] Specification 2.6 is merged with the changes above.
-- [ ] Tickets 145–148 are updated with any decision that differs from its default.
+- [ ] Each working default is either confirmed or replaced by a recorded decision, and tickets 145–148 updated to
+      match.

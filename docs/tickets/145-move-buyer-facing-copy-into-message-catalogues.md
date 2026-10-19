@@ -5,7 +5,7 @@ On 2026-10-19 every component in `frontend/src` (about 20,000 lines of TSX) writ
 `index.html` hard-codes `lang="en"`, and 30 source files format money and dates with a hard-coded `"en-US"`
 (51 call sites across `toLocaleString`, `toLocaleDateString` and `Intl.NumberFormat`). There is no translation library.
 
-**Blocked by:** 144 for the language-choice decision. 143 should land first, because both edit the footer. This
+**Blocked by:** none; ticket 144 recorded the language-choice decision on 2026-10-19. 143 should land first, because both edit the footer. This
 ticket touches nearly every client file, including the hot files, so run it when no other client ticket is in
 progress, and split it into several pull requests (for example by journey) if that keeps reviews readable.
 

@@ -7,14 +7,15 @@ not contain, and declines the same topics with fixed wording.
 **Blocked by:** 144 (decision 7), 118 (the English articles must be reviewed first, so the translation does not
 chase a moving text), 132 (decline wording) and 133 (how closely answers must quote the guide).
 
-**Status:** open — filed on 2026-10-19.
+**Status:** deferred — filed on 2026-10-19. Operator, 2026-10-19: Spanish starts with the screens and findings;
+Toto stays English-only for now (working default 7 in ticket 144).
 
 ## Scope
 
 - **Spanish articles** next to the 50 English ones, in `backend/src/main/resources/toto/guide/es/`, one per English
   article with the same `id`. Front matter records `translated_from` (the English article's version),
-  `reviewed_by` and `reviewed_on`. A test fails when a Spanish article is missing, unreviewed, or translated from an
-  older English version.
+  `reviewed_by` and `reviewed_on`, following whatever review decision 1 of ticket 144 then requires. A test fails
+  when a Spanish article is missing or translated from an older English version.
 - **Answering.** The client sends the Buyer's current language. Toto retrieves and cites Spanish articles and
   answers in Spanish. Fixed decline messages and the "I'm an AI guide" line have reviewed Spanish versions. A
   question asked in Spanish while the site is in English gets a Spanish answer when Spanish articles exist.

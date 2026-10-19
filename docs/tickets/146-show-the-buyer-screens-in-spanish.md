@@ -3,25 +3,30 @@
 **What to build:** A Spanish version of every Buyer screen, with a language switch in the header. It builds on the
 English catalogue from ticket 145 and follows the decisions in ticket 144.
 
-**Blocked by:** 144 (reviewer, register, glossary and language choice) and 145 (catalogues and per-language claim
-rules).
+**Blocked by:** 145 (catalogues and per-language claim rules). Ticket 144's decisions and working defaults are
+enough to start.
 
 **Status:** open — filed on 2026-10-19.
 
 ## Scope
 
-- **`es.ts` catalogue** covering every id in `en.ts`. The type checker from ticket 145 enforces parity. Drafts may
-  start from a model or machine translation, but each string records that it was reviewed (for example a
-  reviewed-on date per catalogue section, kept in a sidecar file the build checks). Unreviewed strings do not ship;
-  the build fails instead of falling back silently.
+- **`es.ts` catalogue** covering every id in `en.ts`, written by the implementing agent (decision 1 of ticket 144).
+  The type checker from ticket 145 enforces parity, so a missing string fails the build instead of falling back to
+  English silently. Write for understanding: plain sentences a first-time car buyer follows, not a word-for-word
+  copy of the English.
 - **The glossary** from decision 3 of ticket 144, as code-owned data in `frontend/src/i18n/glossary.ts`, used so the
   same term is translated the same way everywhere. The first use on a screen shows the English term the dealer uses,
   where the decision says to.
-- **The language switch.** It sits in the header next to the appearance menu and shows "English" and "Español",
-  each with its own `lang` attribute. On a phone it must not add a header row; ticket 143's footer can carry a
-  second copy of the switch if the header has no room. The choice is remembered in the browser, wrapped in
-  `try`/`catch` like the theme choice in `theme.ts`. A signed-in Buyer's choice is also saved on the Buyer Account
-  (a small API change and migration), so it follows them to another device.
+- **One menu for theme and language** (decision 8 of ticket 144). The header's existing appearance button
+  (`ThemeMenu.tsx`) opens a menu with two labelled groups: Theme (System, Light, Dark) and Language (English,
+  Español). Each language name is written in its own language and carries its own `lang` attribute. The button keeps
+  its theme icon; its accessible name becomes something like "Theme and language: Dark, English". No header button
+  is added, so the phone header keeps its current rows. Keep the menu's keyboard behaviour (arrow keys, Home, End,
+  Escape), with each group as its own `menuitemradio` set. Rename the component and update
+  `theme-menu.spec.ts` accordingly.
+- **Remembering the choice.** The language is remembered in the browser, wrapped in `try`/`catch` like the theme
+  choice in `theme.ts`. A signed-in Buyer's choice is also saved on the Buyer Account (a small API change and
+  migration), so it follows them to another device.
 - **First visit** follows `navigator.languages` when Spanish comes first, otherwise English.
 - **Spanish claim rules.** Add Spanish patterns to `ClaimVocabulary` for each English claim the spec forbids: safe
   to sign, guaranteed savings, the best or cheapest price or rate, negotiating or acting for the Buyer, contacting
@@ -38,8 +43,7 @@ rules).
 - [ ] With Spanish chosen, every screen a Buyer can reach shows Spanish copy and `<html lang="es">`. A test walks
       the Buyer journeys in Spanish and fails on any English string outside the allow-list (brand name, the English
       dealer terms from the glossary, amounts).
-- [ ] The switch works by keyboard and screen reader, is remembered across reloads and, when signed in, across
-      devices.
+- [ ] The theme and language menu works by keyboard and screen reader, and the language choice is remembered
+      across reloads and, when signed in, across devices.
 - [ ] `PilotCopyClaimsTest` checks the Spanish catalogue against the Spanish patterns and passes.
 - [ ] The 360 px Playwright gate and the axe sweep run in Spanish as well as English, in both themes, and pass.
-- [ ] Every Spanish string is recorded as reviewed by the reviewer named in ticket 144.

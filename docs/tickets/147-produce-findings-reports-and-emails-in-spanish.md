@@ -8,7 +8,8 @@ Today this text is English sentences built on the server and stored in the immut
 `DealAnalysis.topReasons` is a list of English strings, and `CoreDealReport.tsx` matches the out-the-door total by its
 English label "Out-the-door total". The client cannot translate stored sentences.
 
-**Blocked by:** 144 (decisions 4 and 8) and 145. It can run in parallel with 146, since it is mostly backend work.
+**Blocked by:** 145. Ticket 144 recorded decisions 5 and 8; decision 4 is a working default. It can run in
+parallel with 146, since it is mostly backend work.
 
 **Status:** open — filed on 2026-10-19.
 
@@ -28,10 +29,9 @@ English label "Out-the-door total". The client cannot translate stored sentences
 - **Explanations** (ticket 37) are generated with the Spanish claim rules from ticket 146 and checked by the same
   grounding rules. A Spanish explanation that fails the check falls back to the templated Spanish findings, never
   to unchecked text.
-- **Dealer drafts** follow decision 4: English by default, Spanish when the Buyer picks it for that dealer. When the
-  draft is in English and the Buyer reads Spanish, show a Spanish reading copy marked "for you to read — the dealer
-  receives the English text", and make the approval name the exact text that is sent. The outbound gate (ticket 59)
-  checks the text that is sent.
+- **Dealer drafts** follow working default 4: drafts to dealers stay in English. When the Buyer reads Spanish, show
+  a Spanish reading copy marked "for you to read — the dealer receives the English text", and make the approval
+  name the exact English text that is sent. The outbound gate (ticket 59) checks the text that is sent.
 - **Emails** (sign-in, recovery, notifications, test-drive reminders) and **the PDF** use the case's or account's
   language. Subject lines are translated too.
 - Spanish claim patterns from ticket 146 run over backend templates as well, through `ClaimVocabulary`.
@@ -42,6 +42,7 @@ English label "Out-the-door total". The client cannot translate stored sentences
       paperwork labels as printed.
 - [ ] Reports stored before this ticket still render, in English, and a test proves it.
 - [ ] No client code finds a report amount by English label.
-- [ ] Dealer drafts follow decision 4, and a test proves the approved text is the text sent.
+- [ ] Dealer drafts stay in English with a Spanish reading copy, and a test proves the approved text is the text
+      sent.
 - [ ] Each email type and the PDF have a Spanish version, with tests on a Spanish case.
 - [ ] Backend claim checks run in both languages, and `mvn clean verify` passes.
