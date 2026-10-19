@@ -49,13 +49,16 @@ public class DeskCheckService {
   private final com.dealanalyzer.desk.tactic.DeskTacticService tactics;
   private final com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice;
   private final com.dealanalyzer.economics.persistence.CashEconomicsPersistence policies;
+  private final com.dealanalyzer.economics.fees.DocFeeCheck docFees;
 
   public DeskCheckService(EphemeralBuyingCaseService cases, PricePlanService plans, DealerOfferPersistence offers,
       DocumentExtractionPersistence extractions, JdbcTemplate jdbc, ObjectMapper json,
       com.dealanalyzer.purchase.PurchaseService purchases, TradeDeskCheck trade,
       com.dealanalyzer.desk.tactic.DeskTacticService tactics,
       com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice,
-      com.dealanalyzer.economics.persistence.CashEconomicsPersistence policies) {
+      com.dealanalyzer.economics.persistence.CashEconomicsPersistence policies,
+      com.dealanalyzer.economics.fees.DocFeeCheck docFees) {
+    this.docFees = docFees;
     this.listingPrice = listingPrice;
     this.policies = policies;
     this.cases = cases; this.plans = plans; this.offers = offers; this.extractions = extractions;
@@ -228,6 +231,10 @@ public class DeskCheckService {
           nullable(row.at("/observedEvidence/evidence")), action);
       (group.equals("OTHER") ? other : lead).add(finding);
     }
+    for (var fee : docFees.findings(caseId, deskTerms))
+      other.add(new Finding("OTHER", "doc-fee:state-rule", "Dealer documentary fee", "DOC_FEE_CHECK", null,
+          fee.observed(), null, "USD_MINOR", fee.severity(), !"READ_FROM_PAPERWORK".equals(source) && !fee.uncertain(),
+          fee.observedEvidence(), fee.reason() + " " + fee.buyerAction()));
     // The trade check (ticket 103) leads the TRADE group, ahead of totals; its terms rest on the same source.
     var tradeCheck = trade.check(caseId, token, deskTerms, agreedTerms);
     boolean tradeVerified = !"READ_FROM_PAPERWORK".equals(source);

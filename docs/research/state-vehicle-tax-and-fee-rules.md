@@ -130,9 +130,11 @@ indexed cap goes stale on a known date.
 - **Percentage limit too:** Michigan (5%) and Ohio (10%) cap the fee at the lower of a dollar
   amount or a share of the price. Minnesota is reported to work the same way, unconfirmed.
 
-In a capped state, a doc fee over the cap is a legal violation the Buyer can cite. In the 32
-uncapped states, including Florida, the check can only compare the fee to what other dealers
-charge.
+An amount above a stated cap needs the rule's conditions checked before making a claim.
+Uncapped states can still impose disclosure requirements: Florida's F.S. 501.976(16), (18)
+and North Carolina's G.S. 20-101.1 do so. Texas's $225 threshold is a safe harbor, with
+notice and cost analysis required for higher charges, not a hard cap or prior-approval rule.
+Checked 2026-10-18; see [the verified pilot rules and sources](../doc-fee-rules.md).
 
 ## Gaps
 

@@ -103,6 +103,20 @@ test("a saved Deal Review reports verified differences with the calculated tax e
   expect(screen.queryByRole("button", { name: "Verify these terms" })).not.toBeInTheDocument();
 });
 
+test("an unchanged documentary fee shows the state-rule question without calling it a new charge", async () => {
+  const view = deskFixture("REVIEWED");
+  const question = "Texas has a $225 documentary fee safe harbor. Has your dealership filed with the OCCC?";
+  view.otherDifferences = [{ group: "OTHER", term: "doc-fee:state-rule", label: "Dealer documentary fee",
+    kind: "DOC_FEE_CHECK", agreed: null, desk: { amountMinor: 89900, currency: "USD" }, delta: null,
+    unit: "USD_MINOR", severity: "MATERIAL", verified: true, evidence: null, buyerAction: question }];
+  stub([view]);
+  render(<DeskCheck caseId="case" token="token" />);
+  await userEvent.click(await screen.findByText("Other paperwork notes and state fee checks"));
+  expect(screen.getByText(question)).toBeVisible();
+  expect(screen.getByText(/Dealer documentary fee on the paperwork: \$899.00/)).toBeVisible();
+  expect(screen.queryByText(/documentary fee is new/)).not.toBeInTheDocument();
+});
+
 test("scenario 24: a different VIN blocks the check and starts a separate case with the same paperwork", async () => {
   const calls = stub([deskFixture("AWAITING"), deskFixture("OTHER_CAR")]);
   const onFreshCase = vi.fn();

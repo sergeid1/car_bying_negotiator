@@ -16,7 +16,7 @@ Filed on 2026-10-18 after the pilot widened to three states (specification 2.4).
 **Blocked by:** none in the dependency graph. It reads the same paperwork lines as ticket 139 (government fees),
 so the two must keep their data and checks in separate files (see Scope).
 
-**Status:** open — filed on 2026-10-18.
+**Status:** implemented on the branch, pending coordinator integration — 2026-10-18.
 
 **Sources to read in full, not from search excerpts:** the
 [Texas OCCC doc fee rule](https://occc.texas.gov/sites/default/files/2024-06/mvsf-docfee-adoption-fc-071124.pdf) and
@@ -53,11 +53,41 @@ checked.
 
 ## Done when
 
-- [ ] The three states' rules ship with citations, checked dates and review dates, documented with sources and a
+- [x] The three states' rules ship with citations, checked dates and review dates, documented with sources and a
       worked example in `docs/jurisdiction-tax-packs.md` (or a new `docs/doc-fee-rules.md`).
-- [ ] Tests cover, with labelled synthetic cases: a Texas fee at the safe harbor, one above it, and one under it; a
+- [x] Tests cover, with labelled synthetic cases: a Texas fee at the safe harbor, one above it, and one under it; a
       Florida and a North Carolina fee; a fee under an unusual label that is recognised and one that is not; two doc
       fee lines on one paperwork; and a state with no rule file entry, which makes no finding.
-- [ ] An acceptance test shows the Texas finding in the Deal Review and the Desk Check.
-- [ ] Buyer-facing copy passes `ClaimVocabulary` and `PilotCopyClaimsTest`.
-- [ ] Any value the sources contradict, or that the research doc got wrong, is corrected there and noted here.
+- [x] An acceptance test shows the Texas finding in the Deal Review and the Desk Check.
+- [x] Buyer-facing copy passes `ClaimVocabulary` and `PilotCopyClaimsTest`.
+- [x] Any value the sources contradict, or that the research doc got wrong, is corrected there and noted here.
+
+## Implementation notes
+
+Implemented on `feature/doc-fee-check`, pending coordinator integration. The independent
+`economics.fees.DocFeeCheck` reads `fees/doc-fee-rules.v1.json`; no migration or shared
+government-fee abstraction. [Rule documentation](../doc-fee-rules.md) records sources,
+dates, matching behavior and worked examples. All rules are checked 2026-10-18 and due
+for review 2027-01-18; Texas's $225 threshold is effective 2024-07-11.
+
+Texas findings ask about notification and cost support, without asserting that a dealer
+lacks a filing or needs prior approval. Florida and North Carolina use disclosure rules
+without a cap. The research note's statement that uncapped states could only be checked
+against market data was corrected: both have disclosure duties, and North Carolina's
+G.S. 20-101.1 also explicitly permits reducing or waiving the fee.
+
+The dealer's state controls this check, independently of the Buyer's tax jurisdiction.
+Matched fee lines are combined for the threshold while all original lines and evidence
+are retained. Saved core reports and Deal Reviews contain `docFeeFindings` in the existing
+discrepancy shape. Desk Check presents the rule under paperwork notes, without counting
+it as an Agreed Price difference; the at-dealer first result uses its existing findings.
+Existing report views and HTML/PDF exports display the rule and question. Browser checks
+cover the populated report at 360 px in both themes; the new inline renderer is included
+in an axe check and adds no separate panel.
+
+Source-access limitation for coordinator review: the original OCCC adoption PDF returns
+404, and the official Texas Register archive returns 403. They could not be read in full.
+The currently linked official OCCC Bulletin B16-5 was read in full and independently
+confirms the shipped $225 threshold, effective date, notice/cost analysis and ALECS filing
+requirements. The full reproduced 7 TAC 84.205 text was also reviewed. No amount was
+shipped from a search excerpt. Details and working source links are in the rule document.

@@ -46,6 +46,7 @@ public class CoreReportService {
   private final com.dealanalyzer.vehicle.safety.VehicleSafetyService safety;
   private final com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice;
   private final com.dealanalyzer.listing.persistence.ListingEvidencePersistence listings;
+  private final com.dealanalyzer.economics.fees.DocFeeCheck docFees;
 
   public CoreReportService(EphemeralBuyingCaseService access, AnalysisCaseRepository cases,
       OperationRepository operations, AnalysisReportRepository reports, BuyingCaseStore store,
@@ -56,7 +57,9 @@ public class CoreReportService {
       com.dealanalyzer.desk.tactic.DeskTacticService tactics,
       com.dealanalyzer.vehicle.safety.VehicleSafetyService safety,
       com.dealanalyzer.listing.capture.ListingPriceCheck listingPrice,
-      com.dealanalyzer.listing.persistence.ListingEvidencePersistence listings) {
+      com.dealanalyzer.listing.persistence.ListingEvidencePersistence listings,
+      com.dealanalyzer.economics.fees.DocFeeCheck docFees) {
+    this.docFees = docFees;
     this.safety = safety;
     this.listingPrice = listingPrice;
     this.listings = listings;
@@ -160,6 +163,7 @@ public class CoreReportService {
     evidence.put("buyerJurisdiction", buyingCase.buyerJurisdiction);
     evidence.set("vehicleSafety", json.valueToTree(safetyView));
     ObjectNode analysis = json.createObjectNode();
+    analysis.set("docFeeFindings", json.valueToTree(offer == null ? List.of() : docFees.findings(caseId, offer.terms())));
     JsonNode tacticTerms = worksheet != null && (offer == null || !worksheet.id().equals(offer.extractionId()) || !dealerCurrent)
         ? tactics.asRead(worksheet) : offer == null ? tactics.asRead(null) : offer.terms();
     var tacticFindings = new ArrayList<>(tactics.findings(caseId, tacticTerms, null));
