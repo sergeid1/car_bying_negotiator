@@ -11,7 +11,8 @@ the pilot widened to three states (specification 2.4).
 **Blocked by:** none in the dependency graph. It reads the same paperwork lines as ticket 140 (doc fees), so the
 two must keep their data and checks in separate files (see Scope).
 
-**Status:** open — filed on 2026-10-18.
+**Status:** implemented on the branch `feature/government-fee-check`, pending coordinator integration — filed on
+2026-10-18.
 
 **Sources to read in full, not from search excerpts.** Every amount ships with its citation (statute or agency
 publication, edition, URL) and the date it was checked:
@@ -65,3 +66,28 @@ publication, edition, URL) and the date it was checked:
 - [ ] Buyer-facing copy passes `ClaimVocabulary` and `PilotCopyClaimsTest`.
 - [ ] The ticket's notes list what stays out of scope: non-resident and out-of-state registration (ticket 141), lease
       fees, and specialty plates.
+
+## Implementation notes
+
+Implemented on the branch, pending coordinator integration (2026-10-18).
+
+- Data: `backend/src/main/resources/fees/government-fees.v1.json`, version `government-fees.2026-10.v1`, loaded and
+  validated by `economics.fees.GovernmentFeeSchedule`. Florida and Texas are effective from 2026-01-01, North
+  Carolina from 2024-07-01 (its last quadrennial fee adjustment); all were checked on 2026-10-18 and are reviewed by
+  2027-01-01. No migration.
+- Check: `economics.fees.GovernmentFeeCheck` (`government-fee-check.v1`) with `FeeLabels`, normalised keyword
+  matching that reads abbreviations, odd punctuation and small misspellings ("TT&L", "D.M.V.", "Regis.",
+  "registeration", "E-file"). Ambiguous lines are asked about rather than dropped: a label mixing a dealer charge and
+  a state fee, a state fee line that names no fee, an unreadable amount, and a state fee name listed with the
+  dealer's charges. No shared fee abstraction with ticket 140.
+- Shown in the report as `analysis.governmentFeeCheck` (the Deal Review), in the Desk Check as `governmentFees`, and
+  in the "I'm at the dealer" result as `governmentFees` with its material findings added to the existing findings
+  list. Client: `frontend/src/GovernmentFees.tsx`, registered in the axe sweep.
+- North Carolina's highway use tax stays with the tax pack; a line naming it is `TAX_COVERED` and not counted.
+- Sources, the worked examples and the open points are in
+  [docs/government-fee-schedules.md](../government-fee-schedules.md). Open points: the Texas 24-month new-car
+  registration amount is not stated on the pages read, so two years of base and county fees are allowed; G.S. 20-85
+  prints $25.00 where NCDOT's 2024 table lists $25.50, and $25.50 is used.
+
+Out of scope: non-resident and out-of-state registration (ticket 141), lease fees, specialty and personalized
+plates, heavy and commercial vehicles, dealer doc fees (ticket 140), and the Texas dealer vehicle inventory tax.

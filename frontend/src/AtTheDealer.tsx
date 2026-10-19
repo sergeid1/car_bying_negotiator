@@ -7,6 +7,7 @@ import { toMinor, vehicleName, type Trade, type TradeView } from "./TradeVehicle
 import { TradeValueLinks } from "./TradeValueChecks";
 import type { DeskTacticFinding } from "./DeskTactics";
 import { ListingCapture, ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
+import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
 
 type Credentials = { caseId: string; token: string };
 type Route = "AGREED_CAR" | "THIS_CASE";
@@ -29,6 +30,7 @@ export type FirstResult = {
   lead: DeskFinding | null; findings: DeskFinding[];
   tacticFindings?: DeskTacticFinding[];
   listingPrice?: ListingPriceCheck | null;
+  governmentFees?: GovernmentFeeCheck | null;
 };
 type Typed = { vin?: string; sellingPriceMinor?: number; tradeAllowanceMinor?: number; cashDownMinor?: number;
   monthlyPaymentMinor?: number; termMonths?: number; aprPercent?: number; outTheDoorMinor?: number };
@@ -583,6 +585,8 @@ function ResultView({ result, headingRef, elapsed, onDeskCheck, onType, onClose 
     </div> : <p>Nothing in these terms stood out. Check them against the paperwork for the full result.</p>}
     {result.listingPrice && <ListingPriceNote check={result.listingPrice} title="The ad you saved"
       question={!result.findings.some(finding => finding.code.startsWith("LISTING_"))} />}
+    {/* Its questions are already among the findings to ask about. */}
+    {result.governmentFees && <GovernmentFeeNote check={result.governmentFees} question={false} />}
     {more.length > 0 && <details>
       <summary>{more.length} more to ask about</summary>
       <ul className="dealer-more">{more.map((finding, index) => <li key={`${finding.code}-${index}`}>

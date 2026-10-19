@@ -171,3 +171,5 @@ new-resident and even-exchange taxes and standard presumptive value (private sal
 sales in both states; dealer doc fee caps (Texas has a $225 safe harbor, North Carolina no cap;
 nothing in the product checks doc fee caps yet); non-resident purchases; and vehicles bought out of
 state.
+
+Title, registration, plate and other state fees are checked separately; see [government-fee-schedules.md](government-fee-schedules.md) (ticket 139).
