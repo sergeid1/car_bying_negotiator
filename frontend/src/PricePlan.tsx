@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import * as format from "./i18n/format";
+import { useMessages } from "./i18n/LanguageProvider";
 
 type Boundary = { openingMinor: number; targetMinor: number; policyMaximumMinor: number; walkAwayMinor: number };
 type Snapshot = { version: number; payload: { plan: {
@@ -9,6 +10,7 @@ type Snapshot = { version: number; payload: { plan: {
 } } };
 
 export function PricePlan({ caseId, token }: { caseId: string; token: string }) {
+  const { m: { money: { pricePlan: t } }, fill } = useMessages();
   const [plan, setPlan] = useState<Snapshot>();
   const [baseline, setBaseline] = useState<Snapshot>();
   const [error, setError] = useState<string>();
@@ -20,7 +22,7 @@ export function PricePlan({ caseId, token }: { caseId: string; token: string }) 
       method: "POST", headers: { "Content-Type": "application/json", "Case-Access-Token": token, "Idempotency-Key": key },
       body: JSON.stringify(body),
     });
-    if (!response.ok) throw new Error((await response.json()).detail ?? "Price plan request failed");
+    if (!response.ok) throw new Error((await response.json()).detail ?? t.requestFailed);
     return response.json();
   }
   async function propose(event: FormEvent<HTMLFormElement>) {
@@ -39,29 +41,30 @@ export function PricePlan({ caseId, token }: { caseId: string; token: string }) 
   }
   const money = (minor: number) => format.money(minor, { currency: plan?.payload.plan.currency ?? "USD" });
   return <section className="panel" aria-labelledby="plan-heading">
-    <h2 id="plan-heading">Set your price limits</h2>
-    <p>Suggested limits come from the dealer offer you checked against the paperwork and the market range for this car. Check the offer first if you have not yet.</p>
+    <h2 id="plan-heading">{t.heading}</h2>
+    <p>{t.intro}</p>
     <form onSubmit={propose}>
-      <label>Maximum selling price ($)<input name="selling" type="number" min="0.01" step="0.01" /></label>
-      <label>Maximum out-the-door price ($)<input name="otd" type="number" min="0.01" step="0.01" /></label>
-      <p>Leave blank to use your existing case limit, if any.</p>
-      <button disabled={busy}>Review suggested boundaries</button>
+      <label>{t.maxSelling}<input name="selling" type="number" min="0.01" step="0.01" /></label>
+      <label>{t.maxOutTheDoor}<input name="otd" type="number" min="0.01" step="0.01" /></label>
+      <p>{t.blankUsesCase}</p>
+      <button disabled={busy}>{t.review}</button>
     </form>
     {error && <p role="alert">{error}</p>}
     {plan && <>
-      <p>{plan.payload.plan.method} All suggested boundaries are estimated.</p>
-      {([['Selling price', plan.payload.plan.sellingPrice], ['Out-the-door price', plan.payload.plan.outTheDoor]] as const).map(([label, boundary]) =>
-        <section key={label} aria-label={label}><h3>{label}</h3>{boundary ? <dl className="facts">
-          <div><dt>Opening</dt><dd>{money(boundary.openingMinor)}</dd></div>
-          <div><dt>Target</dt><dd>{money(boundary.targetMinor)}</dd></div>
-          <div><dt>Policy maximum</dt><dd>{money(boundary.policyMaximumMinor)}</dd></div>
-          <div><dt>Walk-away ceiling</dt><dd>{money(boundary.walkAwayMinor)}</dd></div>
-        </dl> : <p>Unavailable: jurisdiction inputs do not support conversion.</p>}</section>)}
-      {plan.payload.plan.warnings.map(warning => <p className="notice" key={warning}>Warning: {warning}</p>)}
-      <p>Estimated savings: {money(plan.payload.plan.savings.amountMinor)} against {plan.payload.plan.savings.baseline}. {plan.payload.plan.savings.uncertainty}</p>
-      <label><input type="checkbox" checked={approved} onChange={event => setApproved(event.target.checked)} />I approve these Deal Terms and price limits as my comparison baseline.</label>
-      <button onClick={approve} disabled={busy || !approved || Boolean(baseline)}>Approve immutable baseline</button>
-      {baseline && <p role="status">Approved baseline version {baseline.version} saved.</p>}
+      <p>{fill(t.methodEstimated, { method: plan.payload.plan.method })}</p>
+      {([["selling", t.sellingPrice, plan.payload.plan.sellingPrice], ["otd", t.outTheDoorPrice, plan.payload.plan.outTheDoor]] as const).map(([key, label, boundary]) =>
+        <section key={key} aria-label={label}><h3>{label}</h3>{boundary ? <dl className="facts">
+          <div><dt>{t.opening}</dt><dd>{money(boundary.openingMinor)}</dd></div>
+          <div><dt>{t.target}</dt><dd>{money(boundary.targetMinor)}</dd></div>
+          <div><dt>{t.policyMaximum}</dt><dd>{money(boundary.policyMaximumMinor)}</dd></div>
+          <div><dt>{t.walkAway}</dt><dd>{money(boundary.walkAwayMinor)}</dd></div>
+        </dl> : <p>{t.noConversion}</p>}</section>)}
+      {plan.payload.plan.warnings.map(warning => <p className="notice" key={warning}>{fill(t.warning, { warning })}</p>)}
+      <p>{fill(t.estimate, { amount: money(plan.payload.plan.savings.amountMinor), baseline: plan.payload.plan.savings.baseline,
+        uncertainty: plan.payload.plan.savings.uncertainty })}</p>
+      <label><input type="checkbox" checked={approved} onChange={event => setApproved(event.target.checked)} />{t.approveLabel}</label>
+      <button onClick={approve} disabled={busy || !approved || Boolean(baseline)}>{t.approve}</button>
+      {baseline && <p role="status">{fill(t.approved, { version: String(baseline.version) })}</p>}
     </>}
   </section>;
 }
