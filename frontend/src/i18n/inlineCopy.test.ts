@@ -53,16 +53,7 @@ const PAPERWORK_PENDING = [
 ];
 
 /** Journey: at the dealer; copy in en/dealer.ts. */
-const DEALER_PENDING = [
-  "AtTheDealer.tsx",
-  "CaseFlow.tsx",
-  "DeskCheck.tsx",
-  "DeskTactics.tsx",
-  "TestDriveAppointment.tsx",
-  "TradeCheck.tsx",
-  "TradeValueChecks.tsx",
-  "TradeVehicle.tsx",
-];
+const DEALER_PENDING: string[] = [];
 
 /** Journey: messages to the dealer; copy in en/messages.ts. */
 const MESSAGES_PENDING = [

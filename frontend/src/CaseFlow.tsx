@@ -16,21 +16,22 @@ import { ListingCapture } from "./ListingCapture";
 import { InsuranceQuotes } from "./InsuranceQuotes";
 import { LoanPreApprovals } from "./LoanPreApprovals";
 import { SigningNote } from "./SigningNote";
+import { en } from "./i18n/en";
+import { useMessages } from "./i18n/LanguageProvider";
 
 type Credentials = { caseId: string; token: string };
 export type CaseStepId = "quotes" | "compare" | "dealer" | "final";
 
-/** The four steps of a case, in order. The names are placeholders until the operator confirms them. */
-export const CASE_STEPS: readonly { id: CaseStepId; name: string; unlock: string; done: string }[] = [
-  { id: "quotes", name: "Get quotes", unlock: "",
-    done: "A dealer quote is in." },
-  { id: "compare", name: "Compare & negotiate", unlock: "Unlocks when you have a dealer quote.",
-    done: "You have an agreed price." },
-  { id: "dealer", name: "At the dealer", unlock: "Unlocks when you agree a price with the dealer.",
-    done: "The dealer's paperwork is in." },
-  { id: "final", name: "Final check", unlock: "Unlocks when the dealer's paperwork is read.",
-    done: "" },
-];
+/** The four steps of a case, in order. Their names are placeholders until the operator confirms them. */
+const STEP_IDS: readonly CaseStepId[] = ["quotes", "compare", "dealer", "final"];
+type CaseStep = { id: CaseStepId; name: string; unlock: string; done: string };
+
+function caseSteps(copy: typeof en.dealer.caseFlow.steps): readonly CaseStep[] {
+  return STEP_IDS.map(id => ({ id, ...copy[id] }));
+}
+
+/** The steps with their English copy, the reference the catalogue's other languages follow. */
+export const CASE_STEPS = caseSteps(en.dealer.caseFlow.steps);
 
 /** What the existing case endpoints say about how far this case has come. */
 export type CaseProgress = {
@@ -45,9 +46,8 @@ export function currentStepOf(progress: CaseProgress): CaseStepId {
   return "quotes";
 }
 
+/** `paying` is the case's purchase method code, named from the catalogue when shown. */
 type CaseSummary = { car?: string; dealer?: string; location?: string; paying?: string };
-
-const PAYING: Record<string, string> = { CASH: "Paying cash", FINANCE: "Dealer financing" };
 
 /** Reads one case resource; anything but a JSON body (not found, not yet purchased, no content) counts as absent. */
 async function readJson(path: string, token: string): Promise<Record<string, unknown> | undefined> {
@@ -90,7 +90,7 @@ async function loadSummary({ caseId, token }: Credentials): Promise<CaseSummary>
     dealer: listing?.dealer?.name,
     // Shown as stored: "City, ST" for newer cases, a five-digit ZIP for older ones.
     location,
-    paying: PAYING[String(buyingCase?.purchaseMethod)],
+    paying: typeof buyingCase?.purchaseMethod === "string" ? buyingCase.purchaseMethod : undefined,
   };
 }
 
@@ -104,6 +104,8 @@ export function CaseFlow({ caseId, token, openedFromAccount, referral, deskFresh
   pollDelayMs?: number;
   onFreshCase: (value: FreshDeskCase) => void; onBackToAgreed: () => void;
 }) {
+  const { m: { dealer: { caseFlow: t } }, fill, fillNodes } = useMessages();
+  const steps = caseSteps(t.steps);
   const credentials = { caseId, token };
   // Tied to this case (the flow is keyed by it) so a version saved in one case never reaches another.
   const [frozenOffer, setFrozenOffer] = useState<number>();
@@ -170,11 +172,12 @@ export function CaseFlow({ caseId, token, openedFromAccount, referral, deskFresh
     scrollTo.current = step; setOpen(step);
     if (open === step) document.getElementById(`case-step-${step}`)?.scrollIntoView?.({ block: "start" });
   }
-  const currentIndex = CASE_STEPS.findIndex(step => step.id === current);
+  const currentIndex = steps.findIndex(step => step.id === current);
   const stateOf = (index: number) => current === undefined ? "later"
     : index < currentIndex ? "done" : index === currentIndex ? "current" : "later";
-  const details = [summary.dealer, summary.location, summary.paying].filter(Boolean);
-  const folded = CASE_STEPS.filter((step, index) => stateOf(index) === "done" && open !== step.id);
+  const paying = summary.paying ? (t.paying as Record<string, string>)[summary.paying] : undefined;
+  const details = [summary.dealer, summary.location, paying].filter(Boolean);
+  const folded = steps.filter((step, index) => stateOf(index) === "done" && open !== step.id);
 
   const content: Record<CaseStepId, ReactNode> = {
     quotes: <>
@@ -202,10 +205,10 @@ export function CaseFlow({ caseId, token, openedFromAccount, referral, deskFresh
   return <div className="case-flow stack">
     <section className="panel case-flow-header" aria-labelledby="case-flow-heading">
       <div className="case-flow-title">
-        <h1 id="case-flow-heading">{summary.car ?? "Your car"}</h1>
+        <h1 id="case-flow-heading">{summary.car ?? t.yourCar}</h1>
         {details.length > 0 && <p className="case-flow-details">{details.join(" · ")}</p>}
       </div>
-      <button type="button" className="btn-secondary" aria-haspopup="dialog" onClick={() => openSidePanel("case")}>This case</button>
+      <button type="button" className="btn-secondary" aria-haspopup="dialog" onClick={() => openSidePanel("case")}>{t.thisCase}</button>
     </section>
     <VehicleSafety key={`safety-${caseId}-${token}`} {...credentials} />
 
@@ -213,31 +216,31 @@ export function CaseFlow({ caseId, token, openedFromAccount, referral, deskFresh
     {/* A referral is disclosed before any step asks for the Buyer's paperwork. */}
     {referral && <ReferralDisclosure text={referral} />}
 
-    <nav className="case-progress" aria-label="Case progress" ref={progressNav}>
+    <nav className="case-progress" aria-label={t.progress} ref={progressNav}>
       {thumb && <span className="case-progress-thumb" aria-hidden="true"
         style={{ transform: `translate(${thumb.left}px, ${thumb.top}px)`, width: thumb.width, height: thumb.height }} />}
       <ol>
-        {CASE_STEPS.map((step, index) => <li key={step.id} data-state={stateOf(index)}>
+        {steps.map((step, index) => <li key={step.id} data-state={stateOf(index)}>
           <button type="button" aria-current={step.id === current ? "step" : undefined}
             aria-expanded={open === step.id} aria-controls={`case-step-${step.id}-body`} onClick={() => choose(step.id)}>
             <span className="case-progress-number" aria-hidden="true">{stateOf(index) === "done" ? "✓" : index + 1}</span>
             <span className="case-progress-name">{step.name}</span>
-            <span className="visually-hidden">{stateOf(index) === "done" ? ", done" : stateOf(index) === "later" ? ", not reached yet" : ""}</span>
+            <span className="visually-hidden">{stateOf(index) === "done" ? t.stepDone : stateOf(index) === "later" ? t.stepLater : ""}</span>
           </button>
         </li>)}
       </ol>
-      {!progress && <p className="muted" role="status">Checking where your case is…</p>}
+      {!progress && <p className="muted" role="status">{t.checking}</p>}
     </nav>
 
     {folded.length > 0 && <p className="case-done-summary">
       <span className="case-done-mark" aria-hidden="true">✓</span>
-      <span>Done: {folded.map((step, index) => <span key={step.id}>{index > 0 && (index === folded.length - 1 ? " and " : ", ")}
+      <span>{fillNodes(t.doneList, { steps: folded.map((step, index) => <span key={step.id}>{index > 0 && (index === folded.length - 1 ? t.listAnd : t.listComma)}
         <button type="button" className="case-done-step" aria-expanded="false" aria-controls={`case-step-${step.id}-body`}
-          title={step.done} onClick={() => choose(step.id)}>{step.name}<span className="visually-hidden">. {step.done} Reopen this step</span></button>
-      </span>)}.</span>
+          title={step.done} onClick={() => choose(step.id)}>{step.name}<span className="visually-hidden">{fill(t.reopenHidden, { done: step.done })}</span></button>
+      </span>) })}</span>
     </p>}
 
-    {CASE_STEPS.map((step, index) => {
+    {steps.map((step, index) => {
       const state = stateOf(index);
       const isOpen = open === step.id;
       // A finished step that is not open is listed in the summary line above; it stays mounted so its forms keep their place.
@@ -245,12 +248,12 @@ export function CaseFlow({ caseId, token, openedFromAccount, referral, deskFresh
         aria-labelledby={`case-step-${step.id}-heading`} tabIndex={-1} hidden={state === "done" && !isOpen}>
         <div className="case-step-head">
           <div className="case-step-title">
-            <h2 id={`case-step-${step.id}-heading`}><span className="case-step-count">Step {index + 1} of {CASE_STEPS.length}</span> {step.name}</h2>
-            {state === "done" && <p className="case-step-note">Done. {step.done}</p>}
+            <h2 id={`case-step-${step.id}-heading`}><span className="case-step-count">{fill(t.stepCount, { number: index + 1, total: steps.length })}</span> {step.name}</h2>
+            {state === "done" && <p className="case-step-note">{fill(t.doneNote, { done: step.done })}</p>}
             {state === "later" && step.unlock && progress && <p className="case-step-note">{step.unlock}</p>}
           </div>
           {!isOpen && <button type="button" className="btn-ghost" aria-expanded="false" aria-controls={`case-step-${step.id}-body`}
-            onClick={() => choose(step.id)}>{state === "done" ? "Reopen" : "Open"}{" "}<span className="visually-hidden">this step: {step.name}</span></button>}
+            onClick={() => choose(step.id)}>{state === "done" ? t.reopen : t.open}{" "}<span className="visually-hidden">{fill(t.thisStep, { name: step.name })}</span></button>}
         </div>
         {/* Closed steps stay mounted so their forms and checks keep their place. */}
         <div id={`case-step-${step.id}-body`} className="case-step-body stack" hidden={!isOpen}>{content[step.id]}</div>
@@ -263,26 +266,26 @@ export function CaseFlow({ caseId, token, openedFromAccount, referral, deskFresh
     <LoanPreApprovals key={`loan-${caseId}-${token}`} {...credentials} />
 
     {!openedFromAccount && <SaveCaseLink {...credentials} />}
-    {openedFromAccount && <section className="panel" aria-label="Opened from your Buyer Account">
-      <h2>Opened from your Buyer Account</h2>
-      <p>This case stays open while you are signed in. Signing out closes it here; the private case link you saved
-        still opens it.</p>
+    {openedFromAccount && <section className="panel" aria-label={t.openedFromAccount}>
+      <h2>{t.openedFromAccount}</h2>
+      <p>{t.openedFromAccountBody}</p>
     </section>}
   </div>;
 }
 
 /** The comparison of the dealer's paperwork with the agreed price, read before signing. */
 function FinalCheck({ desk, onShowDifferences }: { desk?: DeskCheckView; onShowDifferences: () => void }) {
-  if (!desk) return <section className="panel" aria-label="Final check">
-    <p>When the dealer's paperwork is read, this step compares it with your agreed price, line by line.</p>
+  const { m: { dealer: { caseFlow: t, deskCheck } }, fill } = useMessages();
+  if (!desk) return <section className="panel" aria-label={t.finalCheck}>
+    <p>{t.finalWaiting}</p>
   </section>;
-  const count = desk.findings.length;
-  return <section className="panel final-check" aria-label="Final check">
+  const effect = totalEffectSentence(deskCheck, fill, desk);
+  return <section className="panel final-check" aria-label={t.finalCheck}>
     <p className="desk-check-lead">{desk.status === "DIFFERENCES"
-      ? `${count} ${count === 1 ? "difference" : "differences"} from your agreed price. ${totalEffectSentence(desk)}`
-      : `No differences from your agreed price. ${totalEffectSentence(desk)}`}</p>
+      ? fill(t.differences, { count: desk.findings.length, effect })
+      : fill(t.noDifferences, { effect })}</p>
     <button type="button" className="btn-secondary" onClick={onShowDifferences}>
-      {desk.status === "DIFFERENCES" ? "See each difference" : "See the Desk Check"}</button>
+      {desk.status === "DIFFERENCES" ? t.seeEach : t.seeDeskCheck}</button>
     <SigningNote />
   </section>;
 }

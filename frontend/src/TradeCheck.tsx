@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { TradeTacticAnnotation, type DeskTacticFinding } from "./DeskTactics";
 import * as format from "./i18n/format";
+import { useMessages, type Messages } from "./i18n/LanguageProvider";
 
 export type TradeCheckFinding = {
   code: string; severity: "BLOCKING" | "WARNING" | "INFORMATIONAL"; summary: string;
@@ -32,71 +33,79 @@ function money(minor: number) {
   return `${minor < 0 ? "−" : ""}${format.money(Math.abs(minor))}`;
 }
 
-const PAYOFF_STATE: Record<string, string> = {
-  CURRENT: "", STALE: " (past its valid-through date; get a current payoff quote)", UNKNOWN: "Unknown", NOT_OWED: "Nothing owed",
-};
+type Copy = Messages["dealer"]["tradeCheck"];
+type Fill = ReturnType<typeof useMessages>["fill"];
 
 /** The state's own name for the tax, such as "North Carolina highway use tax"; "Sales tax" before ticket 137. */
-function taxHeading(name: string | null | undefined) {
-  const tax = name ?? "sales tax";
-  return `${tax.charAt(0).toUpperCase()}${tax.slice(1)} a trade-in removes`;
+function taxHeading(t: Copy, fill: Fill, name: string | null | undefined) {
+  if (name == null) return t.salesTaxHeading;
+  return fill(t.taxHeading, { tax: `${name.charAt(0).toUpperCase()}${name.slice(1)}` });
 }
 
-function yourPayoff(payoff: NonNullable<TradeCheckResult["buyerPayoff"]>) {
-  if (payoff.state === "UNKNOWN" || payoff.state === "NOT_OWED") return PAYOFF_STATE[payoff.state];
-  return `${money(payoff.amountMinor ?? 0)} valid through ${payoff.goodThrough}${PAYOFF_STATE[payoff.state]}`;
+function yourPayoff(t: Copy, fill: Fill, payoff: NonNullable<TradeCheckResult["buyerPayoff"]>) {
+  if (payoff.state === "UNKNOWN") return t.payoffUnknown;
+  if (payoff.state === "NOT_OWED") return t.payoffNotOwed;
+  const values = { amount: money(payoff.amountMinor ?? 0), date: String(payoff.goodThrough) };
+  return fill(payoff.state === "STALE" ? t.payoffStale : t.payoffCurrent, values);
 }
 
 /** Trade findings first, then the figures they rest on. Range figures are labelled as estimates from their source. */
-export function TradeCheckPanel({ result, heading = "Trade-in check", tactics = [] }: {
+export function TradeCheckPanel({ result, heading, tactics = [] }: {
   result: TradeCheckResult; heading?: string; tactics?: DeskTacticFinding[];
 }) {
+  const { m: { dealer: { tradeCheck: t, common } }, fill, fillNodes } = useMessages();
   const id = useId();
   if (result.status === "NO_ALLOWANCE") return null;
   const valuation = result.valuation;
   const cost = result.negativeEquityCost;
   const tax = result.taxCredit;
   return <section className="trade-check" aria-labelledby={`${id}-heading`}>
-    <h3 id={`${id}-heading`}>{heading}</h3>
-    <ol className="trade-check-findings" aria-label="Trade-in findings">
+    <h3 id={`${id}-heading`}>{heading ?? t.heading}</h3>
+    <ol className="trade-check-findings" aria-label={t.findings}>
       {result.findings.map(finding => {
         const tactic = tactics.find(item => item.tradeFindingCode === finding.code);
         return <li key={finding.code} data-severity={finding.severity}>
         <p>{finding.summary}</p>
         {(finding.estimate || finding.deskQuestion) && <p className="desk-check-meta">
-          {finding.estimate && <span className="badge">Estimate</span>}
-          {finding.deskQuestion && !tactic && <span>Ask at the desk: <q>{finding.deskQuestion}</q></span>}
+          {finding.estimate && <span className="badge">{t.estimate}</span>}
+          {finding.deskQuestion && !tactic && <span>{fillNodes(t.askAtDesk, { question: <q>{finding.deskQuestion}</q> })}</span>}
         </p>}
         {tactic && <TradeTacticAnnotation finding={tactic} />}
       </li>; })}
     </ol>
     <dl className="trade-check-figures">
-      {result.allowanceMinor !== null && <div><dt>Trade-in allowance on the paperwork</dt><dd>{money(result.allowanceMinor)}</dd></div>}
-      {result.status === "CHECKED" && <div><dt>Best unexpired written offer</dt>
-        <dd>{result.bestOffer ? `${money(result.bestOffer.amountMinor)} from ${result.bestOffer.source}, dated ${result.bestOffer.offerDate}, expires ${result.bestOffer.expiresOn}` : "None recorded"}</dd></div>}
+      {result.allowanceMinor !== null && <div><dt>{t.allowance}</dt><dd>{money(result.allowanceMinor)}</dd></div>}
+      {result.status === "CHECKED" && <div><dt>{t.bestOffer}</dt>
+        <dd>{result.bestOffer ? fill(t.bestOfferValue, { amount: money(result.bestOffer.amountMinor), source: result.bestOffer.source,
+          date: result.bestOffer.offerDate, expires: result.bestOffer.expiresOn }) : t.noneRecorded}</dd></div>}
       {valuation?.basis === "BUYER_ESTIMATE" && valuation.lowMinor !== null && valuation.highMinor !== null && <div>
-        <dt>{valuation.label ? valuation.label.charAt(0).toUpperCase() + valuation.label.slice(1) : "Your estimate"}</dt>
-        <dd>{valuation.lowMinor === valuation.highMinor ? money(valuation.lowMinor) : `${money(valuation.lowMinor)} to ${money(valuation.highMinor)}`}.
-          {" "}An outside estimate you looked up; otdog did not check it, and it is not an offer.
-          {valuation.old && <> <span className="badge badge-warn">Old</span> Looked up more than 30 days ago; look it up again before relying on it.</>}</dd></div>}
-      {valuation && valuation.basis !== "BUYER_ESTIMATE" && <div><dt>Trade-in range{valuation.source ? `, an estimate from ${valuation.source}` : ""}</dt>
+        <dt>{valuation.label ? valuation.label.charAt(0).toUpperCase() + valuation.label.slice(1) : t.yourEstimate}</dt>
+        <dd>{valuation.lowMinor === valuation.highMinor ? money(valuation.lowMinor)
+          : fill(common.range, { low: money(valuation.lowMinor), high: money(valuation.highMinor) })}.{" "}{t.outsideEstimate}
+          {valuation.old && <> <span className="badge badge-warn">{t.old}</span> {t.oldNote}</>}</dd></div>}
+      {valuation && valuation.basis !== "BUYER_ESTIMATE" && <div><dt>{valuation.source ? fill(t.rangeFrom, { source: valuation.source }) : t.range}</dt>
         <dd>{valuation.availability === "AVAILABLE" && valuation.lowMinor !== null && valuation.highMinor !== null
-          ? `${money(valuation.lowMinor)} to ${money(valuation.highMinor)}${valuation.conditionAssumption ? `, assuming ${valuation.conditionAssumption.toLowerCase()} condition` : ""}${valuation.retrievedAt ? `, retrieved ${valuation.retrievedAt.slice(0, 10)}` : ""}${valuation.notice ? `. ${valuation.notice}` : ""}`
-          : `Unavailable. ${valuation.notice ?? ""}`}</dd></div>}
-      <div><dt>Payoff on the paperwork</dt><dd>{result.paperworkPayoffMinor !== null ? money(result.paperworkPayoffMinor) : "Not shown"}</dd></div>
-      {result.buyerPayoff && <div><dt>Your payoff</dt><dd>{yourPayoff(result.buyerPayoff)}</dd></div>}
-      <div><dt>Trade equity</dt><dd>{result.equityMinor !== null ? money(result.equityMinor) : "Unavailable until the payoff is known"}</dd></div>
-      {result.negativeEquityFinancedMinor !== null && <div><dt>Negative equity in the amount financed</dt>
-        <dd>{money(result.negativeEquityFinancedMinor)}{cost?.status === "AVAILABLE" && cost.paymentIncreaseMinor !== null
+          ? [fill(common.range, { low: money(valuation.lowMinor), high: money(valuation.highMinor) }),
+            valuation.conditionAssumption ? fill(t.assuming, { condition: valuation.conditionAssumption.toLowerCase() }) : "",
+            valuation.retrievedAt ? fill(t.retrieved, { date: valuation.retrievedAt.slice(0, 10) }) : ""].filter(Boolean).join(", ")
+            + (valuation.notice ? `. ${valuation.notice}` : "")
+          : fill(t.unavailableNotice, { notice: valuation.notice ?? "" })}</dd></div>}
+      <div><dt>{t.paperworkPayoff}</dt><dd>{result.paperworkPayoffMinor !== null ? money(result.paperworkPayoffMinor) : t.notShown}</dd></div>
+      {result.buyerPayoff && <div><dt>{t.yourPayoff}</dt><dd>{yourPayoff(t, fill, result.buyerPayoff)}</dd></div>}
+      <div><dt>{t.equity}</dt><dd>{result.equityMinor !== null ? money(result.equityMinor) : t.equityUnavailable}</dd></div>
+      {result.negativeEquityFinancedMinor !== null && <div><dt>{t.negativeEquity}</dt>
+        <dd>{cost?.status === "AVAILABLE" && cost.paymentIncreaseMinor !== null
           && cost.scheduledPaymentsIncreaseMinor !== null && cost.interestMinor !== null
-          ? `: ${money(cost.paymentIncreaseMinor)} a month, ${money(cost.scheduledPaymentsIncreaseMinor)} in scheduled payments for ${cost.termMonths} months, ${money(cost.interestMinor)} of it interest`
-          : cost?.reason ? `. ${cost.reason}` : ""}</dd></div>}
-      {tax && <div><dt>{taxHeading(tax.taxName)}</dt>
-        <dd>{tax.status === "AVAILABLE" && tax.creditMinor !== null ? `About ${money(tax.creditMinor)} under ${tax.jurisdiction} rules (${tax.policyVersion})`
-          : tax.status === "NOT_APPLICABLE" ? `None under ${tax.jurisdiction} rules` : tax.reason}
+          ? fill(t.negativeEquityCost, { amount: money(result.negativeEquityFinancedMinor), payment: money(cost.paymentIncreaseMinor),
+            scheduled: money(cost.scheduledPaymentsIncreaseMinor), months: String(cost.termMonths), interest: money(cost.interestMinor) })
+          : money(result.negativeEquityFinancedMinor) + (cost?.reason ? `. ${cost.reason}` : "")}</dd></div>}
+      {tax && <div><dt>{taxHeading(t, fill, tax.taxName)}</dt>
+        <dd>{tax.status === "AVAILABLE" && tax.creditMinor !== null
+          ? fill(t.taxCredit, { amount: money(tax.creditMinor), jurisdiction: String(tax.jurisdiction), policy: String(tax.policyVersion) })
+          : tax.status === "NOT_APPLICABLE" ? fill(t.taxNone, { jurisdiction: String(tax.jurisdiction) }) : tax.reason}
           {tax.status === "AVAILABLE" && tax.reason && <>. {tax.reason}</>}</dd></div>}
-      {result.vinMatch?.paperworkVin && <div><dt>Trade-in VIN on the paperwork</dt><dd>{result.vinMatch.paperworkVin}</dd></div>}
+      {result.vinMatch?.paperworkVin && <div><dt>{t.tradeVin}</dt><dd>{result.vinMatch.paperworkVin}</dd></div>}
     </dl>
-    <p className="muted">A trade-in shortfall is a trade figure, never a discount on the car. otdog does not buy cars or send your trade anywhere.</p>
+    <p className="muted">{t.shortfall}</p>
   </section>;
 }
