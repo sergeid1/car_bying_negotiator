@@ -50,9 +50,12 @@ test("the page footer links to the kit, and an unknown page shows the usual star
   const footer = screen.getByRole("contentinfo");
   expect(within(footer).getByRole("link", { name: KIT }).getAttribute("href")).toBe("?page=referral-partners");
   const terms = footer.textContent!.replace(/\s+/g, " ");
-  expect(terms).toContain("otdog is a tool on your side, the Buyer's. We don't work with dealers. We help people.");
-  expect(terms).toContain("You send every email from your own email and make every decision");
-  expect(terms).toContain("No dealer pays otdog for anything. No company pays for placement");
+  expect(within(footer).getByRole("region", { name: "About otdog" })).toBeTruthy();
+  expect(terms).toContain("otdog is on your side. No dealer pays us, and no company can pay to change what you see.");
+  expect(terms).toContain("It isn't legal, tax or mechanical advice, and it can't promise savings.");
+  expect(terms).toContain("You send every email and make every decision.");
+  expect(terms).not.toMatch(/safe to sign|What this is, and what it is not/i);
+  expect(footer.querySelector(".limitations, h2, h3, strong")).toBeNull();
   expect(within(footer).getByRole("link", { name: "How otdog makes money" }).getAttribute("href")).toBe("?page=how-otdog-makes-money");
   expect(terms).not.toMatch(/gmail|outlook|mailbox/i);
 });

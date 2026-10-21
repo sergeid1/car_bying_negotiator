@@ -74,6 +74,12 @@ test("finished steps fold into a summary line that reopens them", async () => {
   expect(document.getElementById("case-step-final-body")).not.toBeVisible();
 });
 
+test("the Final check summary says it is not a legal review", async () => {
+  await openCase("DESK_COMPARED");
+  const final = await screen.findByRole("region", { name: "Final check" });
+  expect(within(final).getByText("This checks the numbers on the paperwork. It is not a legal review. Read every page before you sign.")).toBeInTheDocument();
+});
+
 test("the progress bar works by keyboard and any step opens by hand", async () => {
   const progress = await openCase("NEW");
   const user = userEvent.setup();

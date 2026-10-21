@@ -6,6 +6,7 @@ import { DeskTactics, type DeskTacticFinding } from "./DeskTactics";
 import { ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
 import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
 import { DealerAddOnsNote, type DealerAddOnCheck } from "./DealerAddOns";
+import { SigningNote } from "./SigningNote";
 
 type Credentials = { caseId: string; token: string };
 type Term = { value?: string | null; unit?: string; amountMinor?: number; currency?: string; category?: string } | number;
@@ -211,6 +212,7 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
           const target = document.getElementById("verify-heading");
           target?.scrollIntoView?.({ block: "start" }); target?.focus();
         }}>Verify these terms</button>}
+        <SigningNote />
       </>}
       <button type="button" className="btn-secondary" onClick={() => void refresh()}>Refresh Desk Check</button>
       <DeskTactics findings={view?.tacticFindings} />
