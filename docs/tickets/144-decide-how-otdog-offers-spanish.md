@@ -14,7 +14,8 @@ is the strongest candidate for a later language.
 
 **Blocked by:** none for the decisions recorded below. The open points do not block tickets 145–147.
 
-**Status:** open — decisions 1, 5 and 8 recorded on 2026-10-19; specification 2.6 not yet written.
+**Status:** open — decisions 1, 5 and 8 recorded on 2026-10-19; specification 2.6 written on 2026-10-20. Remaining:
+the operator confirms or replaces working defaults 2, 3, 4, 6 and 7.
 
 ## Decided on 2026-10-19
 
@@ -55,6 +56,6 @@ The operator deferred these on 2026-10-19. The implementing tickets use the defa
 ## Done when
 
 - [x] Decisions 1, 5 and 8 are recorded with their date.
-- [ ] Specification 2.6 is merged with the changes above.
+- [x] Specification 2.6 is merged with the changes above.
 - [ ] Each working default is either confirmed or replaced by a recorded decision, and tickets 145–148 updated to
       match.

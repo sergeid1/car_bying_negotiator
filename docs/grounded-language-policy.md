@@ -1,5 +1,9 @@
 # Grounded explanations and negotiation drafts
 
+Claim rules apply in every language a Buyer sees, including Spanish: translated screens, findings,
+report explanations and reading copies of dealer drafts must meet the same rules as English copy.
+Ticket 145 makes the claim check enforce this across languages.
+
 Each newly finalized core report creates one immutable negotiation version in the
 same transaction. GET `/api/v1/cases/{caseId}/reports/{version}/negotiation` requires
 the Case-Access-Token and returns that saved version. Regeneration creates a new

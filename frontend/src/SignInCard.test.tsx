@@ -91,7 +91,7 @@ test.each(["GOOGLE", "APPLE", undefined])("completes a return once, loads the ac
   expect(calls).toHaveLength(1);
   expect(JSON.parse(String(calls[0][1]?.body))).toEqual({ state: "single-use-state" });
   expect(calls[0][1]?.headers).toHaveProperty("Account-Request", "1");
-  await userEvent.click(screen.getByRole("button", { name: account.contact.email }));
+  await userEvent.click(await screen.findByRole("button", { name: account.contact.email }));
   expect(screen.getByRole("dialog", { name: "Your account" })).not.toHaveClass("sign-in-card");
 });
 

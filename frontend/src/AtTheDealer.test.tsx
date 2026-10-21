@@ -102,6 +102,7 @@ test("a Buyer with no case answers two ZIP codes, confirms the car, and gets the
   expect(screen.getByText("Service contract, $1,495, is an add-on.")).toBeInTheDocument();
   expect(screen.getByText("Is the Service contract optional? Please show me the price without it.")).toBeInTheDocument();
   expect(screen.getByText("1 more to ask about")).toBeInTheDocument();
+  expect(within(heading.closest("section")!).getByText("This checks the numbers on the paperwork. It is not a legal review. Read every page before you sign.")).toBeInTheDocument();
   expect(JSON.parse(compared(calls)[0].body!)).toEqual({ route: "THIS_CASE", documentId: "new-doc" });
   expect(calls.some(call => call.method === "PUT")).toBe(false);
 });

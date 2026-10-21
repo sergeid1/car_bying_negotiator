@@ -91,6 +91,7 @@ test("scenario 23: the added service contract leads, with its total effect, and 
   expect(screen.getByText(/not yet verified/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Verify these terms" })).toBeInTheDocument();
   expect(screen.getByText("1 other change on the paperwork")).toBeInTheDocument();
+  expect(screen.getByText("This checks the numbers on the paperwork. It is not a legal review. Read every page before you sign.")).toBeInTheDocument();
 });
 
 test("a saved Deal Review reports verified differences with the calculated tax effect", async () => {

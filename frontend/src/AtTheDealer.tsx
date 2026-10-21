@@ -3,6 +3,7 @@ import { AccountSignedInContext } from "./BuyerAccount";
 import { DealerFields } from "./DealerFields";
 import { DealerDocumentUpload } from "./DealerDocumentUpload";
 import type { FreshDeskCase } from "./DeskCheck";
+import { SigningNote } from "./SigningNote";
 import { toMinor, vehicleName, type Trade, type TradeView } from "./TradeVehicle";
 import { TradeValueLinks } from "./TradeValueChecks";
 import type { DeskTacticFinding } from "./DeskTactics";
@@ -600,6 +601,7 @@ function ResultView({ result, headingRef, elapsed, onDeskCheck, onType, onClose 
           && <p className="muted">Draft question wording awaits operator review.</p>}
       </li>)}</ul>
     </details>}
+    <SigningNote />
     <div className="actions">
       {result.route === "AGREED_CAR" && <button type="button" onClick={onDeskCheck}>Open the full Desk Check</button>}
       {result.route === "THIS_CASE" && result.source === "READ_FROM_PAPERWORK" && <button type="button" onClick={() => {

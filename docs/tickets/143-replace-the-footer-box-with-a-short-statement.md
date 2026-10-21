@@ -8,7 +8,12 @@ substance, make it tight.
 **Blocked by:** none. It edits `frontend/src/App.tsx` and `frontend/src/styles.css`, both hot files, so do not run it
 in parallel with another client ticket. Ticket 145 moves the same copy into a message catalogue; land this first.
 
-**Status:** open — filed on 2026-10-19.
+**Status:** complete — on 2026-10-20. The footer is two lines of small print in an "About otdog" region inside
+`contentinfo`. The ticket's "no company can buy a better position" became "no company can pay to change what you
+see", to cover ranges, ratings and findings as well as order (Sections 1.2 and 13). A shared `SigningNote.tsx`
+carries the signing note in the report (both renderers), the Desk Check summary and full view, and the "I'm at the
+dealer" result. `#scope` and `.scope-columns` are gone. Four stale `App.tsx` reviewed phrases were removed and one
+added, and `PilotCopyClaimsTest`'s standing-disclosure assertion now checks the four points in the new wording.
 
 ## Scope
 
@@ -44,10 +49,10 @@ in parallel with another client ticket. Ticket 145 moves the same copy into a me
 
 ## Done when
 
-- [ ] Every page's footer shows the two lines and both links, and no card.
-- [ ] The report, the Desk Check summary and full view, and the "I'm at the dealer" result each show a "not a legal
+- [x] Every page's footer shows the two lines and both links, and no card.
+- [x] The report, the Desk Check summary and full view, and the "I'm at the dealer" result each show a "not a legal
       review, read every page before you sign" note, and a test covers each.
-- [ ] `PilotCopyClaimsTest` passes with the updated reviewed phrases, and no unused entries remain.
-- [ ] The report's limitations aside looks unchanged.
-- [ ] `npm test`, `npm run build` and `npx playwright test` pass, including the 360 px and dark-theme runs and the
+- [x] `PilotCopyClaimsTest` passes with the updated reviewed phrases, and no unused entries remain.
+- [x] The report's limitations aside looks unchanged.
+- [x] `npm test`, `npm run build` and `npx playwright test` pass, including the 360 px and dark-theme runs and the
       referral partner kit link test, which finds the link in `contentinfo`.

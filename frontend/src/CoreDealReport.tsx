@@ -16,6 +16,7 @@ import { DEALER_FINANCING_COSTS_LESS, DeskTactics, type DeskTacticFinding } from
 import { VehicleSafetyFacts, type VehicleSafetyView } from "./VehicleSafety";
 import { ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
 import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
+import { SigningNote } from "./SigningNote";
 
 export type MaterialAmount = {
   label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string;
@@ -183,6 +184,7 @@ export function CoreDealReport({ report, caseId, token, redacted, children }: { 
       </ReportSection>
       <ReportSection id="core-scope" title="Scope and policies">
         {analysis.limitations.map((limitation, index) => <p key={index}>{text(limitation)}</p>)}
+        <SigningNote />
         <dl className="report-policies">{Object.entries(analysis.policyVersions).map(([name, version]) => <div key={name}><dt>{name}</dt><dd>{version}</dd></div>)}</dl>
       </ReportSection>
       {children}

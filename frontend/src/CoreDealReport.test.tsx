@@ -25,6 +25,7 @@ it("focuses the outcome and exposes partial status, unavailable money and eviden
   expect(screen.queryByText("$0.00")).not.toBeInTheDocument();
   expect(screen.getByText("Possible payment packing")).toBeInTheDocument();
   expect(screen.getByText(/Full-term effect: \$2,400.00/)).toBeInTheDocument();
+  expect(screen.getByText("This checks the numbers on the paperwork. It is not a legal review. Read every page before you sign.")).toBeInTheDocument();
 });
 
 
