@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, Page, test } from "@playwright/test";
+import { AxeBuilder, expect, Page, test } from "./fixtures";
 
 const ACCOUNT = {
   contact: { email: "a.very.long.buyer.address.for.layout@example-mailbox-provider.com", firstName: null, lastName: null, phone: null },

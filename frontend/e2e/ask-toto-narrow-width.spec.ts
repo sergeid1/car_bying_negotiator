@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, Page, test } from "@playwright/test";
+import { AxeBuilder, expect, Page, test } from "./fixtures";
 
 const ANSWER = { kind: "ANSWER", message: null, suggestions: [], paragraphs: [
   { text: "A doc fee is what the dealer charges to prepare the sale's paperwork. It is a dealer charge, not a government one.",

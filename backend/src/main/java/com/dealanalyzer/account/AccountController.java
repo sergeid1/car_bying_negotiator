@@ -27,6 +27,7 @@ public class AccountController {
   public record VerifyRequest(@NotBlank @Size(max = 128) String token) {}
   public record ContactRequest(@Size(max = 100) String firstName, @Size(max = 100) String lastName,
       @Size(max = 32) @Pattern(regexp = "^$|^[+]?[0-9 ().-]{7,32}$") String phone) {}
+  public record LanguageRequest(@NotBlank @Size(max = 8) String language) {}
   public record AttachRequest(@NotBlank @Size(max = 36) String caseId) {}
 
   @PostMapping("/sign-in-requests") @ResponseStatus(HttpStatus.ACCEPTED)
@@ -55,6 +56,12 @@ public class AccountController {
   public BuyerAccountService.AccountView updateContact(@com.dealanalyzer.account.AccountSession String session,
       @Valid @RequestBody ContactRequest request) {
     return accounts.updateContact(session, request.firstName(), request.lastName(), request.phone());
+  }
+
+  @PutMapping("/language")
+  public BuyerAccountService.AccountView updateLanguage(@com.dealanalyzer.account.AccountSession String session,
+      @Valid @RequestBody LanguageRequest request) {
+    return accounts.updateLanguage(session, request.language());
   }
 
   @PostMapping("/cases")

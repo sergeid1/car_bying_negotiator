@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, Page, test } from "@playwright/test";
+import { AxeBuilder, expect, Page, test } from "./fixtures";
 
 const OPTIONS = {
   supported: ["US-NC"],

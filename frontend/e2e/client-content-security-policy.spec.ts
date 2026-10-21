@@ -1,4 +1,4 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, localized, Page, test } from "./fixtures";
 import headers from "../client-headers.json" with { type: "json" };
 import { openCaseStep } from "./case-steps";
 
@@ -61,8 +61,9 @@ async function start(page: Page) {
 const violations = new WeakMap<object, string[]>();
 test.use({ page: async ({ context }, use) => {
   const page = await context.newPage();
+  const shown = localized(page);
   const recorded: string[] = [];
-  violations.set(page, recorded);
+  violations.set(shown, recorded);
   await page.exposeBinding("recordCspViolation", (_source, value: string) => recorded.push(value));
   await page.addInitScript(() => {
     document.addEventListener("securitypolicyviolation", event => {
@@ -71,7 +72,7 @@ test.use({ page: async ({ context }, use) => {
         .recordCspViolation(`${event.effectiveDirective}: ${event.blockedURI.split("#")[0]}`);
     });
   });
-  await use(page);
+  await use(shown);
   await page.close();
 } });
 test.afterEach(async ({ page }) => {

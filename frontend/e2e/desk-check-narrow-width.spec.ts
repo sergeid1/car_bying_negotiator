@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { AxeBuilder, expect, test } from "./fixtures";
 import { syntheticTactic, syntheticTradeTactics } from "../src/DeskTactics.fixture";
 
 const agreedPrice = { offerVersion: 2, baselineVersion: 1, vin: "1HGCM82633A004352", sellingPriceMinor: 2500000,

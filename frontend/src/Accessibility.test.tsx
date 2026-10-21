@@ -1188,7 +1188,7 @@ test.each([false, true])("the Ask Toto panel with answers, citations, a fallback
   }
   await within(panel).findAllByText("Toto is resting until tomorrow.");
   await userEvent.click(within(panel).getByRole("button", { name: "Ask" }));
-  expect(within(panel).getByRole("alert")).toHaveTextContent("Type a question first.");
+  expect(within(within(panel).getByRole("alert")).getByText("Type a question first.")).toBeInTheDocument();
   expect((await axe.run(container, AA)).violations).toEqual([]);
   vi.unstubAllGlobals();
 });

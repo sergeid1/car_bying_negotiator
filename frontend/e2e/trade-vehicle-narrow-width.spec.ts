@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { AxeBuilder, expect, test, type Page } from "./fixtures";
 import { openCaseStep } from "./case-steps";
 
 const conditions = [

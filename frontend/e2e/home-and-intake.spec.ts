@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
+import { AxeBuilder, expect, test } from "./fixtures";
 
 for (const width of [360, 1440]) {
   test(`home action and simplified intake at ${width}px`, async ({ page }) => {

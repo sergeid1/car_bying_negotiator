@@ -60,7 +60,11 @@ public class BuyerAccountService {
       String dealer) {}
   /** A session-bound pass for one attached case; it is not a case link and ends with the session. */
   public record OpenedCase(String caseId, String accessToken, Instant accessExpiresAt) {}
-  public record AccountView(Contact contact, Instant createdAt, Instant sessionExpiresAt, List<AttachedCase> cases) {}
+  public record AccountView(Contact contact, Instant createdAt, Instant sessionExpiresAt, List<AttachedCase> cases,
+      String preferredLanguage) {}
+
+  /** The languages a Buyer can choose for the screens (ticket 146), matching the client's catalogues. */
+  public static final java.util.Set<String> LANGUAGES = java.util.Set.of("en", "es");
 
   /** Creates the account on first request; either way, emails a single-use sign-in link. */
   @Transactional
@@ -145,7 +149,19 @@ public class BuyerAccountService {
     var session = requireSession(sessionToken);
     var account = accounts.findById(session.accountId).orElseThrow(BuyerAccountService::sessionEnded);
     return new AccountView(protection.decrypt(account.id, account.contactCiphertext), account.createdAt,
-        session.expiresAt, attachedCases(account.id));
+        session.expiresAt, attachedCases(account.id), account.preferredLanguage);
+  }
+
+  /** Saves the language the Buyer chose for the screens, so a sign-in on another device opens in it. */
+  @Transactional
+  public AccountView updateLanguage(String sessionToken, String language) {
+    if (!LANGUAGES.contains(language))
+      throw new AccountProblem(HttpStatus.BAD_REQUEST, "UNSUPPORTED_LANGUAGE", "That language is not offered.");
+    var session = requireSession(sessionToken);
+    var account = accounts.findLockedById(session.accountId).orElseThrow(BuyerAccountService::sessionEnded);
+    account.preferredLanguage = language;
+    account.updatedAt = Instant.now();
+    return view(sessionToken);
   }
 
   @Transactional

@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { AxeBuilder, expect, test, type Page } from "./fixtures";
 import { insuranceView } from "../src/InsuranceQuotes.fixture";
 
 // Ticket 126: every step of the insurance panel, one-handed at 360 px, in both themes.

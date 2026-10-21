@@ -1,6 +1,7 @@
 import { useState } from "react";
 import * as format from "./i18n/format";
 import { useMessages } from "./i18n/LanguageProvider";
+import { errorMessage } from "./i18n/errors";
 
 export type FinancingResult = {
   status: string; timing: string; rounding: string; issues: string[];
@@ -51,7 +52,7 @@ export function DealerFinancingForm({ caseId, token, outside = false, onSaved }:
       onSaved?.(result);
       setMessage(fill(outside ? t.savedOutside : t.savedDealer, { version: String(result.version), status: result.result.status }));
       setKey(crypto.randomUUID());
-    } catch (error) { setMessage(String(error)); } finally { setBusy(false); }
+    } catch (error) { setMessage(errorMessage(error, t.saveFailed)); } finally { setBusy(false); }
   }
   async function copyPurchase() {
     setBusy(true); setMessage("");
@@ -66,7 +67,7 @@ export function DealerFinancingForm({ caseId, token, outside = false, onSaved }:
       setAddons((inputs.financedAddOns || []).map((item: { label: string; cashPriceMinor: number | null }) => ({ label: item.label, price: item.cashPriceMinor == null ? "" : String(item.cashPriceMinor / 100) })));
       setConfirmed(false); setKey(crypto.randomUUID());
       setMessage(t.purchaseCopied);
-    } catch (error) { setMessage(String(error)); } finally { setBusy(false); }
+    } catch (error) { setMessage(errorMessage(error, t.saveFailed)); } finally { setBusy(false); }
   }
   async function fillChosenPreApproval() {
     setBusy(true); setMessage("");
@@ -80,7 +81,7 @@ export function DealerFinancingForm({ caseId, token, outside = false, onSaved }:
       setPreApproval({ id: chosen.offerId, lender: chosen.lender });
       setConfirmed(false); setKey(crypto.randomUUID());
       setMessage(fill(t.filledFromPreApproval, { lender: chosen.lender }));
-    } catch (error) { setMessage(String(error)); } finally { setBusy(false); }
+    } catch (error) { setMessage(errorMessage(error, t.saveFailed)); } finally { setBusy(false); }
   }
   return <details className="panel"><summary>{outside ? t.summaryOutside : t.summaryDealer}</summary>
     <form onSubmit={save} aria-label={outside ? t.formOutside : t.formDealer}><fieldset disabled={busy}><legend>{t.legend}</legend>

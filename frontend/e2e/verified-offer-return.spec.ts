@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, Page, test } from "@playwright/test";
+import { AxeBuilder, expect, Page, test, localized } from "./fixtures";
 const report = { version: 1, asOf: "2026-09-30", status: "COMPLETE", analysis: {
   marketEvidence: { status: "AVAILABLE", paragraphs: ["Market data retrieved: September 30, 2026.",
     "Observation window: September 1 to September 28, 2026.",
@@ -48,8 +47,8 @@ test("saved link opens frozen offer analysis and report in a second browser sess
   await expect(page.getByRole("link", { name: "$28,500.00", exact: true })).toBeFocused();
   expect(new URL(page.url()).hash).toBe("");
   const link = await page.getByRole("link", { name: "Private case link", exact: true }).getAttribute("href");
-  const session = await browser.newContext({ viewport: { width: 360, height: 800 } });
-  const second = await session.newPage(); await api(second);
+  const session = await browser.newContext({ viewport: { width: 360, height: 800 }, locale: test.info().project.use.locale });
+  const second = localized(await session.newPage()); await api(second);
   await second.goto(link!);
   await expect(second.getByRole("heading", { name: "Deal Analysis Report", exact: true })).toBeVisible();
   await expect(second.getByRole("heading", { name: "What the findings mean" })).toBeVisible();
