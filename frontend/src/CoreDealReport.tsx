@@ -17,6 +17,7 @@ import { VehicleSafetyFacts, type VehicleSafetyView } from "./VehicleSafety";
 import { ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
 import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
 import { SigningNote } from "./SigningNote";
+import * as format from "./i18n/format";
 
 export type MaterialAmount = {
   label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string;
@@ -108,7 +109,7 @@ export function CoreDealReport({ report, caseId, token, redacted, children }: { 
   const [questions, setQuestions] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
   useEffect(() => { setQuestions(report.analysis.topReasons.slice(0, 3).filter(reason => reason != null).map(reason => `Could you explain this finding: ${reason}`).join("\n")); setCopyStatus(""); }, [report]);
-  const money = (amount: CoreReport["analysis"]["materialAmounts"][number] | undefined) => redacted && amount && amount.minorUnits == null && amount.precision !== "UNAVAILABLE" ? removed : !amount || amount.minorUnits == null || amount.precision === "UNAVAILABLE" ? "Unknown" : new Intl.NumberFormat("en-US", { style: "currency", currency: amount.currency }).format(amount.minorUnits / 100);
+  const money = (amount: CoreReport["analysis"]["materialAmounts"][number] | undefined) => redacted && amount && amount.minorUnits == null && amount.precision !== "UNAVAILABLE" ? removed : !amount || amount.minorUnits == null || amount.precision === "UNAVAILABLE" ? "Unknown" : format.money(amount.minorUnits, { currency: amount.currency });
   const totalIndex = total ? analysis.materialAmounts.indexOf(total) : -1;
   const amountLabel = (label: string | null) => label == null ? removed : label.replace("/payload/plan/", "Approved ")
     .replace("/result/", "").replaceAll("/", " · ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/Minor$/, "");

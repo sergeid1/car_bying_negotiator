@@ -7,6 +7,7 @@ import { ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
 import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
 import { DealerAddOnsNote, type DealerAddOnCheck } from "./DealerAddOns";
 import { SigningNote } from "./SigningNote";
+import * as format from "./i18n/format";
 
 type Credentials = { caseId: string; token: string };
 type Term = { value?: string | null; unit?: string; amountMinor?: number; currency?: string; category?: string } | number;
@@ -51,7 +52,7 @@ const LABELS: Record<string, string> = {
 };
 
 function money(minor: number, signed = false) {
-  const text = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Math.abs(minor) / 100);
+  const text = format.money(Math.abs(minor));
   return signed ? `${minor < 0 ? "−" : "+"}${text}` : minor < 0 ? `−${text}` : text;
 }
 function labelOf(finding: DeskFinding) {

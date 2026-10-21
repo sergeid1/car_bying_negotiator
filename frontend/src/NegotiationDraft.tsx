@@ -1,5 +1,6 @@
 import { FindingFeedback } from "./PilotFeedback";
 import { useEffect, useId, useState, type FormEvent } from "react";
+import * as format from "./i18n/format";
 
 export type NegotiationVersion = {
   reportVersion: number; generatedAt: string; sourceReport: string;
@@ -70,7 +71,7 @@ export type ReplySuggestion = {
 };
 
 const MAX_DEALER_RESPONSE = 4000;
-const dollars = (minor: number) => (minor / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+const dollars = (minor: number) => format.money(minor);
 
 function producerNote(reply: ReplySuggestion) {
   if (reply.path === "MODEL") return "Generated from the Dealer's response, then checked in code against this report's recorded figures and your approved limits.";

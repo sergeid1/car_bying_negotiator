@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import * as format from "./i18n/format";
 
 /** `GET /api/v1/offer`. Codes are stable; every Buyer-facing word below is chosen here. */
 export type Offer = {
@@ -63,7 +64,7 @@ function word(words: Record<string, string>, code: string) {
 }
 
 export function offerPrice(offer: Offer) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: offer.price.currency }).format(offer.price.amountMinor / 100);
+  return format.money(offer.price.amountMinor, { currency: offer.price.currency });
 }
 
 function refundTerms(offer: Offer) {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DealerHandoff } from "./DealerHandoff";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
+import * as format from "./i18n/format";
 
 type SentQuote = { id: string; dealerAddress: string; state: string };
 type Source = { offerVersion: number | null };
@@ -70,7 +71,7 @@ export function AgreedPrice({ caseId, token, quotes, sources, onChanged }: {
     <p>Acceptance is subject to a test drive and final paperwork matching the quote. Review and verify the itemized source and price boundaries first.</p>
     {view?.agreedPrice ? <>
       <p role="status">Agreed Price saved from verified offer {view.agreedPrice.offerVersion}. Approved Baseline version {view.agreedPrice.baselineVersion}.</p>
-      <p>Accepted by {view.agreedPrice.actor} at {new Date(view.agreedPrice.acceptedAt).toLocaleString()}.</p>
+      <p>Accepted by {view.agreedPrice.actor} at {format.dateTime(view.agreedPrice.acceptedAt)}.</p>
       {view.agreedPrice.journey.otherOpenNegotiations.length > 0 && <>
         <p>Choose whether to pause or stop other open negotiations in your journey.</p>
         <ul>{view.agreedPrice.journey.otherOpenNegotiations.map(other => <li key={other.caseId}>

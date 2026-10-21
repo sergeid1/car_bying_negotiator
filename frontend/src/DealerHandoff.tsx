@@ -1,6 +1,7 @@
 import { FormEvent, useContext, useEffect, useRef, useState } from "react";
 import { AccountSignedInContext } from "./BuyerAccount";
 import { asMailboxView, ConnectedMailbox } from "./MailboxConnection";
+import * as format from "./i18n/format";
 
 type Handoff = { messageId: string; sendPath: string; state: string; dealerAddress: string; subject: string; body: string;
   handedOffAt: string; sentAt: string | null };
@@ -84,7 +85,7 @@ export function DealerHandoff({ caseId, token, messageId, onChanged }: {
   const waiting = handoff.state === "HANDED_OFF";
   const unclear = handoff.state === "DELIVERY_UNKNOWN";
   const fromMailbox = handoff.sendPath === "CONNECTED_MAILBOX";
-  const sentAt = handoff.sentAt ? ` on ${new Date(handoff.sentAt).toLocaleString()}` : "";
+  const sentAt = handoff.sentAt ? ` on ${format.dateTime(handoff.sentAt)}` : "";
   return <div className="handoff" aria-label={`Send to ${handoff.dealerAddress} from your email`} role="group">
     <p className="handoff-state" role="status">{waiting ? "Not sent yet. Send it from your own email, then tell us."
       : unclear ? "Not confirmed. Your email provider did not say whether this message was sent."

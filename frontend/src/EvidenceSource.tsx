@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as format from "./i18n/format";
 
 export type SourceRegion = { x: number; y: number; width: number; height: number };
 export type DocumentSource = {
@@ -9,7 +10,7 @@ export type Operand = { operator: string | null; label: string; minorUnits: numb
 export type Calculation = { operands: Operand[]; notes: string[] };
 
 export const formatMoney = (minor: number | null | undefined, currency = "USD") => minor == null ? "Unknown"
-  : new Intl.NumberFormat("en-US", { style: "currency", currency }).format(minor / 100);
+  : format.money(minor, { currency });
 
 const percent = (value: number) => `${Math.round(Math.min(1, Math.max(0, value)) * 100)}%`;
 

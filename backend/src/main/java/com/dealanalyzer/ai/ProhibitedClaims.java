@@ -3,7 +3,10 @@ package com.dealanalyzer.ai;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-/** One code-owned list for shipped-copy checks and untrusted model answers. */
+/**
+ * One code-owned list for shipped-copy checks and untrusted model answers. {@link #PATTERNS} is the English list;
+ * {@link #BY_LANGUAGE} holds one list per language a Buyer can see, so each catalogue is checked in its own words.
+ */
 public final class ProhibitedClaims {
   private ProhibitedClaims() {}
 
@@ -22,6 +25,9 @@ public final class ProhibitedClaims {
       "contacts dealers", word("(we|deal x-ray|the platform|the product) (will )?(contacts?|emails?|writes? to)"
           + " (the |a |your )?dealers?|(contacts?|emails?|writes? to) (the |a |your )?dealers?"
           + " (for (you|the buyer)|itself|in its own name)"));
+
+  /** Claim patterns by language code, matching the client's message catalogues under {@code frontend/src/i18n}. */
+  public static final Map<String, Map<String, Pattern>> BY_LANGUAGE = Map.of("en", PATTERNS);
 
   public static boolean contains(String text) {
     String normalized = text.replaceAll("\\s+", " ").strip();

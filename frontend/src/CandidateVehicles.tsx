@@ -1,4 +1,5 @@
 import { ReactNode, useRef, useState } from "react";
+import * as format from "./i18n/format";
 
 export type CandidateMarketCheck = { status: string; range: { lowMinor: number; highMinor: number; currency: string } | null;
   confidence: string; provider: { retrievedAt: string } | null; limitation: string | null;
@@ -20,12 +21,12 @@ type Problem = { status?: number; detail?: string };
 
 const moment = (iso: string | null) => {
   const date = iso ? new Date(iso) : undefined;
-  return !date || Number.isNaN(date.getTime()) ? "" : date.toLocaleString("en-US", { month: "short", day: "numeric",
+  return !date || Number.isNaN(date.getTime()) ? "" : format.dateTime(date, { month: "short", day: "numeric",
     year: "numeric", hour: "numeric", minute: "2-digit" });
 };
 const amount = (minor: number, currency: string | null) => {
   const whole = minor % 100 === 0;
-  const shown = (minor / 100).toLocaleString("en-US", { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
+  const shown = format.number(minor / 100, { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 });
   return !currency || currency === "USD" ? `$${shown}` : `${shown} ${currency}`;
 };
 
@@ -104,7 +105,7 @@ export function CandidateCard({ candidate, position }: { candidate: CandidateVeh
   return <article className="candidate" aria-label={name}>
     <h5>{name}</h5>
     <dl className="facts" aria-label={`Listing details of candidate ${position}`}>
-      <div><dt>Mileage</dt><dd>{candidate.mileage === null ? "Not stated" : `${candidate.mileage.toLocaleString("en-US")} miles`}</dd></div>
+      <div><dt>Mileage</dt><dd>{candidate.mileage === null ? "Not stated" : `${format.number(candidate.mileage)} miles`}</dd></div>
       <div><dt>Distance</dt><dd>{candidate.distanceMiles === null ? "Not stated" : `${candidate.distanceMiles} miles`}</dd></div>
       <div><dt>Advertised price</dt><dd>{candidate.advertisedPriceMinor === null ? "Not stated"
         : `${amount(candidate.advertisedPriceMinor, candidate.currency)} (advertised, not a quote)`}</dd></div>

@@ -1,4 +1,5 @@
 import "./GovernmentFees.css";
+import * as format from "./i18n/format";
 
 /** One state fee line checked against the state's fee schedule (ticket 139). */
 export type GovernmentFeeFinding = {
@@ -13,8 +14,7 @@ export type GovernmentFeeCheck = {
   fees: { name: string; purpose: string; minMinor: number; maxMinor: number | null; dependsOn: string; citation: string }[];
 };
 
-const dollars = (minor: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD",
-  minimumFractionDigits: minor % 100 === 0 ? 0 : 2 }).format(minor / 100);
+const dollars = (minor: number) => format.money(minor, { minimumFractionDigits: minor % 100 === 0 ? 0 : 2 });
 
 function range(min: number, max: number | null) {
   if (max === null) return min === 0 ? "set by local rates" : `from ${dollars(min)}`;

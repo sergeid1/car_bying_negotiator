@@ -1,4 +1,5 @@
 import { FormEvent, useState } from "react";
+import * as format from "./i18n/format";
 
 type Boundary = { openingMinor: number; targetMinor: number; policyMaximumMinor: number; walkAwayMinor: number };
 type Snapshot = { version: number; payload: { plan: {
@@ -36,7 +37,7 @@ export function PricePlan({ caseId, token }: { caseId: string; token: string }) 
     try { setBaseline(await post("approved-baselines", { planVersion: plan!.version, approved }, approvalKey)); }
     catch (caught) { setError(String(caught)); } finally { setBusy(false); }
   }
-  const money = (minor: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: plan?.payload.plan.currency ?? "USD" }).format(minor / 100);
+  const money = (minor: number) => format.money(minor, { currency: plan?.payload.plan.currency ?? "USD" });
   return <section className="panel" aria-labelledby="plan-heading">
     <h2 id="plan-heading">Set your price limits</h2>
     <p>Suggested limits come from the dealer offer you checked against the paperwork and the market range for this car. Check the offer first if you have not yet.</p>

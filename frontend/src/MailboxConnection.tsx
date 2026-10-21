@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as format from "./i18n/format";
 
 export type ConnectedMailbox = { provider: "GOOGLE" | "MICROSOFT"; providerLabel: string; address: string; connectedAt: string };
 export type MailboxView = { available: boolean; providers: ("GOOGLE" | "MICROSOFT")[]; connection: ConnectedMailbox | null };
@@ -127,7 +128,7 @@ export function MailboxConnection({ onSessionEnded }: { onSessionEnded: () => vo
       can be sent from your own email app.</p>}
     {connection && <>
       <p>Connected: <strong className="mailbox-address">{connection.address}</strong> ({connection.providerLabel})
-        {connection.connectedAt ? ` since ${new Date(connection.connectedAt).toLocaleDateString()}` : ""}.</p>
+        {connection.connectedAt ? ` since ${format.date(connection.connectedAt)}` : ""}.</p>
       <p>otdog can only send messages you approve, exactly as approved, from this address. They appear in your Sent
         folder. It cannot read your email, so dealer replies still come in when you paste or upload them.</p>
       <button type="button" className="btn-secondary" disabled={busy} onClick={() => void disconnect(connection.providerLabel)}>

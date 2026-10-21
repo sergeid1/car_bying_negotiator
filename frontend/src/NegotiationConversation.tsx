@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DealerHandoff } from "./DealerHandoff";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
+import * as format from "./i18n/format";
 
 type Revision = { revision: number; editedByBuyer: boolean; text: string; decision: GateDecision; createdAt: string };
 type Counteroffer = {
@@ -67,8 +68,8 @@ function asView(value: unknown): ConversationView {
     throw new Error("The negotiation conversation is unavailable. Try refreshing.");
   return v as ConversationView;
 }
-const usd = (minor: number) => (minor / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
-const when = (iso: string) => new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+const usd = (minor: number) => format.money(minor);
+const when = (iso: string) => format.dateTime(iso, { dateStyle: "medium", timeStyle: "short" });
 
 export function NegotiationConversation({ caseId, token, version = 0 }: { caseId: string; token: string; version?: number }) {
   const [view, setView] = useState<ConversationView>();
@@ -128,8 +129,7 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
         : `After ${view.dealerDeclined.rounds} counteroffers, the dealer's verified selling price did not fall.`}
       {" "}Counteroffers have stopped.
       {view.dealerDeclined.lastVerifiedSellingPriceMinor !== null && view.dealerDeclined.currency
-        ? ` Last verified selling price: ${(view.dealerDeclined.lastVerifiedSellingPriceMinor / 100).toLocaleString("en-US", {
-          style: "currency", currency: view.dealerDeclined.currency })}.`
+        ? ` Last verified selling price: ${format.money(view.dealerDeclined.lastVerifiedSellingPriceMinor, { currency: view.dealerDeclined.currency })}.`
         : " There is no verified selling price yet."}
       {" "}You can still accept the latest written quote or stop negotiation.
     </p>}

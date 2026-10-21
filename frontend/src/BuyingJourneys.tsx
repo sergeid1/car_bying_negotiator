@@ -3,6 +3,7 @@ import { JourneyCandidates, JourneyCaseCredentials } from "./JourneyCandidates";
 import { QuoteComparison } from "./QuoteComparison";
 import { InsuranceQuotes } from "./InsuranceQuotes";
 import { LoanPreApprovals } from "./LoanPreApprovals";
+import * as format from "./i18n/format";
 
 type Option = { id: string; label: string };
 type Model = Option & { trims: Option[] };
@@ -38,10 +39,10 @@ const STATE_LABELS: Record<JourneyState, string> = {
 const STATE_NAMES: Record<string, string> = { "US-NC": "North Carolina", "US-VA": "Virginia", "US-SC": "South Carolina",
   "US-TN": "Tennessee", "US-GA": "Georgia" };
 const stateName = (code: string) => STATE_NAMES[code] ?? code.replace(/^US-/, "");
-const dollars = (minor: number) => `$${Math.round(minor / 100).toLocaleString("en-US")}`;
+const dollars = (minor: number) => format.money(minor, { maximumFractionDigits: 0 });
 const day = (iso: string) => {
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return Number.isNaN(date.getTime()) ? "" : format.date(date, { month: "short", day: "numeric", year: "numeric" });
 };
 const title = (from: number, to: number, make: string, model: string) =>
   `${from === to ? from : `${from}–${to}`} ${make} ${model}`;
@@ -219,7 +220,7 @@ function JourneyDetail({ journey, shown, busy, references, candidates, insurance
       <div><dt>Model years</dt><dd>{shown.yearFrom === shown.yearTo ? shown.yearFrom : `${shown.yearFrom} to ${shown.yearTo}`}</dd></div>
       <div><dt>Make and model</dt><dd>{shown.make.label} {shown.model.label}</dd></div>
       <div><dt>Trims</dt><dd>{list(shown.trims, "Any trim")}</dd></div>
-      <div><dt>Maximum mileage</dt><dd>{shown.maxMileage.toLocaleString("en-US")} miles</dd></div>
+      <div><dt>Maximum mileage</dt><dd>{format.number(shown.maxMileage)} miles</dd></div>
       <div><dt>Price ceiling</dt><dd>{dollars(shown.priceCeilingMinor)}</dd></div>
       <div><dt>Search area</dt><dd>{shown.radiusMiles} miles from {shown.postalCode} ({stateName(shown.jurisdiction)})</dd></div>
       <div><dt>Must-have features</dt><dd>{list(shown.mustHaveFeatures, "None")}</dd></div>

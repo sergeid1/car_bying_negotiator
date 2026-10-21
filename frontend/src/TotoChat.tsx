@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { GUIDE_LIST, guideLink } from "./ExplainerGuides";
 import "./TotoChat.css";
+import * as format from "./i18n/format";
 
 /**
  * Toto, an AI guide that answers process questions from otdog's reviewed guides (tickets 118–121).
@@ -130,8 +131,8 @@ export function TotoChat({ request = fetch }: { request?: typeof fetch }) {
     const trimmed = text.trim();
     if (!trimmed) { setProblem("Type a question first."); return; }
     if (trimmed.length > QUESTION_LIMIT) {
-      setProblem(`Questions can be up to ${QUESTION_LIMIT.toLocaleString("en-US")} characters, and this one is `
-        + `${trimmed.length.toLocaleString("en-US")}. Please shorten it and ask again.`);
+      setProblem(`Questions can be up to ${format.number(QUESTION_LIMIT)} characters, and this one is `
+        + `${format.number(trimmed.length)}. Please shorten it and ask again.`);
       return;
     }
     setProblem(undefined);
@@ -255,7 +256,7 @@ export function TotoChat({ request = fetch }: { request?: typeof fetch }) {
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void ask(question); }
           }} />
         <p className="toto-hint" id={hintId} data-over={over || undefined}>
-          {question.trim().length.toLocaleString("en-US")} of {QUESTION_LIMIT.toLocaleString("en-US")} characters.
+          {format.number(question.trim().length)} of {format.number(QUESTION_LIMIT)} characters.
           Enter sends; Shift+Enter adds a line.
         </p>
         {problem && <p className="error" id={problemId} role="alert">{problem}</p>}

@@ -1,3 +1,5 @@
+import * as format from "./i18n/format";
+
 export type DeskTacticFinding = {
   code: string; label: string; summary: string; policyVersion: string; verified: boolean;
   monthlyEffectMinor: number | null; totalEffectMinor: number | null; effectBasis: string;
@@ -6,7 +8,7 @@ export type DeskTacticFinding = {
   evidenceRegions: { field: string; region: { pageNumber?: number; source?: string; version?: number } | null; verified: boolean }[];
 };
 
-const money = (minor: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(minor / 100);
+const money = (minor: number) => format.money(minor);
 /** Not a tactic: the dealer's financing costs less than the Buyer's own offer, said plainly (ticket 129). */
 export const DEALER_FINANCING_COSTS_LESS = "DEALER_FINANCING_COSTS_LESS";
 

@@ -3,15 +3,16 @@ import { guidesLink } from "./ExplainerGuides";
 import { howItWorksLink } from "./HowItWorks";
 import { exampleReportLink } from "./SampleReport";
 import "./SiteNav.css";
+import { type Messages, useMessages } from "./i18n/LanguageProvider";
 
 export type SitePage = "home" | "example-report" | "how-it-works" | "guides" | "other";
 
 /** `short` is what a phone shows; the accessible name stays the full one and contains it. */
-const TABS: { page: SitePage; label: string; short: string; href: string; name: string }[] = [
-  { page: "home", label: "Check my deal", short: "My deal", href: "./#start", name: "Check my deal" },
-  { page: "example-report", label: "Example report", short: "Example", href: exampleReportLink, name: "See an example report" },
-  { page: "how-it-works", label: "How it works", short: "How it works", href: howItWorksLink, name: "How it works" },
-  { page: "guides", label: "Guides", short: "Guides", href: guidesLink, name: "Guides" },
+const tabs = (nav: Messages["nav"]): { page: SitePage; label: string; short: string; href: string; name: string }[] => [
+  { page: "home", label: nav.checkMyDeal, short: nav.checkMyDealShort, href: "./#start", name: nav.checkMyDeal },
+  { page: "example-report", label: nav.exampleReport, short: nav.exampleReportShort, href: exampleReportLink, name: nav.exampleReportName },
+  { page: "how-it-works", label: nav.howItWorks, short: nav.howItWorks, href: howItWorksLink, name: nav.howItWorks },
+  { page: "guides", label: nav.guides, short: nav.guides, href: guidesLink, name: nav.guides },
 ];
 
 function focusStartForm() {
@@ -33,6 +34,8 @@ function go(href: string) {
  * dragged; it follows the pointer and settles on the nearest tab when let go.
  */
 export function SiteNav({ page }: { page: SitePage }) {
+  const { m } = useMessages();
+  const TABS = tabs(m.nav);
   const track = useRef<HTMLElement>(null);
   const drag = useRef<{ pointer: number; startX: number; moved: boolean } | undefined>(undefined);
   const index = TABS.findIndex(tab => tab.page === page);
@@ -100,7 +103,7 @@ export function SiteNav({ page }: { page: SitePage }) {
   const width = offset === undefined ? 0 : segmentWidth();
   const shown = offset === undefined || width === 0 ? index : Math.round(offset / width);
 
-  return <nav className="site-switch" aria-label="Main" ref={track}
+  return <nav className="site-switch" aria-label={m.nav.label} ref={track}
     data-dragging={offset !== undefined ? "" : undefined} data-pressed={pressed ? "" : undefined}
     onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={cancel}>
     {index >= 0 && <span className="site-switch-thumb" aria-hidden="true"

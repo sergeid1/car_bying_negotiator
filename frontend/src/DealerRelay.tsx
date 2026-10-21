@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as format from "./i18n/format";
 
 type Attachment = { ordinal: number; documentId: string | null; outcome: string };
 export type RelayMessage = {
@@ -47,7 +48,7 @@ export function DealerRelay({ caseId, token }: { caseId: string; token: string }
     } catch { setOpen(previous => ({ ...previous, [id]: "failed" })); }
   }
 
-  const when = (iso: string) => new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+  const when = (iso: string) => format.dateTime(iso, { dateStyle: "medium", timeStyle: "short" });
 
   return <section className="panel relay-panel" aria-labelledby="relay-heading">
     <h2 id="relay-heading">Dealer messages</h2>

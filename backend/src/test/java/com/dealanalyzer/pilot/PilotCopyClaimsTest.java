@@ -23,13 +23,17 @@ import org.junit.jupiter.api.Test;
  * claims, and may not say the platform negotiates, contacts dealers, or acts on the Buyer's behalf
  * (DEVELOPMENT_SPEC.md sections 1.2 and 1.3). Each risky phrase must be recorded as reviewed, so the
  * claim surface cannot grow silently; the standing positioning and commercial-relationship
- * disclosures must remain present.
+ * disclosures must remain present. Claim rules apply in every language a Buyer sees: each message catalogue under
+ * {@code frontend/src/i18n} is checked with its own language's patterns, and all other copy is English (ticket 145).
  */
 class PilotCopyClaimsTest {
   private static final Path REPOSITORY = Path.of("..").toAbsolutePath().normalize();
 
-  /** One pattern per prohibited claim category in the tickets. */
+  /** One pattern per prohibited claim category in the tickets, in English. */
   private static final Map<String, Pattern> PROHIBITED = ProhibitedClaims.PATTERNS;
+
+  private static final Path CATALOGUES = REPOSITORY.resolve("frontend/src/i18n");
+  private static final Pattern CATALOGUE = Pattern.compile("([a-z]{2})\\.ts");
 
   private final ObjectMapper json = new ObjectMapper();
 
@@ -44,7 +48,7 @@ class PilotCopyClaimsTest {
     for (Path file : buyerFacingCopy()) {
       String relative = REPOSITORY.relativize(file).toString();
       String copy = normalize(Files.readString(file, StandardCharsets.UTF_8));
-      for (var claim : PROHIBITED.entrySet()) {
+      for (var claim : ProhibitedClaims.BY_LANGUAGE.get(languageOf(file)).entrySet()) {
         var matches = claim.getValue().matcher(copy);
         while (matches.find()) {
           if (isReviewed(reviewed, relative, claim.getKey(), copy, matches.start(), matches.end())) continue;
@@ -70,12 +74,29 @@ class PilotCopyClaimsTest {
         stale.add(entry.path("file").asText() + " no longer contains: " + contains);
       }
       assertThat(entry.path("justification").asText()).as("justification for " + contains).isNotBlank();
+      assertThat(entry.path("language").asText()).as("language of " + contains).isEqualTo(languageOf(file));
     }
     assertThat(stale).as("Remove reviewed entries whose copy is gone").isEmpty();
   }
 
+  @Test void everyCatalogueIsCheckedInItsOwnLanguage() throws IOException {
+    assertThat(catalogues()).as("the English catalogue must be scanned").contains(CATALOGUES.resolve("en.ts"));
+    for (Path catalogue : catalogues()) {
+      assertThat(buyerFacingCopy()).contains(catalogue);
+      assertThat(ProhibitedClaims.BY_LANGUAGE)
+          .as("claim patterns for the language of " + catalogue.getFileName() + ", added with its catalogue")
+          .containsKey(languageOf(catalogue));
+    }
+    assertThat(languageOf(REPOSITORY.resolve("frontend/src/App.tsx"))).isEqualTo("en");
+    assertThat(languageOf(CATALOGUES.resolve("es/account.ts"))).isEqualTo("es");
+    assertThat(languageOf(CATALOGUES.resolve("format.ts"))).isEqualTo("en");
+  }
+
+  /** The footer's standing disclosures live in the English catalogue, which App.tsx renders in the footer. */
   @Test void theStandingCommercialRelationshipDisclosureIsPresent() throws IOException {
-    String app = normalize(Files.readString(REPOSITORY.resolve("frontend/src/App.tsx"), StandardCharsets.UTF_8));
+    assertThat(Files.readString(REPOSITORY.resolve("frontend/src/App.tsx"), StandardCharsets.UTF_8))
+        .contains("m.footer.onYourSide").contains("m.footer.scope").contains("m.footer.moneyLink");
+    String app = normalize(Files.readString(CATALOGUES.resolve("en.ts"), StandardCharsets.UTF_8));
     assertThat(app).contains("otdog is on your side.");
     assertThat(app).contains("No dealer pays us, and no company can pay to change what you see.");
     assertThat(app).contains("It isn't legal, tax or mechanical advice, and it can't promise savings.");
@@ -131,6 +152,26 @@ class PilotCopyClaimsTest {
       }
     }
     assertThat(claims).as("Toto would reject these passages; reword the article").isEmpty();
+  }
+
+  /**
+   * A catalogue's language is its file name, {@code i18n/es.ts}, and a journey's part of it sits in the folder of
+   * that name, {@code i18n/es/account.ts}; every other scanned file is English.
+   */
+  private static String languageOf(Path file) {
+    Path parent = file.getParent();
+    if (parent == null) return "en";
+    var name = CATALOGUE.matcher(file.getFileName().toString());
+    if (parent.equals(CATALOGUES) && name.matches()) return name.group(1);
+    if (CATALOGUES.equals(parent.getParent()) && parent.getFileName().toString().matches("[a-z]{2}"))
+      return parent.getFileName().toString();
+    return "en";
+  }
+
+  private static List<Path> catalogues() throws IOException {
+    try (Stream<Path> files = Files.list(CATALOGUES)) {
+      return files.filter(file -> CATALOGUE.matcher(file.getFileName().toString()).matches()).sorted().toList();
+    }
   }
 
   private static boolean isReviewed(JsonNode reviewed, String file, String pattern, String copy,

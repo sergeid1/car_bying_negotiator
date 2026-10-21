@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { TradeTacticAnnotation, type DeskTacticFinding } from "./DeskTactics";
+import * as format from "./i18n/format";
 
 export type TradeCheckFinding = {
   code: string; severity: "BLOCKING" | "WARNING" | "INFORMATIONAL"; summary: string;
@@ -28,7 +29,7 @@ export type TradeCheckResult = {
 };
 
 function money(minor: number) {
-  return `${minor < 0 ? "−" : ""}${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Math.abs(minor) / 100)}`;
+  return `${minor < 0 ? "−" : ""}${format.money(Math.abs(minor))}`;
 }
 
 const PAYOFF_STATE: Record<string, string> = {

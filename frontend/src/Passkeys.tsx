@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as format from "./i18n/format";
 
 type Request = (path: string, init?: RequestInit) => Promise<Response>;
 type Metadata = { id: string; nickname: string; createdAt: string; lastUsedAt: string | null };
@@ -68,8 +69,8 @@ export function Passkeys({ request, onSessionEnded }: { request: Request; onSess
     <p>Use your device or security key to sign in. Email links remain available if you lose access to a passkey.</p>
     {keys && (keys.length ? <ul className="account-cases" aria-label="Your passkeys">{keys.map(key => <li key={key.id}>
       <strong className="account-case-name">{key.nickname}</strong>
-      <span>Created {new Date(key.createdAt).toLocaleDateString()}. {key.lastUsedAt
-        ? `Last used ${new Date(key.lastUsedAt).toLocaleDateString()}.` : "Not used to sign in yet."}</span>
+      <span>Created {format.date(key.createdAt)}. {key.lastUsedAt
+        ? `Last used ${format.date(key.lastUsedAt)}.` : "Not used to sign in yet."}</span>
       <button className="btn-secondary" disabled={busy} onClick={() => void run(async () => {
         setKeys(await (await request(`${ROOT}/${encodeURIComponent(key.id)}`, { method: "DELETE" })).json());
         setNotice("Passkey removed. Email sign-in links remain available.");

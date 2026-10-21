@@ -1,4 +1,5 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
+import * as format from "./i18n/format";
 
 /** The intake limits the service publishes, so a pre-check never uses a looser threshold. */
 export type DocumentLimits = {
@@ -75,7 +76,7 @@ function fileSizeLimit(bytes: number) {
 function pixelLimit(pixels: number) {
   return pixels >= 1_000_000
     ? `${Math.round(pixels / 100_000) / 10} megapixels`
-    : `${pixels.toLocaleString("en-US")} pixels`;
+    : `${format.number(pixels)} pixels`;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import * as format from "./i18n/format";
 
 export type FinancingResult = {
   status: string; timing: string; rounding: string; issues: string[];
@@ -8,7 +9,7 @@ export type FinancingResult = {
   financedAddOns: { label: string; cashPriceMinor: number; incrementalPaymentMinor: number;
     incrementalScheduledPaymentsMinor: number; incrementalInterestMinor: number }[];
 };
-const money = (value: number | null) => value == null ? "Unavailable" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value / 100);
+const money = (value: number | null) => value == null ? "Unavailable" : format.money(value);
 const fields = [
   ["purchasePriceMinor", "Purchase price after discounts and rebates"], ["outTheDoorTotalMinor", "Out-the-door total"],
   ["netAmountDueMinor", "Net amount due after trade, cash down and credits"], ["principalMinor", "Amount financed"],
