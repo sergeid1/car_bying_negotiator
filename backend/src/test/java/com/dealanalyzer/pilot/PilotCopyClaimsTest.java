@@ -88,6 +88,8 @@ class PilotCopyClaimsTest {
           .containsKey(languageOf(catalogue));
     }
     assertThat(languageOf(REPOSITORY.resolve("frontend/src/App.tsx"))).isEqualTo("en");
+    assertThat(languageOf(CATALOGUES.resolve("es/account.ts"))).isEqualTo("es");
+    assertThat(languageOf(CATALOGUES.resolve("format.ts"))).isEqualTo("en");
   }
 
   /** The footer's standing disclosures live in the English catalogue, which App.tsx renders in the footer. */
@@ -152,12 +154,17 @@ class PilotCopyClaimsTest {
     assertThat(claims).as("Toto would reject these passages; reword the article").isEmpty();
   }
 
-  /** A catalogue's language is its file name; every other scanned file is English. */
+  /**
+   * A catalogue's language is its file name, {@code i18n/es.ts}, and a journey's part of it sits in the folder of
+   * that name, {@code i18n/es/account.ts}; every other scanned file is English.
+   */
   private static String languageOf(Path file) {
-    if (file.getParent() != null && file.getParent().equals(CATALOGUES)) {
-      var name = CATALOGUE.matcher(file.getFileName().toString());
-      if (name.matches()) return name.group(1);
-    }
+    Path parent = file.getParent();
+    if (parent == null) return "en";
+    var name = CATALOGUE.matcher(file.getFileName().toString());
+    if (parent.equals(CATALOGUES) && name.matches()) return name.group(1);
+    if (CATALOGUES.equals(parent.getParent()) && parent.getFileName().toString().matches("[a-z]{2}"))
+      return parent.getFileName().toString();
     return "en";
   }
 

@@ -1,6 +1,14 @@
+import { account } from "./en/account";
+import { paperwork } from "./en/paperwork";
+import { dealer } from "./en/dealer";
+import { messages } from "./en/messages";
+import { money } from "./en/money";
+import { content } from "./en/content";
+
 /**
  * The English catalogue: every Buyer-visible string, grouped by feature (ticket 145). It is the reference every other
  * language is checked against, and the fallback. Keep sentences whole; put changing parts in `{placeholders}`.
+ * Each journey's copy lives in its own file under `en/`, so journeys can move into the catalogue independently.
  */
 export const en = {
   app: {
@@ -104,4 +112,5 @@ export const en = {
     limitations: "Report limitations",
     scope: "Scope and limitations",
   },
+  account, paperwork, dealer, messages, money, content,
 } as const;
