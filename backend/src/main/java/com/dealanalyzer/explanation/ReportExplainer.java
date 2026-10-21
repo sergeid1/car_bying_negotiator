@@ -33,7 +33,12 @@ public class ReportExplainer {
   }
 
   public ReportExplanation explain(String caseId, JsonNode report) {
+    return explain(caseId, report, "en");
+  }
+
+  public ReportExplanation explain(String caseId, JsonNode report, String language) {
     ExplanationFacts facts = ExplanationFacts.from(report);
+    if ("es".equals(language)) return spanish(caseId, report, facts);
     if (!harness.available()) return template(report, facts, "MODEL_PATH_OFF");
     try {
       var result = harness.run(caseId, task,
@@ -47,6 +52,26 @@ public class ReportExplainer {
     } catch (ExplanationCheck.Rejected rejected) {
       return template(report, facts, rejected.reason());
     }
+  }
+
+  private ReportExplanation spanish(String caseId, JsonNode report, ExplanationFacts facts) {
+    String reason = "MODEL_PATH_OFF";
+    if (harness.available()) {
+      try {
+        var spanish = ExplanationTask.spanishTask();
+        var result = harness.run(caseId, spanish,
+            List.of(new UntrustedInput.Text("finalized findings", facts.modelInput(json))), 1);
+        var sentences = result.value().sentences().stream()
+            .map(s -> new ExplanationCheck.Sentence(s.text(), List.of(s.findingId()))).toList();
+        return new ReportExplanation(ReportExplanation.VERSION, ReportExplanation.Path.MODEL, null, facts.reportVersion(),
+            ExplanationCheck.check(facts, sentences, "es"), result.provenance(), SpanishExplanation.SCOPE);
+      } catch (ProviderMeter.Failure failure) { reason = failure.status().name(); }
+      catch (ExplanationCheck.Rejected rejected) { reason = rejected.reason(); }
+    }
+    var sentences = templateSentences(report, facts).stream()
+        .map(s -> new ExplanationCheck.Sentence(SpanishExplanation.text(s.text()), s.findingIds())).toList();
+    return new ReportExplanation(ReportExplanation.VERSION, ReportExplanation.Path.TEMPLATE, reason, facts.reportVersion(),
+        ExplanationCheck.check(facts, sentences, "es"), null, SpanishExplanation.SCOPE);
   }
 
   ReportExplanation template(JsonNode report, ExplanationFacts facts, String reason) {

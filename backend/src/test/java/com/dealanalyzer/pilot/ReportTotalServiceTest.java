@@ -16,7 +16,7 @@ class ReportTotalServiceTest {
     row.eventType = "REPORT_TOTAL_IDENTIFICATION"; row.category = "OPENED";
     when(events.findById("session")).thenReturn(Optional.of(row));
     when(store.requireReport("case", Optional.of(2))).thenReturn(new ObjectMapper().readTree("""
-        {"analysis":{"materialAmounts":[{"label":"Out-the-door total","minorUnits":2850012,"currency":"USD","precision":"ESTIMATED"}]}}
+        {"analysis":{"materialAmounts":[{"label":"Out-the-door total","pointer":"/result/outTheDoorTotal","minorUnits":2850012,"currency":"USD","precision":"ESTIMATED"}]}}
         """));
     var service = new ReportTotalService(feedback, store, events);
     assertThat(service.identify("case", "token", "session", new ReportTotalService.Answer(2850000L, false, 1000))).isEqualTo(java.util.Map.of("correct", false));

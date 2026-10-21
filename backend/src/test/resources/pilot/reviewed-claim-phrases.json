@@ -3,6 +3,13 @@
   "intent": "Every risky claim phrase in shipped Buyer-facing copy must appear here with a justification and the language of the copy it appears in. A new occurrence fails PilotCopyClaimsTest until it is reviewed and recorded, so the claim surface cannot grow silently.",
   "reviewed": [
     {
+      "file": "frontend/src/i18n/en/findingTemplates.ts",
+      "language": "en",
+      "pattern": "guarantee",
+      "contains": "Savings are not guaranteed.",
+      "justification": "The original core report's negated savings disclaimer, preserved in the generated English findings catalogue."
+    },
+    {
       "file": "backend/src/main/java/com/dealanalyzer/buyingcase/persistence/CoreReportService.java",
       "language": "en",
       "pattern": "guarantee",

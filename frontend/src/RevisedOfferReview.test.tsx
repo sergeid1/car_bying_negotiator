@@ -37,10 +37,10 @@ it("shows expected against observed as a difference with both source lines and t
   const { container } = render(<RevisedOfferReview review={revisedReview} />);
   expect(screen.getByRole("heading", { name: "Revised Dealer Offer review" })).toBeInTheDocument();
   expect(screen.getByText(/Baseline 1 · Previous offer 2 · Current offer 3/)).toBeInTheDocument();
-  expect(screen.getByText(/INFORMATIONAL/)).toBeInTheDocument();
+  expect(screen.getByText(/Informational/)).toBeInTheDocument();
   expect(screen.getByText("+0.01 percentage points")).toBeInTheDocument();
 
-  const fee = screen.getByRole("heading", { name: "Doc fee · against the previous offer" }).closest("li")!;
+  const fee = screen.getByRole("heading", { name: "doc fee · against the previous offer" }).closest("li")!;
   expect(within(fee).getByText("$499.00", { exact: false })).toBeInTheDocument();
   expect(within(fee).getByText("$899.00", { exact: false })).toBeInTheDocument();
   expect(within(fee).getByText("+$400.00")).toBeInTheDocument();

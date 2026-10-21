@@ -80,6 +80,14 @@ public class EphemeralBuyingCaseService {
 
   public String buyerState(String postalCode) { return location.buyerState(postalCode); }
 
+  @org.springframework.transaction.annotation.Transactional
+  public BuyingCaseView changeLanguage(String caseId, String accessToken, String language) {
+    persistence.lock(caseId);
+    reopen(caseId, accessToken);
+    persistence.changeLanguage(caseId, language);
+    return reopen(caseId, accessToken);
+  }
+
   public String marketPostalCode(String caseId, String accessToken) {
     var buyingCase = reopen(caseId, accessToken);
     String dealer = buyingCase.dealerLocation();
@@ -127,7 +135,8 @@ public class EphemeralBuyingCaseService {
         channels.referralDisclosure(stored.id()).orElse(null),
         stored.accessExpiresAt(),
         stored.createdAt(),
-        stored.updatedAt());
+        stored.updatedAt(),
+        stored.language());
   }
 
   private StoredEphemeralCase requireAuthorized(
@@ -154,7 +163,8 @@ public class EphemeralBuyingCaseService {
       String referralDisclosure,
       Instant accessExpiresAt,
       Instant createdAt,
-      Instant updatedAt) {}
+      Instant updatedAt,
+      String language) {}
 
   public record BuyerLimitsView(Long maxSellingPriceMinor, Long maxOutTheDoorPriceMinor) {}
 }

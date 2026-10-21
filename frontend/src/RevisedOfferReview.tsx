@@ -2,6 +2,7 @@ import { DocumentSourceView, formatMoney, type DocumentSource } from "./Evidence
 import { DocFeeFindings, type DocFeeFinding } from "./DocFeeFindings";
 import { DealerAddOnsNote, type DealerAddOnCheck } from "./DealerAddOns";
 import { useMessages, type Messages } from "./i18n/LanguageProvider";
+import { findingCode } from "./i18n/findings";
 
 type CashDelta = {
   availability: string; currency?: string; preTaxDeltaMinor?: number;
@@ -43,28 +44,27 @@ function termValue(v: unknown, unit: string, t: Copy, unknown: string): string {
   return String(raw);
 }
 
-function classification(v: unknown, t: Copy, fill: Fill): string | null {
+function classification(v: unknown, t: Copy, fill: Fill, language: string): string | null {
   const term = fields(v);
   if (!term) return null;
   const parts = ([["category", t.category], ["taxClaim", t.tax], ["optionalityClaim", t.optional]] as const)
     .filter(([key]) => typeof term[key] === "string")
-    .map(([key, name]) => fill(name, { value: String(term[key]).replaceAll("_", " ").toLowerCase() }));
+    .map(([key, name]) => fill(name, { value: findingCode(language, String(term[key])) }));
   return parts.length ? parts.join(" · ") : null;
 }
 
-function termName(term: string, t: Copy, fill: Fill) {
+function termName(term: string, t: Copy, fill: Fill, language: string) {
   const [, kind, name, occurrence] = term.match(/^(candidate|line):(.*)#(\d+)$/) ?? [];
   if (!kind) return (t.limits as Record<string, string>)[term] ?? term.replace(/Minor$/, "").replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll(".", " · ");
-  const readable = kind === "candidate" ? name.replaceAll("_", " ").toLowerCase() : name;
-  const named = `${readable.charAt(0).toUpperCase()}${readable.slice(1)}`;
+  const named = kind === "candidate" ? findingCode(language, name) : name;
   return occurrence !== "1" ? fill(t.occurrence, { name: named, occurrence }) : named;
 }
 
-function difference(d: DealReview["discrepancies"][number], t: Copy, fill: Fill, unknown: string) {
+function difference(d: DealReview["discrepancies"][number], t: Copy, fill: Fill, unknown: string, language: string) {
   if (d.delta == null) return t.notComparable;
   if (d.unit.endsWith("_MINOR")) return signed(d.delta, d.unit.replace("_MINOR", ""), unknown);
   if (d.unit === "PERCENT") return fill(t.percentagePoints, { delta: `${d.delta > 0 ? "+" : ""}${d.delta}` });
-  return `${d.delta > 0 ? "+" : ""}${d.delta} ${d.unit.toLowerCase()}`;
+  return `${d.delta > 0 ? "+" : ""}${d.delta} ${findingCode(language, d.unit)}`;
 }
 
 function documentSource(evidence: unknown, offerVersion: number | null): DocumentSource | null {
@@ -97,7 +97,7 @@ function SourceLine({ evidence, side, offerVersion, baselineVersion, term, absen
 const comparisonName = (comparison: string, t: Copy) => comparison === "BASELINE" ? t.baseline : comparison === "PREVIOUS" ? t.previous : comparison.toLowerCase();
 
 export function RevisedOfferReview({ review, redacted }: { review: DealReview; redacted?: boolean }) {
-  const { m: { paperwork: { revisedOfferReview: t, common } }, fill, fillNodes } = useMessages();
+  const { m: { paperwork: { revisedOfferReview: t, common } }, fill, fillNodes, language } = useMessages();
   const unknown = common.unknown;
   const expectedVersion = (comparison: string) => comparison === "PREVIOUS" ? review.previousOfferVersion : null;
   return <section className="panel" id="revised-offer-review" tabIndex={-1} aria-labelledby="revised-review-heading">
@@ -105,7 +105,7 @@ export function RevisedOfferReview({ review, redacted }: { review: DealReview; r
     <p>{review.baselineVersion != null
       ? fill(t.versions, { baseline: review.baselineVersion, previous: review.previousOfferVersion, current: review.currentOfferVersion })
       : fill(t.versionsNoBaseline, { previous: review.previousOfferVersion, current: review.currentOfferVersion })}</p>
-    <p>{fill(t.reviewLine, { version: review.version, status: review.status.replaceAll("_", " "), checked: review.checkedAt })}</p>
+    <p>{fill(t.reviewLine, { version: review.version, status: findingCode(language, review.status), checked: review.checkedAt })}</p>
     <p>{review.scope}</p>
     <DocFeeFindings findings={review.docFeeFindings} />
     {review.dealerAddOns && <DealerAddOnsNote check={review.dealerAddOns} />}
@@ -131,12 +131,12 @@ export function RevisedOfferReview({ review, redacted }: { review: DealReview; r
     })}
     {review.discrepancies.length === 0 && <p>{t.noDifferences}</p>}
     <ol>{review.discrepancies.map((d, index) => {
-      const name = termName(d.term, t, fill);
+      const name = termName(d.term, t, fill, language);
       const cash = review.cashDeltas[d.comparison.toLowerCase()];
-      const expectedClass = classification(d.expected, t, fill), observedClass = classification(d.observed, t, fill);
+      const expectedClass = classification(d.expected, t, fill, language), observedClass = classification(d.observed, t, fill, language);
       return <li key={index}>
         <h4>{fill(t.termHeading, { term: name, comparison: comparisonName(d.comparison, t) })}</h4>
-        <p>{fill(d.uncertain ? t.kindUncertain : t.kind, { kind: d.kind.replaceAll("_", " ").toLowerCase(), severity: d.severity })}</p>
+        <p>{fill(d.uncertain ? t.kindUncertain : t.kind, { kind: findingCode(language, d.kind), severity: findingCode(language, d.severity) })}</p>
         <dl className="expected-observed">
           <div>
             <dt>{fill(t.expected, { comparison: comparisonName(d.comparison, t) })}</dt>
@@ -150,7 +150,7 @@ export function RevisedOfferReview({ review, redacted }: { review: DealReview; r
           </div>
           <div>
             <dt>{t.difference}</dt>
-            <dd>{difference(d, t, fill, unknown)}</dd>
+            <dd>{difference(d, t, fill, unknown, language)}</dd>
           </div>
           <div>
             <dt>{t.taxEffect}</dt>

@@ -17,12 +17,19 @@ class SmtpRecoveryEmail implements RecoveryEmail {
   }
   public void send(String recipient, String link) { send(recipient, link, Purpose.CASE_RECOVERY); }
   @Override public void send(String recipient, String link, Purpose purpose) {
+    send(recipient, link, purpose, "en");
+  }
+  @Override public void send(String recipient, String link, Purpose purpose, String language) {
     if (suppression.suppressed(recipient)) return;
     var mailer = sender.getIfAvailable();
     if (mailer == null || from.isBlank()) throw unavailable();
     var message = new SimpleMailMessage();
     message.setFrom(from); message.setTo(recipient);
-    if (purpose == Purpose.ACCOUNT_SIGN_IN) {
+    if ("es".equals(language)) {
+      var content = spanish(purpose, link);
+      message.setSubject(content.subject());
+      message.setText(content.body());
+    } else if (purpose == Purpose.ACCOUNT_SIGN_IN) {
       message.setSubject("Your otdog sign-in link");
       message.setText("You asked to sign in to your Buyer Account. This single-use link expires in 15 minutes.\n"
           + link + "\nIf you did not request this, ignore this email. No account is used until the link is opened.");
@@ -42,6 +49,30 @@ class SmtpRecoveryEmail implements RecoveryEmail {
       message.setText(prompt + "\nOpen your journey and sign in to review it.\n" + link);
     }
     try { mailer.send(message); } catch (org.springframework.mail.MailException failure) { throw unavailable(); }
+  }
+  record Content(String subject, String body) {}
+  static Content spanish(Purpose purpose, String link) {
+    if (purpose == Purpose.ACCOUNT_SIGN_IN) return new Content("Su enlace para iniciar sesión en otdog",
+        "Usted pidió iniciar sesión en su cuenta de comprador. Este enlace de un solo uso vence en 15 minutos.\n"
+            + link + "\nSi no lo solicitó, ignore este correo. La cuenta no se usa hasta que se abra el enlace.");
+    if (purpose == Purpose.CASE_RECOVERY) return new Content("Su enlace de acceso al caso de compra",
+        "Usted solicitó acceso a su caso de compra. Este enlace de un solo uso vence en 15 minutos.\n"
+            + link + "\nSi no lo solicitó, ignore este correo.");
+    String subject = switch (purpose) {
+      case DEALER_REPLY -> "Tiene una respuesta del concesionario";
+      case DRAFT_NEEDS_APPROVAL -> "Un borrador necesita su aprobación";
+      case MANDATE_EXPIRING -> "Su límites de negociación está por vencer";
+      case APPOINTMENT -> "Hay una actualización de su cita";
+      default -> "Hay una actualización de seguridad de su cuenta";
+    };
+    String prompt = switch (purpose) {
+      case DEALER_REPLY -> "Hay una respuesta lista para revisar.";
+      case DRAFT_NEEDS_APPROVAL -> "Un borrador necesita su aprobación.";
+      case MANDATE_EXPIRING -> "Su límites de negociación está por vencer.";
+      case APPOINTMENT -> "Hay una actualización de su cita lista para revisar.";
+      default -> "Hay una actualización de seguridad de su cuenta lista para revisar.";
+    };
+    return new Content(subject, prompt + "\nAbra su plan de compra e inicie sesión para revisarla.\n" + link);
   }
   private ResponseStatusException unavailable() {
     return new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Email delivery unavailable; retry safely.");

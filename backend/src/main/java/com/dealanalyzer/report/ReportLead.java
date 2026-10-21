@@ -7,8 +7,8 @@ public final class ReportLead {
   private ReportLead() {}
   public static JsonNode total(JsonNode payload) {
     for (var amount : payload.at("/analysis/materialAmounts"))
-      if (amount.path("label").asText().equals("Out-the-door total")
-          || amount.path("pointer").asText().equals("/result/outTheDoorTotal")) return amount;
+      if (java.util.List.of("/result/outTheDoorTotal", "/inputs/outTheDoorTotalMinor", "/analysis/economics/outTheDoorTotal")
+          .contains(amount.path("pointer").asText())) return amount;
     return com.fasterxml.jackson.databind.node.NullNode.getInstance();
   }
   public static boolean known(JsonNode amount) {

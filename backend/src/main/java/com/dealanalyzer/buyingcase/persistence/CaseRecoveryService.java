@@ -60,7 +60,9 @@ public class CaseRecoveryService {
     var token = new RecoveryTokenEntity(); token.tokenHash=access.protectRecoveryToken(credential.token());
     token.caseId=buyingCase.id; token.deliveryId=delivery.id; token.expiresAt=delivery.expiresAt;
     tokens.saveAndFlush(token);
-    email.send(recipient, origin + "#recover=" + credential.token());
+    if ("es".equals(buyingCase.language))
+      email.send(recipient, origin + "#recover=" + credential.token(), RecoveryEmail.Purpose.CASE_RECOVERY, "es");
+    else email.send(recipient, origin + "#recover=" + credential.token());
   }
   @Transactional
   public Recovered verify(String supplied) {

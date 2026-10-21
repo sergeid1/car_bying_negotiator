@@ -10,6 +10,8 @@ import java.time.Instant;
 @Entity
 @Table(name = "analysis_cases")
 class AnalysisCaseEntity {
+  @Column(nullable = false, length = 2)
+  String language = "en";
   @Column(nullable = false)
   String lifecycle = "ACTIVE";
 

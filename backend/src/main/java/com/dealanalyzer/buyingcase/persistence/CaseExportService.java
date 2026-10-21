@@ -57,7 +57,7 @@ public class CaseExportService {
       else {
         var payload=reports.findProjectedById(new AnalysisReportKey(caseId,version)).orElseThrow(()->new ResourceNotFoundException("Report not found"));
         var report=json.readTree(payload.getPayloadJson());
-        content=format==Format.HTML ? renderer.html(report) : renderer.pdf(report);
+        content=format==Format.HTML ? renderer.html(report, buyingCase.language) : renderer.pdf(report, buyingCase.language);
       }
     } catch(IOException failure) { throw new IllegalStateException("Export unavailable; retry safely",failure); }
     var job=new ExportJobEntity(); job.id=UUID.randomUUID().toString(); job.caseId=caseId; job.requestKey=key;

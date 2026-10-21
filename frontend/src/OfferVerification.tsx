@@ -3,6 +3,7 @@ import * as format from "./i18n/format";
 import { en } from "./i18n/en";
 import { fillIn, type Message, type Values } from "./i18n/messages";
 import { useMessages, type Messages } from "./i18n/LanguageProvider";
+import { findingCode } from "./i18n/findings";
 
 type EvidenceRegion = { pageNumber: number; x: number; y: number; width: number; height: number };
 
@@ -51,11 +52,6 @@ const CATEGORIES = [
 
 const TRADE_FIELDS = new Set(["TRADE_ALLOWANCE", "TRADE_PAYOFF"]);
 
-function humanize(value: string) {
-  const words = value.toLowerCase().replaceAll("_", " ");
-  return words[0].toUpperCase() + words.slice(1);
-}
-
 type Copy = Messages["paperwork"]["offerVerification"];
 
 /** English, for a caller outside a component; components pass the current language's copy. */
@@ -65,8 +61,8 @@ function fillCopy<M extends Message>(message: M, values: Values<M>) {
   return fillIn(format.locale(), message, values);
 }
 
-const fieldLabel = (field: string, t: Copy) => (t.fields as Record<string, string>)[field] ?? humanize(field);
-const categoryLabel = (category: string, t: Copy) => (t.categories as Record<string, string>)[category] ?? humanize(category);
+const fieldLabel = (field: string, t: Copy, language: string) => (t.fields as Record<string, string>)[field] ?? findingCode(language, field);
+const categoryLabel = (category: string, t: Copy, language: string) => (t.categories as Record<string, string>)[category] ?? findingCode(language, category);
 const lineLabel = (label: string, t: Copy) => fillCopy(t.lineItem, { label });
 
 function money(minor: number, currency = "USD") {
@@ -102,7 +98,7 @@ const mustCorrect = (candidate: Candidate) => candidate.material && !candidateVa
 type Change = { term: string; before: string; after: string };
 
 /** Every term that differs between two consecutive frozen versions, including added and removed ones. */
-export function offerChanges(previous: DealerOffer, current: DealerOffer, t: Copy = ENGLISH): Change[] {
+export function offerChanges(previous: DealerOffer, current: DealerOffer, t: Copy = ENGLISH, language = "en"): Change[] {
   const keyed = <T,>(items: T[], key: (item: T) => string) => {
     const seen = new Map<string, number>();
     return new Map(items.map(item => {
@@ -121,13 +117,13 @@ export function offerChanges(previous: DealerOffer, current: DealerOffer, t: Cop
     }
   };
   const candidates = (offer: DealerOffer) =>
-    keyed(offer.terms.candidates ?? [], item => fieldLabel(item.field, t));
+    keyed(offer.terms.candidates ?? [], item => fieldLabel(item.field, t, language));
   compare(candidates(previous), candidates(current),
     item => (item ? formatValue(item.value, item.unit, t) : t.notInVersion));
   const lines = (offer: DealerOffer) =>
     keyed(offer.terms.lineItems ?? [], item => lineLabel(item.originalLabel, t));
   compare(lines(previous), lines(current),
-    item => (item ? `${money(item.amountMinor, item.currency)} · ${categoryLabel(item.category, t)}` : t.notInVersion));
+    item => (item ? `${money(item.amountMinor, item.currency)} · ${categoryLabel(item.category, t, language)}` : t.notInVersion));
   return changes;
 }
 
@@ -446,8 +442,8 @@ export function OfferVerification({
 }
 
 function VersionChanges({ previous, current }: { previous: DealerOffer; current: DealerOffer }) {
-  const { m: { paperwork: { offerVerification: t } }, fill } = useMessages();
-  const changes = offerChanges(previous, current, t);
+  const { m: { paperwork: { offerVerification: t } }, fill, language } = useMessages();
+  const changes = offerChanges(previous, current, t, language);
   const versions = { previous: previous.version, current: current.version };
   if (changes.length === 0) {
     return <p>{fill(t.noDifferences, versions)}</p>;
@@ -524,9 +520,9 @@ function CorrectionHistory({ history, show }: { history: Correction[]; show: (co
 }
 
 function CandidateRow({ item, busy, filename, decisions, pageFor, onConfirm, onCorrect }: RowProps & { item: Candidate }) {
-  const { m: { paperwork: { offerVerification: t } }, fill } = useMessages();
+  const { m: { paperwork: { offerVerification: t } }, fill, language } = useMessages();
   const [editing, setEditing] = useState(false);
-  const label = fieldLabel(item.field, t);
+  const label = fieldLabel(item.field, t, language);
   const decision = decisions[item.id] === "CONFIRMED" && mustCorrect(item) ? undefined : decisions[item.id];
   const missing = !item.normalizedValue;
   const lowConfidence = item.confidence < LOW_CONFIDENCE;
@@ -587,7 +583,7 @@ function CandidateRow({ item, busy, filename, decisions, pageFor, onConfirm, onC
 }
 
 function LineItemRow({ item, busy, filename, decisions, pageFor, onConfirm, onCorrect }: RowProps & { item: LineItem }) {
-  const { m: { paperwork: { offerVerification: t } }, fill } = useMessages();
+  const { m: { paperwork: { offerVerification: t } }, fill, language } = useMessages();
   const [editing, setEditing] = useState(false);
   const label = lineLabel(item.originalLabel, t);
   const decision = decisions[item.id];
@@ -610,8 +606,8 @@ function LineItemRow({ item, busy, filename, decisions, pageFor, onConfirm, onCo
         <h4>{label}</h4>
         <DecisionBadge decision={decision} lowConfidence={item.confidence < LOW_CONFIDENCE} missing={false} />
         <dl className="verify-facts">
-          {correction && <div><dt>{t.yourValue}</dt><dd>{money(correction.amountMinor ?? 0, item.currency)} · {categoryLabel(correction.category ?? item.category, t)}</dd></div>}
-          <div><dt>{correction ? t.readKept : t.read}</dt><dd>{money(item.amountMinor, item.currency)} · {categoryLabel(item.category, t)}</dd></div>
+          {correction && <div><dt>{t.yourValue}</dt><dd>{money(correction.amountMinor ?? 0, item.currency)} · {categoryLabel(correction.category ?? item.category, t, language)}</dd></div>}
+          <div><dt>{correction ? t.readKept : t.read}</dt><dd>{money(item.amountMinor, item.currency)} · {categoryLabel(item.category, t, language)}</dd></div>
           <div><dt>{t.confidence}</dt><dd>{Math.round(item.confidence * 100)}%</dd></div>
           <div><dt>{t.source}</dt><dd>{fill(t.sourcePage, { page: item.evidence.pageNumber, file: filename })}</dd></div>
         </dl>
@@ -629,7 +625,7 @@ function LineItemRow({ item, busy, filename, decisions, pageFor, onConfirm, onCo
           </div>
         )}
         <CorrectionHistory history={item.correctionHistory}
-          show={value => `${money(value.amountMinor ?? 0, item.currency)} · ${categoryLabel(value.category ?? item.category, t)}`} />
+          show={value => `${money(value.amountMinor ?? 0, item.currency)} · ${categoryLabel(value.category ?? item.category, t, language)}`} />
         <div className="actions">
           <button type="button" className="btn-secondary" disabled={busy} aria-pressed={decision === "CONFIRMED"}
             onClick={() => onConfirm(item.id)}>
@@ -647,7 +643,7 @@ function LineItemRow({ item, busy, filename, decisions, pageFor, onConfirm, onCo
               pattern="\$?-?[0-9,]+(\.[0-9]{1,2})?" defaultValue={(lineAmount(item) / 100).toFixed(2)} />
             <label htmlFor={`${inputId}-category`}>{t.kindOfCharge}</label>
             <select id={`${inputId}-category`} name="category" defaultValue={lineCategory(item)}>
-              {CATEGORIES.map(category => <option key={category} value={category}>{categoryLabel(category, t)}</option>)}
+              {CATEGORIES.map(category => <option key={category} value={category}>{categoryLabel(category, t, language)}</option>)}
             </select>
             <button disabled={busy}>{t.saveCorrection}</button>
           </form>
