@@ -21,6 +21,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class QuoteRequestService implements RelayMessageOwner {
   public static final String SUBJECT = "Request for an itemized vehicle quote";
+  public static final String SUBJECT_ES = "Solicitud de una cotización detallada del vehículo";
+  public static String subject(String language) { return "es".equals(language) ? SUBJECT_ES : SUBJECT; }
   private final EphemeralBuyingCaseService cases;
   private final EphemeralCasePersistence locks;
   private final OutboundDraftService drafts;
@@ -39,7 +41,9 @@ public class QuoteRequestService implements RelayMessageOwner {
   public record Quote(String id, String dealerAddress, String state, String messageId,
       Instant approvedAt, OutboundDraftService.StoredDraft gatedDraft) {}
   public record ReplyDocument(String documentId, String outcome, Integer offerVersion, String sourceKind, String messageId) {}
-  public record Dealer(String id, String name) {}
+  /** {@code emailLanguage} is the language the Buyer chose for this dealer's emails. */
+  public record Dealer(String id, String name, String emailLanguage) {}
+  public record LanguageChoice(String language) {}
   public record View(NegotiationStateService.State negotiationState, List<Quote> requests,
       List<ReplyDocument> documents, List<Dealer> dealers) {}
 
@@ -91,7 +95,8 @@ public class QuoteRequestService implements RelayMessageOwner {
       }
       // Keep the case lock through the hand-off, serializing mandate revocation and deletion.
       try {
-        var handoff = handoffs.handOff(caseId, quote.dealerAddress(), SUBJECT, quote.gatedDraft().draft().text(), java.util.Set.of());
+        var handoff = handoffs.handOff(caseId, quote.dealerAddress(), subject(quote.gatedDraft().language()),
+            quote.gatedDraft().draft().text(), java.util.Set.of());
         jdbc.update("update quote_requests set state = ?, message_id = ? where id = ?", handoff.state(), handoff.messageId(), id);
         if (handoff.sent()) negotiation.transition(caseId, NegotiationStateService.State.AWAITING_DEALER);
       } catch (RelayService.RelayRefusedException refused) {
@@ -102,8 +107,32 @@ public class QuoteRequestService implements RelayMessageOwner {
     });
   }
 
+  /**
+   * Sets the language of one dealer's emails (ticket 149). Requests still awaiting approval are prepared again in
+   * the new language and replace the old drafts, which stay in the case record; anything approved stays as it was.
+   */
+  @Transactional
+  public View changeLanguage(String caseId, String token, String dealerId, LanguageChoice choice) {
+    locks.lock(caseId); cases.reopen(caseId, token);
+    if (choice == null || choice.language() == null) throw new IllegalArgumentException("Choose English or Spanish.");
+    drafts.changeLanguage(caseId, dealerId, choice.language());
+    var pending = jdbc.query("""
+        select q.id, q.dealer_address from quote_requests q join outbound_drafts d on d.id = q.draft_id
+        where q.case_id = ? and d.dealer_id = ? and q.state = 'DRAFT' and d.language <> ? order by q.created_at, q.id
+        """, (r, n) -> new String[] {r.getString(1), r.getString(2)}, caseId, dealerId, choice.language());
+    String text = drafts.context(caseId, dealerId).quoteRequestQuestion();
+    for (String[] request : pending) {
+      if (text == null) break;
+      var draft = drafts.create(caseId, token, "quote-request-language:" + UUID.randomUUID(), new OutboundGate.Draft(dealerId, text));
+      jdbc.update("update quote_requests set state = 'REPLACED' where id = ? and state = 'DRAFT'", request[0]);
+      jdbc.update("insert into quote_requests(id, case_id, draft_id, dealer_address, state, created_at) values (?, ?, ?, ?, 'DRAFT', ?)",
+          UUID.randomUUID().toString(), caseId, draft.id(), request[1], Timestamp.from(Instant.now()));
+    }
+    return view(caseId, token);
+  }
+
   private void requirePermitted(String caseId, Quote quote) {
-    var context = drafts.context(caseId, quote.gatedDraft().draft().dealerId());
+    var context = drafts.context(caseId, quote.gatedDraft().draft().dealerId(), quote.gatedDraft().language());
     var decision = new OutboundGate().check(quote.gatedDraft().draft(), context);
     if (!quote.gatedDraft().decision().pass() || !decision.pass() || context.mandate() == null
         || !context.mandate().id().equals(quote.gatedDraft().mandateId()))
@@ -150,13 +179,15 @@ public class QuoteRequestService implements RelayMessageOwner {
   public View view(String caseId, String token) {
     locks.lock(caseId); cases.reopen(caseId, token);
     var dealers = jdbc.query("""
-        select d.id, d.name from dealers d join vehicles v on v.case_id = d.case_id
+        select d.id, d.name, d.email_language from dealers d join vehicles v on v.case_id = d.case_id
         where d.case_id = ? and exists (
           select 1 from listing_snapshots l where l.case_id = d.case_id and l.dealer_id = d.id and l.vin = v.vin
         ) order by d.name, d.id
-        """, (r, n) -> new Dealer(r.getString(1), r.getString(2)), caseId).stream()
+        """, (r, n) -> new Dealer(r.getString(1), r.getString(2), r.getString(3)), caseId).stream()
         .filter(dealer -> drafts.context(caseId, dealer.id()).quoteRequestQuestion() != null).toList();
-    var ids = jdbc.queryForList("select id from quote_requests where case_id = ? order by created_at, id", String.class, caseId);
+    // A request replaced by a language change was never approved; it stays in the case record, not in the view.
+    var ids = jdbc.queryForList("select id from quote_requests where case_id = ? and state <> 'REPLACED' order by created_at, id",
+        String.class, caseId);
     var documents = jdbc.query("""
         select a.document_id, a.outcome, o.offer_version, a.ordinal, a.message_id from dealer_relay_attachments a
         left join document_extractions e on e.document_id = a.document_id

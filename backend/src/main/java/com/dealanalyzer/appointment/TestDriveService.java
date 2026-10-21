@@ -46,7 +46,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Service
 public class TestDriveService implements RelayMessageOwner {
-  private static final Pattern OPTION = Pattern.compile("(?i)\\boption\\s*(?:#|no\\.?|number)?\\s*([1-9])\\b");
+  private static final Pattern OPTION = Pattern.compile("(?iu)(?<!\\p{L})(?:option|opci[oó]n)\\s*(?:#|no\\.?|number|n[uú]mero)?\\s*([1-9])\\b");
   private static final TypeReference<List<TestDriveText.Slot>> SLOTS = new TypeReference<>() {};
 
   private final EphemeralBuyingCaseService cases;
@@ -140,17 +140,18 @@ public class TestDriveService implements RelayMessageOwner {
     ZoneId zone;
     try { zone = ZoneId.of(request.timeZone() == null ? "" : request.timeZone()); }
     catch (DateTimeException invalid) { throw new IllegalArgumentException("Choose a valid time zone."); }
-    var slots = TestDriveText.slots(request.windows(), zone, Instant.now());
+    String language = drafts.language(caseId, agreed.dealerId());
+    var slots = TestDriveText.slots(request.windows(), zone, Instant.now(), language);
     String kind, text;
     if (request.appointmentId() != null) {
       Appointment current = appointment(caseId, request.appointmentId());
       if (!"SCHEDULED".equals(current.state())) throw new IllegalArgumentException("Only a booked test drive can be moved.");
-      kind = "RESCHEDULE"; text = TestDriveText.reschedule(current.label(), slots);
+      kind = "RESCHEDULE"; text = TestDriveText.reschedule(label(current, language), slots, language);
     } else {
       if (active(caseId).isPresent()) throw new IllegalArgumentException("A test drive is already booked. Move or cancel it instead.");
-      kind = "PROPOSAL"; text = TestDriveText.proposal(slots);
+      kind = "PROPOSAL"; text = TestDriveText.proposal(slots, language);
     }
-    return insert(caseId, token, key, fingerprint, agreed, kind, request.appointmentId(), zone.getId(), slots, text);
+    return insert(caseId, token, key, fingerprint, agreed, kind, request.appointmentId(), zone.getId(), slots, text, language);
   }
 
   /** Records the Buyer's confirmation of a dealer reply and their contact choice, and prepares the booking message. */
@@ -200,8 +201,10 @@ public class TestDriveService implements RelayMessageOwner {
           insert into test_drive_contact_releases (id, case_id, appointment_id, account_id, dealer_id, released_fields, state, decided_at)
           values (?, ?, ?, ?, ?, ?, 'PREPARED', ?)
           """, UUID.randomUUID().toString(), caseId, appointmentId, accountId, agreed.dealerId(), encode(fields), Timestamp.from(now));
+      String language = drafts.language(caseId, agreed.dealerId());
+      String label = TestDriveText.label(slot.startsAt(), slot.endsAt(), ZoneId.of(proposal.timeZone()), language);
       return insert(caseId, token, key, fingerprint, agreed, "BOOKING", appointmentId, proposal.timeZone(), List.of(slot),
-          TestDriveText.booking(slot.label(), fields));
+          TestDriveText.booking(label, fields, language), language);
     });
   }
 
@@ -216,8 +219,9 @@ public class TestDriveService implements RelayMessageOwner {
     Appointment appointment = appointment(caseId, appointmentId);
     if (!List.of("SCHEDULED", "RESCHEDULING").contains(appointment.state()))
       throw new IllegalArgumentException("Only a booked test drive can be cancelled.");
+    String language = drafts.language(caseId, agreed.dealerId());
     return insert(caseId, token, key, fingerprint, agreed, "CANCELLATION", appointmentId, appointment.timeZone(), List.of(),
-        TestDriveText.cancellation(appointment.label()));
+        TestDriveText.cancellation(label(appointment, language), language), language);
   }
 
   // ---------------------------------------------------------------- approve and send
@@ -251,11 +255,12 @@ public class TestDriveService implements RelayMessageOwner {
       if ("BOOKING".equals(message.kind()) && !message.release().isEmpty()) {
         var values = contacts.values(accountId, caseId, message.release());
         released.addAll(values.values());
-        body = body + "\n\n" + TestDriveText.releasedBlock(values);
+        body = body + "\n\n" + TestDriveText.releasedBlock(values, message.gatedDraft().language());
       }
       DealerMessageHandoff.Outcome handoff;
       try {
-        handoff = handoffs.handOff(caseId, agreed.dealerAddress(), TestDriveText.subject(message.kind()), body, released);
+        handoff = handoffs.handOff(caseId, agreed.dealerAddress(), TestDriveText.subject(message.kind(), message.gatedDraft().language()),
+            body, released);
       } catch (RelayService.RelayRefusedException refused) {
         // An invalid message, or one revealing the Buyer's details, is not handed off.
         jdbc.update("update test_drive_messages set state = ? where id = ?", refused.reason().name(), id);
@@ -364,7 +369,7 @@ public class TestDriveService implements RelayMessageOwner {
 
   private void requirePermitted(String caseId, Message message) {
     var draft = message.gatedDraft();
-    var context = drafts.context(caseId, draft.draft().dealerId());
+    var context = drafts.context(caseId, draft.draft().dealerId(), draft.language());
     if (!draft.decision().pass() || !new OutboundGate().check(draft.draft(), context).pass()
         || context.mandate() == null || !context.mandate().id().equals(draft.mandateId()))
       throw new IllegalArgumentException("The current mandate or policy no longer permits this message. Prepare a new one.");
@@ -396,7 +401,7 @@ public class TestDriveService implements RelayMessageOwner {
   // ---------------------------------------------------------------- persistence helpers
 
   private Message insert(String caseId, String token, String key, String fingerprint, Agreed agreed, String kind,
-      String appointmentId, String zone, List<TestDriveText.Slot> slots, String text) {
+      String appointmentId, String zone, List<TestDriveText.Slot> slots, String text, String language) {
     String id = UUID.randomUUID().toString();
     // The row exists before the draft so the gate can ground exactly this rendered text.
     jdbc.update("""
@@ -405,9 +410,14 @@ public class TestDriveService implements RelayMessageOwner {
         values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?)
         """, id, caseId, agreed.id(), agreed.quoteRequestId(), appointmentId, kind, zone, write(slots), text, key, fingerprint,
         Timestamp.from(PersistedInstant.round(Instant.now())));
-    var draft = drafts.create(caseId, token, "test-drive:" + offers.fingerprint(key), new OutboundGate.Draft(agreed.dealerId(), text));
+    var draft = drafts.create(caseId, token, "test-drive:" + offers.fingerprint(key), new OutboundGate.Draft(agreed.dealerId(), text), language);
     jdbc.update("update test_drive_messages set draft_id = ? where id = ?", draft.id(), id);
     return message(caseId, token, id);
+  }
+
+  /** The appointment's time in the dealer's email language, as its messages name it. */
+  private static String label(Appointment appointment, String language) {
+    return TestDriveText.label(appointment.startsAt(), appointment.endsAt(), ZoneId.of(appointment.timeZone()), language);
   }
 
   private Optional<Message> replay(String caseId, String token, String key, String fingerprint) {

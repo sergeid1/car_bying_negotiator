@@ -14,7 +14,7 @@ What is in place:
 
 - `i18n/es.ts` and `i18n/es/*.ts` cover every English id, checked by `translation<typeof en>()`. The register is
   neutral US Latin American Spanish with "usted". Kept in English: brand and product names, the synthetic example
-  data, and the email subject sent to dealers (working default 4).
+  data, and the email subject sent to dealers (working default 4; ticket 149 adds Spanish dealer emails).
 - `i18n/glossary.ts` holds 36 terms with their Spanish form and whether the first use on a screen adds the English
   term, as in "precio total final (out-the-door)". `es.test.ts` checks every screen against it.
 - `ThemeMenu` became `ThemeLanguageMenu`: one header button, two `menuitemradio` groups (Theme, Language), each

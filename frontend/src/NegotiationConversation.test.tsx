@@ -145,3 +145,22 @@ test("a message the former platform relay never confirmed is shown with no deliv
   expect(screen.queryByRole("button", { name: /^Check delivery|^Retry/ })).toBeNull();
   expect(fetcher.mock.calls.every(([url]) => !url.includes("/relay/"))).toBe(true);
 });
+
+// Ticket 149: a Spanish draft is approved as the exact Spanish text; it has no reading copy and is marked as Spanish.
+test("a Spanish counteroffer names the Spanish text on its approval button and shows no reading copy", async () => {
+  const spanish = "¿Consideraría USD 18500.00 como precio de venta en una oferta revisada por escrito?";
+  const view = conversation();
+  const draft = view.entries[3].counteroffer!;
+  view.entries[3] = { ...view.entries[3], counteroffer: { ...draft,
+    revisions: [{ revision: 1, editedByBuyer: false, text: spanish, decision: pass, createdAt: "2026-10-04T14:00:00Z", language: "es" }] } };
+  const fetcher = mock(view);
+  render(<NegotiationConversation caseId="c1" token="secret" />);
+  const approve = await screen.findByRole("button", { name: "Approve the Spanish text of revision 1" });
+  expect(screen.getByText(spanish)).toHaveAttribute("lang", "es");
+  expect(screen.queryByText(/For you to read/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Edit this draft" }));
+  expect(screen.getByRole("textbox", { name: "Revised text" })).toHaveAttribute("lang", "es");
+  fireEvent.click(approve);
+  await waitFor(() => expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/negotiation-conversation/drafts/n1/approval",
+    expect.objectContaining({ method: "POST", body: JSON.stringify({ approved: true, text: spanish }) })));
+});

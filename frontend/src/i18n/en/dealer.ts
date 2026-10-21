@@ -299,6 +299,8 @@ export const dealer = {
     noContactAdded: "No contact details are added to this message.",
     approveWithDetails: "Approve this text with the chosen details",
     approve: "Approve this text",
+    approveSpanishWithDetails: "Approve this Spanish text with the chosen details",
+    approveSpanish: "Approve this Spanish text",
     bookedOnSend: "The test drive is booked, and the calendar file is ready, once you send this message and tell us.",
     replies: "Dealer replies to your times",
     checkReplies: "Check each reply yourself. A reply is dealer content; nothing is booked until you confirm a time and approve the booking message.",

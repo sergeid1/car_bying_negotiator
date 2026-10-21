@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
 import { DealerRelay } from "./DealerRelay";
 import { DealerHandoff, DealerReplyPaste } from "./DealerHandoff";
@@ -8,10 +8,14 @@ import { AgreedPrice } from "./AgreedPrice";
 import { NegotiationConversation } from "./NegotiationConversation";
 import { TestDriveAppointment } from "./TestDriveAppointment";
 import { useMessages } from "./i18n/LanguageProvider";
+import { findingCode } from "./i18n/findings";
 
+/** The language a dealer's emails are written in; English unless the Buyer chose Spanish for that dealer. */
+export type EmailLanguage = "en" | "es";
 type Quote = { id: string; dealerAddress: string; state: string; messageId?: string | null;
-  gatedDraft: { draft: { text: string }; decision: GateDecision } };
-type View = { negotiationState: string; requests: Quote[]; dealers: { id: string; name: string }[];
+  gatedDraft: { draft: { dealerId?: string; text: string }; decision: GateDecision; language?: EmailLanguage } };
+type Dealer = { id: string; name: string; emailLanguage?: EmailLanguage };
+type View = { negotiationState: string; requests: Quote[]; dealers: Dealer[];
   documents: { documentId: string | null; outcome: string; offerVersion: number | null; sourceKind: string; messageId: string }[] };
 // Anything other than the documented shape is treated as unavailable rather than rendered.
 function checkedView(value: unknown, unavailable: string): View {
@@ -33,10 +37,11 @@ export function QuoteRequest({ caseId, token }: {
   const [review, setReview] = useState(false);
   const [offerVersion, setOfferVersion] = useState<number>();
   const [relayVersion, setRelayVersion] = useState(0);
+  const [languageStatus, setLanguageStatus] = useState("");
   const key = useRef(crypto.randomUUID());
   const path = `/api/v1/cases/${encodeURIComponent(caseId)}/quote-requests`;
-  async function request(url: string, body?: unknown) {
-    const response = await fetch(url, { method: body === undefined ? "GET" : "POST",
+  async function request(url: string, body?: unknown, method = body === undefined ? "GET" : "POST") {
+    const response = await fetch(url, { method,
       headers: { "Case-Access-Token": token, "Content-Type": "application/json", "Idempotency-Key": key.current },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     if (!response.ok) {
@@ -74,6 +79,14 @@ export function QuoteRequest({ caseId, token }: {
     } catch (failure) { setError((failure as Error).message); }
     finally { setBusy(false); }
   }
+  async function changeLanguage(dealer: string, language: EmailLanguage) {
+    setBusy(true); setError(undefined); setLanguageStatus("");
+    try {
+      setView(asView(await request(`${path}/dealers/${encodeURIComponent(dealer)}/email-language`, { language }, "PUT")));
+      setRelayVersion(v => v + 1); setLanguageStatus(t.emailLanguageSaved);
+    } catch { setError(t.emailLanguageFailed); }
+    finally { setBusy(false); }
+  }
   return <section className="stack" aria-label={t.label}>
     <div className="panel quote-request-panel">
       <h2>{t.heading}</h2>
@@ -91,19 +104,25 @@ export function QuoteRequest({ caseId, token }: {
         setError(undefined); void refresh().catch(() => setError(t.refreshFailed));
       }}>{common.refreshConversation}</button>
       {error && <p role="alert">{error}</p>}
-      {view?.requests.map(quote => <article key={quote.id} className="card">
+      <p role="status">{languageStatus}</p>
+      {view?.requests.map(quote => {
+        const language = quote.gatedDraft.language ?? "en";
+        const dealer = view.dealers.find(candidate => candidate.id === quote.gatedDraft.draft.dealerId);
+        return <article key={quote.id} className="card">
         <h3>{fill(t.requestTo, { address: quote.dealerAddress })}</h3>
-        <p>{t.subject}</p>
-        <p>{quote.gatedDraft.draft.text}</p>
+        {dealer && <EmailLanguageChoice dealer={dealer} busy={busy} onChange={value => void changeLanguage(dealer.id, value)} />}
+        <p>{language === "es" ? t.subjectSpanish : t.subject}</p>
+        <p lang={language}>{quote.gatedDraft.draft.text}</p>
         <OutboundGateDecision decision={quote.gatedDraft.decision} />
         {quote.state === "DRAFT" ? <button type="button" disabled={busy || !quote.gatedDraft.decision.pass}
-          onClick={() => void approve(quote)}>{t.approveText}</button>
+          onClick={() => void approve(quote)}>{language === "es" ? t.approveSpanishText : t.approveText}</button>
           : quote.state === "HANDED_OFF" && quote.messageId
             ? <DealerHandoff caseId={caseId} token={token} messageId={quote.messageId} onChanged={refresh} />
             : <p>{quoteStates[quote.state] ?? t.deliveryNotConfirmed}</p>}
         {quote.state === "SENT" && <DealerReplyPaste caseId={caseId} token={token} quoteRequestId={quote.id}
           dealerAddress={quote.dealerAddress} onAdded={refresh} />}
-      </article>)}
+      </article>;
+      })}
       {!!view?.documents.length && <>
         <p>{t.documentReview}</p>
         <ul aria-label={t.sources}>{view.documents.map((document, index) => <li key={`${document.messageId}-${index}`}>
@@ -126,4 +145,20 @@ export function QuoteRequest({ caseId, token }: {
     }} />}
     {offerVersion !== undefined && <VerifiedOfferAnalysis key={offerVersion} caseId={caseId} token={token} offerVersion={offerVersion} />}
   </section>;
+}
+
+/** The dealer's email language, chosen from that dealer's request; drafts already approved keep their language. */
+function EmailLanguageChoice({ dealer, busy, onChange }: { dealer: Dealer; busy: boolean; onChange: (language: EmailLanguage) => void }) {
+  const { m: { messages: { quoteRequest: t } }, language } = useMessages();
+  const id = useId();
+  return <div className="email-language">
+    <label htmlFor={id}>{t.emailLanguage}</label>
+    <select id={id} value={dealer.emailLanguage ?? "en"} disabled={busy} aria-describedby={`${id}-note`}
+      onChange={event => onChange(event.target.value as EmailLanguage)}>
+      {/* Each language by its own name, as in the header's language menu. */}
+      <option value="en" lang="en">{findingCode(language, "englishName")}</option>
+      <option value="es" lang="es">{findingCode(language, "spanishName")}</option>
+    </select>
+    <p id={`${id}-note`}>{t.emailLanguageNote}</p>
+  </div>;
 }

@@ -133,6 +133,7 @@ class CaseIsolationInventoryAcceptanceTest {
       caseRow("GET", C + "/quote-requests", null),
       caseRow("POST", C + "/quote-requests", "{\"dealerId\":\"{dealerId}\",\"dealerAddress\":\"sales@dealer.example\"}"),
       caseRow("POST", C + "/quote-requests/{id}/approval", "{\"approved\":true,\"text\":\"x\"}", "id=quoteId"),
+      caseRow("PUT", C + "/quote-requests/dealers/{dealerId}/email-language", "{\"language\":\"es\"}"),
       caseRow("GET", C + "/negotiation-conversation", null),
       caseRow("POST", C + "/negotiation-conversation/drafts", "{\"quoteRequestId\":\"{quoteId}\"}"),
       caseRow("POST", C + "/negotiation-conversation/drafts/{id}/revisions", "{\"text\":\"x\"}", "id=conversationDraftId"),

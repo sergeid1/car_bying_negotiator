@@ -3,6 +3,7 @@ package com.dealanalyzer.negotiation;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /** Controlled language over finalized findings. Never interpolates document or provider prose. */
@@ -13,6 +14,40 @@ public final class GroundedLanguage {
   public record Item(String sourcePointer, String sourceValue, String explanation, String question) {}
   public record Language(String policyVersion, List<Item> items, String draft, String scope) {
     public Language { items = List.copyOf(items); }
+  }
+
+  /**
+   * The Spanish counterpart of each question {@link #generate} can produce, for a dealer whose emails the Buyer
+   * chose to send in Spanish (ticket 149). Exact strings only: a question without a counterpart authorizes nothing.
+   */
+  private static final Map<String, String> SPANISH = Map.ofEntries(
+      Map.entry("Could you provide a current itemized written offer?",
+          "¿Podría enviarme una oferta actual por escrito y detallada?"),
+      Map.entry("Could you walk me through the current written terms and any changes?",
+          "¿Podría explicarme los términos actuales por escrito y cualquier cambio?"),
+      Map.entry("Could you confirm whether this exact written offer is still available?",
+          "¿Podría confirmar si esta misma oferta por escrito sigue disponible?"),
+      Map.entry("Could you reconcile the quoted payment with the recorded loan terms and payment schedule?",
+          "¿Podría conciliar el pago cotizado con los términos del préstamo y el calendario de pagos registrados?"),
+      Map.entry("Could you confirm the full payment schedule and full-term cost in writing?",
+          "¿Podría confirmar por escrito el calendario completo de pagos y el costo total durante todo el plazo?"),
+      Map.entry("Could you provide an itemized quote without the financed add-ons for comparison?",
+          "¿Podría enviarme una cotización detallada sin los productos adicionales financiados, para compararla?"),
+      Map.entry("Could you provide complete current financing terms and the payment schedule?",
+          "¿Podría enviarme los términos de financiamiento actuales y completos, y el calendario de pagos?"),
+      Map.entry("Could you itemize the current purchase price, taxes, fees and total due?",
+          "¿Podría detallar el precio de compra actual, los impuestos, los cargos y el total a pagar?"),
+      Map.entry("Is there flexibility in the written selling price?",
+          "¿Hay flexibilidad en el precio de venta por escrito?"),
+      Map.entry("Would you consider a lower selling price in a revised written offer?",
+          "¿Consideraría un precio de venta más bajo en una oferta revisada por escrito?"));
+
+  /** The dealer-facing question in the dealer's email language ("en" or "es"). */
+  public static String question(String english, String language) {
+    if ("en".equals(language)) return english;
+    String translated = "es".equals(language) ? SPANISH.get(english) : null;
+    if (translated == null) throw new IllegalArgumentException("No dealer question in this language");
+    return translated;
   }
 
   public Language generate(JsonNode report) {

@@ -20,15 +20,26 @@ public class WrittenQuoteEvidence {
     this.jdbc = jdbc; this.offers = offers;
   }
   public record Evidence(String messageId, String documentId, DealerOfferView offer, String vin, Instant receivedAt) {
-    public String text() {
+    public String text() { return text("en"); }
+
+    /** The conditional acceptance in the dealer's email language ("en" or "es"). */
+    public String text(String language) {
       com.dealanalyzer.vehicle.Vin.validated(vin);
-      return "I accept your itemized quote for VIN " + vin + " with an out-the-door total of USD "
-          + BigDecimal.valueOf(amount(offer.terms(), "OUT_THE_DOOR_TOTAL"), 2).toPlainString()
+      String total = BigDecimal.valueOf(amount(offer.terms(), "OUT_THE_DOOR_TOTAL"), 2).toPlainString();
+      if ("es".equals(language))
+        return "Acepto su cotización detallada para el VIN " + vin + " con un precio total final (out-the-door) de USD " + total
+            + ", recibida el " + receivedAt.atZone(ZoneOffset.UTC).toLocalDate()
+            + " (UTC), sujeta a una prueba de manejo y a que los documentos finales coincidan con esa cotización.";
+      return "I accept your itemized quote for VIN " + vin + " with an out-the-door total of USD " + total
           + ", received on " + receivedAt.atZone(ZoneOffset.UTC).toLocalDate()
           + " (UTC), subject to a test drive and the final paperwork matching that quote.";
     }
   }
   public static final String CONFIRMATION = "Could you confirm the proposed figure in a current itemized written offer, including the selling price, taxes, all fees and all add-ons?";
+  public static final String CONFIRMATION_ES = "¿Podría confirmar la cifra propuesta en una oferta actual por escrito y detallada, que incluya el precio de venta, los impuestos, todos los cargos y todos los productos adicionales?";
+
+  /** The written-confirmation request in the dealer's email language ("en" or "es"). */
+  public static String confirmation(String language) { return "es".equals(language) ? CONFIRMATION_ES : CONFIRMATION; }
 
   public Optional<Evidence> latest(String caseId, String dealerId) {
     return offers.latestOffer(caseId).filter(WrittenQuoteEvidence::itemized).flatMap(offer -> {

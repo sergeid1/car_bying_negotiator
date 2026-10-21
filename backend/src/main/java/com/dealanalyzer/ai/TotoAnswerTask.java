@@ -37,7 +37,7 @@ public class TotoAnswerTask {
     LEGAL_OR_TAX("I can explain buying terms. For legal or tax questions, talk with a qualified professional."),
     WHETHER_TO_SIGN("The decision to sign is yours. I can explain the buying process."),
     OWN_CASE("Open your report for questions about your own numbers or case."),
-    VEHICLE_JUDGMENT("I can't assess a vehicle's condition or history. A vehicle inspection or history report may help."),
+    VEHICLE_JUDGMENT("I can't assess a vehicle's condition. A vehicle inspection may help."),
     PROVIDER_CHOICE("I can't choose a dealer, lender or insurer for you. I can explain how to compare offers."),
     OUTSIDE_CAR_BUYING("I can help with questions about the car-buying process and otdog.");
 

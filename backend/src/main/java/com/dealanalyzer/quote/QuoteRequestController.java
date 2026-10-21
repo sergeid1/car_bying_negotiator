@@ -27,6 +27,12 @@ public class QuoteRequestController {
       @RequestHeader("Case-Access-Token") String token, @RequestBody QuoteRequestService.Approval approval) {
     return quotes.approveAndSend(caseId, token, id, approval);
   }
+  /** The language of one dealer's emails (ticket 149); requests awaiting approval are prepared again in it. */
+  @PutMapping("/dealers/{dealerId}/email-language")
+  public QuoteRequestService.View changeLanguage(@PathVariable String caseId, @PathVariable String dealerId,
+      @RequestHeader("Case-Access-Token") String token, @RequestBody QuoteRequestService.LanguageChoice choice) {
+    return quotes.changeLanguage(caseId, token, dealerId, choice);
+  }
   @ExceptionHandler(IllegalArgumentException.class)
   ProblemDetail invalid(IllegalArgumentException failure) {
     return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, failure.getMessage());

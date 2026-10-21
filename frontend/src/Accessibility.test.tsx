@@ -699,6 +699,35 @@ test.each(["AWAITING_BUYER", "PAUSED"])("the negotiation conversation (%s) has n
 });
 
 // Ticket 65: test-drive availability, dealer reply confirmation with contact release, and booked states.
+// Ticket 149: a dealer whose emails are in Spanish: the language choice and its warning, and Spanish drafts with no reading copy.
+test("a Spanish dealer's request with its email-language choice and a Spanish counteroffer have no automated AA violations", async () => {
+  const pass = { pass: true, gateVersion: "outbound-gate.v5", reasons: [] };
+  const request = "¿Podría enviarme una cotización detallada del precio total final (out-the-door) para el VIN 1HGCM82633A004352?";
+  const counter = "¿Consideraría USD 18500.00 como precio de venta en una oferta revisada por escrito?";
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(JSON.stringify(url.endsWith("/relay")
+    ? { address: "cabcdefghijklmnopqrstuvwxyz234567@relay.invalid", forwardingAvailable: false, messages: [] }
+    : url.endsWith("/negotiation-conversation") ? {
+      negotiationState: "AWAITING_BUYER", targetReached: false,
+      mandate: { version: 2, currency: "USD", targetMinor: 1850000, ceilingMinor: 1950000, expiresAt: "2026-10-18T12:00:00Z" },
+      conversations: [{ quoteRequestId: "q1", dealerAddress: "ventas@sur.example" }],
+      entries: [{ kind: "COUNTEROFFER", at: "2026-10-04T14:00:00Z", quoteRequest: null, acceptance: null, message: null,
+        counteroffer: { id: "n1", quoteRequestId: "q1", dealerAddress: "ventas@sur.example", state: "PROPOSED", cancelReason: null,
+          proposalMinor: 1850000, reportVersion: 3, offerVersion: 2, grounds: [], messageId: null, createdAt: "2026-10-04T14:00:00Z",
+          revisions: [{ revision: 1, editedByBuyer: false, text: counter, decision: pass, createdAt: "2026-10-04T14:00:00Z", language: "es" }] } }] }
+    : url.includes("/quote-acceptance") || url.endsWith("/appointment") ? {}
+    : { negotiationState: "MANDATE_ACTIVE", documents: [],
+      dealers: [{ id: "d1", name: "Autos del Sur", emailLanguage: "es" }, { id: "d2", name: "Triangle Motors", emailLanguage: "en" }],
+      requests: [{ id: "q1", dealerAddress: "ventas@sur.example", state: "DRAFT", messageId: null, approvedAt: null,
+        gatedDraft: { draft: { dealerId: "d1", text: request }, decision: pass, language: "es" } }] }))));
+  const { container } = render(<main><h1>Buying Case</h1><QuoteRequest caseId="case" token="token" />
+    <NegotiationConversation caseId="case" token="token" /></main>);
+  await screen.findByRole("button", { name: "Approve this Spanish text" });
+  await screen.findAllByRole("combobox", { name: "Language for this dealer's emails" });
+  await screen.findAllByRole("button", { name: "Approve the Spanish text of revision 1" });
+  expect((await axe.run(container, AA)).violations).toEqual([]);
+  vi.unstubAllGlobals();
+});
+
 import { TestDriveAppointment } from "./TestDriveAppointment";
 function testDriveFixture(state: string) {
   const pass = { pass: true, gateVersion: "outbound-gate.v2", reasons: [] };

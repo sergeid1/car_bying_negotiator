@@ -56,7 +56,8 @@ Left for later:
 - **Explanations** (ticket 37) are generated with the Spanish claim rules from ticket 146 and checked by the same
   grounding rules. A Spanish explanation that fails the check falls back to the templated Spanish findings, never
   to unchecked text.
-- **Dealer drafts** follow working default 4: drafts to dealers stay in English. When the Buyer reads Spanish, show
+- **Dealer drafts** follow working default 4 (replaced on 2026-10-21; ticket 149 lets the Buyer choose Spanish):
+  drafts to dealers stay in English. When the Buyer reads Spanish, show
   a Spanish reading copy marked "for you to read — the dealer receives the English text", and make the approval
   name the exact English text that is sent. The outbound gate (ticket 59) checks the text that is sent.
 - **Emails** (sign-in, recovery, notifications, test-drive reminders) and **the PDF** use the case's or account's

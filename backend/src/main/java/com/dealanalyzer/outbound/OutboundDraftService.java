@@ -39,11 +39,22 @@ public class OutboundDraftService {
     this.caseLanguage = caseLanguage;
   }
 
+  /** {@code language} is the dealer's email language when the draft was made; rechecks and its subject use it. */
   public record StoredDraft(String id, String caseId, OutboundGate.Draft draft,
-      String mandateId, OutboundGate.Decision decision, Instant createdAt) {}
+      String mandateId, OutboundGate.Decision decision, Instant createdAt, String language) {}
 
+  /** A draft in the dealer's current email language. */
   @Transactional
   public StoredDraft create(String caseId, String token, String key, OutboundGate.Draft draft) {
+    return create(caseId, token, key, draft, null);
+  }
+
+  /**
+   * A draft in {@code language}, or in the dealer's current email language when it is null. A Buyer's edit keeps the
+   * language of the draft it revises, so switching the dealer's language never changes a draft already prepared.
+   */
+  @Transactional
+  public StoredDraft create(String caseId, String token, String key, OutboundGate.Draft draft, String language) {
     locks.lock(caseId);
     cases.reopen(caseId, token);
     if (draft == null || draft.dealerId() == null || draft.text() == null || draft.text().isBlank()
@@ -60,20 +71,41 @@ public class OutboundDraftService {
     long dealers = ((Number) manager.createNativeQuery("select count(*) from dealers where case_id = :caseId and id = :dealer")
         .setParameter("caseId", caseId).setParameter("dealer", draft.dealerId()).getSingleResult()).longValue();
     if (dealers != 1) throw new ResourceNotFoundException("Dealer not found in this case");
-    var context = context(caseId, draft.dealerId());
+    if (language == null) language = language(caseId, draft.dealerId());
+    var context = context(caseId, draft.dealerId(), language);
     var decision = gate.check(draft, context);
     String id = UUID.randomUUID().toString();
     Instant now = com.dealanalyzer.time.PersistedInstant.round(Instant.now());
     String mandateId = context.mandate() == null ? null : context.mandate().id();
     manager.createNativeQuery("""
         insert into outbound_drafts (id, case_id, dealer_id, mandate_id, draft_text, gate_version,
-          decision_json, context_json, idempotency_key, request_fingerprint, created_at)
-        values (:id, :caseId, :dealer, :mandate, :text, :version, :decision, :context, :key, :fingerprint, :now)
-        """).setParameter("id", id).setParameter("caseId", caseId).setParameter("dealer", draft.dealerId())
+          decision_json, context_json, idempotency_key, request_fingerprint, created_at, language)
+        values (:id, :caseId, :dealer, :mandate, :text, :version, :decision, :context, :key, :fingerprint, :now, :language)
+        """).setParameter("language", language).setParameter("id", id).setParameter("caseId", caseId).setParameter("dealer", draft.dealerId())
         .setParameter("mandate", mandateId).setParameter("text", draft.text()).setParameter("version", OutboundGate.VERSION)
         .setParameter("decision", write(decision)).setParameter("context", write(snapshot(context)))
         .setParameter("key", key).setParameter("fingerprint", fingerprint).setParameter("now", now).executeUpdate();
-    return new StoredDraft(id, caseId, draft, mandateId, decision, now);
+    return new StoredDraft(id, caseId, draft, mandateId, decision, now, language);
+  }
+
+  /**
+   * The language the Buyer chose for this dealer's emails: "en" unless they chose Spanish (ticket 149). A dealer
+   * outside the case reads as English; it authorizes no language either way.
+   */
+  @Transactional(readOnly = true)
+  public String language(String caseId, String dealerId) {
+    var rows = manager.createNativeQuery("select email_language from dealers where case_id = :caseId and id = :dealer")
+        .setParameter("caseId", caseId).setParameter("dealer", dealerId).getResultList();
+    return rows.isEmpty() ? "en" : rows.getFirst().toString();
+  }
+
+  /** Records the dealer's email language. The caller holds the case lock; drafts already made keep theirs. */
+  @Transactional
+  public void changeLanguage(String caseId, String dealerId, String language) {
+    if (!List.of("en", "es").contains(language)) throw new IllegalArgumentException("Choose English or Spanish.");
+    int changed = manager.createNativeQuery("update dealers set email_language = :language where case_id = :caseId and id = :dealer")
+        .setParameter("language", language).setParameter("caseId", caseId).setParameter("dealer", dealerId).executeUpdate();
+    if (changed != 1) throw new ResourceNotFoundException("Dealer not found in this case");
   }
 
   @Transactional(readOnly = true)
@@ -94,8 +126,15 @@ public class OutboundDraftService {
     return context(caseId, null);
   }
 
+  /** The context in the dealer's current email language, for drafting a new message. */
   @Transactional(readOnly = true)
   public OutboundGate.GateContext context(String caseId, String dealerId) {
+    return context(caseId, dealerId, dealerId == null ? "en" : language(caseId, dealerId));
+  }
+
+  /** The context for a draft in {@code language}; a recheck passes the language stored with the draft. */
+  @Transactional(readOnly = true)
+  public OutboundGate.GateContext context(String caseId, String dealerId, String language) {
     var mandate = mandates.activeMandate(caseId).orElse(null);
     var amounts = new HashSet<Long>();
     offers.latestOffer(caseId).ifPresent(offer -> collectAmounts(offer.terms(), mandate == null ? "" : mandate.currency(), amounts));
@@ -117,19 +156,19 @@ public class OutboundDraftService {
       if (!listings.isEmpty()) {
         Object[] row = (Object[]) listings.getFirst();
         try {
-          quoteRequestQuestion = com.dealanalyzer.quote.QuoteRequestText.render((String) row[0], (String) row[1]);
+          quoteRequestQuestion = com.dealanalyzer.quote.QuoteRequestText.render((String) row[0], (String) row[1], language);
           questions.add(quoteRequestQuestion);
-          questions.add(com.dealanalyzer.quote.WrittenQuoteEvidence.CONFIRMATION);
+          questions.add(com.dealanalyzer.quote.WrittenQuoteEvidence.confirmation(language));
           writtenQuotes.latest(caseId, dealerId).ifPresent(evidence -> {
             Long selling = com.dealanalyzer.quote.WrittenQuoteEvidence.amount(evidence.offer().terms(), "SELLING_PRICE");
-            if (mandate != null && selling != null && selling <= mandate.ceilingMinor()) questions.add(evidence.text());
+            if (mandate != null && selling != null && selling <= mandate.ceilingMinor()) questions.add(evidence.text(language));
           });
         }
         catch (IllegalArgumentException unsupported) { /* Invalid source references authorize no language. */ }
       }
-      caseLanguage.orderedStream().forEach(language -> questions.addAll(language.paragraphs(caseId, dealerId)));
+      caseLanguage.orderedStream().forEach(provider -> questions.addAll(provider.paragraphs(caseId, dealerId)));
     }
-    return new OutboundGate.GateContext(mandate, amounts, Set.of(), personal, Set.of(), report, questions, quoteRequestQuestion);
+    return new OutboundGate.GateContext(mandate, amounts, Set.of(), personal, Set.of(), report, questions, quoteRequestQuestion, language);
   }
 
   private Map<String, Object> snapshot(OutboundGate.GateContext context) {
@@ -142,6 +181,7 @@ public class OutboundDraftService {
     snapshot.put("personalValueCount", context.personalValues().size());
     snapshot.put("releasedForDealer", context.releasedForDealer());
     snapshot.put("reportFingerprint", offers.fingerprint(context.finalizedReport()));
+    snapshot.put("language", context.language());
     return snapshot;
   }
 
@@ -161,7 +201,7 @@ public class OutboundDraftService {
   }
 
   private List<StoredDraft> read(String caseId, String id) {
-    var query = manager.createNativeQuery("select id, dealer_id, mandate_id, draft_text, decision_json, created_at from outbound_drafts where case_id = :caseId"
+    var query = manager.createNativeQuery("select id, dealer_id, mandate_id, draft_text, decision_json, created_at, language from outbound_drafts where case_id = :caseId"
         + (id == null ? "" : " and id = :id") + " order by created_at, id").setParameter("caseId", caseId);
     if (id != null) query.setParameter("id", id);
     List<?> rows = query.getResultList();
@@ -170,7 +210,7 @@ public class OutboundDraftService {
       Instant at = row[5] instanceof java.time.OffsetDateTime date ? date.toInstant()
           : row[5] instanceof Instant instant ? instant : ((java.sql.Timestamp) row[5]).toInstant();
       return new StoredDraft(row[0].toString(), caseId, new OutboundGate.Draft(row[1].toString(), row[3].toString()),
-          row[2] == null ? null : row[2].toString(), parse(row[4].toString(), OutboundGate.Decision.class), at);
+          row[2] == null ? null : row[2].toString(), parse(row[4].toString(), OutboundGate.Decision.class), at, row[6].toString());
     }).toList();
   }
   private String write(Object value) {

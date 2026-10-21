@@ -33,6 +33,8 @@ export const paperwork = translation<typeof english>()({
     onceSent: "Cuando usted lo envíe y nos avise, el precio acordado se guarda con una base aprobada tomada del plan de precio revisado {plan}.",
     approveAcceptance: "Aprobar este texto de aceptación y la base",
     approveConfirmation: "Aprobar el texto para pedir confirmación por escrito",
+    approveSpanishAcceptance: "Aprobar este texto de aceptación en español y la base",
+    approveSpanishConfirmation: "Aprobar el texto en español para pedir confirmación por escrito",
     sentAcceptance: "Se envió el mensaje de aceptación con condiciones.",
     sentConfirmation: "Se pidió la confirmación por escrito. Revise y verifique la respuesta del concesionario antes de aceptar.",
     blocked: "Cambiaron los límites de negociación o la cotización. Prepare una nueva solicitud.",

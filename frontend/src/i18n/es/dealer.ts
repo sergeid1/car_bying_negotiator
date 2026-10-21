@@ -304,6 +304,8 @@ export const dealer = translation<typeof english>()({
     noContactAdded: "No se agregan datos de contacto a este mensaje.",
     approveWithDetails: "Aprobar este texto con los datos elegidos",
     approve: "Aprobar este texto",
+    approveSpanishWithDetails: "Aprobar este texto en español con los datos elegidos",
+    approveSpanish: "Aprobar este texto en español",
     bookedOnSend: "La prueba de manejo queda agendada, y el archivo de calendario listo, cuando usted envíe este mensaje y nos avise.",
     replies: "Respuestas del concesionario a sus horarios",
     checkReplies: "Revise usted mismo cada respuesta. Una respuesta es contenido del concesionario; no se agenda nada hasta que usted confirme un horario y apruebe el mensaje de la cita.",

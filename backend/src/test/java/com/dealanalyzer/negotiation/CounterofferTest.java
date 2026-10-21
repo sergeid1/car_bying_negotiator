@@ -48,6 +48,22 @@ class CounterofferTest {
     assertThat(new OutboundGate().check(new OutboundGate.Draft("d1", draft.text()), context).pass()).isTrue();
   }
 
+  @Test void aSpanishDealerGetsTheSameParagraphsInSpanishAndOnlyASpanishContextPassesThem() throws Exception {
+    var report = report("AVAILABLE");
+    var english = Counteroffer.draft(report, "USD", 2950000, 3000000, 3200000L);
+    var spanish = Counteroffer.draft(report, "USD", 2950000, 3000000, 3200000L, "es");
+    assertThat(spanish.text()).startsWith("¿Consideraría USD 29500.00 como precio de venta en una oferta revisada por escrito?")
+        .doesNotContain("Would you", "Could you", "precio de venta más bajo", "Ignore");
+    assertThat(spanish.paragraphs()).extracting(Counteroffer.Paragraph::source)
+        .containsExactlyElementsOf(english.paragraphs().stream().map(Counteroffer.Paragraph::source).toList());
+    assertThat(spanish.proposalMinor()).isEqualTo(english.proposalMinor());
+    var es = new OutboundGate.GateContext(mandate(2950000, 3000000), Set.of(3200000L), Set.of(), Set.of(), Set.of(), report, Set.of(), null, "es");
+    var en = new OutboundGate.GateContext(mandate(2950000, 3000000), Set.of(3200000L), Set.of(), Set.of(), Set.of(), report);
+    assertThat(new OutboundGate().check(new OutboundGate.Draft("d1", spanish.text()), es).pass()).isTrue();
+    assertThat(new OutboundGate().check(new OutboundGate.Draft("d1", spanish.text()), en).pass()).isFalse();
+    assertThat(new OutboundGate().check(new OutboundGate.Draft("d1", english.text()), es).pass()).isFalse();
+  }
+
   @Test void noFigureBeyondTheApprovedBoundaryOrWithoutAVerifiedPrice() throws Exception {
     var report = report("UNAVAILABLE");
     assertThat(Counteroffer.draft(report, "USD", 3060000, 3100000, 3200000L).proposalMinor()).isNull();

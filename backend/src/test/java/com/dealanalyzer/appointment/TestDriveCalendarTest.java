@@ -72,4 +72,32 @@ class TestDriveCalendarTest {
     assertThat(TestDriveText.booking("x", EnumSet.noneOf(Field.class))).endsWith("Please reply to this email with any changes.");
     assertThat(TestDriveText.releasedBlock(Map.of(Field.EMAIL, "b@example.com"))).isEqualTo("Email: b@example.com");
   }
+
+  @Test void spanishWordingCarriesTheSameConditionsAndPassesTheGateOnlyForItsOwnGroundedText() {
+    var zone = ZoneId.of("America/Chicago");
+    var slots = TestDriveText.slots(List.of(new TestDriveText.Window(LocalDateTime.parse("2026-10-10T10:00"), LocalDateTime.parse("2026-10-10T12:30"))),
+        zone, Instant.parse("2026-10-04T12:00:00Z"), "es");
+    String label = slots.getFirst().label();
+    assertThat(label).isEqualTo("sábado 10 de octubre de 2026, de 10:00 a 11:00 (America/Chicago)");
+    var texts = List.of(TestDriveText.proposal(slots, "es"), TestDriveText.reschedule(label, slots, "es"),
+        TestDriveText.booking(label, EnumSet.of(Field.EMAIL, Field.PHONE), "es"),
+        TestDriveText.booking(label, EnumSet.noneOf(Field.class), "es"), TestDriveText.cancellation(label, "es"));
+    assertThat(texts.getFirst()).contains("Opción 1: " + label, "Opción 2: ").endsWith("o sugiera otros horarios.");
+    assertThat(texts.get(2)).contains("Para esta cita, le comparto mis datos: correo electrónico y número telefónico.",
+        "Mi aceptación de su cotización sigue sujeta a esta prueba de manejo y a que los documentos finales coincidan");
+    assertThat(texts.get(3)).endsWith("Por favor, responda a este mensaje con cualquier cambio.");
+    var gate = new OutboundGate();
+    var mandate = new com.dealanalyzer.mandate.MandateService.Mandate("m", "c", 1, com.dealanalyzer.mandate.MandateService.Status.ACTIVE, 1,
+        "USD", 1, 2, 1, 2, List.of(), Instant.now().plusSeconds(3600), "BUYER", Instant.now(), null, null);
+    for (String text : texts) {
+      assertThat(text).doesNotContain("comprador", "otdog", "@").doesNotContainIgnoringCase("compr").doesNotContainIgnoringCase("depósito");
+      var paragraphs = java.util.Set.copyOf(List.of(text.split("\\n\\n", -1)));
+      var spanish = new OutboundGate.GateContext(mandate, java.util.Set.of(), java.util.Set.of(), java.util.Set.of(), java.util.Set.of(),
+          null, paragraphs, null, "es");
+      assertThat(gate.check(new OutboundGate.Draft("d", text), spanish).pass()).as(text).isTrue();
+      assertThat(gate.check(new OutboundGate.Draft("d", text + "\n\nFirmo ese mismo día."), spanish).pass()).isFalse();
+    }
+    assertThat(TestDriveText.releasedBlock(Map.of(Field.PHONE, "+1 312 555 0199"), "es")).isEqualTo("Número telefónico: +1 312 555 0199");
+    assertThat(TestDriveText.subject("PROPOSAL", "es")).isEqualTo("Horarios para una prueba de manejo");
+  }
 }

@@ -9,7 +9,7 @@ type Field = "FIRST_NAME" | "LAST_NAME" | "EMAIL" | "PHONE";
 type Slot = { option: number; startsAt: string; endsAt: string; label: string };
 type Message = { id: string; kind: "PROPOSAL" | "RESCHEDULE" | "BOOKING" | "CANCELLATION"; appointmentId: string | null;
   slots: Slot[]; release: Field[]; state: string; messageId?: string | null; createdAt: string; sentAt: string | null;
-  gatedDraft: { draft: { text: string }; decision: GateDecision } };
+  gatedDraft: { draft: { text: string }; decision: GateDecision; language?: "en" | "es" } };
 type Release = { fields: Field[]; state: string; decidedAt: string; releasedAt: string | null };
 type Appointment = { id: string; option: number; startsAt: string; endsAt: string; label: string; state: string;
   replacesAppointmentId: string | null; release: Release | null };
@@ -161,7 +161,7 @@ export function TestDriveAppointment({ caseId, token, version = 0 }: { caseId: s
 
       {view.messages.map(message => <article key={message.id} className="card">
         <h3>{t.titles[message.kind]}</h3>
-        <pre>{message.gatedDraft.draft.text}</pre>
+        <pre lang={message.gatedDraft.language ?? "en"}>{message.gatedDraft.draft.text}</pre>
         {message.kind === "BOOKING" && <p>{message.release.length
           ? fill(t.bookingRelease, { fields: fieldList(t, message.release) })
           : t.noContactAdded}</p>}
@@ -169,7 +169,9 @@ export function TestDriveAppointment({ caseId, token, version = 0 }: { caseId: s
         {message.state === "DRAFT" ? <button type="button" disabled={busy || !message.gatedDraft.decision.pass}
           onClick={() => void update(`${path}/messages/${encodeURIComponent(message.id)}/approval`,
             { approved: true, text: message.gatedDraft.draft.text })}>
-          {message.kind === "BOOKING" ? t.approveWithDetails : t.approve}
+          {message.gatedDraft.language === "es"
+            ? message.kind === "BOOKING" ? t.approveSpanishWithDetails : t.approveSpanish
+            : message.kind === "BOOKING" ? t.approveWithDetails : t.approve}
         </button> : message.state === "HANDED_OFF" && message.messageId
           ? <DealerHandoff caseId={caseId} token={token} messageId={message.messageId} onChanged={refresh} />
           : <p role="status">{messageStates[message.state] ?? message.state}</p>}

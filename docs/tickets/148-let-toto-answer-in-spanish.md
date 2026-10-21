@@ -8,7 +8,7 @@ not contain, and declines the same topics with fixed wording.
 chase a moving text), 132 (decline wording) and 133 (how closely answers must quote the guide).
 
 **Status:** deferred — filed on 2026-10-19. Operator, 2026-10-19: Spanish starts with the screens and findings;
-Toto stays English-only for now (working default 7 in ticket 144).
+Toto stays English-only for now (working default 7 in ticket 144, confirmed as a decision on 2026-10-21).
 
 ## Scope
 
