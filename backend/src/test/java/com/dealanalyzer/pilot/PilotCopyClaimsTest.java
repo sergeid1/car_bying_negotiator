@@ -104,8 +104,11 @@ class PilotCopyClaimsTest {
     assertThat(app).contains("How otdog makes money");
   }
 
+  /** The partner kit's terms live in the English catalogue, which ReferralPartnerKit.tsx renders. */
   @Test void thePartnerKitKeepsTheCredoAndTheNoDealerMoneyTerms() throws IOException {
-    String kit = normalize(Files.readString(REPOSITORY.resolve("frontend/src/ReferralPartnerKit.tsx"), StandardCharsets.UTF_8));
+    assertThat(Files.readString(REPOSITORY.resolve("frontend/src/ReferralPartnerKit.tsx"), StandardCharsets.UTF_8))
+        .contains("referralPartnerKit: t").contains("t.whoExcluded").contains("t.product").contains("t.terms");
+    String kit = normalize(Files.readString(CATALOGUES.resolve("en/content.ts"), StandardCharsets.UTF_8));
     assertThat(kit).contains("does not contact dealers for the Buyer");
     assertThat(kit).contains("We don't work with dealers. We help people.");
     assertThat(kit).contains("The Buyer sends every email from their own email and makes every decision");

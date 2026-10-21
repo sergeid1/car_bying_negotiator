@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { exampleReportLink } from "./SampleReport";
 import * as format from "./i18n/format";
+import { content } from "./i18n/en/content";
+import { useMessages, type Messages } from "./i18n/LanguageProvider";
 
 /**
  * The how-it-works walkthrough, reachable without a case at `?page=how-it-works`. It is an ordered list
@@ -10,7 +12,6 @@ import * as format from "./i18n/format";
  */
 const PARAMETER = "page";
 const SLUG = "how-it-works";
-const TITLE = "How it works · otdog";
 
 export const howItWorksLink = `?${PARAMETER}=${SLUG}`;
 
@@ -55,95 +56,110 @@ export function sampleFigures(body: unknown): SampleFigures | undefined {
   };
 }
 
-function money(minor: number | null, currency: string) {
-  return minor == null ? "Not in this example" : format.money(minor, { currency });
-}
+type WalkthroughText = Messages["content"]["howItWorks"];
 
 function Rows({ rows }: { rows: [string, ReactNode][] }) {
   return <dl className="walkthrough-rows">{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>;
 }
 
-export const STEPS: WalkthroughStep[] = [
-  {
-    id: "start", title: "Start with the car or the quote", scene: "kitchen", calm: "right",
-    caption: "Describe the car you want, or start from a quote you already have. You do not need an account.",
-    sceneAlt: "A Buyer at a kitchen table in the evening, a laptop open beside a mug.",
-    screen: () => <>
-      <p className="walkthrough-screen-title">Start your Buying Case</p>
-      <Rows rows={[["Which vehicle?", "By VIN, or by year, make and model"], ["Already have a quote?", "Upload it and start from there"]]} />
-    </>,
-  },
-  {
-    id: "request", title: "Ask dealers for an itemized quote", scene: "typing", calm: "left",
-    caption: "Ask dealers for an itemized out-the-door quote. otdog drafts the request; you send it from your own email.",
-    sceneAlt: "Hands typing on a laptop whose screen is a soft, blank glow.",
-    screen: () => <>
-      <p className="walkthrough-screen-title">Request an itemized quote</p>
-      <p className="walkthrough-draft">Please send an itemized out-the-door quote for this car: the selling price, each dealer fee,
-        any add-ons, taxes, and government charges.</p>
-      <p className="walkthrough-screen-note">You copy this request and send it from your own email.</p>
-    </>,
-  },
-  {
-    id: "upload", title: "Add the dealer's paperwork", scene: "paperwork", calm: "right",
-    caption: "Upload the dealer's quote, or photograph the paperwork with your phone.",
-    sceneAlt: "Seen from above, a phone held over printed paperwork whose text is blurred.",
-    screen: () => <>
-      <p className="walkthrough-screen-title">Add the Dealer's paperwork</p>
-      <Rows rows={[["dealer-quote.pdf", "2 pages · read"], ["Photo of the worksheet", "1 page · read"]]} />
-    </>,
-  },
-  {
-    id: "confirm", title: "Confirm each number", scene: "tracing", calm: "left",
-    caption: "otdog reads each amount and outlines where it found it on the page. You confirm or correct every one.",
-    sceneAlt: "Close up, a finger tracing one line of a printed worksheet beside a phone.",
-    screen: figures => <>
-      <p className="walkthrough-screen-title">Check the terms against the paperwork</p>
-      <div className="walkthrough-outline" aria-hidden="true"><span /><span className="walkthrough-outline-mark" /><span /></div>
-      <Rows rows={[
-        ["Selling price", <>{money(figures.sellingPrice, figures.currency)} <span className="walkthrough-badge">Confirmed by you</span></>],
-        ["Dealer fees", <>{money(figures.dealerFees, figures.currency)} <span className="walkthrough-badge walkthrough-badge-open">Waiting for you</span></>],
-      ]} />
-    </>,
-  },
-  {
-    id: "report", title: "Read the report", scene: "couch", calm: "right",
-    caption: "See the out-the-door total, what stands out, and the questions to ask the dealer.",
-    sceneAlt: "A Buyer on a couch reading a phone, seen from the side and behind.",
-    screen: figures => <>
-      <p className="walkthrough-screen-title">Deal Analysis Report</p>
-      <p className="walkthrough-total">{money(figures.total, figures.currency)}</p>
-      <p className="walkthrough-screen-note">Out-the-door total</p>
-      {figures.reasons.length > 0 && <ol className="walkthrough-reasons">{figures.reasons.map(reason => <li key={reason}>{reason}</li>)}</ol>}
-      {figures.nextAction && <p><strong>Next action:</strong> {figures.nextAction}</p>}
-    </>,
-  },
-  {
-    id: "reply", title: "Reply with a draft you edit", scene: "phone", calm: "left",
-    caption: "When the dealer answers, otdog drafts a reply from the report's figures. You edit it and send it yourself.",
-    sceneAlt: "Hands holding a phone, a thumb resting near its bottom edge.",
-    screen: figures => <>
-      <p className="walkthrough-screen-title">Reply to a Dealer response</p>
-      <Rows rows={[["Dealer's response", "This is the best we can do."]]} />
-      <p className="walkthrough-draft">Thank you. The quote lists dealer fees of {money(figures.dealerFees, figures.currency)} and
-        add-ons of {money(figures.addOns, figures.currency)}. Could you explain each one and send a revised itemized quote?</p>
-      <p className="walkthrough-screen-note">You edit the reply, copy it, and send it from your own email.</p>
-    </>,
-  },
-  {
-    id: "desk", title: "Check the four-square at the desk", scene: "desk", calm: "right",
-    caption: "At the dealership, photograph the four-square. otdog checks it against the price you agreed, including your trade-in.",
-    sceneAlt: "A plain showroom desk with a four-square sheet on it and a phone raised over it.",
-    screen: figures => <>
-      <p className="walkthrough-screen-title">Desk Check</p>
-      <Rows rows={[
-        ["Agreed selling price", money(figures.sellingPrice, figures.currency)],
-        ["Agreed out-the-door total", money(figures.total, figures.currency)],
-        ["Trade-in", "Checked against your trade allowance and payoff"],
-      ]} />
-    </>,
-  },
-];
+/** The walkthrough's steps in the given language; each step's words come from `content.howItWorks.steps`. */
+export function walkthroughSteps(t: WalkthroughText): WalkthroughStep[] {
+  const { steps } = t;
+  const money = (minor: number | null, currency: string) => minor == null ? t.notInExample : format.money(minor, { currency });
+  return [
+    {
+      id: "start", title: steps.start.title, scene: "kitchen", calm: "right",
+      caption: steps.start.caption,
+      sceneAlt: steps.start.sceneAlt,
+      screen: () => <>
+        <p className="walkthrough-screen-title">{steps.start.screenTitle}</p>
+        <Rows rows={[[steps.start.whichVehicle, steps.start.whichVehicleValue], [steps.start.haveQuote, steps.start.haveQuoteValue]]} />
+      </>,
+    },
+    {
+      id: "request", title: steps.request.title, scene: "typing", calm: "left",
+      caption: steps.request.caption,
+      sceneAlt: steps.request.sceneAlt,
+      screen: () => <>
+        <p className="walkthrough-screen-title">{steps.request.screenTitle}</p>
+        <p className="walkthrough-draft">{steps.request.draft}</p>
+        <p className="walkthrough-screen-note">{steps.request.note}</p>
+      </>,
+    },
+    {
+      id: "upload", title: steps.upload.title, scene: "paperwork", calm: "right",
+      caption: steps.upload.caption,
+      sceneAlt: steps.upload.sceneAlt,
+      screen: () => <>
+        <p className="walkthrough-screen-title">{steps.upload.screenTitle}</p>
+        <Rows rows={[[steps.upload.quoteFile, steps.upload.quoteFileValue], [steps.upload.photo, steps.upload.photoValue]]} />
+      </>,
+    },
+    {
+      id: "confirm", title: steps.confirm.title, scene: "tracing", calm: "left",
+      caption: steps.confirm.caption,
+      sceneAlt: steps.confirm.sceneAlt,
+      screen: figures => <>
+        <p className="walkthrough-screen-title">{steps.confirm.screenTitle}</p>
+        <div className="walkthrough-outline" aria-hidden="true"><span /><span className="walkthrough-outline-mark" /><span /></div>
+        <Rows rows={[
+          [steps.confirm.sellingPrice, <>{money(figures.sellingPrice, figures.currency)} <span className="walkthrough-badge">{steps.confirm.confirmed}</span></>],
+          [steps.confirm.dealerFees, <>{money(figures.dealerFees, figures.currency)} <span className="walkthrough-badge walkthrough-badge-open">{steps.confirm.waiting}</span></>],
+        ]} />
+      </>,
+    },
+    {
+      id: "report", title: steps.report.title, scene: "couch", calm: "right",
+      caption: steps.report.caption,
+      sceneAlt: steps.report.sceneAlt,
+      screen: figures => <>
+        <p className="walkthrough-screen-title">{steps.report.screenTitle}</p>
+        <p className="walkthrough-total">{money(figures.total, figures.currency)}</p>
+        <p className="walkthrough-screen-note">{steps.report.total}</p>
+        {figures.reasons.length > 0 && <ol className="walkthrough-reasons">{figures.reasons.map(reason => <li key={reason}>{reason}</li>)}</ol>}
+        {figures.nextAction && <p><NextAction text={steps.report} action={figures.nextAction} /></p>}
+      </>,
+    },
+    {
+      id: "reply", title: steps.reply.title, scene: "phone", calm: "left",
+      caption: steps.reply.caption,
+      sceneAlt: steps.reply.sceneAlt,
+      screen: figures => <>
+        <p className="walkthrough-screen-title">{steps.reply.screenTitle}</p>
+        <Rows rows={[[steps.reply.response, steps.reply.responseValue]]} />
+        <p className="walkthrough-draft"><Filled message={steps.reply.draft}
+          values={{ dealerFees: money(figures.dealerFees, figures.currency), addOns: money(figures.addOns, figures.currency) }} /></p>
+        <p className="walkthrough-screen-note">{steps.reply.note}</p>
+      </>,
+    },
+    {
+      id: "desk", title: steps.desk.title, scene: "desk", calm: "right",
+      caption: steps.desk.caption,
+      sceneAlt: steps.desk.sceneAlt,
+      screen: figures => <>
+        <p className="walkthrough-screen-title">{steps.desk.screenTitle}</p>
+        <Rows rows={[
+          [steps.desk.agreedPrice, money(figures.sellingPrice, figures.currency)],
+          [steps.desk.agreedTotal, money(figures.total, figures.currency)],
+          [steps.desk.tradeIn, steps.desk.tradeInValue],
+        ]} />
+      </>,
+    },
+  ];
+}
+
+function NextAction({ text, action }: { text: WalkthroughText["steps"]["report"]; action: string }) {
+  const { fillNodes } = useMessages();
+  return <>{fillNodes(text.nextAction, { label: <strong>{text.nextActionLabel}</strong>, action })}</>;
+}
+
+function Filled({ message, values }: { message: WalkthroughText["steps"]["reply"]["draft"]; values: { dealerFees: string; addOns: string } }) {
+  const { fill } = useMessages();
+  return <>{fill(message, values)}</>;
+}
+
+/** The English steps, for tests and callers that pass their own steps. */
+export const STEPS: WalkthroughStep[] = walkthroughSteps(content.howItWorks);
 
 function useSampleFigures() {
   const [figures, setFigures] = useState<SampleFigures>();
@@ -186,7 +202,10 @@ function clipsAllowed() {
   return !connection?.saveData && !matches("(prefers-reduced-motion: reduce)");
 }
 
-export function HowItWorks({ steps = STEPS }: { steps?: WalkthroughStep[] }) {
+export function HowItWorks({ steps: given }: { steps?: WalkthroughStep[] }) {
+  const { m: { content: { howItWorks: t } } } = useMessages();
+  const translated = useMemo(() => walkthroughSteps(t), [t]);
+  const steps = given ?? translated;
   const { figures, failed } = useSampleFigures();
   const pinned = usePinned();
   const [active, setActive] = useState(0);
@@ -197,9 +216,9 @@ export function HowItWorks({ steps = STEPS }: { steps?: WalkthroughStep[] }) {
 
   useEffect(() => {
     const previous = document.title;
-    document.title = TITLE;
+    document.title = t.title;
     return () => { document.title = previous; };
-  }, []);
+  }, [t]);
 
   // The step whose caption crosses the middle of the screen is the one on stage.
   useEffect(() => {
@@ -241,18 +260,15 @@ export function HowItWorks({ steps = STEPS }: { steps?: WalkthroughStep[] }) {
   }, [playClips, active]);
 
   return <article className="panel guide how-it-works" aria-labelledby="how-it-works-heading">
-    <p className="step">How it works</p>
-    <h1 id="how-it-works-heading">Buying a car with otdog, step by step</h1>
-    <p className="lede">
-      You do the asking, the checking, and the sending; otdog reads the paperwork and checks the numbers. Every
-      screen below is an example built from a synthetic case, not a real Buyer's deal.
-    </p>
-    <nav aria-label="Steps">
+    <p className="step">{t.step}</p>
+    <h1 id="how-it-works-heading">{t.heading}</h1>
+    <p className="lede">{t.lede}</p>
+    <nav aria-label={t.stepsLabel}>
       <ol className="walkthrough-index">
         {steps.map(step => <li key={step.id}><a href={`#how-step-${step.id}`}>{step.title}</a></li>)}
       </ol>
     </nav>
-    {failed && <p className="notice" role="note">The example figures are unavailable right now. The steps still describe what you do.</p>}
+    {failed && <p className="notice" role="note">{t.unavailable}</p>}
 
     <ol className={`walkthrough${pinned ? " walkthrough-pinned" : ""}`}>
       {steps.map((step, index) => <li key={step.id} id={`how-step-${step.id}`} tabIndex={-1}
@@ -267,23 +283,24 @@ export function HowItWorks({ steps = STEPS }: { steps?: WalkthroughStep[] }) {
             <Scene step={step} index={index} clip={playClips && near.has(index)}
               videoRef={element => { videos.current[index] = element; }} />
             <figure className="walkthrough-screen">
-              <figcaption>Example screen from a synthetic case</figcaption>
-              {figures ? step.screen(figures) : <p className="walkthrough-screen-note">{failed ? "Example figures unavailable." : "Loading the example…"}</p>}
+              <figcaption>{t.screenCaption}</figcaption>
+              {figures ? step.screen(figures) : <p className="walkthrough-screen-note">{failed ? t.figuresUnavailable : t.loading}</p>}
             </figure>
           </div>
         </div>
       </li>)}
     </ol>
 
-    <nav className="actions walkthrough-next" aria-label="Get started">
-      <a className="walkthrough-primary" href="./">Start with your quote</a>
-      <a href={exampleReportLink}>See a sample report</a>
+    <nav className="actions walkthrough-next" aria-label={t.nextLabel}>
+      <a className="walkthrough-primary" href="./">{t.startWithQuote}</a>
+      <a href={exampleReportLink}>{t.seeSample}</a>
     </nav>
   </article>;
 }
 
 function Scene({ step, index, clip, videoRef }: { step: WalkthroughStep; index: number; clip: boolean; videoRef: (element: HTMLVideoElement | null) => void }) {
-  return <div className="walkthrough-scene" role="img" aria-label={step.media ? step.sceneAlt : `Placeholder scene: ${step.sceneAlt}`}>
+  const { m: { content: { howItWorks: t } }, fill } = useMessages();
+  return <div className="walkthrough-scene" role="img" aria-label={step.media ? step.sceneAlt : fill(t.placeholderScene, { scene: step.sceneAlt })}>
     {step.media
       ? clip
         ? <video ref={videoRef} src={step.media.clip} poster={step.media.poster} muted playsInline preload="auto" aria-hidden="true" />
@@ -315,19 +332,20 @@ function wasDismissed() {
 
 /** The start screen's invitation for a first-time visitor. It sits in the column and never covers the start form. */
 export function HowItWorksCard() {
+  const { m: { content: { howItWorks: { card: t } } } } = useMessages();
   const [hidden, setHidden] = useState(wasDismissed);
   if (hidden) return null;
   return <section className="panel how-it-works-card" aria-labelledby="how-it-works-card-heading">
     <div>
-      <h2 id="how-it-works-card-heading">New here? See how it works</h2>
-      <p>Seven short steps, from asking for a quote to checking the paperwork at the desk.</p>
+      <h2 id="how-it-works-card-heading">{t.heading}</h2>
+      <p>{t.text}</p>
     </div>
     <div className="actions">
-      <a href={howItWorksLink}>See how it works</a>
-      <button type="button" className="btn-ghost" aria-label="Dismiss the how it works card" onClick={() => {
+      <a href={howItWorksLink}>{t.link}</a>
+      <button type="button" className="btn-ghost" aria-label={t.dismissLabel} onClick={() => {
         try { window.localStorage.setItem(DISMISSED, "1"); } catch { /* Without storage the card returns on the next visit. */ }
         setHidden(true);
-      }}>Dismiss</button>
+      }}>{t.dismiss}</button>
     </div>
   </section>;
 }
