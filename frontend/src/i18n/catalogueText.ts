@@ -159,6 +159,7 @@ export const FRAGMENTS: Record<string, RegExp> = {
   "/where the price the ad shows was read/": /donde se leyó el dato «.+?»/,
   "This ad is for VIN 1M8GDM9AXKP042788": /Este anuncio es para el VIN 1M8GDM9AXKP042788/,
   "/Read from page 2/": /Leído de la página 2/,
+  "/Figures do not add up to the quoted OTD by \\$125\\.00/": /Las cifras no suman el precio total final cotizado; la diferencia es de \$125\.00/,
 };
 
 /**

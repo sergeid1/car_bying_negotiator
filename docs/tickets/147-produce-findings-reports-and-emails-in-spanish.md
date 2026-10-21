@@ -11,7 +11,34 @@ English label "Out-the-door total". The client cannot translate stored sentences
 **Blocked by:** 145. Ticket 144 recorded decisions 5 and 8; decision 4 is a working default. It can run in
 parallel with 146, since it is mostly backend work.
 
-**Status:** open — filed on 2026-10-19.
+**Status:** complete — on 2026-10-21, delivered with ticket 146 on `feature/spanish-screens-and-findings`. A Spanish
+Buyer sees findings, limitations, Desk Check and "I'm at the dealer" results, desk tactics, explanations, the quote
+comparison, emails and the PDF in Spanish, with paperwork labels as printed.
+
+What is in place:
+
+- Reports use `core-deal-analysis-report.v2`, which adds a `textFindings` sidecar keyed by JSON pointer: each entry
+  has a stable `code`, typed `parameters` and the stored English `text`. Stored reports are never rewritten; v1
+  reports and unknown codes render their stored English. Codes and both languages live in `report/FindingText.java`;
+  `frontend/scripts/generate-finding-catalogues.mjs` regenerates `i18n/{en,es}/findingTemplates.ts` from it.
+- `i18n/findings.ts`: `findingText(language, finding)`, `localizeReport` (a presentation copy) and
+  `dealerReadingCopy`. The report total is found by pointer, never by label. The journey quote comparison sends a
+  coded twin beside each English name and reason and sorts by category code.
+- Each Buying Case records its language (`V64`, set at intake, changed from "This case" via
+  `PUT /api/v1/cases/{caseId}/language`). Case emails, mandate and appointment reminders, and the PDF use it.
+  Sign-in requests carry the viewer's language.
+- Spanish explanations are generated with their own prompt (`report-explanation-es-prompt.v1`), checked by Spanish
+  grounding terms in `ClaimVocabulary` and stored separately (`V65`); a failed check falls back to the templated
+  Spanish findings.
+- Dealer drafts stay in English. A Spanish viewer gets a reading copy marked "Para que usted lo lea — el
+  concesionario recibe el texto en inglés", and the approve button names the English text of the revision sent.
+
+Left for later:
+
+- `serverText` and `dealerReadingCopy` translate English text served without a code by matching it against the
+  templates; text that matches none stays English, and Buyer-edited drafts show "no reading copy available".
+- The Spanish explanation prompt must pass its own shadow comparison before model rollout.
+- The PDF's raw saved-payload appendix stays as recorded.
 
 ## Scope
 
@@ -38,11 +65,11 @@ parallel with 146, since it is mostly backend work.
 
 ## Done when
 
-- [ ] A Spanish Buyer sees every finding, limitation, Desk Check result, desk tactic and explanation in Spanish, and
+- [x] A Spanish Buyer sees every finding, limitation, Desk Check result, desk tactic and explanation in Spanish, and
       paperwork labels as printed.
-- [ ] Reports stored before this ticket still render, in English, and a test proves it.
-- [ ] No client code finds a report amount by English label.
-- [ ] Dealer drafts stay in English with a Spanish reading copy, and a test proves the approved text is the text
+- [x] Reports stored before this ticket still render, in English, and a test proves it.
+- [x] No client code finds a report amount by English label.
+- [x] Dealer drafts stay in English with a Spanish reading copy, and a test proves the approved text is the text
       sent.
-- [ ] Each email type and the PDF have a Spanish version, with tests on a Spanish case.
-- [ ] Backend claim checks run in both languages, and `mvn clean verify` passes.
+- [x] Each email type and the PDF have a Spanish version, with tests on a Spanish case.
+- [x] Backend claim checks run in both languages, and `mvn clean verify` passes.
