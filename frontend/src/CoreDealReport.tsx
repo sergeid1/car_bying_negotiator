@@ -18,6 +18,7 @@ import { ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
 import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
 import { SigningNote } from "./SigningNote";
 import * as format from "./i18n/format";
+import { useMessages } from "./i18n/LanguageProvider";
 
 export type MaterialAmount = {
   label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string;
@@ -46,7 +47,11 @@ export type CoreReport = {
   vehicleSafety?: VehicleSafetyView | null;
 };
 
+/** The report path of one leading finding, shown beside it; a path, not copy. */
+const reasonPointer = (index: number) => `/analysis/topReasons/${index}`;
+
 export function CoreReportLoader({ caseId, token }: { caseId: string; token: string }) {
+  const { m: { paperwork: { coreDealReport: t, common } } } = useMessages();
   const [report, setReport] = useState<CoreReport>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -59,22 +64,22 @@ export function CoreReportLoader({ caseId, token }: { caseId: string; token: str
         const response = await fetch(`${path}/analyses`, { method: "POST", headers: {
           "Case-Access-Token": token, "Idempotency-Key": key,
         } });
-        if (!response.ok) throw new Error("Analysis request failed. Retry with the same request key.");
+        if (!response.ok) throw new Error(t.generateFailed);
       }
       const response = await fetch(`${path}/reports/latest`, { headers: { "Case-Access-Token": token } });
-      if (!response.ok) throw new Error("Report unavailable. Check the case credentials and generate a report.");
+      if (!response.ok) throw new Error(t.reportUnavailable);
       const payload = await response.json();
-      if (!payload.analysis?.materialAmounts) throw new Error("This case has a synthetic report. Use a verified Buying Case for the core report.");
+      if (!payload.analysis?.materialAmounts) throw new Error(t.syntheticReport);
       setReport(payload);
       if (generate) setKey(crypto.randomUUID());
     } catch (caught) { setError(String(caught)); } finally { setBusy(false); }
   }
-  return <section className="stack" aria-label="Core deal report">
+  return <section className="stack" aria-label={t.loaderLabel}>
     {report && <CoreDealReport report={report} caseId={caseId} token={token}>
-      <ReportSection id="core-feedback" title="Optional outcome feedback">
+      <ReportSection id="core-feedback" title={common.outcomeFeedback}>
         <OutcomeFeedback key={`feedback-${caseId}-${token}`} caseId={caseId} token={token} headless />
       </ReportSection>
-      <ReportSection id="core-downloads" title="Save a copy">
+      <ReportSection id="core-downloads" title={common.saveCopy}>
         <CaseDownloads key={`download-${caseId}-${token}-${report.version}`} caseId={caseId} token={token} reportVersion={report.version} headless />
       </ReportSection>
     </CoreDealReport>}
@@ -82,10 +87,10 @@ export function CoreReportLoader({ caseId, token }: { caseId: string; token: str
     <OutsideFinancing key={`outside-${caseId}-${token}`} caseId={caseId} token={token} />
     <div className="panel">
       <div className="actions">
-        <button onClick={() => load(true)} disabled={busy}>Generate core deal report</button>
-        <button className="btn-secondary" onClick={() => load(false)} disabled={busy}>Open latest saved report</button>
+        <button onClick={() => load(true)} disabled={busy}>{t.generate}</button>
+        <button className="btn-secondary" onClick={() => load(false)} disabled={busy}>{t.openLatest}</button>
       </div>
-      {busy && <p role="status">Loading report…</p>}
+      {busy && <p role="status">{t.loading}</p>}
       {error && <p role="alert">{error}</p>}
     </div>
     {report && <NegotiationLoader key={`${caseId}-${token}-${report.version}`} caseId={caseId} token={token} reportVersion={report.version} />}
@@ -97,93 +102,94 @@ export function CoreReportLoader({ caseId, token }: { caseId: string; token: str
  * `children` are further `ReportSection`s appended to the end of the collapsible list.
  */
 export function CoreDealReport({ report, caseId, token, redacted, children }: { report: CoreReport; caseId?: string; token?: string; redacted?: boolean; children?: ReactNode }) {
+  const { m: { paperwork: { coreDealReport: t, common } }, fill, fillNodes } = useMessages();
   const heading = useRef<HTMLHeadingElement>(null);
   const article = useRef<HTMLElement>(null);
   useEffect(() => { heading.current?.focus(); }, [report]);
   useSectionLinks(article, report);
   const { analysis } = report;
-  const removed = "Removed from this example";
-  const text = (value: string | null | undefined) => value ?? (redacted ? removed : "Unknown");
+  const removed = t.removed;
+  const text = (value: string | null | undefined) => value ?? (redacted ? removed : common.unknown);
   const total = analysis.materialAmounts.find(amount => amount.label === "Out-the-door total" || amount.pointer === "/result/outTheDoorTotal");
   const reasons = analysis.topReasons.slice(0, 3);
   const [questions, setQuestions] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
-  useEffect(() => { setQuestions(report.analysis.topReasons.slice(0, 3).filter(reason => reason != null).map(reason => `Could you explain this finding: ${reason}`).join("\n")); setCopyStatus(""); }, [report]);
-  const money = (amount: CoreReport["analysis"]["materialAmounts"][number] | undefined) => redacted && amount && amount.minorUnits == null && amount.precision !== "UNAVAILABLE" ? removed : !amount || amount.minorUnits == null || amount.precision === "UNAVAILABLE" ? "Unknown" : format.money(amount.minorUnits, { currency: amount.currency });
+  useEffect(() => { setQuestions(report.analysis.topReasons.slice(0, 3).filter(reason => reason != null).map(reason => fill(t.question, { reason })).join("\n")); setCopyStatus(""); }, [report]);
+  const money = (amount: CoreReport["analysis"]["materialAmounts"][number] | undefined) => redacted && amount && amount.minorUnits == null && amount.precision !== "UNAVAILABLE" ? removed : !amount || amount.minorUnits == null || amount.precision === "UNAVAILABLE" ? common.unknown : format.money(amount.minorUnits, { currency: amount.currency });
   const totalIndex = total ? analysis.materialAmounts.indexOf(total) : -1;
-  const amountLabel = (label: string | null) => label == null ? removed : label.replace("/payload/plan/", "Approved ")
+  const amountLabel = (label: string | null) => label == null ? removed : label.replace("/payload/plan/", t.approvedPrefix)
     .replace("/result/", "").replaceAll("/", " · ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/Minor$/, "");
   const showFinancing = analysis.financingAvailability && analysis.financingAvailability !== "NOT_APPLICABLE";
   return <article className="report" aria-labelledby="core-report-heading" ref={article}>
-    <section className="outcome report-leading" aria-label="Total, findings and next action">
-      <h2 id="core-report-heading" tabIndex={-1} ref={heading}>Deal Analysis Report</h2>
-      <h3>Out-the-door total</h3>
+    <section className="outcome report-leading" aria-label={t.leadingLabel}>
+      <h2 id="core-report-heading" tabIndex={-1} ref={heading}>{t.title}</h2>
+      <h3>{t.outTheDoor}</h3>
       <p className="report-leading-total">{total ? <a href={`#amount-evidence-${totalIndex}`}>{total.minorUnits != null && total.precision !== "UNAVAILABLE"
-        ? <AnimatedAmount minorUnits={total.minorUnits} currency={total.currency} text={money(total)} /> : money(total)}</a> : "Unknown"} <small>{total?.precision.toLowerCase() ?? "unavailable"}</small></p>
-      <h3>Three material findings</h3>
+        ? <AnimatedAmount minorUnits={total.minorUnits} currency={total.currency} text={money(total)} /> : money(total)}</a> : common.unknown} <small>{total?.precision.toLowerCase() ?? t.precisionUnavailable}</small></p>
+      <h3>{t.threeFindings}</h3>
       <ol>{reasons.map((reason, index) => <li key={index}><a href={`#finding-${index}`}>{text(reason)}</a></li>)}</ol>
-      {reasons.length < 3 && <p>{3 - reasons.length} further findings: unknown in this saved report.</p>}
-      <h3>Next action</h3>
+      {reasons.length < 3 && <p>{fill(t.furtherUnknown, { count: 3 - reasons.length })}</p>}
+      <h3>{t.nextAction}</h3>
       <p className="next-action">{text(analysis.nextAction)}</p>
     </section>
     {caseId && token && <ReportExplanationLoader key={`${caseId}-${token}-${report.version}`} caseId={caseId} token={token} reportVersion={report.version} />}
     <section className="panel" aria-labelledby="core-questions">
-      <h3 id="core-questions">Questions to ask the dealer</h3>
-      <p>Edit your questions before copying. Edits stay on this screen; the saved report and PDF keep the original findings.</p>
-      <label htmlFor="report-questions">Your questions<textarea id="report-questions" rows={4} value={questions} onChange={event => setQuestions(event.target.value)} /></label>
-      <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(questions); setCopyStatus("Questions copied."); } catch { setCopyStatus("Copy unavailable. Select the questions and copy them manually."); } }}>Copy questions</button>
+      <h3 id="core-questions">{t.questionsHeading}</h3>
+      <p>{t.questionsNote}</p>
+      <label htmlFor="report-questions">{t.yourQuestions}<textarea id="report-questions" rows={4} value={questions} onChange={event => setQuestions(event.target.value)} /></label>
+      <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(questions); setCopyStatus(t.copied); } catch { setCopyStatus(t.copyFailed); } }}>{t.copy}</button>
       {copyStatus && <p role="status">{copyStatus}</p>}
-      <ol>{reasons.map((reason, index) => <li id={`finding-${index}`} tabIndex={-1} key={index}>{text(reason)} <a href="#core-evidence">Frozen evidence</a> · <code>/analysis/topReasons/{index}</code></li>)}</ol>
+      <ol>{reasons.map((reason, index) => <li id={`finding-${index}`} tabIndex={-1} key={index}>{text(reason)} <a href="#core-evidence">{t.frozenEvidence}</a> · <code>{reasonPointer(index)}</code></li>)}</ol>
     </section>
     {caseId && token && <ReportTotalMeasure key={`${caseId}-${token}-${report.version}`} report={report} caseId={caseId} token={token} />}
-    <section className="panel"><h3>Review and rating</h3><div className="status-row"><strong>{text(analysis.reviewLabel)}</strong><span>{text(analysis.dealRating).replaceAll("_", " ")}</span></div><p>{text(analysis.ratingBasis)}</p></section>
-    <p>Version {report.version} · {report.status} · As of <time dateTime={report.asOf}>{report.asOf}</time></p>
-    {report.status === "PARTIAL" && <p className="notice">Warning: this report is partial. One or more analysis areas are unavailable.</p>}
-    <nav aria-label="Report sections">{analysis.dealReview && <><a href="#revised-offer-review">Revised offer comparison</a> · </>}<a href="#core-amounts">Amounts</a> · {showFinancing && <><a href="#core-financing">Financing</a> · </>} <a href="#core-evidence">Evidence and calculations</a> · <a href="#core-scope">Scope and policies</a></nav>
+    <section className="panel"><h3>{t.reviewRating}</h3><div className="status-row"><strong>{text(analysis.reviewLabel)}</strong><span>{text(analysis.dealRating).replaceAll("_", " ")}</span></div><p>{text(analysis.ratingBasis)}</p></section>
+    <p>{fillNodes(t.versionLine, { version: report.version, status: report.status, time: <time dateTime={report.asOf}>{report.asOf}</time> })}</p>
+    {report.status === "PARTIAL" && <p className="notice">{t.partial}</p>}
+    <nav aria-label={t.sectionsNav}>{analysis.dealReview && <><a href="#revised-offer-review">{t.revisedComparison}</a> · </>}<a href="#core-amounts">{t.amounts}</a> · {showFinancing && <><a href="#core-financing">{t.financing}</a> · </>} <a href="#core-evidence">{t.evidence}</a> · <a href="#core-scope">{t.scope}</a></nav>
     {analysis.dealReview && <RevisedOfferReview review={analysis.dealReview} redacted={redacted} />}
     {analysis.tradeCheck && <div className="panel"><TradeCheckPanel result={analysis.tradeCheck} tactics={analysis.tacticFindings} /></div>}
-    {analysis.listingPriceCheck && <div className="panel"><ListingPriceNote check={analysis.listingPriceCheck} title="The ad you saved" /></div>}
+    {analysis.listingPriceCheck && <div className="panel"><ListingPriceNote check={analysis.listingPriceCheck} title={t.savedAd} /></div>}
     {analysis.governmentFeeCheck && <div className="panel"><GovernmentFeeNote check={analysis.governmentFeeCheck} /></div>}
-    <ul className="report-sections" aria-label="Report details">
-      {report.vehicleSafety && !redacted && <ReportSection id="core-vehicle-safety" title="Recalls and safety ratings">
+    <ul className="report-sections" aria-label={t.details}>
+      {report.vehicleSafety && !redacted && <ReportSection id="core-vehicle-safety" title={t.vehicleSafety}>
         <VehicleSafetyFacts view={report.vehicleSafety} />
       </ReportSection>}
-      <ReportSection id="core-amounts" title="Amounts and sources">
+      <ReportSection id="core-amounts" title={t.amountsSources}>
         {!analysis.dealReview && <DocFeeFindings findings={analysis.docFeeFindings} />}
         {!analysis.dealReview && analysis.dealerAddOns && <DealerAddOnsNote check={analysis.dealerAddOns} />}
-        <p>Market analysis: {analysis.marketAvailability}. Cash economics: {analysis.cashAvailability}.</p>
+        <p>{fill(t.marketCash, { market: analysis.marketAvailability, cash: analysis.cashAvailability })}</p>
         <dl className="money-list">
           {analysis.materialAmounts.map((amount, index) => <div key={index}>
-            <dt>{amountLabel(amount.label)}<small>{amount.precision.toLowerCase()} · <a href={`#amount-evidence-${index}`} title={`${amount.source}${amount.pointer}`}>Source and calculation {index + 1}</a></small></dt>
+            <dt>{amountLabel(amount.label)}<small>{amount.precision.toLowerCase()} · <a href={`#amount-evidence-${index}`} title={`${amount.source}${amount.pointer}`}>{fill(t.sourceCalculation, { number: index + 1 })}</a></small></dt>
             <dd>{money(amount)}</dd>
           </div>)}
         </dl>
       </ReportSection>
-      {showFinancing && <ReportSection id="core-financing" title="Dealer financing">
+      {showFinancing && <ReportSection id="core-financing" title={t.dealerFinancing}>
         <DealerFinancingResult result={analysis.financing ?? null} availability={analysis.financingAvailability!} terms={analysis.financingTerms} headless />
       </ReportSection>}
       {analysis.tacticFindings?.some(finding => !finding.tradeFindingCode) && <ReportSection id="core-tactics"
         title={analysis.tacticFindings.some(finding => !finding.tradeFindingCode && finding.code !== DEALER_FINANCING_COSTS_LESS)
-          ? "Worksheet tactics" : "Your own financing"}>
+          ? t.worksheetTactics : t.ownFinancing}>
         <DeskTactics findings={analysis.tacticFindings} />
       </ReportSection>}
-      <ReportSection id="core-market" title="Market evidence" headingId="market-evidence-heading">
+      <ReportSection id="core-market" title={t.marketEvidence} headingId="market-evidence-heading">
         <MarketEvidenceParagraphs evidence={analysis.marketEvidence} />
       </ReportSection>
-      <ReportSection id="core-evidence" title="Evidence and calculations">
-        <p>Each amount shows the dealer document page and region it was read from, or says that no document source exists, and each calculated amount shows its arithmetic.</p>
+      <ReportSection id="core-evidence" title={t.evidence}>
+        <p>{t.evidenceIntro}</p>
         {analysis.materialAmounts.map((amount, index) => <section key={index} id={`amount-evidence-${index}`} tabIndex={-1} className="amount-evidence">
-          <h4>{amountLabel(amount.label)}: {money(amount)} <small>{amount.precision.toLowerCase()}</small></h4>
+          <h4>{fill(t.amountHeading, { label: amountLabel(amount.label), amount: money(amount) })} <small>{amount.precision.toLowerCase()}</small></h4>
           {redacted && (amount.documentSource?.pageNumber == null || amount.documentSource.region == null)
-            ? <p>Document source: removed from this example. Example reports keep no document pages or regions.</p>
+            ? <p>{t.documentSourceRemoved}</p>
             : amount.documentSource
             ? <DocumentSourceView source={amount.documentSource} caseId={caseId} token={token} what={amountLabel(amount.label)} />
-            : <p>No document source: {amount.sourceNote ?? "this saved report does not record where this amount came from."}</p>}
+            : <p>{fill(t.noDocumentSource, { note: amount.sourceNote ?? t.noSourceNote })}</p>}
           {amount.calculation && <Arithmetic calculation={amount.calculation} result={amount.precision === "UNAVAILABLE" ? null : amount.minorUnits} currency={amount.currency} label={amountLabel(amount.label)} />}
         </section>)}
-        {redacted ? <p>Diagnostic data and frozen inputs: removed from this example.</p> : <ReproductionDiagnostics report={report} />}
+        {redacted ? <p>{t.diagnosticsRemoved}</p> : <ReproductionDiagnostics report={report} />}
       </ReportSection>
-      <ReportSection id="core-scope" title="Scope and policies">
+      <ReportSection id="core-scope" title={t.scope}>
         {analysis.limitations.map((limitation, index) => <p key={index}>{text(limitation)}</p>)}
         <SigningNote />
         <dl className="report-policies">{Object.entries(analysis.policyVersions).map(([name, version]) => <div key={name}><dt>{name}</dt><dd>{version}</dd></div>)}</dl>
@@ -194,15 +200,17 @@ export function CoreDealReport({ report, caseId, token, redacted, children }: { 
 }
 
 export function MarketEvidenceSection({ evidence }: { evidence?: CoreReport["analysis"]["marketEvidence"] }) {
+  const { m: { paperwork: { coreDealReport: t } } } = useMessages();
   return <section className="panel" aria-labelledby="market-evidence-heading">
-    <h3 id="market-evidence-heading">Market evidence</h3>
+    <h3 id="market-evidence-heading">{t.marketEvidence}</h3>
     <MarketEvidenceParagraphs evidence={evidence} />
   </section>;
 }
 
 function MarketEvidenceParagraphs({ evidence }: { evidence?: CoreReport["analysis"]["marketEvidence"] }) {
+  const { m: { paperwork: { coreDealReport: t } } } = useMessages();
   return evidence?.paragraphs.length ? <>{evidence.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</>
-    : <p>Market evidence details are unavailable in this saved report.</p>;
+    : <p>{t.marketUnavailable}</p>;
 }
 
 /**
@@ -279,14 +287,15 @@ function useSectionLinks(article: RefObject<HTMLElement | null>, report: CoreRep
 
 /** Serialized inputs are only rendered once the Buyer opens this diagnostic disclosure. */
 function ReproductionDiagnostics({ report }: { report: CoreReport }) {
+  const { m: { paperwork: { coreDealReport: t } } } = useMessages();
   const [open, setOpen] = useState(false);
   return <details onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary>Diagnostic data for reproducing this report</summary>
-    <p>This is technical data for regenerating and auditing the report. It is not evidence to read as a Buyer; the sections above explain each amount.</p>
+    <summary>{t.diagnostics}</summary>
+    <p>{t.diagnosticsNote}</p>
     {open && <>
-      <h4>Reproduction metadata</h4>
+      <h4>{t.reproduction}</h4>
       <pre>{JSON.stringify(report.reproduction, null, 2)}</pre>
-      <h4>Frozen inputs</h4>
+      <h4>{t.frozenInputs}</h4>
       <pre>{JSON.stringify(report.evidence, null, 2)}</pre>
     </>}
   </details>;

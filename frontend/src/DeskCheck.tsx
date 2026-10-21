@@ -8,6 +8,7 @@ import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
 import { DealerAddOnsNote, type DealerAddOnCheck } from "./DealerAddOns";
 import { SigningNote } from "./SigningNote";
 import * as format from "./i18n/format";
+import { useMessages, type Messages } from "./i18n/LanguageProvider";
 
 type Credentials = { caseId: string; token: string };
 type Term = { value?: string | null; unit?: string; amountMinor?: number; currency?: string; category?: string } | number;
@@ -40,87 +41,84 @@ export type DeskCheckView = {
 };
 export type FreshDeskCase = Credentials & { agreed: Credentials; agreedVin: string | null; vin: string; files: File[] };
 
-const LABELS: Record<string, string> = {
-  SELLING_PRICE: "Selling price", DISCOUNT_TOTAL: "Discount", REBATE_TOTAL: "Rebate",
-  OUT_THE_DOOR_TOTAL: "Out-the-door total", SUBTOTAL: "Subtotal", TAX_TOTAL: "Taxes",
-  DEALER_CHARGES_TOTAL: "Dealer charges", GOVERNMENT_CHARGES_TOTAL: "Government charges", ADD_ON_TOTAL: "Add-ons total",
-  AMOUNT_FINANCED: "Amount financed", APR: "APR", TERM_MONTHS: "Loan term", MONTHLY_PAYMENT: "Monthly payment",
-  FINANCE_CHARGE: "Finance charge", TOTAL_OF_PAYMENTS: "Total of payments", CASH_DOWN: "Cash down",
-  TRADE_ALLOWANCE: "Trade-in allowance", TRADE_PAYOFF: "Trade-in payoff", VEHICLE_VIN: "VIN", TRADE_VIN: "Trade-in VIN",
-  "sellingPrice.walkAwayMinor": "Your walk-away selling price", buyerMaxSellingPriceMinor: "Your maximum selling price",
-  "outTheDoor.walkAwayMinor": "Your walk-away out-the-door price", buyerMaxOutTheDoorPriceMinor: "Your maximum out-the-door price",
-};
+type Copy = Messages["dealer"]["deskCheck"];
+type Fill = ReturnType<typeof useMessages>["fill"];
 
 function money(minor: number, signed = false) {
   const text = format.money(Math.abs(minor));
   return signed ? `${minor < 0 ? "−" : "+"}${text}` : minor < 0 ? `−${text}` : text;
 }
-function labelOf(finding: DeskFinding) {
-  return LABELS[finding.label] ?? (finding.term.startsWith("line:") ? finding.label
+function labelOf(t: Copy, finding: DeskFinding) {
+  return (t.labels as Record<string, string>)[finding.label] ?? (finding.term.startsWith("line:") ? finding.label
     : finding.label.toLowerCase().replaceAll("_", " ").replace(/^./, first => first.toUpperCase()));
 }
-function show(term: Term | null) {
-  if (term === null || term === undefined) return "nothing";
+function show(t: Copy, fill: Fill, term: Term | null) {
+  if (term === null || term === undefined) return t.nothing;
   if (typeof term === "number") return money(term);
   if (typeof term.amountMinor === "number") return money(term.amountMinor);
-  if (term.value === null || term.value === undefined) return "unreadable";
+  if (term.value === null || term.value === undefined) return t.unreadable;
   if (term.unit === "USD_MINOR" && /^-?\d+$/.test(term.value)) return money(Number(term.value));
   if (term.unit === "PERCENT") return `${term.value}%`;
-  if (term.unit === "MONTHS") return `${term.value} months`;
+  if (term.unit === "MONTHS") return fill(t.months, { value: term.value });
   return term.value;
 }
-function moneyDelta(finding: DeskFinding) {
-  return finding.delta !== null && (finding.unit ?? "").endsWith("_MINOR") && finding.delta !== 0 ? ` (${money(finding.delta, true)})` : "";
-}
 /** One plain sentence per difference, saying what changed relative to the Agreed Price. */
-export function describeFinding(finding: DeskFinding) {
-  const label = labelOf(finding);
-  if (finding.kind === "DOC_FEE_CHECK") return `${label} identification on the paperwork.`;
+export function describeFinding(t: Copy, fill: Fill, finding: DeskFinding) {
+  const label = labelOf(t, finding);
+  const term = (value: Term | null) => show(t, fill, value);
+  if (finding.kind === "DOC_FEE_CHECK") return fill(t.docFee, { label });
   switch (finding.group) {
-    case "VEHICLE": return `This paperwork is for VIN ${show(finding.desk)}, but your Agreed Price is for VIN ${show(finding.agreed)}.`;
-    case "ADDED": return `Added: ${label}${finding.chargeName ? ` (${finding.chargeName})` : ""}, ${show(finding.desk)}. It is not in your Agreed Price.`;
-    case "REMOVED": return `Missing: ${label}, ${show(finding.agreed)} in your Agreed Price, is not on this paperwork.`;
-    case "LIMIT": return `${label} of ${show(finding.agreed)} is exceeded by ${money(finding.delta ?? 0)}.`;
-    default:
-      if (finding.desk === null) return `${label} of ${show(finding.agreed)} in your Agreed Price is not on this paperwork.`;
-      if (finding.agreed === null) return `${label} is new on this paperwork: ${show(finding.desk)}.`;
-      return `${label} changed from ${show(finding.agreed)} to ${show(finding.desk)}${moneyDelta(finding)}.`;
+    case "VEHICLE": return fill(t.vehicle, { desk: term(finding.desk), agreed: term(finding.agreed) });
+    case "ADDED": return finding.chargeName
+      ? fill(t.addedNamed, { label, name: finding.chargeName, amount: term(finding.desk) })
+      : fill(t.added, { label, amount: term(finding.desk) });
+    case "REMOVED": return fill(t.removed, { label, amount: term(finding.agreed) });
+    case "LIMIT": return fill(t.limit, { label, limit: term(finding.agreed), amount: money(finding.delta ?? 0) });
+    default: {
+      if (finding.desk === null) return fill(t.notOnPaperwork, { label, amount: term(finding.agreed) });
+      if (finding.agreed === null) return fill(t.newOnPaperwork, { label, amount: term(finding.desk) });
+      const values = { label, agreed: term(finding.agreed), desk: term(finding.desk) };
+      return finding.delta !== null && (finding.unit ?? "").endsWith("_MINOR") && finding.delta !== 0
+        ? fill(t.changedBy, { ...values, delta: money(finding.delta, true) }) : fill(t.changed, values);
+    }
   }
 }
 /** A trade finding's sentence comes from the trade check itself (ticket 103). */
-function describe(view: DeskCheckView, finding: DeskFinding) {
+function describe(t: Copy, fill: Fill, view: DeskCheckView, finding: DeskFinding) {
   if (finding.term.startsWith("trade:")) {
     const trade = view.trade?.findings.find(item => `trade:${item.code}` === finding.term);
     if (trade) return trade.summary;
   }
-  return describeFinding(finding);
+  return describeFinding(t, fill, finding);
 }
-/** The lead line: how many differences and what they do to the total. */
-export function totalEffectSentence(view: DeskCheckView) {
+/** The lead line: how many differences and what they do to the total. Its clauses are joined with semicolons. */
+export function totalEffectSentence(t: Copy, fill: Fill, view: DeskCheckView) {
   const effect = view.totalEffect;
   const parts: string[] = [];
   if (effect.outTheDoorDeltaMinor !== null) {
     const amount = money(Math.abs(effect.outTheDoorDeltaMinor));
-    parts.push(effect.outTheDoorDeltaMinor === 0 ? "The out-the-door total is the same as agreed"
-      : `The out-the-door total is ${amount} ${effect.outTheDoorDeltaMinor > 0 ? "higher" : "lower"} than agreed`
-        + (effect.basis === "CALCULATED" ? ", calculated from the verified terms" : ", as printed on the paperwork"));
-  } else parts.push("The total effect is unavailable until the paperwork's total can be read");
+    const calculated = effect.basis === "CALCULATED";
+    parts.push(effect.outTheDoorDeltaMinor === 0 ? t.totalSame
+      : fill(effect.outTheDoorDeltaMinor > 0 ? (calculated ? t.totalHigherCalculated : t.totalHigherPrinted)
+        : (calculated ? t.totalLowerCalculated : t.totalLowerPrinted), { amount }));
+  } else parts.push(t.totalUnavailable);
   if (effect.basis === "CALCULATED" && effect.preTaxDeltaMinor !== null && effect.taxEffectMinor !== null)
-    parts.push(`${money(effect.preTaxDeltaMinor, true)} before tax and ${money(effect.taxEffectMinor, true)} in tax`);
-  if (effect.addedChargesMinor) parts.push(`added charges come to ${money(effect.addedChargesMinor)}`);
+    parts.push(fill(t.taxSplit, { preTax: money(effect.preTaxDeltaMinor, true), tax: money(effect.taxEffectMinor, true) }));
+  if (effect.addedChargesMinor) parts.push(fill(t.addedCharges, { amount: money(effect.addedChargesMinor) }));
   return parts.join("; ") + ".";
 }
 
-function asView(value: unknown): DeskCheckView {
+function asView(value: unknown, unavailable: string): DeskCheckView {
   const v = value as Partial<DeskCheckView> | null;
   if (!v || typeof v.status !== "string" || !Array.isArray(v.findings) || !Array.isArray(v.otherDifferences) || !v.totalEffect)
-    throw new Error("The Desk Check is unavailable. Try refreshing.");
+    throw new Error(unavailable);
   return v as DeskCheckView;
 }
 
 export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Credentials & {
   refreshKey?: number; onFreshCase?: (value: FreshDeskCase) => void;
 }) {
+  const { m: { dealer: { deskCheck: t, common } }, fill } = useMessages();
   const [view, setView] = useState<DeskCheckView>();
   const [error, setError] = useState<string>();
   const [starting, setStarting] = useState(false);
@@ -130,9 +128,9 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
   const path = `/api/v1/cases/${encodeURIComponent(caseId)}/desk-check`;
   async function load() {
     const response = await fetch(path, { headers: { "Case-Access-Token": token } });
-    if (response.status === 402) throw new Error("The Desk Check uses this case's report, which needs the one-time purchase first.");
-    if (!response.ok) throw new Error("The Desk Check is unavailable. Try refreshing.");
-    return asView(await response.json());
+    if (response.status === 402) throw new Error(common.purchaseRequired);
+    if (!response.ok) throw new Error(t.unavailable);
+    return asView(await response.json(), t.unavailable);
   }
   async function refresh() {
     setError(undefined);
@@ -161,81 +159,82 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
   const read = view?.source === "READ_FROM_PAPERWORK";
   const shownFindings = view?.findings.filter(finding => !view.tacticFindings?.some(tactic =>
     tactic.tradeFindingCode && finding.term === `trade:${tactic.tradeFindingCode}`)) ?? [];
-  return <section className="stack desk-check" aria-label="Desk Check">
+  const total = agreed?.outTheDoorMinor ?? null;
+  const compares = agreed?.vin ? (total !== null ? t.comparesTotalVin : t.comparesVin) : total !== null ? t.comparesTotal : t.compares;
+  return <section className="stack desk-check" aria-label={t.title}>
     <div className="panel desk-check-result">
       <div className="section-heading"><div>
-        <p className="step">At the dealership</p>
-        <h2 id="desk-check-heading" ref={heading} tabIndex={-1}>Desk Check</h2>
+        <p className="step">{t.step}</p>
+        <h2 id="desk-check-heading" ref={heading} tabIndex={-1}>{t.title}</h2>
       </div></div>
-      {agreed && <p className="muted">Compares the paperwork presented at the desk with your Agreed Price
-        {agreed.outTheDoorMinor !== null ? ` of ${money(agreed.outTheDoorMinor)} out the door` : ""}
-        {agreed.vin ? ` for VIN ${agreed.vin}` : ""}.</p>}
-      {view?.status === "AWAITING_PAPERWORK" && <p role="status">Photograph the paperwork the dealer gives you. Any difference from your Agreed Price is listed first.</p>}
-      {view?.status === "READING" && <p role="status">Reading the desk paperwork. The comparison appears here when the terms are read.</p>}
+      {agreed && <p className="muted">{fill(compares, { total: total !== null ? money(total) : "", vin: agreed.vin ?? "" })}</p>}
+      {view?.status === "AWAITING_PAPERWORK" && <p role="status">{t.awaiting}</p>}
+      {view?.status === "READING" && <p role="status">{t.reading}</p>}
       {view?.status === "DIFFERENT_VIN" && view.freshCase && <>
-        <p role="alert">Different car: this paperwork is for VIN {view.freshCase.vin}, not the agreed car{agreed?.vin ? ` (VIN ${agreed.vin})` : ""}. Nothing on it was compared with or added to your Agreed Price.</p>
-        <p>If you are switching to this car, or it is the car you want checked, start a separate case for it. That case gets its own analysis, including your state's fees and taxes, and your Agreed Price stays as it is.</p>
-        {!starting && <button type="button" onClick={() => setStarting(true)}>Start a fresh case for this car</button>}
+        <p role="alert">{agreed?.vin ? fill(t.differentCarVin, { vin: view.freshCase.vin, agreed: agreed.vin })
+          : fill(t.differentCar, { vin: view.freshCase.vin })}</p>
+        <p>{t.switching}</p>
+        {!starting && <button type="button" onClick={() => setStarting(true)}>{t.startFresh}</button>}
       </>}
       {(view?.status === "DIFFERENCES" || view?.status === "NO_DIFFERENCES") && <>
         <p role="status" className="desk-check-lead">{view.status === "DIFFERENCES"
-          ? `${view.findings.length} ${view.findings.length === 1 ? "difference" : "differences"} from your Agreed Price. ${totalEffectSentence(view)}`
-          : `No differences from your Agreed Price in the ${read ? "terms as read" : "verified terms"}. ${totalEffectSentence(view)}`}</p>
-        {shownFindings.length > 0 && <ol className="desk-check-findings" aria-label="Differences from your Agreed Price">
+          ? fill(t.differences, { count: view.findings.length, effect: totalEffectSentence(t, fill, view) })
+          : fill(read ? t.noDifferencesRead : t.noDifferencesVerified, { effect: totalEffectSentence(t, fill, view) })}</p>
+        {shownFindings.length > 0 && <ol className="desk-check-findings" aria-label={t.findings}>
           {shownFindings.map(finding => <li key={`${finding.group}-${finding.term}`} data-severity={finding.severity}>
-            <p>{describe(view, finding)}</p>
+            <p>{describe(t, fill, view, finding)}</p>
             <p className="desk-check-meta">
-              <span className={finding.verified ? "cash-badge" : "badge badge-warn"}>{finding.verified ? "Verified" : "As read, not verified"}</span>
-              {finding.evidence?.pageNumber ? <span> Page {finding.evidence.pageNumber}.</span> : null}
+              <span className={finding.verified ? "cash-badge" : "badge badge-warn"}>{finding.verified ? t.verifiedBadge : t.asReadBadge}</span>
+              {finding.evidence?.pageNumber ? <span> {fill(t.page, { page: finding.evidence.pageNumber })}</span> : null}
               {finding.buyerAction ? <span> {finding.buyerAction}</span> : null}
             </p>
           </li>)}
         </ol>}
         {view.trade && <TradeCheckPanel result={view.trade} tactics={view.tacticFindings} />}
-        {view.listingPrice && <ListingPriceNote check={view.listingPrice} title="The ad you saved" />}
+        {view.listingPrice && <ListingPriceNote check={view.listingPrice} title={common.listingTitle} />}
         {view.governmentFees && <GovernmentFeeNote check={view.governmentFees} />}
         {view.addOns && <DealerAddOnsNote check={view.addOns} />}
         {view.otherDifferences.length > 0 && <details>
           <summary>{view.otherDifferences.some(finding => finding.kind === "DOC_FEE_CHECK")
-            ? "Other paperwork notes and state fee checks"
-            : `${view.otherDifferences.length} other ${view.otherDifferences.length === 1 ? "change" : "changes"} on the paperwork`}</summary>
+            ? t.otherNotes
+            : fill(t.otherChanges, { count: view.otherDifferences.length })}</summary>
           <ul>{view.otherDifferences.map(finding => <li key={`${finding.group}-${finding.term}`}>
-            {describeFinding(finding)} {finding.verified ? "Verified." : "As read, not verified."}
+            {describeFinding(t, fill, finding)} {finding.verified ? t.verifiedSentence : common.asReadSentence}
             {finding.kind === "DOC_FEE_CHECK" && <p>{finding.buyerAction}</p>}
           </li>)}</ul>
         </details>}
         <p className="muted">{read
-          ? "These terms are as read from the paperwork and are not yet verified. Check each one against the page in “Check the terms against the paperwork” before relying on it."
+          ? t.readNote
           : view.source === "DEAL_REVIEW"
-            ? `From saved Deal Review ${view.dealReviewVersion}, against the Approved Baseline of your Agreed Price.`
-            : "From the verified paperwork terms. Open the analysis of this offer to save the comparison as a Deal Review."}</p>
+            ? fill(t.fromDealReview, { version: String(view.dealReviewVersion) })
+            : t.fromVerified}</p>
         {read && <button type="button" className="btn-secondary" onClick={() => {
           const target = document.getElementById("verify-heading");
           target?.scrollIntoView?.({ block: "start" }); target?.focus();
-        }}>Verify these terms</button>}
+        }}>{t.verifyTerms}</button>}
         <SigningNote />
       </>}
-      <button type="button" className="btn-secondary" onClick={() => void refresh()}>Refresh Desk Check</button>
+      <button type="button" className="btn-secondary" onClick={() => void refresh()}>{t.refresh}</button>
       <DeskTactics findings={view?.tacticFindings} />
       {error && <p role="alert">{error}</p>}
     </div>
-    {starting && view?.freshCase && <BuyingCaseIntake title={`Start a fresh case for VIN ${view.freshCase.vin}`}
+    {starting && view?.freshCase && <BuyingCaseIntake title={fill(t.freshCaseTitle, { vin: view.freshCase.vin })}
       initial={{ vin: view.freshCase.vin, dealerLocation: view.freshCase.dealerLocation ?? view.freshCase.dealerPostalCode ?? undefined, purchaseMethod: view.freshCase.purchaseMethod }}
       onCaseOpened={value => onFreshCase?.({ ...value, agreed: { caseId, token }, agreedVin: agreed?.vin ?? null,
         vin: view.freshCase!.vin, files: files.current })} />}
     {view && <DealerDocumentUpload caseId={caseId} token={token}
-      heading={{ id: "desk-paperwork-heading", step: "Desk Check", title: "Photograph the desk paperwork" }}
+      heading={{ id: "desk-paperwork-heading", step: t.title, title: t.paperworkTitle }}
       onChosen={chosen => { files.current = chosen; }} onExtracted={() => void refresh()} />}
   </section>;
 }
 
 /** Shown on a fresh desk case so it is never mistaken for the agreed car. */
 export function DeskFreshCase({ value, onBack }: { value: FreshDeskCase; onBack: () => void }) {
+  const { m: { dealer: { deskFreshCase: t } }, fill } = useMessages();
   return <section className="panel desk-fresh-case" aria-labelledby="desk-fresh-heading">
-    <h2 id="desk-fresh-heading">Separate case for VIN {value.vin}</h2>
-    <p>This case is for the car on the desk paperwork. It is separate from your Agreed Price
-      {value.agreedVin ? ` on VIN ${value.agreedVin}` : ""}, which is unchanged. The paperwork is analyzed here as a new deal.</p>
-    {value.files.length > 0 && <p className="muted">The paperwork you photographed is added to this case below.</p>}
-    <button type="button" className="btn-secondary" onClick={onBack}>Back to the agreed car</button>
+    <h2 id="desk-fresh-heading">{fill(t.heading, { vin: value.vin })}</h2>
+    <p>{value.agreedVin ? fill(t.bodyVin, { vin: value.agreedVin }) : t.body}</p>
+    {value.files.length > 0 && <p className="muted">{t.photographed}</p>}
+    <button type="button" className="btn-secondary" onClick={onBack}>{t.back}</button>
   </section>;
 }

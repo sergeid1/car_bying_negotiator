@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import * as format from "./i18n/format";
+import { useMessages } from "./i18n/LanguageProvider";
 
 type Disclosure = "PAYING_CASH" | "HAS_OUTSIDE_FINANCING" | "FIRST_NAME" | "PURCHASE_TIMELINE";
 type Status = "ACTIVE" | "SUPERSEDED" | "REVOKED" | "PLAN_CHANGED" | "EXPIRED";
@@ -13,19 +14,10 @@ export type Mandate = {
   approvedAt: string; revokedAt: string | null;
 };
 
-const DISCLOSURE_LABELS: Record<Disclosure, string> = {
-  PAYING_CASH: "I am paying cash",
-  HAS_OUTSIDE_FINANCING: "I have financing arranged elsewhere",
-  FIRST_NAME: "My first name",
-  PURCHASE_TIMELINE: "When I plan to buy",
-};
-const STATUS_LABELS: Record<Status, string> = {
-  ACTIVE: "Active", SUPERSEDED: "Replaced by a newer approval", REVOKED: "Revoked",
-  PLAN_CHANGED: "No longer applies: your price limits changed", EXPIRED: "Expired",
-};
 const LIFETIMES = [3, 7, 14, 30];
 
 export function NegotiationMandate({ caseId, token }: { caseId: string; token: string }) {
+  const { m: { messages: { negotiationMandate: t } }, fill } = useMessages();
   const [proposal, setProposal] = useState<MandateProposal>();
   const [mandates, setMandates] = useState<Mandate[]>([]);
   const [error, setError] = useState<string>();
@@ -37,7 +29,7 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
     const response = await fetch(url, { ...init, headers: { "Case-Access-Token": token, ...init?.headers } });
     const text = await response.text();
     const body = text ? JSON.parse(text) : undefined;
-    if (!response.ok) throw new Error(body?.detail ?? "Mandate request failed");
+    if (!response.ok) throw new Error(body?.detail ?? t.requestFailed);
     return body as T | undefined;
   }
 
@@ -89,74 +81,65 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
   const planChanged = mandates[0]?.status === "PLAN_CHANGED";
 
   return <section className="panel mandate-panel" aria-labelledby="mandate-heading">
-    <h2 id="mandate-heading">Set your negotiating limits</h2>
-    <p>A mandate sets the limits for any later contact with a dealer about this car. Approving it sends nothing to any dealer.</p>
+    <h2 id="mandate-heading">{t.heading}</h2>
+    <p>{t.intro}</p>
     <div className="mandate-terms">
       <section aria-labelledby="mandate-may">
-        <h3 id="mandate-may">What the platform may do</h3>
-        <ul>
-          <li>Draft messages asking a dealer for a written, itemized out-the-door quote.</li>
-          <li>Propose prices at or below your target, and never above your walk-away ceiling.</li>
-          <li>Share only the details you tick below.</li>
-          <li>Work under this mandate until it expires or you revoke it, whichever comes first.</li>
-        </ul>
+        <h3 id="mandate-may">{t.mayHeading}</h3>
+        <ul>{t.may.map(item => <li key={item}>{item}</li>)}</ul>
       </section>
       <section aria-labelledby="mandate-may-not">
-        <h3 id="mandate-may-not">What the platform may not do</h3>
-        <ul>
-          <li>Send any message without your approval. Every message waits for you.</li>
-          <li>Offer more than your walk-away ceiling.</li>
-          <li>Share your email address, phone number, surname, or anything you did not tick.</li>
-          <li>Agree to buy, sign anything, or pay a deposit. Only you can do those things.</li>
-        </ul>
+        <h3 id="mandate-may-not">{t.mayNotHeading}</h3>
+        <ul>{t.mayNot.map(item => <li key={item}>{item}</li>)}</ul>
       </section>
     </div>
     {error && <p role="alert">{error}</p>}
     {proposal && !proposal.available && <p role="status">{proposal.unavailableReason}</p>}
-    {planChanged && <p className="notice">Your price limits changed after mandate version {mandates[0].version} was approved, so it no longer applies. Approve a new mandate to continue.</p>}
+    {planChanged && <p className="notice">{fill(t.planChanged, { version: String(mandates[0].version) })}</p>}
     {current && <section aria-labelledby="mandate-current">
-      <h3 id="mandate-current">Current mandate, version {current.version}</h3>
+      <h3 id="mandate-current">{fill(t.current, { version: String(current.version) })}</h3>
       <dl className="facts">
-        <div><dt>Target</dt><dd>{money(current.targetMinor, current.currency)}</dd></div>
-        <div><dt>Walk-away ceiling</dt><dd>{money(current.ceilingMinor, current.currency)}</dd></div>
-        <div><dt>May be shared</dt><dd>{current.disclosures.length ? current.disclosures.map(item => DISCLOSURE_LABELS[item]).join("; ") : "Nothing"}</dd></div>
-        <div><dt>Mode</dt><dd>Supervised: you approve every message</dd></div>
-        <div><dt>Expires</dt><dd>{when(current.expiresAt)}</dd></div>
-        <div><dt>Approved</dt><dd>{when(current.approvedAt)}</dd></div>
+        <div><dt>{t.target}</dt><dd>{money(current.targetMinor, current.currency)}</dd></div>
+        <div><dt>{t.walkAwayCeiling}</dt><dd>{money(current.ceilingMinor, current.currency)}</dd></div>
+        <div><dt>{t.mayBeShared}</dt><dd>{current.disclosures.length ? current.disclosures.map(item => t.disclosures[item]).join("; ") : t.nothing}</dd></div>
+        <div><dt>{t.mode}</dt><dd>{t.supervised}</dd></div>
+        <div><dt>{t.expires}</dt><dd>{when(current.expiresAt)}</dd></div>
+        <div><dt>{t.approved}</dt><dd>{when(current.approvedAt)}</dd></div>
       </dl>
-      <button type="button" onClick={() => revoke(current.version)} disabled={busy}>Revoke mandate now</button>
+      <button type="button" onClick={() => revoke(current.version)} disabled={busy}>{t.revoke}</button>
     </section>}
     {proposal?.available && proposal.targetMinor != null && proposal.ceilingMinor != null &&
       <form onSubmit={approve} aria-labelledby="mandate-form-heading">
-        <h3 id="mandate-form-heading">{current ? "Approve a new version" : "Review and approve"}</h3>
-        <p>Proposed from Deal Plan version {proposal.planVersion}. You may lower either amount, but the ceiling cannot go above {money(proposal.ceilingMinor, proposal.currency)}.
-          {current ? " Changing anything replaces the current mandate only after you approve the new version." : ""}</p>
-        <label>Target selling price ($)<input name="target" type="number" required min="0.01" step="0.01"
+        <h3 id="mandate-form-heading">{current ? t.approveNewVersion : t.reviewAndApprove}</h3>
+        <p>{fill(t.proposedFrom, { plan: String(proposal.planVersion ?? ""), ceiling: money(proposal.ceilingMinor, proposal.currency) })}
+          {current ? <>{" "}{t.replacesCurrent}</> : ""}</p>
+        <label>{t.targetInput}<input name="target" type="number" required min="0.01" step="0.01"
           max={proposal.targetMinor / 100} defaultValue={proposal.targetMinor / 100} /></label>
-        <label>Walk-away ceiling ($)<input name="ceiling" type="number" required min="0.01" step="0.01"
+        <label>{t.ceilingInput}<input name="ceiling" type="number" required min="0.01" step="0.01"
           max={proposal.ceilingMinor / 100} defaultValue={proposal.ceilingMinor / 100} /></label>
         <fieldset>
-          <legend>What may be shared with a dealer</legend>
+          <legend>{t.shareLegend}</legend>
           {proposal.disclosures.map(item =>
-            <label key={item}><input type="checkbox" name="disclosure" value={item} />{DISCLOSURE_LABELS[item]}</label>)}
+            <label key={item}><input type="checkbox" name="disclosure" value={item} />{t.disclosures[item]}</label>)}
         </fieldset>
-        <p>The mandate limits what you can approve. otdog never sends anything: you approve each message and send it from your own email.</p>
-        <label>Mandate lasts<select name="lifetime" defaultValue="14">
-          {LIFETIMES.map(days => <option key={days} value={days}>{days} days</option>)}
+        <p>{t.youSend}</p>
+        <label>{t.lasts}<select name="lifetime" defaultValue="14">
+          {LIFETIMES.map(days => <option key={days} value={days}>{fill(t.days, { count: days })}</option>)}
         </select></label>
-        <label><input type="checkbox" name="approved" required />I approve this Negotiation Mandate. I can revoke it at any time.</label>
-        <button disabled={busy}>Approve mandate</button>
+        <label><input type="checkbox" name="approved" required />{t.approval}</label>
+        <button disabled={busy}>{t.approve}</button>
       </form>}
     {mandates.length > 0 && <section aria-labelledby="mandate-history">
-      <h3 id="mandate-history">Approved versions</h3>
+      <h3 id="mandate-history">{t.history}</h3>
       <ul className="mandate-history">
         {mandates.map(mandate => <li key={mandate.version}>
-          Version {mandate.version}: {STATUS_LABELS[mandate.status]}. Target {money(mandate.targetMinor, mandate.currency)},
-          ceiling {money(mandate.ceilingMinor, mandate.currency)}, approved {when(mandate.approvedAt)}
-          {mandate.revokedAt ? `, revoked ${when(mandate.revokedAt)}` : ""}.
+          {fill(mandate.revokedAt ? t.historyEntryRevoked : t.historyEntry, {
+            version: String(mandate.version), status: t.statuses[mandate.status],
+            target: money(mandate.targetMinor, mandate.currency), ceiling: money(mandate.ceilingMinor, mandate.currency),
+            approved: when(mandate.approvedAt), revoked: mandate.revokedAt ? when(mandate.revokedAt) : "" })}
         </li>)}
       </ul>
     </section>}
-    <button type="button" onClick={load} disabled={busy}>Check again</button>
+    <button type="button" onClick={load} disabled={busy}>{t.checkAgain}</button>
   </section>;
 }

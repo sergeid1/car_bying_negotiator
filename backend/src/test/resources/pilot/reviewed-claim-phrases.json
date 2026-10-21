@@ -38,14 +38,14 @@
       "justification": "Negated advice-boundary disclosure in the footer statement, required by DEVELOPMENT_SPEC.md section 13."
     },
     {
-      "file": "frontend/src/ReferralPartnerKit.tsx",
+      "file": "frontend/src/i18n/en/content.ts",
       "language": "en",
       "pattern": "contacts dealers",
       "contains": "does not contact dealers for the Buyer.",
       "justification": "Negated partner-kit term that ticket 69 requires to stay: the product does not contact dealers for the Buyer."
     },
     {
-      "file": "frontend/src/ReferralPartnerKit.tsx",
+      "file": "frontend/src/i18n/en/content.ts",
       "language": "en",
       "pattern": "contacts dealers",
       "contains": "otdog never contacts a dealer itself.",

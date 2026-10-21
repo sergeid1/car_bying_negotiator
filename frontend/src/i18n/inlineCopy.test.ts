@@ -21,84 +21,22 @@ const COPY_ATTRIBUTES = new Set(["aria-label", "aria-description", "aria-roledes
 /** Components whose copy has not moved into the catalogue yet, one list per journey. Remove a file when its copy moves. */
 
 /** Journey: starting a case, sign-in and the Buyer Account; copy in en/account.ts. */
-const ACCOUNT_PENDING = [
-  "AcquisitionChannel.tsx",
-  "BuyerAccount.tsx",
-  "BuyingCaseIntake.tsx",
-  "CaseLifecycle.tsx",
-  "CasePortability.tsx",
-  "DealerFields.tsx",
-  "Passkeys.tsx",
-  "Passwords.tsx",
-  "SignIn.tsx",
-];
+const ACCOUNT_PENDING: string[] = [];
 
 /** Journey: the dealer's paperwork and the report; copy in en/paperwork.ts. */
-const PAPERWORK_PENDING = [
-  "AgreedPrice.tsx",
-  "CoreDealReport.tsx",
-  "DealerAddOns.tsx",
-  "DealerDocumentUpload.tsx",
-  "DocFeeFindings.tsx",
-  "EvidenceSource.tsx",
-  "GovernmentFees.tsx",
-  "OfferVerification.tsx",
-  "PilotFeedback.tsx",
-  "ReportExplanation.tsx",
-  "ReportTotalMeasure.tsx",
-  "RevisedOfferReview.tsx",
-  "SampleReport.tsx",
-  "VehicleSafety.tsx",
-  "VerifiedOfferAnalysis.tsx",
-];
+const PAPERWORK_PENDING: string[] = [];
 
 /** Journey: at the dealer; copy in en/dealer.ts. */
-const DEALER_PENDING = [
-  "AtTheDealer.tsx",
-  "CaseFlow.tsx",
-  "DeskCheck.tsx",
-  "DeskTactics.tsx",
-  "TestDriveAppointment.tsx",
-  "TradeCheck.tsx",
-  "TradeValueChecks.tsx",
-  "TradeVehicle.tsx",
-];
+const DEALER_PENDING: string[] = [];
 
 /** Journey: messages to the dealer; copy in en/messages.ts. */
-const MESSAGES_PENDING = [
-  "DealerHandoff.tsx",
-  "DealerRelay.tsx",
-  "MailboxConnection.tsx",
-  "NegotiationConversation.tsx",
-  "NegotiationDraft.tsx",
-  "NegotiationMandate.tsx",
-  "OutboundGateDecision.tsx",
-  "QuoteComparison.tsx",
-  "QuoteRequest.tsx",
-];
+const MESSAGES_PENDING: string[] = [];
 
 /** Journey: insurance, loans, financing and the offer; copy in en/money.ts. */
-const MONEY_PENDING = [
-  "DealerFinancing.tsx",
-  "InsuranceQuotes.tsx",
-  "LoanPreApprovals.tsx",
-  "OneTimeOffer.tsx",
-  "OutsideFinancing.tsx",
-  "PricePlan.tsx",
-];
+const MONEY_PENDING: string[] = [];
 
 /** Journey: Buying Journeys, listings, guides, the content pages and Toto; copy in en/content.ts. */
-const CONTENT_PENDING = [
-  "BuyingJourneys.tsx",
-  "CandidateVehicles.tsx",
-  "ExplainerGuides.tsx",
-  "HowItWorks.tsx",
-  "HowOtdogMakesMoney.tsx",
-  "JourneyCandidates.tsx",
-  "ListingCapture.tsx",
-  "ReferralPartnerKit.tsx",
-  "TotoChat.tsx",
-];
+const CONTENT_PENDING: string[] = [];
 
 const PENDING = [...ACCOUNT_PENDING, ...PAPERWORK_PENDING, ...DEALER_PENDING, ...MESSAGES_PENDING, ...MONEY_PENDING, ...CONTENT_PENDING];
 

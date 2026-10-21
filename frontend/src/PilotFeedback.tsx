@@ -1,46 +1,52 @@
 import { useId, useState } from "react";
+import { useMessages, type Messages } from "./i18n/LanguageProvider";
 
 type Credentials = { caseId: string; token: string };
-const answers = [["YES", "Yes"], ["NO", "No"], ["UNSURE", "Not sure"]];
+type Copy = Messages["paperwork"]["pilotFeedback"];
+const answersFrom = (t: Copy) => [["YES", t.yes], ["NO", t.no], ["UNSURE", t.unsure]];
+const entries = (labels: Record<string, string>) => Object.entries(labels);
 function Select({ label, value, onChange, options, required = false }: {
   label: string; value: string; onChange: (value: string) => void; options: string[][]; required?: boolean;
 }) {
+  const { m: { paperwork: { pilotFeedback: t } } } = useMessages();
   const id = useId();
   return <label htmlFor={id}>{label}<select id={id} value={value} required={required} onChange={e => onChange(e.target.value)}>
-    <option value="">{required ? "Choose a response" : "Prefer not to answer"}</option>
+    <option value="">{required ? t.chooseResponse : t.preferNot}</option>
     {options.map(([key, text]) => <option key={key} value={key}>{text}</option>)}
   </select></label>;
 }
-async function submit({ caseId, token }: Credentials, kind: string, body: object) {
+async function submit({ caseId, token }: Credentials, kind: string, body: object, t: Copy) {
   const response = await fetch(`/api/v1/cases/${encodeURIComponent(caseId)}/feedback/${kind}`, {
     method: "POST", headers: { "Content-Type": "application/json", "Case-Access-Token": token }, body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(response.status === 409
-    ? "Feedback was already saved for this finding or outcome stage. Saved responses cannot be replaced."
-    : "Feedback could not be saved. Check your access and retry.");
+  if (!response.ok) throw new Error(response.status === 409 ? t.alreadySaved : t.saveFailed);
 }
 export function FindingFeedback(props: Credentials & { reportVersion: number; findingPointer: string }) {
+  const { m: { paperwork: { pilotFeedback: t } } } = useMessages();
+  const answers = answersFrom(t);
   const [accurate, setAccurate] = useState("");
   const [understandable, setUnderstandable] = useState("");
   const [useful, setUseful] = useState("");
   const [busy, setBusy] = useState(false), [saved, setSaved] = useState(false), [error, setError] = useState("");
   return <form onSubmit={async e => {
     e.preventDefault(); setBusy(true); setError("");
-    try { await submit(props, "findings", { reportVersion: props.reportVersion, findingPointer: props.findingPointer, accurate, understandable, useful }); setSaved(true); }
+    try { await submit(props, "findings", { reportVersion: props.reportVersion, findingPointer: props.findingPointer, accurate, understandable, useful }, t); setSaved(true); }
     catch (error) { setError((error as Error).message); } finally { setBusy(false); }
   }}>
-    <fieldset disabled={busy || saved}><legend>Optional feedback on this finding</legend>
-      <Select label="Accurate" value={accurate} onChange={setAccurate} options={answers} required />
-      <Select label="Understandable" value={understandable} onChange={setUnderstandable} options={answers} required />
-      <Select label="Useful" value={useful} onChange={setUseful} options={answers} required />
-      <button type="submit">Send finding feedback</button>
+    <fieldset disabled={busy || saved}><legend>{t.findingLegend}</legend>
+      <Select label={t.accurate} value={accurate} onChange={setAccurate} options={answers} required />
+      <Select label={t.understandable} value={understandable} onChange={setUnderstandable} options={answers} required />
+      <Select label={t.useful} value={useful} onChange={setUseful} options={answers} required />
+      <button type="submit">{t.sendFinding}</button>
     </fieldset>
-    {saved && <p role="status">Finding feedback saved.</p>}{error && <p role="alert">{error}</p>}
+    {saved && <p role="status">{t.findingSaved}</p>}{error && <p role="alert">{error}</p>}
   </form>;
 }
 
 /** `headless` drops the panel and heading so the report's collapsible list can supply them. */
 export function OutcomeFeedback(props: Credentials & { headless?: boolean }) {
+  const { m: { paperwork: { pilotFeedback: t, common } }, fill } = useMessages();
+  const answers = answersFrom(t);
   const [stage, setStage] = useState("FINAL");
   const [values, setValues] = useState<Record<string, string>>({});
   const [price, setPrice] = useState<{ priceMinor: number; variant: string }>();
@@ -58,11 +64,11 @@ export function OutcomeFeedback(props: Credentials & { headless?: boolean }) {
       if (!response.ok) throw new Error();
       const feedback = await response.json();
       if (feedback.experiment) setPrice(feedback.experiment);
-      else setPriceMessage("There is no price question for this case.");
-    } catch { setPriceMessage("Price question unavailable. Try again later."); }
+      else setPriceMessage(t.noPriceQuestion);
+    } catch { setPriceMessage(t.priceUnavailable); }
   }
   const body = <>
-    <p>Share any answers you choose. Terms are Buyer reported and unverified. Feedback does not change your report or approve a deal. Do not enter names or dealer details.</p>
+    <p>{t.intro}</p>
     <form onSubmit={async e => {
       e.preventDefault(); setBusy(true); setError("");
       const body: Record<string, unknown> = { stage };
@@ -73,34 +79,34 @@ export function OutcomeFeedback(props: Credentials & { headless?: boolean }) {
         else if (["understoodDecision", "liveUse", "willingToPay"].includes(key)) body[key] = value === "YES";
         else body[key] = value;
       }
-      try { await submit(props, "outcomes", body); setSaved(true); }
+      try { await submit(props, "outcomes", body, t); setSaved(true); }
       catch (error) { setError((error as Error).message); } finally { setBusy(false); }
     }}>
-      <label>Outcome stage<select disabled={busy} value={stage} onChange={e => { setStage(e.target.value); setValues({}); setSaved(false); setError(""); }}>
-          <option value="FINAL">Final decision</option><option value="REVISED">Revised offer</option>
+      <label>{t.stage}<select disabled={busy} value={stage} onChange={e => { setStage(e.target.value); setValues({}); setSaved(false); setError(""); }}>
+          <option value="FINAL">{t.finalDecision}</option><option value="REVISED">{t.revisedOffer}</option>
         </select></label>
-      <fieldset disabled={busy || saved}><legend>Usefulness and deal outcome</legend>
-        {optional("Action taken (optional)", "action", [["NEGOTIATED", "Negotiated"], ["REQUESTED_REVISION", "Requested a revised offer"], ["WALKED_AWAY", "Walked away"], ["PURCHASED", "Purchased"], ["NO_ACTION", "No action"]])}
-        {optional("Was the report useful? (optional)", "useful")}
-        {optional("Did you trust the report? (optional)", "trust")}
-        {optional("Did you understand your decision? (optional)", "understoodDecision", answers.slice(0, 2))}
-        {optional("Did you use this for a real purchase decision? (optional)", "liveUse", answers.slice(0, 2))}
-        {values.liveUse && optional("How would you feel if this service were unavailable? (optional)", "disappointment", [["VERY_DISAPPOINTED", "Very disappointed"], ["SOMEWHAT_DISAPPOINTED", "Somewhat disappointed"], ["NOT_DISAPPOINTED", "Not disappointed"]])}
-        <details><summary>Share revised or final terms (optional)</summary>
-          {[["sellingPriceMinor", "Selling price (USD)"], ["outTheDoorMinor", "Out-the-door total (USD)"], ["aprPercent", "APR (%)"], ["termMonths", "Loan term (months)"]].map(([key, label]) =>
+      <fieldset disabled={busy || saved}><legend>{t.outcomeLegend}</legend>
+        {optional(t.action, "action", entries(t.actions))}
+        {optional(t.reportUseful, "useful")}
+        {optional(t.trust, "trust")}
+        {optional(t.understoodDecision, "understoodDecision", answers.slice(0, 2))}
+        {optional(t.liveUse, "liveUse", answers.slice(0, 2))}
+        {values.liveUse && optional(t.disappointment, "disappointment", entries(t.disappointments))}
+        <details><summary>{t.terms}</summary>
+          {entries(t.termFields).map(([key, label]) =>
             <label key={key}>{label}<input type="number" min={key === "termMonths" ? 1 : 0} max={key === "termMonths" ? 120 : key === "aprPercent" ? 100 : 1000000}
               step={key === "termMonths" ? 1 : 0.01} value={values[key] ?? ""} onChange={e => set(key)(e.target.value)} /></label>)}
         </details>
-        <button className="btn-secondary" type="button" onClick={loadPrice}>View optional price question</button>
-        {price && optional(`Would you pay $${(price.priceMinor / 100).toFixed(2)} once for this service? (optional)`, "willingToPay", answers.slice(0, 2))}
+        <button className="btn-secondary" type="button" onClick={loadPrice}>{t.viewPrice}</button>
+        {price && optional(fill(t.willingToPay, { price: `$${(price.priceMinor / 100).toFixed(2)}` }), "willingToPay", answers.slice(0, 2))}
         {priceMessage && <p role="status">{priceMessage}</p>}
-        <p>Each outcome stage can be submitted once. Leave any question blank to skip it.</p>
-        <button type="submit" disabled={!Object.values(values).some(Boolean)}>Send outcome feedback</button>
+        <p>{t.onceEach}</p>
+        <button type="submit" disabled={!Object.values(values).some(Boolean)}>{t.sendOutcome}</button>
       </fieldset>
-      {saved && <p role="status">Outcome feedback saved.</p>}{error && <p role="alert">{error}</p>}
+      {saved && <p role="status">{t.outcomeSaved}</p>}{error && <p role="alert">{error}</p>}
     </form>
   </>;
   return props.headless ? body : <section className="panel" aria-labelledby={`${id}-heading`}>
-    <h3 id={`${id}-heading`}>Optional outcome feedback</h3>{body}
+    <h3 id={`${id}-heading`}>{common.outcomeFeedback}</h3>{body}
   </section>;
 }

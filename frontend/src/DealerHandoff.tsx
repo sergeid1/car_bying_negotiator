@@ -2,6 +2,7 @@ import { FormEvent, useContext, useEffect, useRef, useState } from "react";
 import { AccountSignedInContext } from "./BuyerAccount";
 import { asMailboxView, ConnectedMailbox } from "./MailboxConnection";
 import * as format from "./i18n/format";
+import { useMessages } from "./i18n/LanguageProvider";
 
 type Handoff = { messageId: string; sendPath: string; state: string; dealerAddress: string; subject: string; body: string;
   handedOffAt: string; sentAt: string | null };
@@ -15,10 +16,10 @@ export function mailtoLink(address: string, subject: string, body: string) {
   return `mailto:${encode(address).replace(/%40/g, "@")}?subject=${encode(subject)}&body=${encode(body.replace(/\r?\n/g, "\r\n"))}`;
 }
 
-function asHandoff(value: unknown): Handoff {
+function asHandoff(value: unknown, unavailable: string): Handoff {
   const v = value as Partial<Handoff> | null;
   if (!v || typeof v.state !== "string" || typeof v.dealerAddress !== "string" || typeof v.subject !== "string"
-    || typeof v.body !== "string") throw new Error("This message is unavailable. Try refreshing.");
+    || typeof v.body !== "string") throw new Error(unavailable);
   return v as Handoff;
 }
 
@@ -30,6 +31,7 @@ function asHandoff(value: unknown): Handoff {
 export function DealerHandoff({ caseId, token, messageId, onChanged }: {
   caseId: string; token: string; messageId: string; onChanged: () => Promise<void> | void;
 }) {
+  const { m: { messages: { dealerHandoff: t } }, fill, fillNodes } = useMessages();
   const signedIn = useContext(AccountSignedInContext);
   const [handoff, setHandoff] = useState<Handoff>();
   const [mailbox, setMailbox] = useState<ConnectedMailbox | null>(null);
@@ -42,15 +44,15 @@ export function DealerHandoff({ caseId, token, messageId, onChanged }: {
       ...(account ? { "Account-Request": "1" } : {}) }, ...(method === "POST" ? { body: "{}" } : {}) });
     if (!response.ok) {
       const detail = await response.json().catch(() => ({}));
-      throw new Error(typeof detail.detail === "string" ? detail.detail : "This message could not be updated. Try again.");
+      throw new Error(typeof detail.detail === "string" ? detail.detail : t.updateFailed);
     }
-    return asHandoff(await response.json());
+    return asHandoff(await response.json(), t.unavailable);
   }
   useEffect(() => {
     let current = true;
     setHandoff(undefined); setError(undefined); setCopied("");
     request(path).then(value => { if (current) setHandoff(value); })
-      .catch(() => { if (current) setError("This message is unavailable. Try refreshing."); });
+      .catch(() => { if (current) setError(t.unavailable); });
     return () => { current = false; };
     // The message and the case credential define this view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,56 +75,58 @@ export function DealerHandoff({ caseId, token, messageId, onChanged }: {
     }
     finally { setBusy(false); }
   }
-  async function copy(label: string, text: string) {
+  async function copy(what: "subject" | "message", text: string) {
     setCopied("");
-    try { await navigator.clipboard.writeText(text); setCopied(`${label} copied.`); }
-    catch { setCopied(`Copying is not available here. Select the ${label.toLowerCase()} and copy it yourself.`); }
+    try { await navigator.clipboard.writeText(text); setCopied(what === "subject" ? t.subjectCopied : t.messageCopied); }
+    catch { setCopied(what === "subject" ? t.subjectCopyUnavailable : t.messageCopyUnavailable); }
   }
   const confirmSent = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); void act("sent"); };
 
-  if (!handoff) return <div className="handoff">{error ? <p role="alert">{error}</p> : <p>Loading the approved message…</p>}</div>;
+  if (!handoff) return <div className="handoff">{error ? <p role="alert">{error}</p> : <p>{t.loading}</p>}</div>;
   const link = mailtoLink(handoff.dealerAddress, handoff.subject, handoff.body);
   const waiting = handoff.state === "HANDED_OFF";
   const unclear = handoff.state === "DELIVERY_UNKNOWN";
   const fromMailbox = handoff.sendPath === "CONNECTED_MAILBOX";
-  const sentAt = handoff.sentAt ? ` on ${format.dateTime(handoff.sentAt)}` : "";
-  return <div className="handoff" aria-label={`Send to ${handoff.dealerAddress} from your email`} role="group">
-    <p className="handoff-state" role="status">{waiting ? "Not sent yet. Send it from your own email, then tell us."
-      : unclear ? "Not confirmed. Your email provider did not say whether this message was sent."
-      : handoff.state === "SENT" ? fromMailbox ? `Sent from your connected email${sentAt}.` : `You sent this${sentAt}.`
-      : "Discarded. It was not sent."}</p>
+  const sentAt = handoff.sentAt ? format.dateTime(handoff.sentAt) : "";
+  const sent = fromMailbox ? sentAt ? fill(t.sentFromMailboxOn, { when: sentAt }) : t.sentFromMailbox
+    : sentAt ? fill(t.sentByYouOn, { when: sentAt }) : t.sentByYou;
+  return <div className="handoff" aria-label={fill(t.group, { address: handoff.dealerAddress })} role="group">
+    <p className="handoff-state" role="status">{waiting ? t.waiting
+      : unclear ? t.unclear
+      : handoff.state === "SENT" ? sent
+      : t.discarded}</p>
     <dl className="facts handoff-fields">
-      <div><dt>To</dt><dd>{handoff.dealerAddress}</dd></div>
-      <div><dt>Subject</dt><dd>{handoff.subject}</dd></div>
+      <div><dt>{t.to}</dt><dd>{handoff.dealerAddress}</dd></div>
+      <div><dt>{t.subject}</dt><dd>{handoff.subject}</dd></div>
     </dl>
     <pre className="handoff-body">{handoff.body}</pre>
     {waiting && mailbox && <div className="handoff-mailbox">
-      <p>Send it from <strong className="mailbox-address">{mailbox.address}</strong> through your connected {mailbox.providerLabel}.
-        Exactly this text is sent, and it appears in your Sent folder.</p>
-      <button type="button" disabled={busy} onClick={() => void act("mailbox-send")}>Send from my email</button>
+      <p>{fillNodes(t.sendFromMailbox, {
+        address: <strong className="mailbox-address">{mailbox.address}</strong>, provider: mailbox.providerLabel })}</p>
+      <button type="button" disabled={busy} onClick={() => void act("mailbox-send")}>{t.sendFromMyEmail}</button>
     </div>}
     {unclear && <div className="handoff-mailbox">
-      <p>Check the Sent folder of your email before doing anything else. Nothing is sent again unless you choose to.</p>
+      <p>{t.checkSentFolder}</p>
       <div className="handoff-actions">
-        <button type="button" disabled={busy} onClick={() => void act("sent")}>It was sent</button>
-        <button type="button" disabled={busy} onClick={() => void act("mailbox-send")}>Send again</button>
+        <button type="button" disabled={busy} onClick={() => void act("sent")}>{t.itWasSent}</button>
+        <button type="button" disabled={busy} onClick={() => void act("mailbox-send")}>{t.sendAgain}</button>
         <button type="button" className="btn-secondary" disabled={busy} onClick={() => void act("own-email-app")}>
-          It was not sent: use my email app</button>
+          {t.notSentUseApp}</button>
       </div>
     </div>}
     {waiting && <>
-      <p>This is your message, exactly as you approved it. It goes from your email address, and otdog adds nothing to it.</p>
+      <p>{t.exactlyAsApproved}</p>
       <div className="handoff-actions">
         {link.length <= MAILTO_LIMIT
-          ? <a className="button-link" href={link}>Open in my email app</a>
-          : <p>This message is too long to open in an email app reliably. Copy the subject and message into a new email instead.</p>}
-        <button type="button" onClick={() => void copy("Subject", handoff.subject)}>Copy subject</button>
-        <button type="button" onClick={() => void copy("Message", handoff.body)}>Copy message</button>
+          ? <a className="button-link" href={link}>{t.openInEmailApp}</a>
+          : <p>{t.tooLong}</p>}
+        <button type="button" onClick={() => void copy("subject", handoff.subject)}>{t.copySubject}</button>
+        <button type="button" onClick={() => void copy("message", handoff.body)}>{t.copyMessage}</button>
       </div>
       <p className="handoff-copied" role="status" aria-live="polite">{copied}</p>
       <form onSubmit={confirmSent} className="handoff-actions">
-        <button type="submit" disabled={busy}>I sent it</button>
-        <button type="button" disabled={busy} onClick={() => void act("discard")}>Discard this message</button>
+        <button type="submit" disabled={busy}>{t.iSentIt}</button>
+        <button type="button" disabled={busy} onClick={() => void act("discard")}>{t.discard}</button>
       </form>
     </>}
     {error && <p role="alert">{error}</p>}
@@ -133,6 +137,7 @@ export function DealerHandoff({ caseId, token, messageId, onChanged }: {
 export function DealerReplyPaste({ caseId, token, quoteRequestId, dealerAddress, onAdded }: {
   caseId: string; token: string; quoteRequestId: string; dealerAddress: string; onAdded: () => Promise<void> | void;
 }) {
+  const { m: { messages: { dealerReply: t } }, fill } = useMessages();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [added, setAdded] = useState("");
@@ -146,7 +151,7 @@ export function DealerReplyPaste({ caseId, token, quoteRequestId, dealerAddress,
     data.delete("file");
     files.forEach(file => data.append("file", file));
     if (!String(data.get("text") ?? "").trim() && files.length === 0) {
-      setError("Paste the dealer's reply or add its attachments."); return;
+      setError(t.empty); return;
     }
     setBusy(true); setError(undefined); setAdded("");
     try {
@@ -154,24 +159,22 @@ export function DealerReplyPaste({ caseId, token, quoteRequestId, dealerAddress,
         { method: "POST", headers: { "Case-Access-Token": token, "Idempotency-Key": key.current }, body: data });
       if (!response.ok) {
         const detail = await response.json().catch(() => ({}));
-        throw new Error(typeof detail.detail === "string" ? detail.detail : "The reply could not be added. Try again.");
+        throw new Error(typeof detail.detail === "string" ? detail.detail : t.addFailed);
       }
       const result = await response.json();
       key.current = crypto.randomUUID(); form.reset();
-      setAdded(result?.outcome === "REJECTED_MALWARE" ? "The reply was recorded, but it failed the malware scan and was not opened."
-        : "Reply added. Quote figures and attachments go to your documents for review.");
+      setAdded(result?.outcome === "REJECTED_MALWARE" ? t.malware : t.added);
       await onAdded();
     } catch (failure) { setError((failure as Error).message); }
     finally { setBusy(false); }
   }
   return <form className="handoff-reply" onSubmit={event => void submit(event)} aria-labelledby={`${id}-heading`}>
-    <h4 id={`${id}-heading`}>Add the reply from {dealerAddress}</h4>
-    <p>Paste the dealer's email or attach the files they sent. It is treated as the dealer's claims: nothing in it is acted on,
-      and any figures are checked by you before use.</p>
-    <label>Subject (optional)<input name="subject" maxLength={300} disabled={busy} autoComplete="off" /></label>
-    <label>Dealer's reply<textarea name="text" rows={6} disabled={busy} /></label>
-    <label>Attachments<input name="file" type="file" multiple disabled={busy} /></label>
-    <button type="submit" disabled={busy}>Add reply</button>
+    <h4 id={`${id}-heading`}>{fill(t.heading, { address: dealerAddress })}</h4>
+    <p>{t.intro}</p>
+    <label>{t.subject}<input name="subject" maxLength={300} disabled={busy} autoComplete="off" /></label>
+    <label>{t.reply}<textarea name="text" rows={6} disabled={busy} /></label>
+    <label>{t.attachments}<input name="file" type="file" multiple disabled={busy} /></label>
+    <button type="submit" disabled={busy}>{t.add}</button>
     <p role="status">{added}</p>
     {error && <p role="alert">{error}</p>}
   </form>;

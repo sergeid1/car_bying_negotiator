@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useId, useRef, useState } from "react";
-import { GUIDE_LIST, guideLink } from "./ExplainerGuides";
+import { GUIDE_SLUGS, guideLink } from "./ExplainerGuides";
+import { useMessages } from "./i18n/LanguageProvider";
 import "./TotoChat.css";
 import * as format from "./i18n/format";
 
@@ -23,20 +24,8 @@ export type TotoAnswer = {
 type Turn = { role: "BUYER" | "TOTO"; text: string };
 type Exchange = { id: number; question: string; answer?: TotoAnswer; failure?: string };
 
-/** Static, code-owned starter questions shown while the chat is empty. */
-export const STARTER_QUESTIONS = [
-  "What is a doc fee?",
-  "What does the four-square do?",
-  "What should I bring to the dealership?",
-  "How does an outside finance offer work?",
-];
-
-const RESTING = "Toto is resting for now. The guides are still open to read.";
-const FAILED = "Toto couldn't answer just now. Your chat is still here, so you can try again.";
-const UNAVAILABLE = "Toto isn't available right now. The guides are still open to read.";
-
 /** Only links into the guides this client knows are followed; anything else shows as the title alone. */
-const KNOWN_LINKS = new Set(GUIDE_LIST.map(guide => guideLink(guide.slug)));
+const KNOWN_LINKS = new Set(GUIDE_SLUGS.map(guideLink));
 
 /** Opens a guide without reloading, as the header's tabs do, so the chat stays in memory. */
 function openGuide(href: string) {
@@ -63,6 +52,7 @@ function isNarrow() {
 }
 
 export function TotoChat({ request = fetch }: { request?: typeof fetch }) {
+  const { m: { content: { toto: t } }, fill } = useMessages();
   const [available, setAvailable] = useState(false);
   const [open, setOpen] = useState(false);
   const [modal, setModal] = useState(isNarrow);
@@ -129,10 +119,9 @@ export function TotoChat({ request = fetch }: { request?: typeof fetch }) {
   async function ask(text: string) {
     if (pending || stopped) return;
     const trimmed = text.trim();
-    if (!trimmed) { setProblem("Type a question first."); return; }
+    if (!trimmed) { setProblem(t.typeFirst); return; }
     if (trimmed.length > QUESTION_LIMIT) {
-      setProblem(`Questions can be up to ${format.number(QUESTION_LIMIT)} characters, and this one is `
-        + `${format.number(trimmed.length)}. Please shorten it and ask again.`);
+      setProblem(fill(t.tooLong, { limit: format.number(QUESTION_LIMIT), length: format.number(trimmed.length) }));
       return;
     }
     setProblem(undefined);
@@ -141,7 +130,7 @@ export function TotoChat({ request = fetch }: { request?: typeof fetch }) {
     setExchanges(list => [...list, { id, question: trimmed }]);
     setQuestion("");
     setPending(true);
-    setAnnouncement("Toto is working on an answer.");
+    setAnnouncement(t.working);
     const settle = (change: Partial<Exchange>, spoken: string) => {
       setExchanges(list => list.map(exchange => exchange.id === id ? { ...exchange, ...change } : exchange));
       setAnnouncement(spoken);
@@ -154,24 +143,24 @@ export function TotoChat({ request = fetch }: { request?: typeof fetch }) {
       });
       if (response.ok) {
         const answer = await response.json() as TotoAnswer;
-        settle({ answer }, `Toto answered: ${answerText(answer)}`);
+        settle({ answer }, fill(t.answered, { answer: answerText(answer) }));
         return;
       }
       const refusal = await response.json().catch(() => ({})) as { code?: string; detail?: string };
       if (refusal.code === "TOTO_RESTING") {
-        settle({ failure: refusal.detail || RESTING }, refusal.detail || RESTING);
+        settle({ failure: refusal.detail || t.resting }, refusal.detail || t.resting);
       } else if (refusal.code === "TOTO_UNAVAILABLE") {
         setStopped(true);
-        settle({ failure: UNAVAILABLE }, UNAVAILABLE);
+        settle({ failure: t.unavailable }, t.unavailable);
       } else if (refusal.code === "TOTO_QUESTION_INVALID" && refusal.detail) {
         settle({ failure: refusal.detail }, refusal.detail);
         setQuestion(trimmed);
       } else {
-        settle({ failure: FAILED }, FAILED);
+        settle({ failure: t.failed }, t.failed);
         setQuestion(trimmed);
       }
     } catch {
-      settle({ failure: FAILED }, FAILED);
+      settle({ failure: t.failed }, t.failed);
       setQuestion(trimmed);
     } finally {
       setPending(false);
@@ -208,47 +197,43 @@ export function TotoChat({ request = fetch }: { request?: typeof fetch }) {
         strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />
       </svg>
-      Ask Toto
+      {t.open}
     </button>
     {modal && <div className="toto-backdrop" hidden={!open} onClick={close} aria-hidden="true" />}
     <div id="toto-panel" className="toto-panel" role="dialog" aria-modal={modal ? true : undefined}
       aria-labelledby={titleId} aria-describedby={noticeId} hidden={!open} tabIndex={-1} ref={panel} onKeyDown={onKeyDown}>
       <div className="toto-header">
-        <h2 id={titleId} className="toto-title">Ask Toto</h2>
-        <button type="button" className="btn-ghost toto-close" aria-label="Close Ask Toto" onClick={close}>
+        <h2 id={titleId} className="toto-title">{t.title}</h2>
+        <button type="button" className="btn-ghost toto-close" aria-label={t.close} onClick={close}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
       </div>
-      <p className="toto-notice" id={noticeId}>
-        Toto is an AI guide that answers from otdog's guides. It can't see your case or documents, and it can't
-        answer legal or tax questions. Please don't type personal details. Questions are sent to an AI provider
-        and are not saved by otdog. This chat clears when you leave or reload the page.
-      </p>
+      <p className="toto-notice" id={noticeId}>{t.notice}</p>
       <div className="toto-body">
         {exchanges.length === 0 && <div className="toto-starters">
-          <p id={`${ids}-starters`}>Try one of these:</p>
+          <p id={`${ids}-starters`}>{t.tryThese}</p>
           <ul aria-labelledby={`${ids}-starters`}>
-            {STARTER_QUESTIONS.map(starter => <li key={starter}>
+            {t.starters.map(starter => <li key={starter}>
               <button type="button" className="btn-secondary" disabled={pending || stopped} onClick={() => void ask(starter)}>{starter}</button>
             </li>)}
           </ul>
         </div>}
-        {exchanges.length > 0 && <ol className="toto-log" ref={log} aria-label="Your questions and Toto's answers">
+        {exchanges.length > 0 && <ol className="toto-log" ref={log} aria-label={t.logLabel}>
           {exchanges.map(exchange => <li key={exchange.id}>
-            <p className="toto-question"><span className="visually-hidden">You asked: </span>{exchange.question}</p>
+            <p className="toto-question"><span className="visually-hidden">{t.youAsked}</span>{exchange.question}</p>
             <div className="toto-reply">
-              <span className="visually-hidden">Toto: </span>
+              <span className="visually-hidden">{t.totoSaid}</span>
               {exchange.answer ? <Reply answer={exchange.answer} onGuide={guideOpened} />
                 : exchange.failure ? <p className="toto-failure">{exchange.failure}</p>
-                  : <p className="toto-thinking"><span className="spinner" aria-hidden="true" />Toto is thinking…</p>}
+                  : <p className="toto-thinking"><span className="spinner" aria-hidden="true" />{t.thinking}</p>}
             </div>
           </li>)}
         </ol>}
       </div>
       <form className="toto-form" onSubmit={submit} aria-busy={pending}>
-        <label htmlFor={`${ids}-question`}>Your question</label>
+        <label htmlFor={`${ids}-question`}>{t.questionLabel}</label>
         <textarea id={`${ids}-question`} ref={field} rows={2} value={question} disabled={stopped}
           aria-invalid={problem || over ? true : undefined} aria-describedby={problem ? `${problemId} ${hintId}` : hintId}
           onChange={event => { setQuestion(event.target.value); setProblem(undefined); }}
@@ -256,11 +241,10 @@ export function TotoChat({ request = fetch }: { request?: typeof fetch }) {
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void ask(question); }
           }} />
         <p className="toto-hint" id={hintId} data-over={over || undefined}>
-          {format.number(question.trim().length)} of {format.number(QUESTION_LIMIT)} characters.
-          Enter sends; Shift+Enter adds a line.
+          {fill(t.hint, { length: format.number(question.trim().length), limit: format.number(QUESTION_LIMIT) })}
         </p>
         {problem && <p className="error" id={problemId} role="alert">{problem}</p>}
-        <button type="submit" disabled={pending || stopped}>{pending ? "Asking…" : "Ask"}</button>
+        <button type="submit" disabled={pending || stopped}>{pending ? t.asking : t.ask}</button>
       </form>
       <p className="visually-hidden" role="status" aria-live="polite">{announcement}</p>
     </div>
@@ -268,21 +252,23 @@ export function TotoChat({ request = fetch }: { request?: typeof fetch }) {
 }
 
 function Reply({ answer, onGuide }: { answer: TotoAnswer; onGuide: () => void }) {
+  const { m: { content: { toto: t } } } = useMessages();
   if (answer.kind === "ANSWER") {
     return <>{answer.paragraphs.map((paragraph, index) => <div className="toto-paragraph" key={index}>
       <p>{paragraph.text}</p>
-      {paragraph.citations.length > 0 && <Sources label="From the guide" citations={paragraph.citations} onGuide={onGuide} />}
+      {paragraph.citations.length > 0 && <Sources label={t.fromGuide} citations={paragraph.citations} onGuide={onGuide} />}
     </div>)}</>;
   }
   return <>
     <p>{answer.message}</p>
-    {answer.suggestions.length > 0 && <Sources label="Guides that may help" citations={answer.suggestions} onGuide={onGuide} />}
+    {answer.suggestions.length > 0 && <Sources label={t.mayHelp} citations={answer.suggestions} onGuide={onGuide} />}
   </>;
 }
 
 function Sources({ label, citations, onGuide }: { label: string; citations: TotoCitation[]; onGuide: () => void }) {
+  const { m: { content: { toto: t } }, fill } = useMessages();
   return <p className="toto-sources">
-    <span>{label}: </span>
+    <span>{fill(t.sources, { label })}</span>
     {citations.map((citation, index) => <span key={`${citation.articleId}-${index}`}>
       {index > 0 && ", "}
       {citation.link && KNOWN_LINKS.has(citation.link)

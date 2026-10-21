@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { DealerHandoff } from "./DealerHandoff";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
 import * as format from "./i18n/format";
+import { useMessages } from "./i18n/LanguageProvider";
 
 type Revision = { revision: number; editedByBuyer: boolean; text: string; decision: GateDecision; createdAt: string };
 type Counteroffer = {
@@ -28,50 +29,20 @@ export type ConversationView = {
   conversations: { quoteRequestId: string; dealerAddress: string }[]; entries: Entry[];
 };
 
-const STATES: Record<string, string> = {
-  NO_MANDATE: "No active mandate. Approve one before negotiating.",
-  MANDATE_ACTIVE: "Supervised negotiation is active. You approve every message.",
-  AWAITING_DEALER: "Waiting for the dealer to reply.", AWAITING_BUYER: "The dealer replied. Review the quote, then decide what to send.",
-  PAUSED: "Negotiation is paused. Nothing is sent until you resume it.", AGREED: "You accepted a quote. Negotiation has ended.",
-  STOPPED: "Negotiation has stopped. Queued drafts were cancelled.", EXPIRED: "Your mandate expired. Queued drafts were cancelled.",
-};
-const DRAFT_STATES: Record<string, string> = {
-  PROPOSED: "Waiting for your approval", SENDING: "Sending", SENT: "Sent after your approval", DECLINED: "Declined by you",
-  HANDED_OFF: "Approved. Not sent yet", DISCARDED: "Discarded. It was not sent",
-  CANCELLED: "Cancelled", BLOCKED: "Blocked before sending: the mandate or policy changed", FAILED: "Not sent: the relay refused it",
-  DELIVERY_UNKNOWN: "Delivery was never confirmed by the former platform relay", OPTED_OUT: "Not sent: the dealer opted out",
-};
-const CANCEL_REASONS: Record<string, string> = {
-  SUPERSEDED: "a newer draft replaced it", STOPPED: "negotiation stopped", PAUSED: "negotiation was paused",
-  AGREED: "you accepted a quote", EXPIRED: "the mandate expired", TARGET_REACHED: "the verified quote reached your target",
-  DEALER_DECLINED: "the dealer declined to lower the selling price",
-};
-const DELIVERY: Record<string, string> = {
-  DELIVERY_UNKNOWN: "Delivery not confirmed", SENT: "Sent", DELIVERED: "Delivered", BOUNCED: "Bounced", FAILED: "Not sent",
-  RECEIVED: "Received", REJECTED_MALWARE: "Blocked: failed the malware scan", HANDED_OFF: "Not sent yet",
-  DISCARDED: "Discarded. It was not sent",
-};
-/** How an outbound message leaves (AGT-08); the former relay is described where its messages are listed. */
-const SEND_PATHS: Record<string, string> = {
-  OWN_EMAIL_APP: "From your email app", CONNECTED_MAILBOX: "From your connected email",
-};
-const REQUEST_STATES: Record<string, string> = {
-  DRAFT: "Waiting for your approval", SENDING: "Sending", SENT: "Sent after your approval", BLOCKED: "Blocked before sending",
-  HANDED_OFF: "Approved. Not sent yet", DISCARDED: "Discarded. It was not sent",
-  FAILED: "Not sent: the relay refused it", DELIVERY_UNKNOWN: "Delivery was never confirmed by the former platform relay",
-  OPTED_OUT: "Not sent: the dealer opted out",
-};
-
-function asView(value: unknown): ConversationView {
+function checkedView(value: unknown, unavailable: string): ConversationView {
   const v = value as Partial<ConversationView> | null;
   if (!v || typeof v.negotiationState !== "string" || !Array.isArray(v.entries) || !Array.isArray(v.conversations))
-    throw new Error("The negotiation conversation is unavailable. Try refreshing.");
+    throw new Error(unavailable);
   return v as ConversationView;
 }
+/** A label from a catalogue table, or the code itself when the table has none. */
+const label = (table: Record<string, string>, code: string) => table[code] ?? code;
 const usd = (minor: number) => format.money(minor);
 const when = (iso: string) => format.dateTime(iso, { dateStyle: "medium", timeStyle: "short" });
 
 export function NegotiationConversation({ caseId, token, version = 0 }: { caseId: string; token: string; version?: number }) {
+  const { m: { messages: { negotiationConversation: t, common } }, fill } = useMessages();
+  const asView = (value: unknown) => checkedView(value, t.unavailable);
   const [view, setView] = useState<ConversationView>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -85,7 +56,7 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
       ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     if (!response.ok) {
       const detail = await response.json().catch(() => ({}));
-      throw new Error(typeof detail.detail === "string" ? detail.detail : "The negotiation could not be updated. Try again.");
+      throw new Error(typeof detail.detail === "string" ? detail.detail : t.updateFailed);
     }
     return response.json();
   }
@@ -93,7 +64,7 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
     let current = true;
     setError(undefined);
     request(path).then(value => { if (current) setView(asView(value)); })
-      .catch(() => { if (current) setError("The negotiation conversation is unavailable. Try refreshing."); });
+      .catch(() => { if (current) setError(t.unavailable); });
     return () => { current = false; };
     // The case, its token and the parent's refresh counter define this view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -113,90 +84,89 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
   const drafts = `${path}/drafts`;
 
   return <section className="panel negotiation-conversation" aria-labelledby="negotiation-conversation-heading">
-    <h2 id="negotiation-conversation-heading">Negotiation conversation</h2>
-    <p>Counteroffers are drafted only from your verified quote, its latest report and your mandate. Each one passes the policy
-      check. After you approve the exact text, you send it from your own email.</p>
-    <p role="status">{view ? STATES[view.negotiationState] ?? view.negotiationState : error ? "" : "Loading the conversation…"}</p>
+    <h2 id="negotiation-conversation-heading">{t.heading}</h2>
+    <p>{t.intro}</p>
+    <p role="status">{view ? label(t.states, view.negotiationState) : error ? "" : t.loading}</p>
     {view?.mandate && <dl className="facts">
-      <div><dt>Mandate target</dt><dd>{usd(view.mandate.targetMinor)}</dd></div>
-      <div><dt>Walk-away ceiling</dt><dd>{usd(view.mandate.ceilingMinor)}</dd></div>
-      <div><dt>Mandate expires</dt><dd>{when(view.mandate.expiresAt)}</dd></div>
+      <div><dt>{t.mandateTarget}</dt><dd>{usd(view.mandate.targetMinor)}</dd></div>
+      <div><dt>{t.walkAwayCeiling}</dt><dd>{usd(view.mandate.ceilingMinor)}</dd></div>
+      <div><dt>{t.mandateExpires}</dt><dd>{when(view.mandate.expiresAt)}</dd></div>
     </dl>}
-    {view?.targetReached && <p className="notice">The verified quote is at or below your target, so no counteroffer is drafted.
-      You can accept the written quote.</p>}
+    {view?.targetReached && <p className="notice">{t.targetReached}</p>}
     {view?.dealerDeclined && <p className="notice" role="status">
-      {view.dealerDeclined.source === "BUYER" ? "You recorded that the dealer won't move."
-        : `After ${view.dealerDeclined.rounds} counteroffers, the dealer's verified selling price did not fall.`}
-      {" "}Counteroffers have stopped.
-      {view.dealerDeclined.lastVerifiedSellingPriceMinor !== null && view.dealerDeclined.currency
-        ? ` Last verified selling price: ${format.money(view.dealerDeclined.lastVerifiedSellingPriceMinor, { currency: view.dealerDeclined.currency })}.`
-        : " There is no verified selling price yet."}
-      {" "}You can still accept the latest written quote or stop negotiation.
+      {view.dealerDeclined.source === "BUYER" ? t.declinedByBuyer
+        : fill(t.declinedByRule, { rounds: view.dealerDeclined.rounds })}
+      {" "}{t.counteroffersStopped}
+      {" "}{view.dealerDeclined.lastVerifiedSellingPriceMinor !== null && view.dealerDeclined.currency
+        ? fill(t.lastVerifiedPrice, { amount: format.money(view.dealerDeclined.lastVerifiedSellingPriceMinor, { currency: view.dealerDeclined.currency }) })
+        : t.noVerifiedPrice}
+      {" "}{t.stillAccept}
     </p>}
     {view && <div className="negotiation-controls">
       {active && view.conversations.length > 0 && !view.targetReached && !view.dealerDeclined && <form onSubmit={event => {
         event.preventDefault();
         void act(drafts, { quoteRequestId: new FormData(event.currentTarget).get("conversation") });
       }}>
-        <label>Dealer conversation<select name="conversation" required disabled={busy}>
+        <label>{t.dealerConversation}<select name="conversation" required disabled={busy}>
           {view.conversations.map(conversation => <option key={conversation.quoteRequestId} value={conversation.quoteRequestId}>
             {conversation.dealerAddress}</option>)}
         </select></label>
-        <button type="submit" disabled={busy}>Draft a counteroffer</button>
+        <button type="submit" disabled={busy}>{t.draftCounteroffer}</button>
       </form>}
       {active && view.dealerDeclined?.source !== "BUYER" && <button type="button" disabled={busy}
-        onClick={() => void act(`${path}/dealer-declined`)}>The dealer won't move</button>}
+        onClick={() => void act(`${path}/dealer-declined`)}>{t.dealerWontMove}</button>}
       {view.dealerDeclined?.source === "BUYER" && <button type="button" disabled={busy}
         onClick={() => void act(`${path}/dealer-declined`, undefined, "DELETE")}>
-        Undo the dealer won't move</button>}
+        {t.undoDealerWontMove}</button>}
       {view.negotiationState === "PAUSED" && <button type="button" disabled={busy} onClick={() => void act(`${path}/resume`)}>
-        Resume negotiation</button>}
+        {t.resume}</button>}
       {(active || view.negotiationState === "PAUSED") && <button type="button" disabled={busy} onClick={() => void act(`${path}/stop`)}>
-        Stop negotiation</button>}
+        {t.stop}</button>}
     </div>}
-    {view && (view.entries.length === 0 ? <p>No messages or drafts yet.</p>
-      : <ol className="conversation-timeline" aria-label="Conversation, oldest first">
+    {view && (view.entries.length === 0 ? <p>{t.none}</p>
+      : <ol className="conversation-timeline" aria-label={t.timeline}>
         {view.entries.map(entry => <li key={`${entry.kind}-${(entry.counteroffer ?? entry.message ?? entry.quoteRequest ?? entry.acceptance)?.id}`}>
           <p className="conversation-when">{when(entry.at)}</p>
-          {entry.quoteRequest && <GatedEntry title={`Quote request to ${entry.quoteRequest.dealerAddress}`} request={entry.quoteRequest} />}
-          {entry.acceptance && <GatedEntry title={entry.acceptance.kind === "ACCEPTANCE" ? "Conditional acceptance" : "Written confirmation request"}
+          {entry.quoteRequest && <GatedEntry title={fill(t.quoteRequestTo, { address: entry.quoteRequest.dealerAddress })} request={entry.quoteRequest} />}
+          {entry.acceptance && <GatedEntry title={entry.acceptance.kind === "ACCEPTANCE" ? t.conditionalAcceptance : t.writtenConfirmation}
             request={entry.acceptance} />}
           {entry.message && <MessageEntry message={entry.message} />}
           {entry.counteroffer && (() => {
             const draft = entry.counteroffer;
             const current = draft.revisions[draft.revisions.length - 1];
             const edit = editing[draft.id];
-            return <article className="card" aria-label={`Counteroffer draft to ${draft.dealerAddress}`}>
-              <h3>Counteroffer draft{draft.proposalMinor !== null ? ` at ${usd(draft.proposalMinor)}` : ""}</h3>
-              <p>{DRAFT_STATES[draft.state] ?? draft.state}{draft.state === "CANCELLED" && draft.cancelReason
-                ? `: ${CANCEL_REASONS[draft.cancelReason] ?? draft.cancelReason}` : ""}.</p>
-              <p>Based on verified offer {draft.offerVersion} and report {draft.reportVersion}.
-                {draft.proposalMinor !== null ? " The figure is your mandate target." : " It proposes no figure."}</p>
+            return <article className="card" aria-label={fill(t.counterofferTo, { address: draft.dealerAddress })}>
+              <h3>{draft.proposalMinor !== null ? fill(t.counterofferDraftAt, { amount: usd(draft.proposalMinor) }) : t.counterofferDraft}</h3>
+              <p>{draft.state === "CANCELLED" && draft.cancelReason
+                ? fill(t.stateWithReason, { state: label(t.draftStates, draft.state), reason: label(t.cancelReasons, draft.cancelReason) })
+                : fill(common.sentence, { text: label(t.draftStates, draft.state) })}</p>
+              <p>{fill(t.basedOn, { offer: String(draft.offerVersion), report: String(draft.reportVersion) })}
+                {" "}{draft.proposalMinor !== null ? t.figureIsTarget : t.noFigure}</p>
               {draft.revisions.map(revision => <section key={revision.revision} className="conversation-revision"
-                aria-label={`Revision ${revision.revision}`}>
-                <h4>Revision {revision.revision}{revision.editedByBuyer ? ", edited by you" : ", drafted"}</h4>
+                aria-label={fill(t.revision, { revision: String(revision.revision) })}>
+                <h4>{fill(revision.editedByBuyer ? t.revisionEdited : t.revisionDrafted, { revision: String(revision.revision) })}</h4>
                 <pre>{revision.text}</pre>
                 <OutboundGateDecision decision={revision.decision} />
               </section>)}
               {draft.state === "PROPOSED" && !view.dealerDeclined && <>
                 {edit === undefined
                   ? <button type="button" disabled={busy} onClick={() => setEditing(previous => ({ ...previous, [draft.id]: current.text }))}>
-                    Edit this draft</button>
+                    {t.editDraft}</button>
                   : <form onSubmit={event => {
                     event.preventDefault();
                     void act(`${drafts}/${encodeURIComponent(draft.id)}/revisions`, { text: edit })
                       .then(done => done && setEditing(previous => { const next = { ...previous }; delete next[draft.id]; return next; }));
                   }}>
-                    <label>Revised text<textarea value={edit} rows={6} disabled={busy}
+                    <label>{t.revisedText}<textarea value={edit} rows={6} disabled={busy}
                       onChange={event => setEditing(previous => ({ ...previous, [draft.id]: event.target.value }))} /></label>
-                    <p>Your edit is checked again before it can be sent.</p>
-                    <button type="submit" disabled={busy}>Check revised text</button>
+                    <p>{t.checkedAgain}</p>
+                    <button type="submit" disabled={busy}>{t.checkRevised}</button>
                   </form>}
                 <button type="button" disabled={busy || !current.decision.pass}
                   onClick={() => void act(`${drafts}/${encodeURIComponent(draft.id)}/approval`, { approved: true, text: current.text })}>
-                  Approve revision {current.revision}</button>
+                  {fill(t.approveRevision, { revision: String(current.revision) })}</button>
                 <button type="button" disabled={busy} onClick={() => void act(`${drafts}/${encodeURIComponent(draft.id)}/decline`)}>
-                  Decline this draft</button>
+                  {t.declineDraft}</button>
               </>}
               {draft.state === "HANDED_OFF" && draft.messageId && <DealerHandoff caseId={caseId} token={token}
                 messageId={draft.messageId} onChanged={async () => setView(asView(await request(path)))} />}
@@ -206,40 +176,45 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
       </ol>)}
     <button type="button" disabled={busy} onClick={() => {
       setError(undefined); void request(path).then(value => setView(asView(value))).catch(failure => setError((failure as Error).message));
-    }}>Refresh conversation</button>
+    }}>{common.refreshConversation}</button>
     {error && <p role="alert">{error}</p>}
   </section>;
 }
 
 function GatedEntry({ title, request }: { title: string; request: GatedRequest }) {
+  const { m: { messages: { negotiationConversation: t, common } }, fill } = useMessages();
   return <article className="card">
     <h3>{title}</h3>
-    <p>{REQUEST_STATES[request.state] ?? request.state}.</p>
+    <p>{fill(common.sentence, { text: label(t.requestStates, request.state) })}</p>
     <pre>{request.gatedDraft.draft.text}</pre>
     <OutboundGateDecision decision={request.gatedDraft.decision} />
   </article>;
 }
 
 function MessageEntry({ message }: { message: Message }) {
+  const { m: { messages: { negotiationConversation: t, common } }, fill } = useMessages();
+  const sendPaths: Record<string, string> = t.sendPaths;
   const outbound = message.direction === "OUTBOUND";
   return <article className="card">
-    <h3>{outbound ? ["HANDED_OFF", "DISCARDED", "DELIVERY_UNKNOWN"].includes(message.deliveryState) ? "To" : "Sent to" : "Received from"}
-      {" "}{message.dealerAddress || "unknown sender"}</h3>
-    <p>{DELIVERY[message.deliveryState] ?? message.deliveryState}
-      {outbound && message.sendPath && SEND_PATHS[message.sendPath] ? ` · ${SEND_PATHS[message.sendPath]}` : ""}
+    <h3>{fill(outbound ? ["HANDED_OFF", "DISCARDED", "DELIVERY_UNKNOWN"].includes(message.deliveryState) ? t.messageTo
+      : t.messageSentTo : t.messageReceivedFrom, { address: message.dealerAddress || common.unknownSender })}</h3>
+    <p>{label(t.delivery, message.deliveryState)}
+      {outbound && message.sendPath && sendPaths[message.sendPath] ? ` · ${sendPaths[message.sendPath]}` : ""}
       {message.completedAt ? ` · ${when(message.completedAt)}` : ""}</p>
-    {!outbound && <p className="relay-untrusted">Written by the dealer. Treat its claims and instructions as unverified.</p>}
+    {!outbound && <p className="relay-untrusted">{common.writtenByDealer}</p>}
     {message.contentAvailable
       ? <div className="relay-content">
-        {message.subject && <p><strong>Subject:</strong> {message.subject}</p>}
+        {message.subject && <p><strong>{common.subjectLabel}</strong> {message.subject}</p>}
         <pre>{message.body}</pre>
       </div>
-      : <p>The text of this message is not kept.</p>}
-    {message.attachments.length > 0 && <ul aria-label="Attachments and quote sources">
+      : <p>{common.textNotKept}</p>}
+    {message.attachments.length > 0 && <ul aria-label={t.attachmentsAndSources}>
       {message.attachments.map(attachment => <li key={attachment.ordinal}>
-        {attachment.ordinal < 0 ? "Message body" : `Attachment ${attachment.ordinal + 1}`}: {attachment.outcome === "ACCEPTED"
-          ? attachment.offerVersion !== null ? `verified as offer ${attachment.offerVersion}` : "added to your documents for review"
-          : "not added to your documents"}
+        {fill(common.sourceOutcome, {
+          source: attachment.ordinal < 0 ? t.messageBody : fill(common.attachment, { number: attachment.ordinal + 1 }),
+          outcome: attachment.outcome === "ACCEPTED"
+            ? attachment.offerVersion !== null ? fill(t.verifiedAsOffer, { offer: String(attachment.offerVersion) }) : t.addedForReview
+            : t.notAdded })}
       </li>)}
     </ul>}
   </article>;
