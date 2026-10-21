@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as format from "./i18n/format";
 
 /**
  * Counts a money amount up to its value once, then shows the exact formatted text. Assistive
@@ -24,6 +25,6 @@ export function AnimatedAmount({ minorUnits, currency, text }: { minorUnits: num
     return () => { window.cancelAnimationFrame(frame); setShown(null); };
   }, [minorUnits]);
   if (shown === null) return <>{text}</>;
-  const interim = new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(shown / 100);
+  const interim = format.money(shown, { currency, maximumFractionDigits: 0 });
   return <><span className="visually-hidden">{text}</span><span aria-hidden="true">{interim}</span></>;
 }

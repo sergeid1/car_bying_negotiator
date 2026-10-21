@@ -1,5 +1,6 @@
 import { FormEvent, useId, useState } from "react";
 import { toMinor, type Trade, type TradeEstimate, type TradeView } from "./TradeVehicle";
+import * as format from "./i18n/format";
 
 /**
  * Free checks the Buyer runs themselves on other sites (ticket 106). These are the sites' public pages with
@@ -15,12 +16,11 @@ export const VALUE_CHECKS = [
 ] as const;
 
 function money(minor: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(minor / 100);
+  return format.money(minor);
 }
 function day(iso: string) {
   const [year, month, date] = iso.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
-    .format(new Date(Date.UTC(year, month - 1, date)));
+  return format.date(Date.UTC(year, month - 1, date), { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 function today() {
   const now = new Date();

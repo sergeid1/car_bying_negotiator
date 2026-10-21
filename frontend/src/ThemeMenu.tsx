@@ -1,7 +1,6 @@
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { applyThemeChoice, readThemeChoice, THEME_CHOICES, type ThemeChoice } from "./theme";
-
-const LABELS: Record<ThemeChoice, string> = { system: "System", light: "Light", dark: "Dark" };
+import { useMessages } from "./i18n/LanguageProvider";
 
 function ThemeIcon({ choice }: { choice: ThemeChoice }) {
   const common = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
@@ -13,6 +12,8 @@ function ThemeIcon({ choice }: { choice: ThemeChoice }) {
 
 /** The header's appearance menu: follow the device, or pin light or dark. */
 export function ThemeMenu() {
+  const { m, fill } = useMessages();
+  const LABELS: Record<ThemeChoice, string> = { system: m.theme.system, light: m.theme.light, dark: m.theme.dark };
   const [choice, setChoice] = useState<ThemeChoice>(readThemeChoice);
   const [open, setOpen] = useState(false);
   const container = useRef<HTMLDivElement>(null);
@@ -51,10 +52,10 @@ export function ThemeMenu() {
 
   return <div className="theme-menu" ref={container}>
     <button type="button" ref={toggle} className="theme-toggle" aria-haspopup="menu" aria-expanded={open}
-      aria-label={`Appearance: ${LABELS[choice]}`} onClick={() => setOpen(value => !value)}>
+      aria-label={fill(m.theme.current, { choice: LABELS[choice] })} onClick={() => setOpen(value => !value)}>
       <ThemeIcon choice={choice} />
     </button>
-    {open && <div role="menu" aria-label="Appearance" className="theme-options" onKeyDown={navigate}>
+    {open && <div role="menu" aria-label={m.theme.menu} className="theme-options" onKeyDown={navigate}>
       {THEME_CHOICES.map(option => <button key={option} type="button" role="menuitemradio"
         aria-checked={option === choice} tabIndex={option === choice ? 0 : -1} onClick={() => pick(option)}>
         <span className={`theme-swatch theme-swatch-${option}`} aria-hidden="true" />

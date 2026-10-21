@@ -1,4 +1,5 @@
 import "./DealerAddOns.css";
+import * as format from "./i18n/format";
 
 /** One add-on or extra dealer charge, named from the catalogue or listed as unrecognised (ticket 142). */
 export type DealerAddOnLine = {
@@ -12,8 +13,7 @@ export type DealerAddOnCheck = {
   summary: string; listingNote: string | null;
 };
 
-const dollars = (minor: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD",
-  minimumFractionDigits: minor % 100 === 0 ? 0 : 2 }).format(minor / 100);
+const dollars = (minor: number) => format.money(minor, { minimumFractionDigits: minor % 100 === 0 ? 0 : 2 });
 
 function heading(line: DealerAddOnLine) {
   if (line.status === "RECOGNISED") return `${line.name?.replace(/^./, first => first.toUpperCase())}.`;

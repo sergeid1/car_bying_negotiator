@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import * as format from "./i18n/format";
 
 type Disclosure = "PAYING_CASH" | "HAS_OUTSIDE_FINANCING" | "FIRST_NAME" | "PURCHASE_TIMELINE";
 type Status = "ACTIVE" | "SUPERSEDED" | "REVOKED" | "PLAN_CHANGED" | "EXPIRED";
@@ -82,8 +83,8 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
   }
 
   const money = (minor: number, currency?: string | null) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: currency ?? "USD" }).format(minor / 100);
-  const when = (iso: string) => new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+    format.money(minor, { currency: currency ?? "USD" });
+  const when = (iso: string) => format.dateTime(iso, { dateStyle: "medium", timeStyle: "short" });
   const current = mandates.find(mandate => mandate.status === "ACTIVE");
   const planChanged = mandates[0]?.status === "PLAN_CHANGED";
 

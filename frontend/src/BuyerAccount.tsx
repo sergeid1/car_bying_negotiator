@@ -5,6 +5,7 @@ import { Passkeys } from "./Passkeys";
 import { Passwords } from "./Passwords";
 import { openSidePanel } from "./SidePanel";
 import { SignIn, type SignInMode } from "./SignIn";
+import * as format from "./i18n/format";
 
 type Contact = { email: string; firstName: string | null; lastName: string | null; phone: string | null };
 type AttachedCase = {
@@ -61,7 +62,7 @@ function startedOn(value?: string | null) {
   if (!value) return undefined;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? undefined
-    : date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    : format.date(date, { year: "numeric", month: "short", day: "numeric" });
 }
 
 /**

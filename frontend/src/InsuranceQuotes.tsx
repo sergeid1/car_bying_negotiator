@@ -1,6 +1,7 @@
 import { FormEvent, ReactNode, useEffect, useId, useRef, useState } from "react";
 import "./InsuranceQuotes.css";
 import { howOtdogMakesMoneyLink } from "./HowOtdogMakesMoney";
+import * as format from "./i18n/format";
 
 export type CoverageType = "BODILY_INJURY_LIABILITY" | "PROPERTY_DAMAGE_LIABILITY" | "PERSONAL_INJURY_PROTECTION"
   | "UNINSURED_MOTORIST" | "COLLISION" | "COMPREHENSIVE";
@@ -116,11 +117,10 @@ function MinimumWarning({ gaps, minimums, live = false }: { gaps: string[]; mini
 }
 
 function money(minor: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: minor % 100 ? 2 : 0 })
-    .format(minor / 100);
+  return format.money(minor, { maximumFractionDigits: minor % 100 ? 2 : 0 });
 }
 function day(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" });
+  return format.date(iso, { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" });
 }
 /** Dollars as typed, to whole cents; null when it is not an amount. */
 function toMinor(text: string) {
@@ -278,7 +278,7 @@ function ApplicationSummary({ application, labels, Sub }: { application: Insuran
           in {driver.licenceState}, {driver.atFaultAccidents} at-fault accidents, {driver.violations} tickets</span>)}</dd></div>
       <div><dt>Where the car is kept</dt><dd>{application.garaging.zip}, {application.garaging.state}</dd></div>
       <div><dt>Car</dt><dd>{[v.modelYear, v.make, v.model, v.trim].filter(Boolean).join(" ")}
-        {v.annualMileage != null && `, ${v.annualMileage.toLocaleString("en-US")} miles a year`}</dd></div>
+        {v.annualMileage != null && `, ${format.number(v.annualMileage)} miles a year`}</dd></div>
       <div><dt>Coverage you chose</dt><dd>{application.coverage.map(line =>
         <span key={line.type} className="insurance-line">{labels[line.type]}: {amounts(line)}</span>)}</dd></div>
       <div><dt>Current policy</dt><dd>{current ? `${current.insurer ?? "Insurer not given"}, ${money(current.premiumMinor)} for ${perTerm(current.term)}`

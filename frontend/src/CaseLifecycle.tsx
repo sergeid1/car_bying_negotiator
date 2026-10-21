@@ -1,4 +1,5 @@
 import { useState } from "react";
+import * as format from "./i18n/format";
 
 type Receipt = { state: "DELETION_PENDING" | "DELETED"; attempts?: number; failureCode?: string; backupStatus: string };
 export function CaseLifecycle({ caseId, token, onRevoked }: { caseId: string; token: string; onRevoked: () => void }) {
@@ -35,7 +36,7 @@ export function CaseLifecycle({ caseId, token, onRevoked }: { caseId: string; to
             "Content-Type": "application/json", "Case-Access-Token": token,
           }, body: JSON.stringify({ days: Number(data.get("days")) }) });
           if (!response.ok) throw new Error("Retention could not be changed. Retry safely.");
-          const result = await response.json(); setMessage(`Case expires ${new Date(result.caseExpiresAt).toLocaleString()}. Existing deadlines are never extended.`);
+          const result = await response.json(); setMessage(`Case expires ${format.dateTime(result.caseExpiresAt)}. Existing deadlines are never extended.`);
         } catch (failure) { setError(String(failure)); } finally { setBusy(false); }
       }}>
         <label>Retain for days<input name="days" type="number" required min={1} max={30} defaultValue={7} /></label>

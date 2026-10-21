@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { DealerFinancingForm, type FinancingResult } from "./DealerFinancing";
+import * as format from "./i18n/format";
 
 type Economics = FinancingResult & { finalPaymentMinor: number | null; totalScheduledPaymentsMinor: number | null;
   totalInterestMinor: number | null; totalTransactionCostMinor: number | null };
@@ -14,7 +15,7 @@ export type Comparison = { version: number; createdAt: string; inputs: Inputs;
     dealer: Economics; outside: Economics; outsideMinusDealerCostMinor: number | null;
     aprOnlyScheduledPaymentsDeltaMinor: number | null;
   } };
-const money = (value: number | null | undefined) => value == null ? "Unavailable" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value / 100);
+const money = (value: number | null | undefined) => value == null ? "Unavailable" : format.money(value);
 
 export function OutsideFinancing({ caseId, token }: { caseId: string; token: string }) {
   const [saved, setSaved] = useState<Comparison>();

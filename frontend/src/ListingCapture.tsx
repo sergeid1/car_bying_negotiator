@@ -1,6 +1,7 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import "./ListingCapture.css";
 import { toMinor } from "./TradeVehicle";
+import * as format from "./i18n/format";
 
 type Credentials = { caseId: string; token: string };
 type Region = { pageNumber: number; x: number; y: number; width: number; height: number };
@@ -43,8 +44,7 @@ const FIELDS = [
 ] as const;
 
 function money(minor: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: minor % 100 ? 2 : 0 })
-    .format(minor / 100);
+  return format.money(minor, { minimumFractionDigits: minor % 100 ? 2 : 0 });
 }
 /** A field's label inside a sentence; the VIN keeps its capitals. */
 function lower(label: string) {
@@ -52,12 +52,12 @@ function lower(label: string) {
 }
 function shownDate(iso: string) {
   const [year, month, day] = iso.slice(0, 10).split("-").map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  return format.date(new Date(year, month - 1, day), { year: "numeric", month: "long", day: "numeric" });
 }
 /** A read value as the Buyer types it: dollars for the price, the rest as read. */
 function asTyped(field: ListingField | undefined) {
   if (!field?.value) return "";
-  if (field.unit === "USD_MINOR") return (Number(field.value) / 100).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (field.unit === "USD_MINOR") return format.number(Number(field.value) / 100, { maximumFractionDigits: 2 });
   return field.value;
 }
 

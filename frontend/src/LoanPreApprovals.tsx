@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import "./LoanPreApprovals.css";
 import { howOtdogMakesMoneyLink } from "./HowOtdogMakesMoney";
+import * as format from "./i18n/format";
 
 type Housing = "OWN" | "RENT" | "OTHER";
 export type LoanApplication = {
@@ -44,11 +45,10 @@ const OUTCOMES: Record<Outcome, string> = {
   UNAVAILABLE: "Unavailable", TIMED_OUT: "Did not answer in time" };
 
 export function money(minor: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: minor % 100 ? 2 : 0 })
-    .format(minor / 100);
+  return format.money(minor, { maximumFractionDigits: minor % 100 ? 2 : 0 });
 }
 function day(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" });
+  return format.date(iso, { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" });
 }
 /** Dollars as typed, to whole cents; null when it is not an amount. */
 function toMinor(text: string) {
@@ -85,7 +85,7 @@ function conditionsText(conditions: LoanOffer["conditions"]) {
   if (!conditions) return null;
   const parts = [];
   if (conditions.maximumVehicleAgeYears != null) parts.push(`a car up to ${conditions.maximumVehicleAgeYears} years old`);
-  if (conditions.maximumMileage != null) parts.push(`up to ${conditions.maximumMileage.toLocaleString("en-US")} miles`);
+  if (conditions.maximumMileage != null) parts.push(`up to ${format.number(conditions.maximumMileage)} miles`);
   if (conditions.minimumDownPaymentMinor) parts.push(`at least ${money(conditions.minimumDownPaymentMinor)} down`);
   return parts.length ? `Conditions: ${parts.join(", ")}.` : null;
 }
@@ -224,7 +224,7 @@ function ApplicationSummary({ application, Sub }: { application: LoanApplication
     <Sub>Your application</Sub>
     <dl className="facts">
       <div><dt>Amount</dt><dd>{money(application.amountMinor)} over {application.termMonths} months</dd></div>
-      <div><dt>Car</dt><dd>{[v.modelYear, v.make, v.model].join(" ")}, {v.mileage.toLocaleString("en-US")} miles</dd></div>
+      <div><dt>Car</dt><dd>{[v.modelYear, v.make, v.model].join(" ")}, {format.number(v.mileage)} miles</dd></div>
       <div><dt>Yearly income</dt><dd>{money(application.annualIncomeMinor)}</dd></div>
       <div><dt>Housing</dt><dd>{HOUSING.find(option => option.value === application.housing)?.label},
         {" "}{money(application.monthlyHousingCostMinor)} a month</dd></div>

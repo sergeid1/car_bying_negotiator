@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import * as format from "./i18n/format";
 
 type EvidenceRegion = { pageNumber: number; x: number; y: number; width: number; height: number };
 
@@ -87,7 +88,7 @@ function humanize(value: string) {
 const fieldLabel = (field: string) => FIELD_LABELS[field] ?? humanize(field);
 
 function money(minor: number, currency = "USD") {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(minor / 100);
+  return format.money(minor, { currency });
 }
 
 export function formatValue(value: string | null | undefined, unit: string) {

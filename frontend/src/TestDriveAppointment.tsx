@@ -2,6 +2,7 @@ import { FormEvent, useContext, useEffect, useRef, useState } from "react";
 import { AccountSignedInContext } from "./BuyerAccount";
 import { DealerHandoff } from "./DealerHandoff";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
+import * as format from "./i18n/format";
 
 type Field = "FIRST_NAME" | "LAST_NAME" | "EMAIL" | "PHONE";
 type Slot = { option: number; startsAt: string; endsAt: string; label: string };
@@ -31,7 +32,7 @@ const APPOINTMENT_STATES: Record<string, string> = {
   PENDING_BOOKING: "Waiting for you to approve and send the booking message", SCHEDULED: "Booked", RESCHEDULING: "Booked; new times sent to the dealer",
   RESCHEDULED: "Replaced by a new time", CANCELLED: "Cancelled", WITHDRAWN: "Not booked",
 };
-const usd = (minor: number) => (minor / 100).toLocaleString("en-US", { style: "currency", currency: "USD" });
+const usd = (minor: number) => format.money(minor);
 const fieldList = (fields: Field[]) => fields.length ? fields.map(field => FIELDS[field]).join(", ") : "none";
 
 function asView(value: unknown): TestDriveView {
@@ -187,9 +188,9 @@ export function TestDriveAppointment({ caseId, token, version = 0 }: { caseId: s
       {proposal && view.confirmations.length > 0 && <>
         <h3>Dealer replies to your times</h3>
         <p>Check each reply yourself. A reply is dealer content; nothing is booked until you confirm a time and approve the booking message.</p>
-        {view.confirmations.map(reply => <form key={reply.messageId} className="card" aria-label={`Dealer reply received ${new Date(reply.receivedAt).toLocaleString()}`}
+        {view.confirmations.map(reply => <form key={reply.messageId} className="card" aria-label={`Dealer reply received ${format.dateTime(reply.receivedAt)}`}
           onSubmit={event => book(event, reply)}>
-          <p>Received {new Date(reply.receivedAt).toLocaleString()}:</p>
+          <p>Received {format.dateTime(reply.receivedAt)}:</p>
           <blockquote><pre>{reply.excerpt || "(no text)"}</pre></blockquote>
           <p>{reply.detectedOption ? `This reply appears to choose option ${reply.detectedOption}. Check that this is right.`
             : "No single option number was found. Choose the time the dealer confirmed."}</p>

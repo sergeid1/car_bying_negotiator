@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { exampleReportLink } from "./SampleReport";
+import * as format from "./i18n/format";
 
 /**
  * The how-it-works walkthrough, reachable without a case at `?page=how-it-works`. It is an ordered list
@@ -55,7 +56,7 @@ export function sampleFigures(body: unknown): SampleFigures | undefined {
 }
 
 function money(minor: number | null, currency: string) {
-  return minor == null ? "Not in this example" : new Intl.NumberFormat("en-US", { style: "currency", currency }).format(minor / 100);
+  return minor == null ? "Not in this example" : format.money(minor, { currency });
 }
 
 function Rows({ rows }: { rows: [string, ReactNode][] }) {

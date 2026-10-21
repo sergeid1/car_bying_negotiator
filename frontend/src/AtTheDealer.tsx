@@ -10,6 +10,7 @@ import type { DeskTacticFinding } from "./DeskTactics";
 import { ListingCapture, ListingPriceNote, type ListingPriceCheck } from "./ListingCapture";
 import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
 import { DealerAddOnsNote, type DealerAddOnCheck } from "./DealerAddOns";
+import * as format from "./i18n/format";
 
 type Credentials = { caseId: string; token: string };
 type Route = "AGREED_CAR" | "THIS_CASE";
@@ -67,8 +68,7 @@ function reveal(element: HTMLElement | null) {
 }
 
 function money(minor: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: minor % 100 ? 2 : 0 })
-    .format(Math.abs(minor) / 100);
+  return format.money(Math.abs(minor), { minimumFractionDigits: minor % 100 ? 2 : 0 });
 }
 
 class Refusal extends Error {

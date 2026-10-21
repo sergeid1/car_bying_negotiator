@@ -23,6 +23,8 @@ import logo from "./assets/otdog-logo.png";
 import logoDark from "./assets/otdog-logo-dark.png";
 import { SidePanel, type SidePanelView, useSidePanelRequests } from "./SidePanel";
 import { TotoChat } from "./TotoChat";
+import { useMessages } from "./i18n/LanguageProvider";
+import { money as formatMinor } from "./i18n/format";
 
 type MoneyAmount = {
   minorUnits: number;
@@ -84,32 +86,11 @@ const fixture = {
   },
 };
 
-const stageLabels: Record<string, string> = {
-  QUEUED: "Queued",
-  LOADING_INPUTS: "Loading recorded inputs",
-  FETCHING_MARKET: "Reading market evidence",
-  CALCULATING: "Calculating cash economics",
-  ASSEMBLING_REPORT: "Assembling immutable report",
-  COMPLETE: "Complete",
-  FAILED: "Failed",
-};
-
 /** Ordered so the progress meter can show how far a running analysis has come. */
 const stageOrder = ["QUEUED", "LOADING_INPUTS", "FETCHING_MARKET", "CALCULATING", "ASSEMBLING_REPORT", "COMPLETE"];
 
-async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(path, options);
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
-  }
-  return response.json() as Promise<T>;
-}
-
 function formatMoney(amount: MoneyAmount) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: amount.currency,
-  }).format(amount.minorUnits / 100);
+  return formatMinor(amount.minorUnits, { currency: amount.currency });
 }
 
 function humanize(value: string) {
@@ -118,6 +99,14 @@ function humanize(value: string) {
 }
 
 export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
+  const { m, fill, fillNodes } = useMessages();
+  async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
+    const response = await fetch(path, options);
+    if (!response.ok) {
+      throw new Error(fill(m.app.requestFailed, { status: response.status }));
+    }
+    return response.json() as Promise<T>;
+  }
   const [recoveryCaseId, setRecoveryCaseId] = useState<string>();
   const [caseRevoked, setCaseRevoked] = useState(false);
   const [stage, setStage] = useState<string>();
@@ -198,7 +187,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       } while (operation.stage !== "COMPLETE" && operation.stage !== "FAILED");
 
       if (operation.stage === "FAILED") {
-        throw new Error(operation.error ?? "Analysis could not be completed");
+        throw new Error(operation.error ?? m.app.analysisFailed);
       }
       setReport(
         await requestJson<Report>(
@@ -207,7 +196,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
         ),
       );
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Analysis could not be completed");
+      setError(caught instanceof Error ? caught.message : m.app.analysisFailed);
     }
   }
 
@@ -219,11 +208,11 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       <div className="page" inert={sidePanel ? true : undefined}>
       <a className="skip-link" href="#case-workflow" onClick={event => {
         event.preventDefault(); document.getElementById("case-workflow")?.focus();
-      }}>Skip to case workflow</a>
+      }}>{m.app.skipToWorkflow}</a>
 
       <header className="masthead">
         <div className="masthead-inner">
-          <a className="wordmark" href="/" aria-label="otdog home">
+          <a className="wordmark" href="/" aria-label={m.app.homeLink}>
             <img className="wordmark-light" src={logo} alt="" width="114" height="40" />
             <img className="wordmark-dark" src={logoDark} alt="" width="114" height="40" />
           </a>
@@ -281,24 +270,24 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
               <section className="panel" aria-labelledby="case-heading">
                 <div className="section-heading">
                   <div>
-                    <p className="step">Development fixture</p>
-                    <h2 id="case-heading">2021 Honda Accord EX-L</h2>
+                    <p className="step">{m.fixture.step}</p>
+                    <h2 id="case-heading">{m.fixture.vehicle}</h2>
                   </div>
-                  <span className="cash-badge">Cash purchase</span>
+                  <span className="cash-badge">{m.fixture.cashPurchase}</span>
                 </div>
 
                 <dl className="facts">
-                  <div><dt>VIN</dt><dd>1HGCM82633A004352</dd></div>
-                  <div><dt>Mileage</dt><dd>38,000 mi</dd></div>
-                  <div><dt>Buyer ZIP</dt><dd>27601</dd></div>
-                  <div><dt>Dealer ZIP</dt><dd>27604</dd></div>
-                  <div><dt>Selling price</dt><dd>$25,000.00</dd></div>
-                  <div><dt>Quoted components</dt><dd>Fees, add-ons, taxes, government charges</dd></div>
+                  <div><dt>{m.fixture.vin}</dt><dd>{fixture.vehicle.vin}</dd></div>
+                  <div><dt>{m.fixture.mileage}</dt><dd>{fill(m.fixture.mileageValue, { miles: fixture.vehicle.mileage })}</dd></div>
+                  <div><dt>{m.fixture.buyerZip}</dt><dd>{fixture.buyerZip}</dd></div>
+                  <div><dt>{m.fixture.dealerZip}</dt><dd>{fixture.dealerZip}</dd></div>
+                  <div><dt>{m.fixture.sellingPrice}</dt><dd>{formatMinor(fixture.dealerOffer.sellingPriceMinor)}</dd></div>
+                  <div><dt>{m.fixture.quotedComponents}</dt><dd>{m.fixture.quotedComponentsValue}</dd></div>
                 </dl>
 
                 <form onSubmit={startAnalysis}>
                   <button type="submit" disabled={running}>
-                    {running ? "Analyzing…" : "Analyze synthetic deal"}
+                    {running ? m.fixture.analyzing : m.fixture.analyze}
                   </button>
                 </form>
 
@@ -306,7 +295,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
                   <>
                     <p className="operation" role="status" aria-live="polite">
                       <span className="spinner" aria-hidden="true" />
-                      {stageLabels[stage!] ?? stage}
+                      {m.fixture.stages[stage as keyof typeof m.fixture.stages] ?? stage}
                     </p>
                     <ol className="stage-track" aria-hidden="true">
                       {stageOrder.slice(0, -1).map((name, index) => (
@@ -337,26 +326,20 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       </main>
 
       <footer className="page-footer">
-        <section className="page-footer-inner footer-statement" aria-label="About otdog">
-          <p>
-            otdog is on your side. No dealer pays us, and no company can pay to change what you see.{" "}
-            <a href={howOtdogMakesMoneyLink}>How otdog makes money</a>
-          </p>
-          <p>
-            It checks the numbers on the dealer's paperwork. It isn't legal, tax or mechanical advice, and it can't
-            promise savings. You send every email and make every decision. · <a href={partnerKitLink}>Referral partner kit</a>
-          </p>
+        <section className="page-footer-inner footer-statement" aria-label={m.footer.label}>
+          <p>{fillNodes(m.footer.onYourSide, { link: <a href={howOtdogMakesMoneyLink}>{m.footer.moneyLink}</a> })}</p>
+          <p>{fillNodes(m.footer.scope, { link: <a href={partnerKitLink}>{m.footer.partnerKitLink}</a> })}</p>
         </section>
       </footer>
       </div>
 
-      <SidePanel id="case-panel" title="This case" open={sidePanel === "case" && Boolean(caseCredentials)} onClose={closeSidePanel}>
+      <SidePanel id="case-panel" title={m.app.casePanelTitle} open={sidePanel === "case" && Boolean(caseCredentials)} onClose={closeSidePanel}>
         {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
         {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
         {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
           onRevoked={() => { setCaseRevoked(true); setReport(undefined); setStage(undefined); setError(undefined); }} />}
       </SidePanel>
-      {!partnerKit && <SidePanel id="account-panel" title={accountSignedIn ? "Your account" : signInMode === "login" ? "Log in" : "Sign up"}
+      {!partnerKit && <SidePanel id="account-panel" title={accountSignedIn ? m.app.accountPanelSignedIn : signInMode === "login" ? m.app.accountPanelLogIn : m.app.accountPanelSignUp}
         centered={!accountSignedIn}
         open={sidePanel === "account"} onClose={closeSidePanel}>
         <BuyerAccount caseCredentials={caseCredentials && !caseRevoked ? caseCredentials : undefined}
@@ -382,6 +365,8 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 }
 
 function DealReport({ report }: { report: Report }) {
+  const { m, fill } = useMessages();
+  const r = m.syntheticReport;
   const { analysis } = report;
   const economics = analysis.economics;
   const market = analysis.marketAssessment;
@@ -392,27 +377,27 @@ function DealReport({ report }: { report: Report }) {
   return (
     <article className="report" aria-labelledby="report-heading">
       <div className="report-meta">
-        <span>Report v{report.version}</span>
+        <span>{fill(r.version, { version: report.version })}</span>
         <span>{report.schemaVersion}</span>
       </div>
       <section className="outcome">
-        <p className="eyebrow">Deal Analysis Report</p>
-        <h2 id="report-heading">Deal Analysis Report</h2>
+        <p className="eyebrow">{r.title}</p>
+        <h2 id="report-heading">{r.title}</h2>
         <div className="status-row">
-          <strong className="warning">{analysis.reviewStatus === "MATCHES_APPROVED_BASELINE" ? "Matches approved deal" : humanize(analysis.reviewStatus)}</strong>
+          <strong className="warning">{analysis.reviewStatus === "MATCHES_APPROVED_BASELINE" ? r.matchesApproved : humanize(analysis.reviewStatus)}</strong>
           <span>{humanize(analysis.dealRating)}</span>
         </div>
         <p className="next-action">{analysis.nextAction}</p>
       </section>
 
-      <section className="report-grid" aria-label="Deal totals">
+      <section className="report-grid" aria-label={r.totals}>
         <div className="total-card">
-          <span>Out-the-door total</span>
+          <span>{r.outTheDoor}</span>
           <strong>{formatMoney(economics.outTheDoorTotal)}</strong>
-          <small>{humanize(economics.outTheDoorTotal.precision)} calculation</small>
+          <small>{fill(r.calculation, { precision: humanize(economics.outTheDoorTotal.precision) })}</small>
         </div>
         <div className="market-card">
-          <span>Synthetic market range</span>
+          <span>{r.marketRange}</span>
           <strong>
             {formatMoney(market.low)}–
             {formatMoney(market.high)}
@@ -422,30 +407,30 @@ function DealReport({ report }: { report: Report }) {
               <span className="range-marker" style={{ left: `${position * 100}%` }} />
             </div>
           )}
-          <small>{humanize(market.confidence)} confidence · estimated</small>
+          <small>{fill(r.confidence, { confidence: humanize(market.confidence) })}</small>
         </div>
       </section>
 
       <section className="panel detail">
-        <h3>What makes up the total</h3>
+        <h3>{r.makesUpTotal}</h3>
         <dl className="money-list">
-          <MoneyRow label="Selling price" amount={economics.sellingPrice} />
-          <MoneyRow label="Dealer fees" amount={economics.dealerFees} />
-          <MoneyRow label="Add-ons" amount={economics.addOns} />
-          <MoneyRow label="Taxes" amount={economics.taxes} />
-          <MoneyRow label="Government charges" amount={economics.governmentCharges} />
+          <MoneyRow label={r.sellingPrice} amount={economics.sellingPrice} />
+          <MoneyRow label={r.dealerFees} amount={economics.dealerFees} />
+          <MoneyRow label={r.addOns} amount={economics.addOns} />
+          <MoneyRow label={r.taxes} amount={economics.taxes} />
+          <MoneyRow label={r.governmentCharges} amount={economics.governmentCharges} />
         </dl>
       </section>
 
       <section className="panel detail">
-        <h3>Why this needs review</h3>
+        <h3>{r.whyReview}</h3>
         <ol>{analysis.topReasons.map((reason) => <li key={reason}>{reason}</li>)}</ol>
       </section>
 
       <SigningNote />
 
-      <aside className="limitations" aria-label="Report limitations">
-        <strong>Scope and limitations</strong>
+      <aside className="limitations" aria-label={r.limitations}>
+        <strong>{r.scope}</strong>
         {analysis.limitations.map((limitation) => <p key={limitation}>{limitation}</p>)}
       </aside>
     </article>

@@ -4,10 +4,13 @@ import { createRoot } from "react-dom/client";
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import App from "./App";
+import { LanguageProvider } from "./i18n/LanguageProvider";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
   </StrictMode>,
 );
 

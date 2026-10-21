@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { TradeValueChecks } from "./TradeValueChecks";
+import * as format from "./i18n/format";
 
 type Credentials = { caseId: string; token: string };
 type Condition = "EXCELLENT" | "GOOD" | "FAIR" | "POOR";
@@ -33,12 +34,11 @@ const OWED: { value: Owed; label: string }[] = [
   { value: "YES", label: "Yes" }, { value: "NO", label: "No" }, { value: "NOT_SURE", label: "I'm not sure" }];
 
 function money(minor: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(minor / 100);
+  return format.money(minor);
 }
 function day(iso: string) {
   const [year, month, date] = iso.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
-    .format(new Date(Date.UTC(year, month - 1, date)));
+  return format.date(Date.UTC(year, month - 1, date), { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 /** Dollars as typed, to whole cents; null when it is not an amount. */
 export function toMinor(text: string) {
@@ -119,7 +119,7 @@ export function TradeVehicle({ caseId, token, carryFrom }: Credentials & { carry
       ? "This trade-in belongs to your Buying Journey, so every case in the journey uses the same one."
       : "This case holds its own trade-in."}</p>
     {trade && view.analysis.outdated && view.analysis.analyzedAt && <p role="alert">Your trade-in changed after this case was
-      analyzed on {new Date(view.analysis.analyzedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })},
+      analyzed on {format.date(view.analysis.analyzedAt, { month: "short", day: "numeric", year: "numeric" })},
       so that analysis is outdated. Analyze the deal again to use the trade-in as it is now.</p>}
     {!trade && !editing && <button type="button" onClick={() => setEditing(true)}>Add the car I'm trading in</button>}
     {trade && !editing && <TradeSummary trade={trade} view={view} />}
@@ -147,7 +147,7 @@ function TradeSummary({ trade, view }: { trade: Trade; view: TradeView }) {
     <dl className="facts trade-facts">
       <div><dt>Car</dt><dd>{vehicleName(trade)}</dd></div>
       <div><dt>VIN</dt><dd className="vin">{trade.vehicle.vin}</dd></div>
-      <div><dt>Mileage</dt><dd>{trade.mileage.toLocaleString("en-US")} mi</dd></div>
+      <div><dt>Mileage</dt><dd>{format.number(trade.mileage)} mi</dd></div>
       <div><dt>Condition</dt><dd>{condition?.label ?? trade.condition}</dd></div>
       <div><dt>Money owed</dt><dd>{trade.moneyOwed === null ? "Not answered yet"
         : OWED.find(option => option.value === trade.moneyOwed)!.label}</dd></div>
