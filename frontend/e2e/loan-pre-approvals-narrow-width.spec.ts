@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { AxeBuilder, expect, test, type Page } from "./fixtures";
 import { loanView } from "../src/LoanPreApprovals.fixture";
 
 // Ticket 129: every step of the loan pre-approvals panel, one-handed at 360 px, in both themes.

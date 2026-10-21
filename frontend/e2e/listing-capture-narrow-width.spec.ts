@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { AxeBuilder, expect, test, type Page } from "./fixtures";
 import { conflictingListing, readCapture, savedListing } from "../src/ListingCapture.fixture";
 
 // A 1 x 1 white PNG stands in for the normalized page of the Buyer's copy of the ad.

@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { AxeBuilder, expect, test } from "./fixtures";
 import { randomBytes, randomUUID } from "node:crypto";
 
 for (const width of [360, 1280]) {

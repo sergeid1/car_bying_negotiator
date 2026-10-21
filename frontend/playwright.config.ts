@@ -47,6 +47,18 @@ export default defineConfig({
       name: "narrow-dark",
       use: { ...devices["Desktop Chrome"], viewport: { width: 360, height: 780 }, colorScheme: "dark" },
     },
+    // Both themes again in Spanish (ticket 146): the browser asks for Spanish, so a first visit opens in it, and
+    // e2e/fixtures.ts reads each journey's English selectors through the catalogues.
+    {
+      name: "narrow-es",
+      metadata: { language: "es" },
+      use: { ...devices["Desktop Chrome"], viewport: { width: 360, height: 780 }, colorScheme: "light", locale: "es-US" },
+    },
+    {
+      name: "narrow-dark-es",
+      metadata: { language: "es" },
+      use: { ...devices["Desktop Chrome"], viewport: { width: 360, height: 780 }, colorScheme: "dark", locale: "es-US" },
+    },
   ],
   webServer: {
     command: `npm run preview -- --host 127.0.0.1 --port ${port} --strictPort`,

@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { AxeBuilder, expect, test } from "./fixtures";
 import { caseFlowRecord } from "../src/CaseFlow.fixture";
 import { vehicleSafetyFixture } from "../src/VehicleSafety.fixture";
 

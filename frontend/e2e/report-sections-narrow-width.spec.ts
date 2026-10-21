@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, Page, test } from "@playwright/test";
+import { AxeBuilder, expect, Page, test } from "./fixtures";
 
 // Ticket 71: the report's secondary sections are one collapsible list below the leading section.
 const report = { version: 1, asOf: "2026-10-05", status: "COMPLETE", analysis: {

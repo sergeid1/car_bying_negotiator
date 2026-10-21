@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { AxeBuilder, expect, test } from "./fixtures";
 import { openCaseStep } from "./case-steps";
 
 const LONG_DEALER = "internet-sales-department.after-hours@a-very-long-dealership-domain-name.example";
