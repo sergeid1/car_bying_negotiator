@@ -30,17 +30,7 @@ const PAPERWORK_PENDING: string[] = [];
 const DEALER_PENDING: string[] = [];
 
 /** Journey: messages to the dealer; copy in en/messages.ts. */
-const MESSAGES_PENDING = [
-  "DealerHandoff.tsx",
-  "DealerRelay.tsx",
-  "MailboxConnection.tsx",
-  "NegotiationConversation.tsx",
-  "NegotiationDraft.tsx",
-  "NegotiationMandate.tsx",
-  "OutboundGateDecision.tsx",
-  "QuoteComparison.tsx",
-  "QuoteRequest.tsx",
-];
+const MESSAGES_PENDING: string[] = [];
 
 /** Journey: insurance, loans, financing and the offer; copy in en/money.ts. */
 const MONEY_PENDING = [

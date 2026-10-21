@@ -7,33 +7,26 @@ import { VerifiedOfferAnalysis } from "./VerifiedOfferAnalysis";
 import { AgreedPrice } from "./AgreedPrice";
 import { NegotiationConversation } from "./NegotiationConversation";
 import { TestDriveAppointment } from "./TestDriveAppointment";
+import { useMessages } from "./i18n/LanguageProvider";
 
 type Quote = { id: string; dealerAddress: string; state: string; messageId?: string | null;
   gatedDraft: { draft: { text: string }; decision: GateDecision } };
 type View = { negotiationState: string; requests: Quote[]; dealers: { id: string; name: string }[];
   documents: { documentId: string | null; outcome: string; offerVersion: number | null; sourceKind: string; messageId: string }[] };
-const states: Record<string, string> = {
-  NO_MANDATE: "Set your negotiating limits in Compare & negotiate before you contact the dealer.",
-  MANDATE_ACTIVE: "Your mandate is active. Review a quote request, approve it, and send it from your own email.",
-  AWAITING_DEALER: "Your request was sent. When the dealer replies, add the reply to the conversation.",
-  AWAITING_BUYER: "The dealer replied. Review and verify the quote before analysis.",
-  PAUSED: "Negotiation is paused. Nothing is sent until you resume it.",
-  AGREED: "You accepted the quote.", STOPPED: "Negotiation has stopped.", EXPIRED: "Your mandate expired. No more requests can be sent.",
-};
-const QUOTE_STATES: Record<string, string> = {
-  SENT: "Request sent.", DISCARDED: "Discarded. It was not sent.",
-  BLOCKED: "The mandate or policy changed before sending. This request was stopped.",
-};
 // Anything other than the documented shape is treated as unavailable rather than rendered.
-function asView(value: unknown): View {
+function checkedView(value: unknown, unavailable: string): View {
   const v = value as Partial<View> | null;
   if (!v || typeof v.negotiationState !== "string" || !Array.isArray(v.requests)
-    || !Array.isArray(v.documents) || !Array.isArray(v.dealers)) throw new Error("Quote requests are unavailable. Try refreshing.");
+    || !Array.isArray(v.documents) || !Array.isArray(v.dealers)) throw new Error(unavailable);
   return v as View;
 }
 export function QuoteRequest({ caseId, token }: {
   caseId: string; token: string;
 }) {
+  const { m: { messages: { quoteRequest: t, common } }, fill } = useMessages();
+  const states: Record<string, string> = t.states;
+  const quoteStates: Record<string, string> = t.quoteStates;
+  const asView = (value: unknown) => checkedView(value, t.unavailable);
   const [view, setView] = useState<View>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -48,7 +41,7 @@ export function QuoteRequest({ caseId, token }: {
       ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     if (!response.ok) {
       const detail = await response.json().catch(() => ({}));
-      throw new Error(typeof detail.detail === "string" ? detail.detail : "The quote request could not be updated. Try again.");
+      throw new Error(typeof detail.detail === "string" ? detail.detail : t.updateFailed);
     }
     return response.json();
   }
@@ -59,7 +52,7 @@ export function QuoteRequest({ caseId, token }: {
     let current = true;
     setView(undefined); setReview(false); setOfferVersion(undefined); setError(undefined);
     request(path).then(value => { if (current) setView(asView(value)); })
-      .catch(() => { if (current) setError("Quote requests are unavailable. Try refreshing."); });
+      .catch(() => { if (current) setError(t.unavailable); });
     return () => { current = false; };
     // The case and its token define this request session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,47 +74,47 @@ export function QuoteRequest({ caseId, token }: {
     } catch (failure) { setError((failure as Error).message); }
     finally { setBusy(false); }
   }
-  return <section className="stack" aria-label="Request a dealer quote">
+  return <section className="stack" aria-label={t.label}>
     <div className="panel quote-request-panel">
-      <h2>Request an itemized quote</h2>
-      <p>Review the request for this Vehicle. Approving it requires your current mandate; you then send it from your own email.</p>
-      <p role="status">{view ? states[view.negotiationState] : "Loading quote requests…"}</p>
+      <h2>{t.heading}</h2>
+      <p>{t.intro}</p>
+      <p role="status">{view ? states[view.negotiationState] : t.loading}</p>
       {view && (view.dealers.length > 0 ? <form onSubmit={event => void create(event)}>
-        <label>Dealer<select name="dealer" required disabled={busy}>
-          <option value="">Choose a dealer</option>{view.dealers.map(dealer => <option key={dealer.id} value={dealer.id}>{dealer.name}</option>)}
+        <label>{t.dealer}<select name="dealer" required disabled={busy}>
+          <option value="">{t.chooseDealer}</option>{view.dealers.map(dealer => <option key={dealer.id} value={dealer.id}>{dealer.name}</option>)}
         </select></label>
-        <label>Dealer email<input name="email" type="email" required disabled={busy} autoComplete="off" /></label>
-        <p>Check the address against the dealer's listing. Every message in this conversation goes to it.</p>
-        <button type="submit" disabled={busy || !view}>Prepare request</button>
-      </form> : <p>No dealer has a listing for this car's VIN yet. Save the dealer's ad for this car below, then choose that dealer here.</p>)}
+        <label>{t.dealerEmail}<input name="email" type="email" required disabled={busy} autoComplete="off" /></label>
+        <p>{t.checkAddress}</p>
+        <button type="submit" disabled={busy || !view}>{t.prepare}</button>
+      </form> : <p>{t.noDealer}</p>)}
       <button type="button" disabled={busy} onClick={() => {
-        setError(undefined); void refresh().catch(() => setError("Quote requests could not be refreshed."));
-      }}>Refresh conversation</button>
+        setError(undefined); void refresh().catch(() => setError(t.refreshFailed));
+      }}>{common.refreshConversation}</button>
       {error && <p role="alert">{error}</p>}
       {view?.requests.map(quote => <article key={quote.id} className="card">
-        <h3>Quote request to {quote.dealerAddress}</h3>
-        <p>Subject: Request for an itemized vehicle quote</p>
+        <h3>{fill(t.requestTo, { address: quote.dealerAddress })}</h3>
+        <p>{t.subject}</p>
         <p>{quote.gatedDraft.draft.text}</p>
         <OutboundGateDecision decision={quote.gatedDraft.decision} />
         {quote.state === "DRAFT" ? <button type="button" disabled={busy || !quote.gatedDraft.decision.pass}
-          onClick={() => void approve(quote)}>Approve this text</button>
+          onClick={() => void approve(quote)}>{t.approveText}</button>
           : quote.state === "HANDED_OFF" && quote.messageId
             ? <DealerHandoff caseId={caseId} token={token} messageId={quote.messageId} onChanged={refresh} />
-            : <p>{QUOTE_STATES[quote.state] ?? "Delivery was not confirmed. Check the conversation before preparing another request."}</p>}
+            : <p>{quoteStates[quote.state] ?? t.deliveryNotConfirmed}</p>}
         {quote.state === "SENT" && <DealerReplyPaste caseId={caseId} token={token} quoteRequestId={quote.id}
           dealerAddress={quote.dealerAddress} onAdded={refresh} />}
       </article>)}
       {!!view?.documents.length && <>
-        <p>Dealer quotes enter document review. Confirm or correct the extracted amounts against the source before analysis.</p>
-        <ul aria-label="Dealer quote sources">{view.documents.map((document, index) => <li key={`${document.messageId}-${index}`}>
-          {document.sourceKind === "MESSAGE_BODY" ? "Dealer message body" : "Dealer attachment"}: {document.outcome === "ACCEPTED"
-            ? "added as a document for your review" : "could not be added for review"}.
+        <p>{t.documentReview}</p>
+        <ul aria-label={t.sources}>{view.documents.map((document, index) => <li key={`${document.messageId}-${index}`}>
+          {fill(t.sourceLine, { source: document.sourceKind === "MESSAGE_BODY" ? t.messageBody : t.attachment,
+            outcome: document.outcome === "ACCEPTED" ? t.addedForReview : t.notAddedForReview })}
         </li>)}</ul>
-        {view.documents.some(document => document.outcome !== "ACCEPTED") && <p>Some reply content could not be added. Check the conversation and ask for a supported document.</p>}
-        <button type="button" onClick={() => setReview(true)}>Review quote documents</button>
+        {view.documents.some(document => document.outcome !== "ACCEPTED") && <p>{t.someNotAdded}</p>}
+        <button type="button" onClick={() => setReview(true)}>{t.reviewDocuments}</button>
         {view.documents.filter(document => document.offerVersion !== null).map(document =>
           <button key={`${document.documentId}-${document.offerVersion}`} type="button"
-            onClick={() => setOfferVersion(document.offerVersion!)}>Open analysis of verified quote {document.offerVersion}</button>)}
+            onClick={() => setOfferVersion(document.offerVersion!)}>{fill(t.openAnalysis, { version: String(document.offerVersion) })}</button>)}
       </>}
     </div>
     {view && <AgreedPrice caseId={caseId} token={token} quotes={view.requests} sources={view.documents} onChanged={refresh} />}
@@ -129,7 +122,7 @@ export function QuoteRequest({ caseId, token }: {
     {view && <NegotiationConversation caseId={caseId} token={token} version={relayVersion} />}
     <DealerRelay key={relayVersion} caseId={caseId} token={token} />
     {review && <OfferVerification caseId={caseId} token={token} onOfferFrozen={offer => {
-      setOfferVersion(offer.version); void refresh().catch(() => setError("Refresh to see the latest quote status."));
+      setOfferVersion(offer.version); void refresh().catch(() => setError(t.refreshLatest));
     }} />}
     {offerVersion !== undefined && <VerifiedOfferAnalysis key={offerVersion} caseId={caseId} token={token} offerVersion={offerVersion} />}
   </section>;
