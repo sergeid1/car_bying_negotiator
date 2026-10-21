@@ -21,7 +21,7 @@ export const templates = {
   "SCOPE_CASH": "Las comprobaciones abarcan la oferta verificada guardada, los límites aprobados, la identificación y el cálculo registrado de la compra al contado al {asOf}.",
   "SCOPE_FINANCE": "Las comprobaciones de financiamiento abarcan los datos confirmados por usted y el calendario declarado al {asOf}; no abarcan límites de financiamiento aprobados ni una conciliación independiente de los cargos de compra.",
   "SCOPE_ESTIMATES": "Los cálculos de impuestos y cargos son estimaciones registradas; las clasificaciones pendientes impiden indicar una coincidencia.",
-  "SCOPE_EXCLUSIONS": "El financiamiento abarca solo el calendario mensual estándar registrado. No se evalúan el estado mecánico, el título, el cumplimiento legal ni la seguridad de la compra. No se garantizan ahorros.",
+  "SCOPE_EXCLUSIONS": "El financiamiento abarca solo el calendario mensual estándar registrado. No se evalúan el estado mecánico, el título, el cumplimiento legal ni la seguridad de la compra. No podemos prometer ahorros.",
   "AMOUNT_OTD": "Precio total final (out-the-door)",
   "AMOUNT_PURCHASE": "Precio de compra",
   "AMOUNT_FINANCED": "Monto financiado (amount financed)",

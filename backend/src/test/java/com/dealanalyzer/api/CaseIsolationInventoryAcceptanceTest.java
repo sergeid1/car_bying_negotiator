@@ -216,6 +216,7 @@ class CaseIsolationInventoryAcceptanceTest {
   static final List<Endpoint> ACCOUNT_ENDPOINTS = List.of(
       accountRow("GET", V + "/account", null),
       accountRow("PUT", V + "/account/contact", "{\"firstName\":\"Pat\"}"),
+      accountRow("PUT", V + "/account/language", "{\"language\":\"es\"}"),
       accountRow("POST", V + "/account/cases", "{\"caseId\":\"{caseId}\"}"),
       accountRow("POST", V + "/account/cases/{caseId}/open", "{}"),
       accountRow("POST", V + "/account/sign-out", "{}"),
