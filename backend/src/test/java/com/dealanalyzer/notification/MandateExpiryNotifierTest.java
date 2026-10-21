@@ -28,7 +28,7 @@ class MandateExpiryNotifierTest {
     int attempted = new MandateExpiryNotifier(mandates, notifications, jdbc, Duration.ofHours(24)).notifyExpiring(NOW);
 
     assertThat(attempted).isEqualTo(1);
-    verify(notifications).notify("account-1", NotificationType.MANDATE_EXPIRING, "mandate-expiring:m-attached");
+    verify(notifications).notifyCase("account-1", NotificationType.MANDATE_EXPIRING, "mandate-expiring:m-attached", "case-attached");
     verifyNoMoreInteractions(notifications);
   }
 

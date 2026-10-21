@@ -16,11 +16,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/cases/{caseId}/reports/{version}/explanation")
 public class ReportExplanationController {
   private final ReportExplanationService service;
-  public ReportExplanationController(ReportExplanationService service) { this.service = service; }
+  private final com.dealanalyzer.buyingcase.persistence.SpanishReportExplanationService spanish;
+  public ReportExplanationController(ReportExplanationService service,
+      com.dealanalyzer.buyingcase.persistence.SpanishReportExplanationService spanish) { this.service = service; this.spanish = spanish; }
 
   @GetMapping
   public JsonNode get(@PathVariable String caseId, @PathVariable int version,
-      @RequestHeader("Case-Access-Token") String token) {
-    return service.explain(caseId, version, token);
+      @RequestHeader("Case-Access-Token") String token,
+      @org.springframework.web.bind.annotation.RequestParam(defaultValue = "en") String language) {
+    return "es".equals(language) ? spanish.explain(caseId, version, token) : service.explain(caseId, version, token);
   }
 }

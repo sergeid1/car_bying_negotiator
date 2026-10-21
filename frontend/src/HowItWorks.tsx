@@ -45,7 +45,7 @@ export function sampleFigures(body: unknown): SampleFigures | undefined {
   const economics = analysis.economics as Record<string, { minorUnits?: number | null; currency?: string } | undefined> | undefined;
   const material = (analysis.materialAmounts ?? []) as { label?: string | null; pointer?: string; minorUnits: number | null; currency: string }[];
   const amount = (key: typeof AMOUNT_KEYS[number]) => economics?.[key]?.minorUnits
-    ?? material.find(each => each.pointer?.endsWith(`/${key}`) || (key === "outTheDoorTotal" && each.label === "Out-the-door total"))?.minorUnits
+    ?? material.find(each => each.pointer?.endsWith(`/${key}`) || (key === "outTheDoorTotal" && each.pointer === "/inputs/outTheDoorTotalMinor"))?.minorUnits
     ?? null;
   const currency = economics?.outTheDoorTotal?.currency ?? material[0]?.currency ?? "USD";
   const reasons = Array.isArray(analysis.topReasons) ? (analysis.topReasons as unknown[]).filter((each): each is string => typeof each === "string") : [];

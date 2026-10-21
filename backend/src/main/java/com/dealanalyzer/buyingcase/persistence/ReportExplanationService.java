@@ -42,7 +42,7 @@ public class ReportExplanationService {
     if (stored.isPresent()) return read(stored.get().getPayloadJson());
     JsonNode report = read(reports.findProjectedById(key)
         .orElseThrow(() -> new ResourceNotFoundException("Report not found")).getPayloadJson());
-    if (!ExplanationFacts.CORE_SCHEMA.equals(report.path("schemaVersion").asText()))
+    if (!ExplanationFacts.supports(report))
       throw new ResourceNotFoundException("No explanation exists for this report");
     var explanation = explainer.explain(caseId, report);
     String payload;

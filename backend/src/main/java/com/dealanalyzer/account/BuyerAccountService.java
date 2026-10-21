@@ -65,6 +65,11 @@ public class BuyerAccountService {
   /** Creates the account on first request; either way, emails a single-use sign-in link. */
   @Transactional
   public void requestSignIn(String address, String requestKey) {
+    requestSignIn(address, requestKey, "en");
+  }
+
+  @Transactional
+  public void requestSignIn(String address, String requestKey, String language) {
     String normalized = address.strip().toLowerCase(Locale.ROOT);
     String lookup = secrets.protectAccountSecret("email", normalized);
     var account = accounts.findLockedByEmailLookup(lookup).orElse(null);
@@ -87,7 +92,8 @@ public class BuyerAccountService {
     link.accountId = account.id; link.requestKeyHash = keyHash; link.createdAt = now;
     link.expiresAt = now.plus(linkLifetime);
     links.saveAndFlush(link);
-    email.send(normalized, origin + "#sign-in=" + token, RecoveryEmail.Purpose.ACCOUNT_SIGN_IN);
+    if ("es".equals(language)) email.send(normalized, origin + "#sign-in=" + token, RecoveryEmail.Purpose.ACCOUNT_SIGN_IN, "es");
+    else email.send(normalized, origin + "#sign-in=" + token, RecoveryEmail.Purpose.ACCOUNT_SIGN_IN);
   }
 
   @Transactional(noRollbackFor = AccountProblem.class)

@@ -38,6 +38,14 @@ public class EphemeralCasePersistence {
     return cases.findById(caseId).map(value -> value.buyerZip).orElse(null);
   }
 
+  @Transactional
+  public void changeLanguage(String caseId, String language) {
+    if (!List.of("en", "es").contains(language)) throw new IllegalArgumentException("Unsupported language");
+    var entity = cases.findLockedById(caseId).orElseThrow();
+    entity.language = language;
+    entity.updatedAt = Instant.now();
+  }
+
   public boolean requiresEvidenceReview(String caseId) {
     return cases.findById(caseId).map(value -> value.coreReviewBlocked
         && !"READY_TO_ANALYZE".equals(value.status)).orElse(true);
@@ -99,6 +107,7 @@ public class EphemeralCasePersistence {
         idempotencyKey,
         now);
     entity.buyerZip = request.buyerPostalCode().strip();
+    entity.language = request.language();
     AnalysisCaseEntity saved = cases.saveAndFlush(entity);
     if (request.dealerName() != null && !request.dealerName().isBlank()) {
       entities.createNativeQuery("""
@@ -234,7 +243,8 @@ public class EphemeralCasePersistence {
         entity.accessExpiresAt,
         entity.createdAt,
         entity.updatedAt,
-        consentHistory);
+        consentHistory,
+        entity.language);
   }
 
   private StoredConsent stored(ConsentRecordEntity entity) {
@@ -261,7 +271,8 @@ public class EphemeralCasePersistence {
       Instant accessExpiresAt,
       Instant createdAt,
       Instant updatedAt,
-      List<StoredConsent> consents) {}
+      List<StoredConsent> consents,
+      String language) {}
 
   public enum ConsentAction { GRANTED, DECLINED, REVOKED }
 

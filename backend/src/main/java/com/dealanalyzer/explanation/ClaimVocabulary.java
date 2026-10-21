@@ -28,6 +28,29 @@ final class ClaimVocabulary {
   private static final Map<String, Subject> SUBJECTS = new LinkedHashMap<>();
 
   static {
+    terms(Term.MATCH, "coincide", "coinciden", "coincidencia", "concuerda", "concuerdan");
+    terms(Term.DIFFERS, "difiere", "difieren", "diferencia", "diferencias", "no coincide", "no coinciden", "cambió", "cambiaron");
+    terms(Term.RECONCILES, "concilia", "concilian", "conciliado");
+    terms(Term.REVIEW, "revisión", "revisar", "revise");
+    terms(Term.UNVERIFIABLE, "no puede verificar", "no se puede verificar", "sin verificar", "no verificable");
+    terms(Term.UNAVAILABLE, "no disponible", "no disponibles", "no está disponible", "no están disponibles", "desconocido", "desconocida", "faltante", "faltantes", "falta", "faltan", "insuficiente", "insuficientes");
+    terms(Term.AVAILABLE, "disponible", "disponibles", "confirmado", "confirmados", "verificado", "verificados");
+    terms(Term.STALE, "desactualizado", "desactualizada", "desactualizados", "vencido");
+    terms(Term.ABOVE, "por encima", "superior", "mayor", "supera", "más alto");
+    terms(Term.BELOW, "por debajo", "inferior", "menor", "menos que");
+    terms(Term.WITHIN, "dentro", "dentro de");
+    terms(Term.STRONG, "favorable", "bueno", "excelente");
+    terms(Term.FAIR, "razonable", "aceptable");
+    terms(Term.POOR, "desfavorable", "malo", "caro");
+    terms(Term.EXACT, "exacto", "exacta", "exactamente", "preciso", "definitivo");
+    terms(Term.ESTIMATED, "estimado", "estimada", "estimados", "estimadas", "aproximado", "aproximadamente");
+    subjects(Subject.APPROVAL, "aprobado", "aprobada", "aprobados", "aprobación", "límite", "límites", "versión de referencia");
+    subjects(Subject.RATING, "evaluación", "calificación");
+    subjects(Subject.MARKET, "mercado", "anuncio", "anuncios", "comparable", "comparables");
+    subjects(Subject.CASH, "al contado");
+    subjects(Subject.FINANCING, "financiamiento", "financiado", "financiados", "préstamo", "prestamista", "intereses", "calendario");
+    subjects(Subject.PAYMENT, "pago", "pagos", "mensual", "mensuales");
+    subjects(Subject.ADD_ONS, "productos adicionales", "complementos");
     terms(Term.MATCH, "match", "matches", "matched", "matching", "consistent", "agree", "agrees", "same");
     terms(Term.DIFFERS, "differ", "differs", "differed", "different", "difference", "differences", "mismatch",
         "mismatches", "mismatched", "does not match", "do not match", "did not match", "not match", "inconsistent",

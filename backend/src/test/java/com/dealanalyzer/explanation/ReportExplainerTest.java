@@ -71,6 +71,47 @@ class ReportExplainerTest {
     return new ReportExplainer(new ModelHarness(meter, SHIPPED, null, "VENDOR_TERMS_UNVALIDATED", json), json);
   }
 
+  @ParameterizedTest @CsvSource({"REVIEW_REQUIRED,AVAILABLE", "UNABLE_TO_VERIFY,UNAVAILABLE", "MATCHES_APPROVED_BASELINE,AVAILABLE"})
+  void spanishTemplatesPassTheSameGroundingGate(String review, String market) throws Exception {
+    var report = (com.fasterxml.jackson.databind.node.ObjectNode) report();
+    var analysis = (com.fasterxml.jackson.databind.node.ObjectNode) report.path("analysis");
+    analysis.put("reviewStatus", review); analysis.put("marketAvailability", market);
+    if (market.equals("UNAVAILABLE")) analysis.put("dealRating", "INSUFFICIENT_DATA");
+    var explanation = off().explain("spanish-case", report, "es");
+    assertThat(explanation.path()).isEqualTo(Path.TEMPLATE);
+    assertThat(explanation.statements()).isNotEmpty();
+    assertThat(explanation.statements().getFirst().text()).doesNotStartWith("The").doesNotStartWith("This");
+    assertThat(explanation.scope()).contains("coherencia financiera");
+  }
+
+  @Test void spanishModelClaimsThatFailGroundingFallBackToSpanishTemplates() throws Exception {
+    var explanation = model(replying(sentence("El mercado está disponible.", "review-status")))
+        .explain("spanish-case", report(), "es");
+    assertThat(explanation.path()).isEqualTo(Path.TEMPLATE);
+    assertThat(explanation.fallbackReason()).startsWith("UNSUPPORTED");
+    assertThat(explanation.statements().getFirst().text()).startsWith("Las comprobaciones financieras");
+  }
+
+  @ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings = {
+      "El historial del vehículo está limpio.", "Es seguro firmar.", "Usted ahorrará dinero.",
+      "El precio incluye un dólar.", "The checks require review."})
+  void spanishCandidatesCannotBypassTheEnglishClaimBoundary(String candidate) throws Exception {
+    var explanation = model(replying(sentence(candidate, "review-status"))).explain("spanish-case", report(), "es");
+    assertThat(explanation.path()).isEqualTo(Path.TEMPLATE);
+    assertThat(explanation.fallbackReason()).isIn("PROHIBITED_FRAMING", "AMOUNT_RESTATED", "LANGUAGE_MISMATCH");
+    assertThat(explanation.statements().getFirst().text()).startsWith("Las comprobaciones financieras");
+  }
+
+  @Test void spanishModelAmountPlaceholdersKeepTheRecordedPrecisionInSpanish() throws Exception {
+    var explanation = model(replying(sentence("El rango estimado de mercado incluye {amount-2}.", "deal-rating")))
+        .explain("spanish-case", report(), "es");
+    assertThat(explanation.path()).isEqualTo(Path.MODEL);
+    assertThat(explanation.statements().getFirst().text()).contains("(estimado)").doesNotContain("(estimated)");
+    assertThat(explanation.statements().getFirst().segments()).anySatisfy(segment -> {
+      assertThat(segment.amountId()).isEqualTo("amount-2"); assertThat(segment.precision()).isEqualTo("ESTIMATED");
+    });
+  }
+
   private ReportExplainer model(ModelGateway gateway) {
     return new ReportExplainer(new ModelHarness(meter, ENABLED, gateway, "agreement-under-test", json), json);
   }

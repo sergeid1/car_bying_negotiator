@@ -30,7 +30,7 @@
     "maxObservationPriceMinor": 20000000
   },
   "reportSchema": {
-    "reportSchemaVersion": "core-deal-analysis-report.v1",
+    "reportSchemaVersion": "core-deal-analysis-report.v2",
     "policyVersions": {
       "priceBoundaries": "price-boundaries.v1",
       "revisedOffer": "revised-offer.v1",

@@ -12,6 +12,7 @@ import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
 import { DealerAddOnsNote, type DealerAddOnCheck } from "./DealerAddOns";
 import * as format from "./i18n/format";
 import { useMessages } from "./i18n/LanguageProvider";
+import { localizeReport, type Finding } from "./i18n/findings";
 
 type Credentials = { caseId: string; token: string };
 type Route = "AGREED_CAR" | "THIS_CASE";
@@ -29,6 +30,7 @@ export type DeskRouting = {
 };
 export type DeskFinding = { code: string; summary: string; amountMinor: number | null; deskQuestion: string; tacticCode?: string | null };
 export type FirstResult = {
+  textFindings?: Record<string, Finding>;
   route: Route; source: "READ_FROM_PAPERWORK" | "TYPED_BY_BUYER";
   outTheDoor: { amountMinor: number | null; agreedMinor: number | null; differenceMinor: number | null };
   lead: DeskFinding | null; findings: DeskFinding[];
@@ -117,7 +119,7 @@ export function AtTheDealer({ files, open, onCaseOpened, onFreshCase, onDeskChec
   onCaseOpened: (value: Credentials) => void; onFreshCase: (value: FreshDeskCase) => void;
   onDeskCheck: () => void; onClose: () => void;
 }) {
-  const { m: { dealer: { atTheDealer: t, common } }, fill } = useMessages();
+  const { m: { dealer: { atTheDealer: t, common } }, fill, language } = useMessages();
   const signedIn = useContext(AccountSignedInContext);
   const [target, setTarget] = useState<Credentials | undefined>(open);
   const [phase, setPhase] = useState<Phase>(open ? (files.length ? "reading" : "typed") : "start");
@@ -171,6 +173,7 @@ export function AtTheDealer({ files, open, onCaseOpened, onFreshCase, onDeskChec
       headers: { "Idempotency-Key": crypto.randomUUID(), ...(signedIn ? { "Account-Request": "1" } : {}) },
       body: JSON.stringify({
         buyerPostalCode: String(values.get("buyerPostalCode") ?? "").trim(),
+        language,
         dealerCity: String(values.get("dealerCity") ?? "").trim(),
         dealerState: String(values.get("dealerState") ?? ""),
         dealerName: String(values.get("dealerName") ?? "").trim() || undefined,
@@ -581,7 +584,8 @@ function ResultView({ result, headingRef, elapsed, onDeskCheck, onType, onClose 
   result: FirstResult; headingRef: RefObject<HTMLHeadingElement | null>; elapsed: { read?: number; result?: number };
   onDeskCheck: () => void; onType: () => void; onClose: () => void;
 }) {
-  const { m: { dealer: { atTheDealer: { result: t }, common } }, fill } = useMessages();
+  const { m: { dealer: { atTheDealer: { result: t }, common } }, fill, language } = useMessages();
+  result = localizeReport(result, language);
   const total = result.outTheDoor;
   // The lead is the first finding; the rest stay one tap away.
   const more = result.findings.slice(1);

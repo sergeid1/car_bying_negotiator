@@ -73,7 +73,7 @@ export function Arithmetic({ calculation, result, currency = "USD", label }: {
   calculation: Calculation; result: number | null; currency?: string; label: string;
 }) {
   const { m: { paperwork: { evidenceSource: t, common } }, fill } = useMessages();
-  const shown = (operand: Operand) => operand.minorUnits != null ? formatMoney(operand.minorUnits, currency, common.unknown) : operand.value ?? common.unknown;
+  const shown = (operand: Operand) => operand.minorUnits != null ? formatMoney(operand.minorUnits, currency, common.unknown) : operand.value === "Unknown" ? common.unknown : operand.value ?? common.unknown;
   return <div className="arithmetic">
     {calculation.operands.length > 0 && <ol aria-label={fill(t.calculationOf, { label })}>
       {calculation.operands.map((operand, index) => <li key={index}>

@@ -44,7 +44,7 @@ test("requests a sign-in link from one email box without storing anything in the
   expect(screen.getByRole("status")).toHaveFocus();
   const [path, init] = fetcher.mock.calls.find(([path]) => String(path).endsWith("/sign-in-requests"))!;
   expect(path).toBe("/api/v1/account/sign-in-requests");
-  expect(JSON.parse(String(init?.body))).toEqual({ email: "buyer@example.com" });
+  expect(JSON.parse(String(init?.body))).toEqual({ email: "buyer@example.com", language: "en" });
   expect((init?.headers as Record<string, string>)["Idempotency-Key"]).toBeTruthy();
 
   await user.click(screen.getByRole("button", { name: "Send again" }));

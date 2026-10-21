@@ -39,12 +39,17 @@ public class ReplyAssistant {
   }
 
   public ReplyDraft draft(String caseId, JsonNode report, String dealerResponse) {
+    return draft(caseId, report, dealerResponse, "en");
+  }
+
+  public ReplyDraft draft(String caseId, JsonNode report, String dealerResponse, String language) {
     if (dealerResponse == null || dealerResponse.isBlank())
       throw new InvalidDealerResponse("Paste the Dealer's response to draft a reply.");
     if (dealerResponse.length() > MAX_DEALER_RESPONSE)
       throw new InvalidDealerResponse("The Dealer's response is limited to " + MAX_DEALER_RESPONSE + " characters.");
     ReplyGrounds grounds = ReplyGrounds.from(report);
-    if (!harness.available()) return template(grounds, "MODEL_PATH_OFF");
+    // Spanish readers receive the bilingual template bank's exact English draft and its complete reading copy.
+    if ("es".equals(language) || !harness.available()) return template(grounds, "MODEL_PATH_OFF");
     try {
       var result = harness.run(caseId, task, List.of(
           new UntrustedInput.Text("dealer response", dealerResponse),

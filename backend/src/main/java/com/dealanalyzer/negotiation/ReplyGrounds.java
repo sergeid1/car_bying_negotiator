@@ -47,7 +47,7 @@ public record ReplyGrounds(int reportVersion, String dealerOfferId, Integer deal
   static final String PAYMENT_MISMATCH = "payment-reconciliation";
 
   public static ReplyGrounds from(JsonNode report) {
-    if (!"core-deal-analysis-report.v1".equals(report.path("schemaVersion").asText()))
+    if (!com.dealanalyzer.explanation.ExplanationFacts.supports(report))
       throw new IllegalArgumentException("Finalized core report required");
     List<Fact> facts = new ArrayList<>();
     JsonNode analysis = report.path("analysis");

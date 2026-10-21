@@ -3,6 +3,8 @@ import { DealerHandoff } from "./DealerHandoff";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
 import * as format from "./i18n/format";
 import { useMessages } from "./i18n/LanguageProvider";
+import { DealerReadingCopy } from "./DealerReadingCopy";
+import { findingCode } from "./i18n/findings";
 
 type Revision = { revision: number; editedByBuyer: boolean; text: string; decision: GateDecision; createdAt: string };
 type Counteroffer = {
@@ -41,7 +43,7 @@ const usd = (minor: number) => format.money(minor);
 const when = (iso: string) => format.dateTime(iso, { dateStyle: "medium", timeStyle: "short" });
 
 export function NegotiationConversation({ caseId, token, version = 0 }: { caseId: string; token: string; version?: number }) {
-  const { m: { messages: { negotiationConversation: t, common } }, fill } = useMessages();
+  const { m: { messages: { negotiationConversation: t, common } }, fill, language } = useMessages();
   const asView = (value: unknown) => checkedView(value, t.unavailable);
   const [view, setView] = useState<ConversationView>();
   const [error, setError] = useState<string>();
@@ -145,7 +147,8 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
               {draft.revisions.map(revision => <section key={revision.revision} className="conversation-revision"
                 aria-label={fill(t.revision, { revision: String(revision.revision) })}>
                 <h4>{fill(revision.editedByBuyer ? t.revisionEdited : t.revisionDrafted, { revision: String(revision.revision) })}</h4>
-                <pre>{revision.text}</pre>
+                <DealerReadingCopy english={revision.text} />
+                <pre lang="en">{revision.text}</pre>
                 <OutboundGateDecision decision={revision.decision} />
               </section>)}
               {draft.state === "PROPOSED" && !view.dealerDeclined && <>
@@ -164,7 +167,7 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
                   </form>}
                 <button type="button" disabled={busy || !current.decision.pass}
                   onClick={() => void act(`${drafts}/${encodeURIComponent(draft.id)}/approval`, { approved: true, text: current.text })}>
-                  {fill(t.approveRevision, { revision: String(current.revision) })}</button>
+                  {String(language) === "es" ? findingCode(language, "approveEnglish") : fill(t.approveRevision, { revision: String(current.revision) })}</button>
                 <button type="button" disabled={busy} onClick={() => void act(`${drafts}/${encodeURIComponent(draft.id)}/decline`)}>
                   {t.declineDraft}</button>
               </>}

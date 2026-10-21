@@ -1,6 +1,7 @@
 import { ReactNode, useRef, useState } from "react";
 import * as format from "./i18n/format";
 import { useMessages } from "./i18n/LanguageProvider";
+import { findingCode } from "./i18n/findings";
 
 export type CandidateMarketCheck = { status: string; range: { lowMinor: number; highMinor: number; currency: string } | null;
   confidence: string; provider: { retrievedAt: string } | null; limitation: string | null;
@@ -125,9 +126,9 @@ export function CandidateCard({ candidate, position }: { candidate: CandidateVeh
 }
 
 export function CandidateMarketAssessment({ check }: { check?: CandidateMarketCheck }) {
-  const { m: { content: { candidateVehicles: { marketCheck: t } } }, fill, fillNodes } = useMessages();
+  const { m: { content: { candidateVehicles: { marketCheck: t } } }, fill, fillNodes, language } = useMessages();
   if (!check) return <p className="muted">{t.unavailable}</p>;
-  const confidence = check.confidence.toLowerCase().replaceAll("_", " ");
+  const confidence = findingCode(language, check.confidence).toLocaleLowerCase(language);
   const retrieved = check.provider?.retrievedAt;
   const observed = check.vintage && { from: moment(check.vintage.oldestObservationAt), to: moment(check.vintage.newestObservationAt) };
   return <div className="candidate-market-check">

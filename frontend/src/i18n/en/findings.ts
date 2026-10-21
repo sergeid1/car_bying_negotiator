@@ -1,0 +1,26 @@
+import { templates } from "./findingTemplates";
+export const enFindings = {
+  englishName: "English", spanishName: "Español",
+  caseLanguage: "Language for this case", caseLanguageNote: "Emails and downloaded reports use this language.",
+  caseLanguageFailed: "The case language could not be saved. Try again.", caseLanguageSaved: "Case language saved.",
+  readingCopy: "For you to read — the dealer receives the English text.", approveEnglish: "Approve this exact English text for the dealer",
+  readingUnavailable: "A reading copy is unavailable for this edited text. Review the exact English text before approving it.",
+  // Server enums are presentation codes, never translated by changing underscores or capitalization.
+  MATCHES_APPROVED_BASELINE: "Matches approved baseline", REVIEW_REQUIRED: "Review required", UNABLE_TO_VERIFY: "Unable to verify",
+  STRONG_DEAL: "Strong deal", FAIR_NEGOTIATE: "Fair, negotiate", POOR_DEAL: "Poor deal", INSUFFICIENT_DATA: "Insufficient data",
+  EXACT: "Exact", ESTIMATED: "Estimated", UNAVAILABLE: "Unavailable", AVAILABLE: "Available", STALE_OR_UNVERIFIED: "Stale or unverified",
+  LOW: "Low", MEDIUM: "Medium", HIGH: "High", NOT_APPLICABLE: "Not applicable", UNSUPPORTED: "Unsupported",
+  COMPLETE: "Complete", PARTIAL: "Partial", VERIFIED: "Verified", UNVERIFIED: "Unverified",
+  BASELINE: "Baseline", PREVIOUS: "Previous", MATERIAL: "Material", INFORMATIONAL: "Informational",
+  ADDED: "Added", MISSING: "Missing", CHANGED: "Changed", UNCERTAIN: "Uncertain", LIMIT_VIOLATION: "Above the approved limit",
+  SELLING_PRICE: "Selling price", DISCOUNT: "Discount", DISCOUNT_TOTAL: "Total discount", REBATE: "Rebate", REBATE_TOTAL: "Total rebate",
+  DEALER_FEE: "Dealer fee", ADD_ON: "Add-on", TAX: "Tax", TAXABLE: "Taxable", NON_TAXABLE: "Not taxable", EXEMPT: "Exempt",
+  OPTIONAL: "Optional", REQUIRED: "Required", GOVERNMENT_CHARGE: "Government charge", TRADE: "Trade-in", CREDIT: "Credit",
+  TRADE_ALLOWANCE: "Trade allowance", TRADE_PAYOFF: "Trade payoff", TRADE_VIN: "Trade VIN", VEHICLE_VIN: "Vehicle VIN",
+  VEHICLE_YEAR: "Vehicle year", VEHICLE_MAKE: "Make", VEHICLE_MODEL: "Model", VEHICLE_TRIM: "Trim", VEHICLE_MILEAGE: "Mileage",
+  APR: "APR", TERM_MONTHS: "Loan term", MONTHLY_PAYMENT: "Monthly payment", CASH_DOWN: "Cash down",
+  OUT_THE_DOOR_TOTAL: "Out-the-door total", SUBTOTAL: "Subtotal", TAX_TOTAL: "Total tax", FINANCE_CHARGE: "Finance charge", TOTAL_OF_PAYMENTS: "Total of payments",
+  DEALER_CHARGES_TOTAL: "Total dealer charges", GOVERNMENT_CHARGES_TOTAL: "Total government charges", ADD_ON_TOTAL: "Total add-ons",
+  MONTH: "Month", MONTHS: "Months", GOOD: "Good", FAIR: "Fair", EXCELLENT: "Excellent", POOR: "Poor",
+  ...templates,
+} as const;

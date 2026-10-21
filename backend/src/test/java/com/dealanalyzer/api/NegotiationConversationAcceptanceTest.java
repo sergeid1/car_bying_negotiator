@@ -32,6 +32,8 @@ class NegotiationConversationAcceptanceTest {
       String caseId = created.at("/case/id").asText(), token = created.path("accessToken").asText();
       String base = "/api/v1/cases/" + caseId, path = base + "/negotiation-conversation";
       var jdbc = app.context().getBean(JdbcTemplate.class);
+      // The case's presentation language never changes the exact English draft approved and sent below.
+      jdbc.update("update analysis_cases set language = 'es' where id = ?", caseId);
       OutboundDraftAcceptanceTest.verifyAndPlan(app, base, token);
       jdbc.update("update vehicles set vin = '1HGCM82633A004352' where case_id = ?", caseId);
       String dealer = UUID.randomUUID().toString();

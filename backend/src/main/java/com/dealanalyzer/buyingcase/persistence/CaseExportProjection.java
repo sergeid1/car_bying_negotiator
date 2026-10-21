@@ -12,6 +12,7 @@ class CaseExportProjection {
   CaseExportProjection(EntityManager manager, ObjectMapper json) { this.manager=manager; this.json=json; }
   ObjectNode read(String caseId) {
     var result=json.createObjectNode();
+    result.set("spanish_report_explanations", rows("spanish_report_explanations", "case_id, report_version, payload_json, created_at", "case_id = :caseId", caseId));
     result.set("test_drive_appointments", rows("test_drive_appointments", "id, case_id, agreed_price_id, proposal_id, slot_option, starts_at, ends_at, time_zone, confirmation_message_id, replaces_appointment_id, state, created_at, scheduled_at, ended_at", "case_id = :caseId", caseId));
     result.set("test_drive_messages", rows("test_drive_messages", "id, case_id, agreed_price_id, quote_request_id, appointment_id, kind, time_zone, slots_json, message_text, draft_id, state, message_id, created_at, sent_at", "case_id = :caseId", caseId));
     result.set("test_drive_contact_releases", rows("test_drive_contact_releases", "id, case_id, appointment_id, dealer_id, released_fields, state, decided_at, released_at", "case_id = :caseId", caseId));
@@ -39,7 +40,7 @@ class CaseExportProjection {
     result.set("quote_acceptance_requests", rows("quote_acceptance_requests", "id, case_id, quote_request_id, draft_id, offer_version, plan_version, evidence_message_id, evidence_document_id, kind, state, message_id, created_at", "case_id = :caseId", caseId));
     result.set("quote_requests", rows("quote_requests", "id, case_id, draft_id, dealer_address, state, message_id, approved_at, created_at", "case_id = :caseId", caseId));
     result.set("case_negotiation_states", rows("case_negotiation_states", "case_id, mandate_id, state, updated_at", "case_id = :caseId", caseId));
-    result.set("analysis_cases", rows("analysis_cases", "id, buyer_zip, dealer_zip, purchase_method, status, vehicle_json, dealer_offer_json, input_json, input_fingerprint, current_report_version, created_at, updated_at, buyer_jurisdiction, dealer_location, max_selling_price_minor, max_out_the_door_price_minor, access_expires_at, core_review_blocked, acquisition_channel", "id = :caseId", caseId));
+    result.set("analysis_cases", rows("analysis_cases", "id, buyer_zip, dealer_zip, purchase_method, status, vehicle_json, dealer_offer_json, input_json, input_fingerprint, current_report_version, created_at, updated_at, buyer_jurisdiction, dealer_location, max_selling_price_minor, max_out_the_door_price_minor, access_expires_at, core_review_blocked, acquisition_channel, language", "id = :caseId", caseId));
     result.set("operations", rows("operations", "id, case_id, stage, error_message, created_at, updated_at", "case_id = :caseId", caseId));
     result.set("analysis_reports", rows("analysis_reports", "case_id, report_version, payload_json, analysis_fingerprint, created_at, operation_id", "case_id = :caseId", caseId));
     result.set("experiment_assignments", rows("experiment_assignments", "id, case_id, variant, price_minor, qualified, created_at", "case_id = :caseId", caseId));

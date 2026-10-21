@@ -28,6 +28,24 @@ class EphemeralBuyingCaseAcceptanceTest {
     harness = new HttpAcceptanceHarness(temporaryDirectory);
   }
 
+  @Test void buyerSetsLanguageAtIntakeAndChangesOnlyTheCaseLanguage() throws Exception {
+    try (RunningApplication application = harness.start("spanish-case-language")) {
+      var request = new HashMap<String, Object>(validCase());
+      request.put("language", "es");
+      var created = createCase(application.client(), "create-spanish-case", request);
+      assertThat(created.at("/case/language").asText()).isEqualTo("es");
+      String id = created.at("/case/id").asText(), token = created.path("accessToken").asText();
+      var changed = application.client().put().uri("/api/v1/cases/{id}/language", id)
+          .header("Case-Access-Token", token).contentType(MediaType.APPLICATION_JSON)
+          .body(Map.of("language", "en")).retrieve().body(JsonNode.class);
+      assertThat(changed.path("language").asText()).isEqualTo("en");
+      assertThat(changed.path("id")).isEqualTo(created.at("/case/id"));
+      var reopened = application.client().get().uri("/api/v1/cases/{id}", id)
+          .header("Case-Access-Token", token).retrieve().body(JsonNode.class);
+      assertThat(reopened.path("language").asText()).isEqualTo("en");
+    }
+  }
+
   @Test
   void buyerCreatesAndSecurelyReopensAnAccountFreeBuyingCase() throws Exception {
     try (RunningApplication application = harness.start("secure-reopen")) {

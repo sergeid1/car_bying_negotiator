@@ -9,8 +9,13 @@ import java.util.Map;
 public class CaseRecoveryController {
   private final CaseRecoveryService service;
   public CaseRecoveryController(CaseRecoveryService service) { this.service=service; }
-  public record EmailRequest(@NotBlank @Email @Size(max=254) String email) {}
-  public record RecoverRequest(@NotBlank @Size(max=36) String caseId, @NotBlank @Email @Size(max=254) String email) {}
+  public record EmailRequest(@NotBlank @Email @Size(max=254) String email, @Pattern(regexp="en|es") String language) {
+    public EmailRequest(String email) { this(email, "en"); }
+  }
+  public record RecoverRequest(@NotBlank @Size(max=36) String caseId, @NotBlank @Email @Size(max=254) String email,
+      @Pattern(regexp="en|es") String language) {
+    public RecoverRequest(String caseId, String email) { this(caseId, email, "en"); }
+  }
   public record VerifyRequest(@NotBlank @Size(max=128) String token) {}
   @PostMapping("/cases/{id}/recovery-email")
   public Map<String,String> enroll(@PathVariable String id, @RequestHeader("Case-Access-Token") String token,

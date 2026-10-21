@@ -36,7 +36,7 @@ class MandateExpiryNotifier {
       var account = jdbc.queryForList("select account_id from buyer_account_cases where case_id = ?",
           String.class, mandate.caseId());
       if (account.isEmpty()) continue;
-      notifications.notify(account.getFirst(), NotificationType.MANDATE_EXPIRING, "mandate-expiring:" + mandate.id());
+      notifications.notifyCase(account.getFirst(), NotificationType.MANDATE_EXPIRING, "mandate-expiring:" + mandate.id(), mandate.caseId());
       attempted++;
     }
     return attempted;

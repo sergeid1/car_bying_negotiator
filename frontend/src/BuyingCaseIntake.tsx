@@ -63,7 +63,7 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
   initial?: { vin?: string; dealerPostalCode?: string; dealerLocation?: string; purchaseMethod?: string };
   title?: string;
 }) {
-  const { m: { account: { intake: t, stateNames } }, fill, fillNodes } = useMessages();
+  const { m: { account: { intake: t, stateNames } }, fill, fillNodes, language } = useMessages();
   const stateName = (jurisdiction: string) => (stateNames as Record<string, string>)[jurisdiction] ?? jurisdiction;
   const [options, setOptions] = useState<IntakeOptions>();
   const [buyerPostalCode, setBuyerPostalCode] = useState("");
@@ -127,6 +127,7 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
           },
           body: JSON.stringify({
             buyerPostalCode: String(values.get("buyerPostalCode") ?? "").trim(),
+            language,
             dealerCity: String(values.get("dealerCity") ?? "").trim(),
             dealerState: String(values.get("dealerState") ?? ""),
             dealerName: String(values.get("dealerName") ?? "").trim() || undefined,

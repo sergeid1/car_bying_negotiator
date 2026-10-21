@@ -23,7 +23,20 @@ public record CreateBuyingCaseRequest(
     String buyerCounty,
     String dealerCity,
     String dealerState,
-    @jakarta.validation.constraints.Size(max = 200) String dealerName) {
+    @jakarta.validation.constraints.Size(max = 200) String dealerName,
+    @jakarta.validation.constraints.Pattern(regexp = "en|es") String language) {
+
+  public CreateBuyingCaseRequest {
+    if (language == null) language = "en";
+  }
+
+  public CreateBuyingCaseRequest(String buyerPostalCode, String dealerPostalCode,
+      String buyerJurisdiction, PurchaseMethod purchaseMethod, BuyerLimits buyerLimits,
+      InitialConsents consents, String channel, String buyerCounty, String dealerCity,
+      String dealerState, String dealerName) {
+    this(buyerPostalCode, dealerPostalCode, buyerJurisdiction, purchaseMethod, buyerLimits,
+        consents, channel, buyerCounty, dealerCity, dealerState, dealerName, "en");
+  }
 
   public CreateBuyingCaseRequest(String buyerPostalCode, String dealerPostalCode,
       String buyerJurisdiction, PurchaseMethod purchaseMethod, BuyerLimits buyerLimits,

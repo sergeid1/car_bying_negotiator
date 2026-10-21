@@ -154,7 +154,7 @@ public class RelayService {
     if (stored.duplicate()) return new InboundResult(InboundOutcome.DUPLICATE, stored.messageId());
     if (bodyClean) ingest(stored, mail.body(), mail.attachments());
     transaction.execute(status -> accounts.accountId(stored.caseId()))
-        .ifPresent(account -> notifications.notify(account, NotificationType.DEALER_REPLY, "relay-inbound:" + stored.messageId()));
+        .ifPresent(account -> notifications.notifyCase(account, NotificationType.DEALER_REPLY, "relay-inbound:" + stored.messageId(), stored.caseId()));
     return new InboundResult(bodyClean ? InboundOutcome.RECEIVED : InboundOutcome.REJECTED_MALWARE, stored.messageId());
   }
 
