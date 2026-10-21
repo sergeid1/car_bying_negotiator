@@ -18,6 +18,23 @@ export const messages = {
     blocked: "Draft blocked by the policy check",
     passedDetail: "This stored check applies to this draft and its saved mandate. Sending requires a current check and your approval.",
     blockedDetail: "This draft cannot proceed. Review these reasons and revise the message.",
+    // The gate's reasons as the server words them (OutboundGate.java), so the screen can show them in the site's language.
+    reasons: {
+      aboveCeiling: "The draft includes an amount above your walk-away ceiling.",
+      commitment: "This wording may commit you to buying, paying, reserving or signing. Ask for written terms instead.",
+      currency: "The amount uses a different currency from your mandate.",
+      disclosure: "Your mandate does not permit this disclosure to the dealer.",
+      invalidDraft: "The draft must contain a message of at most 10,000 characters.",
+      noActiveMandate: "Approve a current Negotiation Mandate before this message can proceed.",
+      personalValue: "The draft contains your personal information that has not been released for this dealer.",
+      personalDetails: "The draft includes personal contact or identity details. Remove them before review.",
+      prohibitedClaim: "The draft makes a claim that messages may not make. Revise it before review.",
+      ungroundedStatement: "The draft makes a statement that is not grounded in verified case facts.",
+      unsupportedFact: "This statement is not supported by verified case facts.",
+      unsupportedLanguage: "This wording cannot be checked against the approved message templates and verified facts. Revise it before review.",
+      untraceableAmount: "The amount does not come from your mandate or verified case facts.",
+      unverifiableAmount: "Use an explicit currency and decimal amount in the approved price question so every amount can be checked.",
+    },
   },
   quoteComparison: {
     loading: "Loading quote comparison…",

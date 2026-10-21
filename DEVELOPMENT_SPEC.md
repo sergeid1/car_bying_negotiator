@@ -267,7 +267,7 @@ confirmed 2, 3, 6 and 7 and replaced 4.
    appearance on each screen, the English term the dealer uses, for example
    "precio total final (out-the-door)".
 - **4. Dealer email language.** Drafts to dealers are in English unless the Buyer chooses Spanish for
-   that dealer (to build, ticket 149). An English draft shows a Spanish Buyer a Spanish reading copy, and
+   that dealer (built, ticket 149). An English draft shows a Spanish Buyer a Spanish reading copy, and
    the Buyer approves the exact English text that is sent. A Spanish draft is checked by the outbound
    gate's Spanish templates and the Spanish claim rules, and the Buyer approves the exact Spanish text.
 - **6. Legal documents.** The Spanish site links to the English Terms of Service and Privacy Policy
