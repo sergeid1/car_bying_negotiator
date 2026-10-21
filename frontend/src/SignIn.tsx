@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { passkeyAutofillAvailable, passkeysSupported, signInWithPasskey } from "./Passkeys";
 import "./SignIn.css";
+import { useMessages } from "./i18n/LanguageProvider";
 
 type Request = (path: string, init?: RequestInit & { key?: string }) => Promise<Response>;
 type Step = "email" | "sent" | "password";
@@ -8,7 +9,8 @@ export type SignInMethod = "password" | "passkey";
 export type SignInMode = "login" | "signup";
 type Provider = "GOOGLE" | "APPLE";
 
-const SENT = "Check your email. The link works for 15 minutes.";
+/** Brand names, the same in every language. */
+const PROVIDER_NAMES: Record<Provider, string> = { GOOGLE: "Google", APPLE: "Apple" };
 
 /**
  * One email box and one Continue button. Continue emails a sign-in link, and the answer is the same whether or not
@@ -20,6 +22,7 @@ export function SignIn({ request, onSignedIn, offerPasskeys = true, mode = "logi
   /** Whether the panel is showing, so a closed panel does not ask the server for a passkey sign-in. */
   offerPasskeys?: boolean;
 }) {
+  const { m: { account: { signIn: t } }, fill } = useMessages();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -53,7 +56,7 @@ export function SignIn({ request, onSignedIn, offerPasskeys = true, mode = "logi
       } catch (problem) {
         // Only a passkey the Buyer picked can fail; a background request that fails first stays quiet.
         if (chosen && !waiting.signal.aborted && (problem as { status?: number })?.status)
-          setError("Passkey sign-in could not be completed. Try again or continue with your email.");
+          setError(t.passkeyAutofillFailed);
       }
     })();
     return () => waiting.abort();
@@ -64,70 +67,70 @@ export function SignIn({ request, onSignedIn, offerPasskeys = true, mode = "logi
     try { await action(); } catch (problem) { setError((problem as { detail?: string })?.detail ?? failure); }
     finally { setBusy(false); }
   }
-  function sendLink(notice = SENT) {
+  function sendLink(notice: string = t.sent) {
     return run(async () => {
       await request("/api/v1/account/sign-in-requests", { method: "POST", key: crypto.randomUUID(), body: JSON.stringify({ email }) });
       setPassword(""); setStep("sent"); setNotice(notice);
-    }, "The sign-in link could not be sent. Retry safely.");
+    }, t.linkFailed);
   }
   function differentEmail() { setStep("email"); setPassword(""); setError(""); setNotice(""); }
   const passkeyButton = passkeysSupported() && <button type="button" className="btn-secondary sign-in-provider" disabled={busy} onClick={() => void run(async () => {
     await signInWithPasskey(request); await onSignedIn("passkey");
-  }, "Passkey sign-in could not be completed. Try again or use an email link.")}>Continue with a passkey</button>;
-  const changeEmail = <button type="button" className="btn-link" onClick={differentEmail}>Use a different email</button>;
+  }, t.passkeyFailed)}>{t.continueWithPasskey}</button>;
+  const changeEmail = <button type="button" className="btn-link" onClick={differentEmail}>{t.differentEmail}</button>;
   const providerButtons = providers.length > 0 && <div className="sign-in-providers">
     {providers.map(provider => <button key={provider} type="button" className={`btn-secondary sign-in-provider provider-${provider.toLowerCase()}`}
       disabled={busy} onClick={() => void run(async () => {
         const result = await (await request("/api/v1/account/social-sign-in", { method: "POST", body: JSON.stringify({ provider }) })).json();
         window.location.assign(result.authorizationUrl);
-      }, `Sign-in with ${provider === "GOOGLE" ? "Google" : "Apple"} could not be started. Try again or continue with your email.`)}>
-      <ProviderMark provider={provider} />Continue with {provider === "GOOGLE" ? "Google" : "Apple"}
+      }, fill(t.providerFailed, { provider: PROVIDER_NAMES[provider] }))}>
+      <ProviderMark provider={provider} />{fill(t.continueWithProvider, { provider: PROVIDER_NAMES[provider] })}
     </button>)}
   </div>;
-  const divider = providers.length > 0 && <div className="sign-in-divider"><span>or</span></div>;
+  const divider = providers.length > 0 && <div className="sign-in-divider"><span>{t.or}</span></div>;
 
   return <div className="sign-in">
-    {onMode && <p className="sign-in-switch">{mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
+    {onMode && <p className="sign-in-switch">{mode === "login" ? t.noAccount : t.haveAccount}{" "}
       <button type="button" className="btn-link" disabled={busy} onClick={() => onMode(mode === "login" ? "signup" : "login")}>
-        {mode === "login" ? "Sign up" : "Log in"}
+        {mode === "login" ? t.signUp : t.logIn}
       </button></p>}
     {step === "email" && mode === "signup" && <>{providerButtons}{divider}</>}
-    {step === "email" && <form aria-label="Sign in" onSubmit={event => { event.preventDefault(); void sendLink(); }}>
-      <label>Email<input ref={emailInput} type="email" autoComplete="username webauthn" required maxLength={254} value={email}
+    {step === "email" && <form aria-label={t.form} onSubmit={event => { event.preventDefault(); void sendLink(); }}>
+      <label>{t.email}<input ref={emailInput} type="email" autoComplete="username webauthn" required maxLength={254} value={email}
         onChange={event => setEmail(event.target.value)} /></label>
       {mode === "login" && <button type="button" className="btn-link sign-in-password" disabled={busy} onClick={() => {
         if (!emailInput.current?.reportValidity()) return;
         setStep("password"); setError("");
-      }}>Use a password instead</button>}
-      <button disabled={busy}>Continue with email</button>
+      }}>{t.usePassword}</button>}
+      <button disabled={busy}>{t.continueWithEmail}</button>
     </form>}
     {step === "email" && mode === "login" && <>{divider}{providerButtons}{passkeyButton}</>}
     {step === "sent" && <div className="sign-in-step">
       <p role="status" tabIndex={-1} ref={sentNotice}>{notice}</p>
       <p className="sign-in-email">{email}</p>
       <div className="sign-in-links">
-        <button type="button" className="btn-link" disabled={busy} onClick={() => void sendLink()}>Send again</button>
+        <button type="button" className="btn-link" disabled={busy} onClick={() => void sendLink()}>{t.sendAgain}</button>
         {changeEmail}
-        <button type="button" className="btn-link" disabled={busy} onClick={() => { setStep("password"); setError(""); setNotice(""); }}>Sign in with a password</button>
+        <button type="button" className="btn-link" disabled={busy} onClick={() => { setStep("password"); setError(""); setNotice(""); }}>{t.signInWithPassword}</button>
         {passkeyButton}
       </div>
     </div>}
-    {step === "password" && <form aria-label="Password sign-in" className="sign-in-step" onSubmit={event => {
+    {step === "password" && <form aria-label={t.passwordForm} className="sign-in-step" onSubmit={event => {
       event.preventDefault();
       void run(async () => {
         try { await request("/api/v1/account/password/sign-in", { method: "POST", body: JSON.stringify({ email, password }) }); }
         finally { setPassword(""); }
         await onSignedIn("password");
-      }, "Sign-in could not be completed. Check your details or use an email link.");
+      }, t.passwordFailed);
     }}>
       <p className="sign-in-email">{email}</p>
       <input type="email" autoComplete="username" value={email} readOnly hidden />
-      <label>Password<input type="password" autoComplete="current-password" required maxLength={72} autoFocus
+      <label>{t.password}<input type="password" autoComplete="current-password" required maxLength={72} autoFocus
         value={password} onChange={event => setPassword(event.target.value)} /></label>
-      <button disabled={busy}>Sign in</button>
+      <button disabled={busy}>{t.signInButton}</button>
       <div className="sign-in-links">
-        <button type="button" className="btn-link" disabled={busy} onClick={() => void sendLink(`${SENT} After you sign in, you can set a new password.`)}>Forgot password?</button>
-        <button type="button" className="btn-link" disabled={busy} onClick={() => void sendLink()}>Email me a link instead</button>
+        <button type="button" className="btn-link" disabled={busy} onClick={() => void sendLink(t.sentForgotPassword)}>{t.forgotPassword}</button>
+        <button type="button" className="btn-link" disabled={busy} onClick={() => void sendLink()}>{t.emailLinkInstead}</button>
         {changeEmail}
       </div>
     </form>}

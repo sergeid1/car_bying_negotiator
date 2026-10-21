@@ -2,7 +2,9 @@ import { FormEvent, useContext, useEffect, useState } from "react";
 import { arrivalChannel, forgetArrivalChannel } from "./AcquisitionChannel";
 import { openSidePanel } from "./SidePanel";
 import { AccountSignedInContext } from "./BuyerAccount";
-import { DealerFields, STATE_NAMES } from "./DealerFields";
+import { DealerFields } from "./DealerFields";
+import * as format from "./i18n/format";
+import { useMessages } from "./i18n/LanguageProvider";
 
 type CaseCredentials = { caseId: string; token: string };
 
@@ -36,17 +38,12 @@ class IntakeProblem extends Error {
   }
 }
 
-
-function stateName(jurisdiction: string) {
-  return STATE_NAMES[jurisdiction] ?? jurisdiction;
-}
-
-async function send<T>(path: string, options: RequestInit): Promise<T> {
+async function send<T>(path: string, options: RequestInit, failure: string): Promise<T> {
   const response = await fetch(path, options);
   if (response.ok) {
     return (await response.json()) as T;
   }
-  let problem: Problem = { detail: "That request could not be completed." };
+  let problem: Problem = { detail: failure };
   try {
     const body = await response.json();
     if (body && typeof body.detail === "string") {
@@ -66,6 +63,8 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
   initial?: { vin?: string; dealerPostalCode?: string; dealerLocation?: string; purchaseMethod?: string };
   title?: string;
 }) {
+  const { m: { account: { intake: t, stateNames } }, fill, fillNodes } = useMessages();
+  const stateName = (jurisdiction: string) => (stateNames as Record<string, string>)[jurisdiction] ?? jurisdiction;
   const [options, setOptions] = useState<IntakeOptions>();
   const [buyerPostalCode, setBuyerPostalCode] = useState("");
   const [identifyBy, setIdentifyBy] = useState<"vin" | "details">("vin");
@@ -154,7 +153,7 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
             },
             channel,
           }),
-        });
+        }, t.requestFailed);
         forgetArrivalChannel();
         if (created.savedToAccount) onSavedToAccount?.();
         credentials = { caseId: created.case.id, token: created.accessToken };
@@ -186,6 +185,7 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
             confirmed: true,
           }),
         },
+        t.requestFailed,
       );
 
       const unresolved = evidence.identityConflicts.filter(item => item.status === "UNRESOLVED");
@@ -205,7 +205,7 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
           setCountyCandidates(caught.problem.candidateJurisdictions ?? []);
         }
       } else {
-        setProblem({ detail: "That request could not be completed." });
+        setProblem({ detail: t.requestFailed });
       }
     } finally {
       setSubmitting(false);
@@ -223,6 +223,7 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
           headers: { "Content-Type": "application/json", "Case-Access-Token": openCase.token },
           body: JSON.stringify({ resolution }),
         },
+        t.requestFailed,
       );
       const unresolved = evidence.identityConflicts.filter(item => item.status === "UNRESOLVED");
       setConflicts(unresolved.length > 0 ? unresolved : undefined);
@@ -234,7 +235,7 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
       setProblem(
         caught instanceof IntakeProblem
           ? caught.problem
-          : { detail: "That request could not be completed." },
+          : { detail: t.requestFailed },
       );
     }
   }
@@ -245,28 +246,25 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
     <section className="panel" id="buying-case-intake" aria-labelledby="intake-heading">
       <div className="section-heading">
         <div>
-          <p className="step">Step 1</p>
-          <h2 id="intake-heading">{title ?? "Start your Buying Case"}</h2>
+          <p className="step">{t.step}</p>
+          <h2 id="intake-heading">{title ?? t.title}</h2>
         </div>
       </div>
 
       <p className="muted">
         {supported.length > 0
-          ? `Supported during the pilot: ${supported.map(stateName).join(", ")}.`
-          : "Enter the vehicle you are negotiating for."}
+          ? fill(t.supported, { states: supported.map(stateName).join(", ") })
+          : t.enterVehicle}
       </p>
 
       {!openCase && signedIn === true && (
-        <p className="account-save-note" role="note">
-          You are signed in, so this case will be saved to your Buyer Account. Its private case link works too.
-        </p>
+        <p className="account-save-note" role="note">{t.signedInNote}</p>
       )}
       {!openCase && signedIn === false && (
         <p className="account-save-note" role="note">
-          No account is required. To keep your cases in one place, you can{" "}
-          <a href="#account-panel" onClick={event => {
+          {fillNodes(t.signedOutNote, { link: <a href="#account-panel" onClick={event => {
             event.preventDefault(); openSidePanel("account");
-          }}>sign in with a Buyer Account</a> first.
+          }}>{t.signInLink}</a> })}
         </p>
       )}
 
@@ -278,37 +276,34 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
 
       {conflicts ? (
         <div>
-          <h3>Resolve the vehicle conflict</h3>
-          <p className="muted">
-            The listing and the vehicle you confirmed disagree. Choose which to keep before the
-            analysis continues. Your entered details are kept either way.
-          </p>
+          <h3>{t.conflictHeading}</h3>
+          <p className="muted">{t.conflictIntro}</p>
           {conflicts.map(conflict => (
             <div key={conflict.id} className="status-row">
               <dl className="facts">
                 <div>
-                  <dt>Field</dt>
+                  <dt>{t.field}</dt>
                   <dd>{conflict.field}</dd>
                 </div>
                 <div>
-                  <dt>You confirmed</dt>
+                  <dt>{t.youConfirmed}</dt>
                   <dd>{conflict.confirmedValue}</dd>
                 </div>
                 <div>
-                  <dt>The listing says</dt>
+                  <dt>{t.listingSays}</dt>
                   <dd>{conflict.listingValue}</dd>
                 </div>
               </dl>
               <div className="actions">
                 <button type="button" onClick={() => resolveConflict(conflict.id, "KEEP_CONFIRMED_VEHICLE")}>
-                  Keep what I confirmed
+                  {t.keepConfirmed}
                 </button>
                 <button
                   type="button"
                   className="btn-secondary"
                   onClick={() => resolveConflict(conflict.id, "USE_LISTING_VEHICLE")}
                 >
-                  Use the listing value
+                  {t.useListing}
                 </button>
               </div>
             </div>
@@ -317,7 +312,7 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
       ) : (
         <form onSubmit={submit}>
           <label>
-            Your ZIP code
+            {t.zip}
             <input
               name="buyerPostalCode"
               inputMode="numeric"
@@ -340,14 +335,14 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
           {crossingCandidates && (
             <>
               <label>
-                State where the vehicle will be registered
+                {t.registrationState}
                 <select
                   name="buyerJurisdiction"
                   value={statedJurisdiction}
                   onChange={event => setStatedJurisdiction(event.target.value)}
                   required
                 >
-                  <option value="">Select a state</option>
+                  <option value="">{t.selectState}</option>
                   {crossingCandidates.map(candidate => (
                     <option key={candidate} value={candidate}>
                       {stateName(candidate)}
@@ -366,17 +361,17 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
           {countyCandidates && (
             <>
               <label>
-                Florida county where the vehicle will be registered
+                {t.registrationCounty}
                 <select name="buyerCounty" value={statedCounty} required
                   aria-describedby="county-tax-explanation"
                   onChange={event => setStatedCounty(event.target.value)}>
-                  <option value="">Select a county</option>
-                  {countyCandidates.map(county => <option key={county} value={county}>{county} County</option>)}
+                  <option value="">{t.selectCounty}</option>
+                  {countyCandidates.map(county => <option key={county} value={county}>{fill(t.county, { county })}</option>)}
                 </select>
               </label>
               <p id="county-tax-explanation" className="muted">
-                {statedCounty ? `${statedCounty} County` : "Your registration county"} sets the county surtax rate.
-                The surtax applies to the first $5,000 of the taxable price after the trade-in.
+                {statedCounty ? fill(t.countyTaxNamed, { county: statedCounty, amount: format.money(500000, { minimumFractionDigits: 0 }) })
+                  : fill(t.countyTaxUnnamed, { amount: format.money(500000, { minimumFractionDigits: 0 }) })}
               </p>
               {fieldProblem("buyerCounty") && <p className="error" role="alert">{fieldProblem("buyerCounty")}</p>}
             </>
@@ -387,15 +382,15 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
           {fieldProblem("dealerCity") && <p className="error" role="alert">{fieldProblem("dealerCity")}</p>}
           {fieldProblem("dealerState") && <p className="error" role="alert">{fieldProblem("dealerState")}</p>}
           <label>
-            How you are paying
+            {t.paying}
             <select name="purchaseMethod" defaultValue={initial?.purchaseMethod ?? "CASH"}>
-              <option value="CASH">Cash</option>
-              <option value="FINANCE">Dealer financing</option>
+              <option value="CASH">{t.cash}</option>
+              <option value="FINANCE">{t.dealerFinancing}</option>
             </select>
           </label>
 
           <fieldset>
-            <legend>Which vehicle?</legend>
+            <legend>{t.whichVehicle}</legend>
             <div className="segmented">
               <label>
                 <input
@@ -405,7 +400,7 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
                   checked={identifyBy === "vin"}
                   onChange={() => setIdentifyBy("vin")}
                 />
-                I have the VIN
+                {t.haveVin}
               </label>
               <label>
                 <input
@@ -415,69 +410,69 @@ export function BuyingCaseIntake({ onCaseOpened, onSavedToAccount, initial, titl
                   checked={identifyBy === "details"}
                   onChange={() => setIdentifyBy("details")}
                 />
-                Enter the vehicle details
+                {t.enterDetails}
               </label>
             </div>
 
             {identifyBy === "vin" ? (
               <label>
-                VIN
+                {t.vin}
                 <input name="vin" required autoComplete="off" defaultValue={initial?.vin} />
               </label>
             ) : (
               <>
                 <label>
-                  Year
+                  {t.year}
                   <input name="year" type="number" min="1900" required />
                 </label>
                 <label>
-                  Make
+                  {t.make}
                   <input name="make" required />
                 </label>
                 <label>
-                  Model
+                  {t.model}
                   <input name="model" required />
                 </label>
                 <label>
-                  Trim (optional)
+                  {t.trim}
                   <input name="trim" />
                 </label>
                 <label>
-                  Mileage
+                  {t.mileage}
                   <input name="mileage" type="number" min="0" required aria-describedby="mileage-hint" />
                 </label>
-                <p id="mileage-hint" className="muted">Use 0 if new.</p>
+                <p id="mileage-hint" className="muted">{t.mileageHint}</p>
               </>
             )}
           </fieldset>
 
           <details>
-          <summary>Add more (optional)</summary>
+          <summary>{t.addMore}</summary>
           <label>
-            Listing URL (optional)
+            {t.listingUrl}
             <input name="listingUrl" type="url" inputMode="url" />
           </label>
 
           <label>
-            Most you will pay out the door (optional)
+            {t.maxOutTheDoor}
             <input name="maxOutTheDoorPrice" type="number" min="0" step="0.01" />
           </label>
 
           <fieldset className="switches">
-            <legend>Optional permissions</legend>
+            <legend>{t.permissions}</legend>
             <label>
               <input type="checkbox" name="humanReview" />
-              Let a person check redacted fields when a number needs checking
+              {t.humanReview}
             </label>
             <label>
               <input type="checkbox" name="anonymizedResearch" />
-              Use my case for research with identifying details removed
+              {t.research}
             </label>
           </fieldset>
           </details>
-          <p className="muted">Starting means otdog may process what you enter to produce your report.</p>
+          <p className="muted">{t.processing}</p>
           <button type="submit" disabled={submitting}>
-            {submitting ? "Starting…" : openCase ? "Continue" : "Start my case"}
+            {submitting ? t.starting : openCase ? t.continue : t.start}
           </button>
         </form>
       )}

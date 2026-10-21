@@ -21,17 +21,7 @@ const COPY_ATTRIBUTES = new Set(["aria-label", "aria-description", "aria-roledes
 /** Components whose copy has not moved into the catalogue yet, one list per journey. Remove a file when its copy moves. */
 
 /** Journey: starting a case, sign-in and the Buyer Account; copy in en/account.ts. */
-const ACCOUNT_PENDING = [
-  "AcquisitionChannel.tsx",
-  "BuyerAccount.tsx",
-  "BuyingCaseIntake.tsx",
-  "CaseLifecycle.tsx",
-  "CasePortability.tsx",
-  "DealerFields.tsx",
-  "Passkeys.tsx",
-  "Passwords.tsx",
-  "SignIn.tsx",
-];
+const ACCOUNT_PENDING: string[] = [];
 
 /** Journey: the dealer's paperwork and the report; copy in en/paperwork.ts. */
 const PAPERWORK_PENDING = [

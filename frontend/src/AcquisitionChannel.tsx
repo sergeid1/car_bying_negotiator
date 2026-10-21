@@ -1,3 +1,5 @@
+import { useMessages } from "./i18n/LanguageProvider";
+
 /**
  * First-party channel attribution. The arrival link may carry `?channel=<code>`; the code is read
  * once, removed from the address bar, held only in memory, and sent with case creation. Nothing is
@@ -37,13 +39,12 @@ export function forgetArrivalChannel() {
 }
 
 export function ReferralDisclosure({ text }: { text: string }) {
+  const { m: { account: { referral: t } } } = useMessages();
   return (
     <section className="panel" aria-labelledby="referral-heading">
-      <h2 id="referral-heading">How you reached us</h2>
+      <h2 id="referral-heading">{t.heading}</h2>
       <p>{text}</p>
-      <p className="muted">
-        This referral does not change the analysis, the report, or the price offered to you.
-      </p>
+      <p className="muted">{t.unchanged}</p>
     </section>
   );
 }
