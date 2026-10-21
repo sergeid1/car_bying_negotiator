@@ -84,7 +84,7 @@ export const es = translation<typeof en>()({
     dealerZip: "Código postal del concesionario",
     sellingPrice: "Precio de venta (selling price)",
     quotedComponents: "Partes cotizadas",
-    quotedComponentsValue: "Cargos, productos adicionales, impuestos, cargos del gobierno",
+    quotedComponentsValue: "Cargos, productos adicionales (add-ons), impuestos, cargos del gobierno",
     analyzing: "Analizando…",
     analyze: "Analizar el trato de prueba",
     stages: {

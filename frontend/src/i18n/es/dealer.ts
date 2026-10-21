@@ -97,7 +97,7 @@ export const dealer = translation<typeof english>()({
       term: "Plazo (meses)",
       apr: "Tasa anual (%)",
       outTheDoor: "Precio total final (out-the-door), si aparece",
-      vinOptional: "VIN (opcional)",
+      vinOptional: "Número de identificación del vehículo (VIN), opcional",
       check: "Revisar estos números",
     },
     questions: {
@@ -113,7 +113,7 @@ export const dealer = translation<typeof english>()({
       yourTrade: "Su vehículo en parte de pago: {car}.",
       tradeVin: "VIN del vehículo en parte de pago",
       chooseOne: "Elija una opción",
-      payoffAmount: "Saldo del préstamo",
+      payoffAmount: "Saldo del préstamo (payoff)",
       financing: "La hoja de trabajo muestra un préstamo. ¿Tiene su propia oferta de préstamo de un banco o una cooperativa de crédito?",
       ownApr: "Su tasa anual (%)",
       showResult: "Ver mi resultado",
@@ -355,13 +355,13 @@ export const dealer = translation<typeof english>()({
     negativeEquityCost: "{amount}: {payment} al mes, {scheduled} en pagos programados durante {months} meses, de los cuales {interest} son intereses",
     taxCredit: "Unos {amount} según las reglas de {jurisdiction} ({policy})",
     taxNone: "Ninguno según las reglas de {jurisdiction}",
-    tradeVin: "Número de identificación (VIN) del vehículo en parte de pago en los documentos",
+    tradeVin: "Número de identificación del vehículo (VIN) en parte de pago, según los documentos",
     shortfall: "Un faltante en el vehículo en parte de pago es una cifra de ese vehículo, nunca un descuento en el auto. otdog no compra autos ni envía su vehículo en parte de pago a ningún lado.",
   },
   tradeValueChecks: {
     sites: {
       carfax: { label: "Consulta de valor de Carfax",
-        gives: "Un estimado de lo que vale el auto, a partir de su VIN o su placa. No es una oferta.",
+        gives: "Un estimado de lo que vale el auto, a partir de su número de identificación del vehículo (VIN) o su placa. No es una oferta.",
         time: "Unos 2 minutos." },
       carmax: { label: "Oferta instantánea de CarMax",
         gives: "Una oferta por escrito para comprar el auto, válida por el número de días que indica la oferta.",
