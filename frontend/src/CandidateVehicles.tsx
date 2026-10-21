@@ -1,5 +1,6 @@
 import { ReactNode, useRef, useState } from "react";
 import * as format from "./i18n/format";
+import { useMessages } from "./i18n/LanguageProvider";
 
 export type CandidateMarketCheck = { status: string; range: { lowMinor: number; highMinor: number; currency: string } | null;
   confidence: string; provider: { retrievedAt: string } | null; limitation: string | null;
@@ -39,6 +40,7 @@ export function CandidateVehicles({ briefVersion, search, onSessionEnded, action
   briefVersion: number; search: () => Promise<CandidateResults>; onSessionEnded: () => void;
   actions?: (candidate: CandidateVehicle) => ReactNode;
 }) {
+  const { m: { content: { candidateVehicles: t } }, fill } = useMessages();
   const [results, setResults] = useState<CandidateResults>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -52,37 +54,34 @@ export function CandidateVehicles({ briefVersion, search, onSessionEnded, action
     } catch (thrown) {
       const problem = thrown as Problem;
       if (problem?.status === 401) onSessionEnded();
-      else setError(problem?.detail ?? "Inventory could not be searched. Retry safely; nothing was saved.");
+      else setError(problem?.detail ?? t.searchFailed);
     } finally { setBusy(false); }
   }
 
   const count = results?.candidates.length ?? 0;
   return <section className="candidate-vehicles" aria-labelledby="candidate-vehicles-heading">
-    <h3 id="candidate-vehicles-heading">Candidate Vehicles</h3>
-    <p>Search licensed inventory for brief version {briefVersion}. Each candidate lists which of your criteria and reference
-      details it matches, which it misses, and which the listing does not state. There is no hidden score, and the search
-      shares nothing about you.</p>
-    <button disabled={busy} onClick={run}>{results ? "Search inventory again" : "Search inventory for candidates"}</button>
-    {busy && <p role="status">Searching inventory…</p>}
+    <h3 id="candidate-vehicles-heading">{t.heading}</h3>
+    <p>{fill(t.intro, { version: String(briefVersion) })}</p>
+    <button disabled={busy} onClick={run}>{results ? t.searchAgain : t.search}</button>
+    {busy && <p role="status">{t.searching}</p>}
     {error && <p role="alert">{error}</p>}
     {results && <div className="candidate-results">
-      <h4 ref={heading} tabIndex={-1}>{results.availability !== "AVAILABLE" ? "No search results"
-        : `${count} ${count === 1 ? "candidate" : "candidates"} for brief version ${results.briefVersion}`}</h4>
+      <h4 ref={heading} tabIndex={-1}>{results.availability !== "AVAILABLE" ? t.noResults
+        : fill(t.results, { count, version: String(results.briefVersion) })}</h4>
       {results.notice && <p className="notice">{results.notice}</p>}
       {results.availability === "AVAILABLE" && <>
         <p className="muted">{results.ordering}</p>
-        <p className="muted">Searched {results.provider.name} (version {results.provider.version}) on {moment(results.retrievedAt)};
-          matched with {results.matcherVersion}.</p>
-        {count === 0 ? <p>No listing meets your must-have criteria. Widening the brief may find more.</p>
-          : <ol className="candidate-list" aria-label={`Candidate Vehicles, brief version ${results.briefVersion}`}>
+        <p className="muted">{fill(t.searched, { provider: results.provider.name, version: results.provider.version,
+          date: moment(results.retrievedAt), matcher: results.matcherVersion })}</p>
+        {count === 0 ? <p>{t.noneMeet}</p>
+          : <ol className="candidate-list" aria-label={fill(t.listLabel, { version: String(results.briefVersion) })}>
             {results.candidates.map((candidate, index) => <li key={`${candidate.snapshot.source}-${candidate.listingId}`}>
               <CandidateCard candidate={candidate} position={index + 1} />
               {actions?.(candidate)}
             </li>)}
           </ol>}
         {results.excluded.length > 0 && <details className="candidate-excluded">
-          <summary>{results.excluded.length} {results.excluded.length === 1 ? "listing was" : "listings were"} left out for missing
-            a must-have</summary>
+          <summary>{fill(t.excluded, { count: results.excluded.length })}</summary>
           <ul>
             {results.excluded.map(row => <li key={`${row.snapshot.source}-${row.listingId}`}>
               <strong>{row.title}</strong>
@@ -96,43 +95,48 @@ export function CandidateVehicles({ briefVersion, search, onSessionEnded, action
 }
 
 export function CandidateCard({ candidate, position }: { candidate: CandidateVehicle; position: number }) {
+  const { m: { content: { candidateVehicles: { card: t } } }, fill } = useMessages();
   const { snapshot } = candidate;
-  const name = `Candidate ${position}: ${candidate.title}`;
+  const name = fill(t.name, { position: String(position), title: candidate.title });
   const reasons = (label: string, list: Reason[]) => list.length > 0 && <div className="candidate-reasons">
     <h6>{label}</h6>
     <ul>{list.map(reason => <li key={reason.text}>{reason.text}</li>)}</ul>
   </div>;
   return <article className="candidate" aria-label={name}>
     <h5>{name}</h5>
-    <dl className="facts" aria-label={`Listing details of candidate ${position}`}>
-      <div><dt>Mileage</dt><dd>{candidate.mileage === null ? "Not stated" : `${format.number(candidate.mileage)} miles`}</dd></div>
-      <div><dt>Distance</dt><dd>{candidate.distanceMiles === null ? "Not stated" : `${candidate.distanceMiles} miles`}</dd></div>
-      <div><dt>Advertised price</dt><dd>{candidate.advertisedPriceMinor === null ? "Not stated"
-        : `${amount(candidate.advertisedPriceMinor, candidate.currency)} (advertised, not a quote)`}</dd></div>
-      <div><dt>VIN</dt><dd className="vin">{candidate.vin ?? "Not stated"}</dd></div>
+    <dl className="facts" aria-label={fill(t.detailsLabel, { position: String(position) })}>
+      <div><dt>{t.mileage}</dt><dd>{candidate.mileage === null ? t.notStated : fill(t.miles, { miles: format.number(candidate.mileage) })}</dd></div>
+      <div><dt>{t.distance}</dt><dd>{candidate.distanceMiles === null ? t.notStated : fill(t.miles, { miles: String(candidate.distanceMiles) })}</dd></div>
+      <div><dt>{t.advertisedPrice}</dt><dd>{candidate.advertisedPriceMinor === null ? t.notStated
+        : fill(t.advertised, { price: amount(candidate.advertisedPriceMinor, candidate.currency) })}</dd></div>
+      <div><dt>{t.vin}</dt><dd className="vin">{candidate.vin ?? t.notStated}</dd></div>
     </dl>
     <CandidateMarketAssessment check={candidate.marketCheck} />
-    <p className="muted candidate-snapshot">Listing Snapshot from {snapshot.source}, retrieved {moment(snapshot.retrievedAt)}
-      {snapshot.observedAt && `; listing last seen ${moment(snapshot.observedAt)}`}.
-      {snapshot.synthetic && " Synthetic listing, not for sale."}</p>
-    {snapshot.staleness === "STALE" && <p className="badge badge-warn candidate-stale">Stale listing: last seen over a week
-      before this search, so it may be gone or changed.</p>}
-    {snapshot.staleness === "UNKNOWN" && <p className="badge badge-warn candidate-stale">The listing does not say when it was
-      last seen.</p>}
-    {reasons("Matches", candidate.matched)}
-    {reasons("Misses", candidate.missed)}
-    {reasons("Not stated in the listing", candidate.unconfirmed)}
+    <p className="muted candidate-snapshot">{snapshot.observedAt
+      ? fill(t.snapshotSeen, { source: snapshot.source, retrieved: moment(snapshot.retrievedAt), seen: moment(snapshot.observedAt) })
+      : fill(t.snapshot, { source: snapshot.source, retrieved: moment(snapshot.retrievedAt) })}
+      {snapshot.synthetic && <>{" "}{t.synthetic}</>}</p>
+    {snapshot.staleness === "STALE" && <p className="badge badge-warn candidate-stale">{t.stale}</p>}
+    {snapshot.staleness === "UNKNOWN" && <p className="badge badge-warn candidate-stale">{t.unknownSeen}</p>}
+    {reasons(t.matches, candidate.matched)}
+    {reasons(t.misses, candidate.missed)}
+    {reasons(t.unconfirmed, candidate.unconfirmed)}
   </article>;
 }
 
 export function CandidateMarketAssessment({ check }: { check?: CandidateMarketCheck }) {
-  if (!check) return <p className="muted">Advertised-price market check unavailable.</p>;
+  const { m: { content: { candidateVehicles: { marketCheck: t } } }, fill, fillNodes } = useMessages();
+  if (!check) return <p className="muted">{t.unavailable}</p>;
+  const confidence = check.confidence.toLowerCase().replaceAll("_", " ");
+  const retrieved = check.provider?.retrievedAt;
+  const observed = check.vintage && { from: moment(check.vintage.oldestObservationAt), to: moment(check.vintage.newestObservationAt) };
   return <div className="candidate-market-check">
-    <p><strong>Advertised-price market check</strong> — not a dealer quote.</p>
-    <p>{check.range ? `Estimated selling-price range: ${amount(check.range.lowMinor, check.range.currency)}–${amount(check.range.highMinor, check.range.currency)}.`
-      : "No estimated price range is available."} Confidence: {check.confidence.toLowerCase().replaceAll("_", " ")}.</p>
-    <p className="muted">Freshness: {check.provider?.retrievedAt ? `retrieved ${moment(check.provider.retrievedAt)}` : "retrieval time unavailable"}
-      {check.vintage ? `; observations ${moment(check.vintage.oldestObservationAt)} to ${moment(check.vintage.newestObservationAt)}` : ""}.</p>
+    <p>{fillNodes(t.title, { name: <strong>{t.name}</strong> })}</p>
+    <p>{check.range ? fill(t.range, { low: amount(check.range.lowMinor, check.range.currency),
+      high: amount(check.range.highMinor, check.range.currency), confidence }) : fill(t.noRange, { confidence })}</p>
+    <p className="muted">{retrieved
+      ? observed ? fill(t.retrievedObserved, { date: moment(retrieved), ...observed }) : fill(t.retrieved, { date: moment(retrieved) })
+      : observed ? fill(t.unknownObserved, observed) : t.unknown}</p>
     {check.limitation && <p className="muted">{check.limitation}</p>}
   </div>;
 }

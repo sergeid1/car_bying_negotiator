@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { DealerFields } from "./DealerFields";
+import { useMessages } from "./i18n/LanguageProvider";
 import { CandidateCard, CandidateMarketCheck, CandidateResults, CandidateVehicle, CandidateVehicles } from "./CandidateVehicles";
 
 export type JourneyCaseCredentials = { caseId: string; token: string };
@@ -13,6 +14,7 @@ export function JourneyCandidates({ journeyId, briefVersion, postalCode, request
   journeyId: string; briefVersion: number; postalCode: string; request: Request; onSessionEnded: () => void;
   onCaseOpened?: (value: JourneyCaseCredentials, disclosure?: string) => void;
 }) {
+  const { m: { content: { journeyCandidates: t } }, fill } = useMessages();
   const path = `/api/v1/journeys/${encodeURIComponent(journeyId)}`;
   const [entries, setEntries] = useState<ShortlistEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -21,7 +23,7 @@ export function JourneyCandidates({ journeyId, briefVersion, postalCode, request
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<ShortlistEntry>();
   const [loads, setLoads] = useState(0);
-  function failed(thrown: unknown, fallback = "The shortlist could not be saved. Retry safely.") {
+  function failed(thrown: unknown, fallback: string = t.saveFailed) {
     const problem = thrown as Problem;
     if (problem?.status === 401) onSessionEnded();
     else setError(problem?.detail ?? fallback);
@@ -46,7 +48,7 @@ export function JourneyCandidates({ journeyId, briefVersion, postalCode, request
     try {
       const created = await request<CaseResponse>(`${path}/candidates/${encodeURIComponent(entry.candidateId)}/case`, { method: "GET" });
       onCaseOpened?.({ caseId: created.case.id, token: created.accessToken }, created.case.referralDisclosure ?? undefined);
-    } catch (thrown) { failed(thrown, "The linked case could not be opened. Retry safely."); }
+    } catch (thrown) { failed(thrown, t.openFailed); }
     finally { setBusy(false); setOpening(false); }
   }
   function move(index: number, delta: number) {
@@ -59,24 +61,24 @@ export function JourneyCandidates({ journeyId, briefVersion, postalCode, request
       search={() => request<CandidateResults>(`${path}/candidates`, { method: "POST" })}
       actions={candidate => candidate.candidateId && <button className="btn-secondary" disabled={!loaded || busy}
         onClick={() => save(ids.includes(candidate.candidateId!) ? ids.filter(id => id !== candidate.candidateId) : [...ids, candidate.candidateId!])}>
-        {ids.includes(candidate.candidateId) ? "Remove from shortlist" : "Add to shortlist"}</button>} />
+        {ids.includes(candidate.candidateId) ? t.remove : t.add}</button>} />
     <section className="journey-shortlist" aria-labelledby="journey-shortlist-heading">
-      <h3 id="journey-shortlist-heading">Your shortlist</h3>
-      <p>You choose the order. Saved candidates remain here when you return to this journey.</p>
+      <h3 id="journey-shortlist-heading">{t.heading}</h3>
+      <p>{t.intro}</p>
       {error && <p role="alert">{error}</p>}
-      {!loaded && (error ? <button onClick={() => setLoads(loads + 1)}>Retry loading shortlist</button> : <p role="status">Loading shortlist…</p>)}
-      {loaded && entries.length === 0 && <p>No shortlisted candidates yet. Search inventory and add a candidate.</p>}
-      {busy && <p role="status">{opening ? "Opening linked Buying Case…" : "Saving shortlist…"}</p>}
-      <ol className="candidate-list" aria-label="Your shortlist order">
+      {!loaded && (error ? <button onClick={() => setLoads(loads + 1)}>{t.retry}</button> : <p role="status">{t.loading}</p>)}
+      {loaded && entries.length === 0 && <p>{t.empty}</p>}
+      {busy && <p role="status">{opening ? t.opening : t.saving}</p>}
+      <ol className="candidate-list" aria-label={t.orderLabel}>
         {entries.map((entry, index) => <li key={entry.candidateId}>
           <CandidateCard candidate={{ ...entry.candidate, marketCheck: entry.marketCheck }} position={index + 1} />
           <div className="actions">
-            <button className="btn-secondary" disabled={busy || index === 0} onClick={() => move(index, -1)} aria-label={`Move ${entry.candidate.title} up`}>Move up</button>
-            <button className="btn-secondary" disabled={busy || index === entries.length - 1} onClick={() => move(index, 1)} aria-label={`Move ${entry.candidate.title} down`}>Move down</button>
-            <button className="btn-ghost" disabled={busy} onClick={() => save(ids.filter(id => id !== entry.candidateId))} aria-label={`Remove ${entry.candidate.title} from shortlist`}>Remove</button>
-            <button disabled={busy} onClick={() => entry.caseId ? openLinked(entry) : setSelected(entry)}>{entry.caseId ? "Open linked Buying Case" : "Open a Buying Case"}</button>
+            <button className="btn-secondary" disabled={busy || index === 0} onClick={() => move(index, -1)} aria-label={fill(t.moveUpLabel, { title: entry.candidate.title })}>{t.moveUp}</button>
+            <button className="btn-secondary" disabled={busy || index === entries.length - 1} onClick={() => move(index, 1)} aria-label={fill(t.moveDownLabel, { title: entry.candidate.title })}>{t.moveDown}</button>
+            <button className="btn-ghost" disabled={busy} onClick={() => save(ids.filter(id => id !== entry.candidateId))} aria-label={fill(t.removeLabel, { title: entry.candidate.title })}>{t.removeShort}</button>
+            <button disabled={busy} onClick={() => entry.caseId ? openLinked(entry) : setSelected(entry)}>{entry.caseId ? t.openLinked : t.openNew}</button>
           </div>
-          {entry.caseId && <p className="muted">A Buying Case is already linked to this candidate. Opening it keeps its saved location, purchase method and permissions.</p>}
+          {entry.caseId && <p className="muted">{t.linkedNote}</p>}
         </li>)}
       </ol>
       {selected && <CandidateCaseForm key={selected.candidateId} entry={selected} postalCode={postalCode}
@@ -94,6 +96,7 @@ function CandidateCaseForm({ entry, postalCode, request, path, onCancel, onSessi
   entry: ShortlistEntry; postalCode: string; request: Request; path: string; onCancel: () => void;
   onSessionEnded: () => void; onOpened: (created: CaseResponse) => void;
 }) {
+  const { m: { content: { journeyCandidates: { caseForm: t } } }, fill } = useMessages();
   const [options, setOptions] = useState<Options>();
   const [buyerPostalCode, setBuyerPostalCode] = useState(postalCode);
   const [problem, setProblem] = useState<Problem>();
@@ -107,7 +110,7 @@ function CandidateCaseForm({ entry, postalCode, request, path, onCancel, onSessi
       if (!response.ok) throw new Error();
       const value = await response.json() as Options;
       if (current) setOptions(value);
-    }).catch(() => { if (current) setProblem({ detail: "Case permissions could not be loaded. Close this form and retry." }); });
+    }).catch(() => { if (current) setProblem({ detail: t.permissionsFailed }); });
     return () => { current = false; };
   }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -131,29 +134,29 @@ function CandidateCaseForm({ entry, postalCode, request, path, onCancel, onSessi
     } catch (thrown) {
       const failure = thrown as Problem;
       if (failure?.status === 401) onSessionEnded();
-      else setProblem(failure?.detail ? failure : { detail: "The case could not be opened. Your shortlist is saved; retry safely." });
+      else setProblem(failure?.detail ? failure : { detail: t.openFailed });
     } finally { setBusy(false); }
   }
   return <section className="candidate-case-form" aria-labelledby="candidate-case-heading">
-    <h4 id="candidate-case-heading" ref={heading} tabIndex={-1}>Confirm your Buying Case</h4>
-    <p>{entry.candidate.title}. Its Vehicle and Listing Snapshot will stay with the case as evidence.</p>
+    <h4 id="candidate-case-heading" ref={heading} tabIndex={-1}>{t.heading}</h4>
+    <p>{fill(t.evidence, { title: entry.candidate.title })}</p>
     {problem && <p role="alert">{problem.detail}</p>}
     <form onSubmit={submit}>
-      <label>Your ZIP code<input name="buyerPostalCode" defaultValue={postalCode} inputMode="numeric" autoComplete="postal-code" required
+      <label>{t.postalCode}<input name="buyerPostalCode" defaultValue={postalCode} inputMode="numeric" autoComplete="postal-code" required
         onChange={event => setBuyerPostalCode(event.target.value)} /></label>
       <DealerFields buyerPostalCode={buyerPostalCode} />
-      {!!problem?.candidateJurisdictions?.length && <label>State where the vehicle will be registered
-        <select name="buyerJurisdiction" required defaultValue=""><option value="">Choose your state</option>
+      {!!problem?.candidateJurisdictions?.length && <label>{t.registeredState}
+        <select name="buyerJurisdiction" required defaultValue=""><option value="">{t.chooseState}</option>
           {problem.candidateJurisdictions.map(code => <option key={code} value={code}>{code}</option>)}</select>
       </label>}
-      <label>How you are paying<select name="purchaseMethod" defaultValue="CASH"><option value="CASH">Cash</option><option value="FINANCE">Dealer financing</option></select></label>
-      <fieldset className="switches"><legend>Permissions</legend>
-        <p>Processing your entered details to produce your own report is required. The rest are optional and can be changed later.</p>
-        <label><input name="humanReview" type="checkbox" />Let a reviewer look at redacted fields if a number needs checking</label>
-        <label><input name="anonymizedResearch" type="checkbox" />Allow anonymized use of my case for research</label>
+      <label>{t.paying}<select name="purchaseMethod" defaultValue="CASH"><option value="CASH">{t.cash}</option><option value="FINANCE">{t.finance}</option></select></label>
+      <fieldset className="switches"><legend>{t.permissions}</legend>
+        <p>{t.permissionsIntro}</p>
+        <label><input name="humanReview" type="checkbox" />{t.humanReview}</label>
+        <label><input name="anonymizedResearch" type="checkbox" />{t.research}</label>
       </fieldset>
-      <div className="actions"><button disabled={busy || !options}>{busy ? "Opening…" : "Confirm and open case"}</button>
-        <button type="button" className="btn-ghost" disabled={busy} onClick={onCancel}>Cancel</button></div>
+      <div className="actions"><button disabled={busy || !options}>{busy ? t.opening : t.confirm}</button>
+        <button type="button" className="btn-ghost" disabled={busy} onClick={onCancel}>{t.cancel}</button></div>
     </form>
   </section>;
 }

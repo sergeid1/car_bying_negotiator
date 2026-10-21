@@ -88,17 +88,7 @@ const MONEY_PENDING = [
 ];
 
 /** Journey: Buying Journeys, listings, guides, the content pages and Toto; copy in en/content.ts. */
-const CONTENT_PENDING = [
-  "BuyingJourneys.tsx",
-  "CandidateVehicles.tsx",
-  "ExplainerGuides.tsx",
-  "HowItWorks.tsx",
-  "HowOtdogMakesMoney.tsx",
-  "JourneyCandidates.tsx",
-  "ListingCapture.tsx",
-  "ReferralPartnerKit.tsx",
-  "TotoChat.tsx",
-];
+const CONTENT_PENDING: string[] = [];
 
 const PENDING = [...ACCOUNT_PENDING, ...PAPERWORK_PENDING, ...DEALER_PENDING, ...MESSAGES_PENDING, ...MONEY_PENDING, ...CONTENT_PENDING];
 
