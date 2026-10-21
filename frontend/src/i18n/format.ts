@@ -5,6 +5,7 @@
  */
 export const languages = {
   en: { locale: "en-US", name: "English" },
+  es: { locale: "es-US", name: "Español" },
 } as const;
 
 export type Language = keyof typeof languages;

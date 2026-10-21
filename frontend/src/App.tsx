@@ -10,7 +10,7 @@ import { type FreshDeskCase } from "./DeskCheck";
 import { SigningNote } from "./SigningNote";
 import { CaseFlow } from "./CaseFlow";
 import { AtTheDealer, DealerCameraEntry } from "./AtTheDealer";
-import { ThemeMenu } from "./ThemeMenu";
+import { ThemeLanguageMenu } from "./ThemeLanguageMenu";
 import { OfferTerms } from "./OneTimeOffer";
 import { ExampleReportPage, requestedExampleReport } from "./SampleReport";
 import { ExplainerGuide, GuideLinks, requestedGuide, requestedGuideIndex } from "./ExplainerGuides";
@@ -218,7 +218,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
           </a>
           {!caseOpen && !partnerKit && <SiteNav page={howItWorks ? "how-it-works" : exampleReport ? "example-report" : guide || guideIndex ? "guides" : standalone ? "other" : "home"} />}
           {!partnerKit && <DealerCameraEntry onPhotos={files => setAtDealer({ files, started: Date.now() })} />}
-          <ThemeMenu />
+          <ThemeLanguageMenu />
           {!partnerKit && <AccountHeader controls={accountControls} onOpen={() => openPanel("account")} />}
         </div>
       </header>

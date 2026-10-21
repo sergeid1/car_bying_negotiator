@@ -24,8 +24,11 @@ export type TotoAnswer = {
 type Turn = { role: "BUYER" | "TOTO"; text: string };
 type Exchange = { id: number; question: string; answer?: TotoAnswer; failure?: string };
 
-/** Only links into the guides this client knows are followed; anything else shows as the title alone. */
-const KNOWN_LINKS = new Set(GUIDE_SLUGS.map(guideLink));
+/**
+ * Only links into the guides this client knows are followed; anything else shows as the title alone. A known link
+ * is named with the guide's own title in the page language, since that is the guide it opens.
+ */
+const KNOWN_LINKS = new Map(GUIDE_SLUGS.map(slug => [guideLink(slug), slug]));
 
 /** Opens a guide without reloading, as the header's tabs do, so the chat stays in memory. */
 function openGuide(href: string) {
@@ -266,7 +269,7 @@ function Reply({ answer, onGuide }: { answer: TotoAnswer; onGuide: () => void })
 }
 
 function Sources({ label, citations, onGuide }: { label: string; citations: TotoCitation[]; onGuide: () => void }) {
-  const { m: { content: { toto: t } }, fill } = useMessages();
+  const { m: { content: { toto: t, explainerGuides: { guides } } }, fill } = useMessages();
   return <p className="toto-sources">
     <span>{fill(t.sources, { label })}</span>
     {citations.map((citation, index) => <span key={`${citation.articleId}-${index}`}>
@@ -275,7 +278,7 @@ function Sources({ label, citations, onGuide }: { label: string; citations: Toto
         ? <a href={citation.link} onClick={event => {
           if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           event.preventDefault(); openGuide(citation.link!); onGuide();
-        }}>{citation.title}</a>
+        }}>{guides[KNOWN_LINKS.get(citation.link)!].title}</a>
         : <cite>{citation.title}</cite>}
     </span>)}
   </p>;

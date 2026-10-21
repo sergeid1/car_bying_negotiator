@@ -6,13 +6,16 @@ import { Passwords } from "./Passwords";
 import { openSidePanel } from "./SidePanel";
 import { SignIn, type SignInMode } from "./SignIn";
 import * as format from "./i18n/format";
-import { useMessages } from "./i18n/LanguageProvider";
+import { useLanguageChoice, useMessages } from "./i18n/LanguageProvider";
+import { isLanguage, readStoredLanguage } from "./i18n/languageChoice";
 
 type Contact = { email: string; firstName: string | null; lastName: string | null; phone: string | null };
 type AttachedCase = {
   caseId: string; attachedAt: string; state: string; startedAt?: string | null; vehicle?: string | null; dealer?: string | null;
 };
-type Account = { contact: Contact; createdAt: string; sessionExpiresAt: string; cases: AttachedCase[] };
+type Account = {
+  contact: Contact; createdAt: string; sessionExpiresAt: string; cases: AttachedCase[]; preferredLanguage?: string | null;
+};
 type Receipt = { state: "DELETION_PENDING" | "DELETED"; failureCode?: string | null; cases: { caseId: string; state: string }[] };
 type Problem = { status: number; code?: string; detail?: string };
 
@@ -154,6 +157,20 @@ export function BuyerAccount({ caseCredentials, onSignedIn, onControls, onCaseOp
     return () => { current = false; };
   }, [loads, recheck, socialReturn.state]);
   useEffect(() => { onSignedIn?.(!!account); }, [account]);
+  // The language follows a signed-in Buyer: a saved choice applies here, and a choice made here is saved.
+  const { adopt, setAccountSaver } = useLanguageChoice();
+  const signedInAs = account?.contact.email;
+  useEffect(() => {
+    if (!signedInAs) return;
+    const save = (language: string) => {
+      call("/api/v1/account/language", { method: "PUT", body: JSON.stringify({ language }) })
+        .catch(() => { /* The choice still applies in this browser. */ });
+    };
+    if (isLanguage(account?.preferredLanguage)) adopt(account.preferredLanguage);
+    else { const stored = readStoredLanguage(); if (stored) save(stored); }
+    setAccountSaver(save);
+    return () => setAccountSaver(undefined);
+  }, [signedInAs]);
   useEffect(() => { onControls?.({ email: account?.contact.email, busy, signOut }); }, [account, busy]);
 
   function signOut() {
