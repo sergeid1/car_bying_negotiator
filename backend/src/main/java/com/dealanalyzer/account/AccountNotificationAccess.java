@@ -24,4 +24,11 @@ public class AccountNotificationAccess {
     if (account == null || !"ACTIVE".equals(account.lifecycle) || account.verifiedAt == null) return null;
     return protection.decrypt(account.id, account.contactCiphertext).email();
   }
+
+  /** The language the Buyer saved for the screens (ticket 146), used for emails not tied to a case; English if none. */
+  @Transactional(readOnly = true)
+  public String preferredLanguage(String accountId) {
+    return accounts.findById(accountId).map(account -> account.preferredLanguage)
+        .filter(BuyerAccountService.LANGUAGES::contains).orElse("en");
+  }
 }

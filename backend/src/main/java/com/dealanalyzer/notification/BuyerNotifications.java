@@ -79,7 +79,7 @@ public class BuyerNotifications {
    * not confirmed inbox receipt. Failed and uncertain attempts are not retried automatically.
    */
   public void notify(String accountId, NotificationType type, String dedupeKey) {
-    notifyInLanguage(accountId, type, dedupeKey, "en");
+    notifyInLanguage(accountId, type, dedupeKey, accounts.preferredLanguage(accountId));
   }
 
   public void notifyCase(String accountId, NotificationType type, String dedupeKey, String caseId) {

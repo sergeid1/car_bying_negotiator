@@ -25,7 +25,7 @@ public class AccountController {
 
   public record SignInRequest(@NotBlank @Email @Size(max = 254) String email,
       @Pattern(regexp = "en|es") String language) {
-    public SignInRequest(String email) { this(email, "en"); }
+    public SignInRequest(String email) { this(email, null); }
   }
   public record VerifyRequest(@NotBlank @Size(max = 128) String token) {}
   public record ContactRequest(@Size(max = 100) String firstName, @Size(max = 100) String lastName,

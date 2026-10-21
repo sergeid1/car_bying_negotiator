@@ -69,9 +69,10 @@ public class BuyerAccountService {
   /** Creates the account on first request; either way, emails a single-use sign-in link. */
   @Transactional
   public void requestSignIn(String address, String requestKey) {
-    requestSignIn(address, requestKey, "en");
+    requestSignIn(address, requestKey, null);
   }
 
+  /** Emails the link in the viewer's language; with none given, in the language the account saved, else English. */
   @Transactional
   public void requestSignIn(String address, String requestKey, String language) {
     String normalized = address.strip().toLowerCase(Locale.ROOT);
@@ -96,6 +97,7 @@ public class BuyerAccountService {
     link.accountId = account.id; link.requestKeyHash = keyHash; link.createdAt = now;
     link.expiresAt = now.plus(linkLifetime);
     links.saveAndFlush(link);
+    if (language == null) language = account.preferredLanguage;
     if ("es".equals(language)) email.send(normalized, origin + "#sign-in=" + token, RecoveryEmail.Purpose.ACCOUNT_SIGN_IN, "es");
     else email.send(normalized, origin + "#sign-in=" + token, RecoveryEmail.Purpose.ACCOUNT_SIGN_IN);
   }

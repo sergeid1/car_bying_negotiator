@@ -60,6 +60,18 @@ class SpanishCaseAcceptanceTest {
       assertThat(deliveries).extracting(Delivery::purpose).contains(RecoveryEmail.Purpose.values());
       assertThat(deliveries).allSatisfy(delivery -> assertThat(delivery.language()).isEqualTo("es"));
 
+      // Emails not tied to a case follow the language the account saved (ticket 146): English until it saves one.
+      notifications.notify(account, NotificationType.ACCOUNT_SECURITY, "security-before-choice");
+      assertThat(deliveries.getLast().language()).isEqualTo("en");
+      jdbc.update("update buyer_accounts set preferred_language = 'es' where id = ?", account);
+      notifications.notify(account, NotificationType.ACCOUNT_SECURITY, "security-after-choice");
+      assertThat(deliveries.getLast().language()).isEqualTo("es");
+      client.post().uri("/api/v1/account/sign-in-requests").header("Account-Request", "1").header("Idempotency-Key", "saved-language")
+          .contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(Map.of("email", "spanish@example.com"))
+          .retrieve().toBodilessEntity();
+      assertThat(deliveries.getLast().purpose()).isEqualTo(RecoveryEmail.Purpose.ACCOUNT_SIGN_IN);
+      assertThat(deliveries.getLast().language()).isEqualTo("es");
+
       post(client, base + "/analyses", Map.of(), "spanish-report", token);
       var report = get(client, base + "/reports/1", token);
       assertThat(report.path("schemaVersion").asText()).isEqualTo("core-deal-analysis-report.v2");
