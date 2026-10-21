@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { DealerFinancingForm, type FinancingResult } from "./DealerFinancing";
 import * as format from "./i18n/format";
+import { useMessages } from "./i18n/LanguageProvider";
 
 type Economics = FinancingResult & { finalPaymentMinor: number | null; totalScheduledPaymentsMinor: number | null;
   totalInterestMinor: number | null; totalTransactionCostMinor: number | null };
@@ -15,9 +16,13 @@ export type Comparison = { version: number; createdAt: string; inputs: Inputs;
     dealer: Economics; outside: Economics; outsideMinusDealerCostMinor: number | null;
     aprOnlyScheduledPaymentsDeltaMinor: number | null;
   } };
-const money = (value: number | null | undefined) => value == null ? "Unavailable" : format.money(value);
+
+const INPUT_ROWS = ["purchasePriceMinor", "outTheDoorTotalMinor", "netAmountDueMinor", "cashPaidAtClosingMinor", "deferredChargesMinor",
+  "principalMinor", "financedFeesMinor", "upfrontFeesMinor"] as const;
+const ECONOMICS_ROWS = ["paymentMinor", "finalPaymentMinor", "totalInterestMinor", "totalScheduledPaymentsMinor", "totalTransactionCostMinor"] as const;
 
 export function OutsideFinancing({ caseId, token }: { caseId: string; token: string }) {
+  const { m: { money: { outsideFinancing: t } } } = useMessages();
   const [saved, setSaved] = useState<Comparison>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -25,14 +30,14 @@ export function OutsideFinancing({ caseId, token }: { caseId: string; token: str
     setBusy(true); setError(""); setSaved(undefined);
     try {
       const response = await fetch(`/api/v1/cases/${encodeURIComponent(caseId)}/outside-finance-offers/latest`, { headers: { "Case-Access-Token": token } });
-      if (!response.ok) throw new Error("Saved outside comparison unavailable. Check case access or save an outside offer first.");
+      if (!response.ok) throw new Error(t.savedUnavailable);
       setSaved(await response.json());
     } catch (error) { setError(String(error)); } finally { setBusy(false); }
   }
-  return <section className="stack" aria-label="Outside financing">
+  return <section className="stack" aria-label={t.label}>
     <DealerFinancingForm caseId={caseId} token={token} outside onSaved={value => { setSaved(value as Comparison); setError(""); }} />
     <div className="panel">
-      <button className="btn-secondary" onClick={load} disabled={busy}>Open saved outside comparison</button>
+      <button className="btn-secondary" onClick={load} disabled={busy}>{t.openSaved}</button>
       {error && <p role="alert">{error}</p>}
     </div>
     {saved && <OutsideFinancingResult comparison={saved} />}
@@ -40,32 +45,35 @@ export function OutsideFinancing({ caseId, token }: { caseId: string; token: str
 }
 
 export function OutsideFinancingResult({ comparison }: { comparison: Comparison }) {
+  const { m: { money: { outsideFinancing: t } }, fill } = useMessages();
+  const money = (value: number | null | undefined) => value == null ? t.unavailable : format.money(value);
   const { result } = comparison;
   const comparable = result.status === "COMPARABLE";
-  return <section className="panel" aria-label="Saved financing comparison"><h3>Outside financing comparison — version {comparison.version}</h3>
-    <p>Buyer-selected financing, not a dealer discount. Saved estimate as of {comparison.createdAt}, using dealer financing {comparison.dealerFinancing.id}. This historical snapshot does not reflect later offer or vehicle changes. Save a new comparison against current verified financing to update it.</p>
-    {comparison.preApproval && <p>Outside financing: your chosen pre-approval from {comparison.preApproval.lender}.</p>}
-    <p>Comparison: {result.status}</p>
+  return <section className="panel" aria-label={t.resultLabel}><h3>{fill(t.heading, { version: String(comparison.version) })}</h3>
+    <p>{fill(t.snapshot, { createdAt: comparison.createdAt, id: comparison.dealerFinancing.id })}</p>
+    {comparison.preApproval && <p>{fill(t.chosenPreApproval, { lender: comparison.preApproval.lender })}</p>}
+    <p>{fill(t.comparison, { status: result.status })}</p>
     {[...result.issues, ...result.purchaseDifferences].map((issue, index) => <p className="notice" key={index}>{issue}</p>)}
-    <table><caption>Full-term economics under each saved scenario’s purchase assumptions</caption>
-      <thead><tr><th scope="col">Amount or term</th><th scope="col">Dealer financing</th><th scope="col">Outside financing</th></tr></thead>
+    <table><caption>{t.caption}</caption>
+      <thead><tr><th scope="col">{t.amountOrTerm}</th><th scope="col">{t.dealerFinancing}</th><th scope="col">{t.outsideFinancing}</th></tr></thead>
       <tbody>
-        <tr><th scope="row">APR (%)</th><td>{comparison.dealerFinancing.inputs.aprPercent ?? "Unavailable"}</td><td>{comparison.inputs.aprPercent ?? "Unavailable"}</td></tr>
-        <tr><th scope="row">Term (months)</th><td>{comparison.dealerFinancing.inputs.termMonths ?? "Unavailable"}</td><td>{comparison.inputs.termMonths ?? "Unavailable"}</td></tr>
-        {([["purchasePriceMinor", "Purchase price after discounts and rebates"], ["outTheDoorTotalMinor", "Out-the-door total"], ["netAmountDueMinor", "Net amount due"], ["cashPaidAtClosingMinor", "Cash paid including upfront fees"], ["deferredChargesMinor", "Deferred charges"], ["principalMinor", "Principal"], ["financedFeesMinor", "Financed lender fees (included in principal)"], ["upfrontFeesMinor", "Upfront lender fees (included in cash paid)"]] as const).map(([field, label]) =>
-          <tr key={field}><th scope="row">{label}</th><td>{money(comparison.dealerFinancing.inputs[field])}</td><td>{money(comparison.inputs[field])}</td></tr>)}
-        {([["paymentMinor", "Monthly payment"], ["finalPaymentMinor", "Final payment"], ["totalInterestMinor", "Total interest"], ["totalScheduledPaymentsMinor", "Scheduled payments"], ["totalTransactionCostMinor", "Total Transaction Cost"]] as const).map(([field, label]) =>
-          <tr key={field}><th scope="row">{label}</th>{[result.dealer, result.outside].map((scenario, index) => <td key={index}>{scenario.status === "AVAILABLE" ? money(scenario[field]) : "Unavailable"}</td>)}</tr>)}
+        <tr><th scope="row">{t.apr}</th><td>{comparison.dealerFinancing.inputs.aprPercent ?? t.unavailable}</td><td>{comparison.inputs.aprPercent ?? t.unavailable}</td></tr>
+        <tr><th scope="row">{t.term}</th><td>{comparison.dealerFinancing.inputs.termMonths ?? t.unavailable}</td><td>{comparison.inputs.termMonths ?? t.unavailable}</td></tr>
+        {INPUT_ROWS.map(field =>
+          <tr key={field}><th scope="row">{t.inputs[field]}</th><td>{money(comparison.dealerFinancing.inputs[field])}</td><td>{money(comparison.inputs[field])}</td></tr>)}
+        {ECONOMICS_ROWS.map(field =>
+          <tr key={field}><th scope="row">{t.economics[field]}</th>{[result.dealer, result.outside].map((scenario, index) => <td key={index}>{scenario.status === "AVAILABLE" ? money(scenario[field]) : t.unavailable}</td>)}</tr>)}
       </tbody>
     </table>
-    {comparable ? <><p>Outside minus dealer Total Transaction Cost: {money(result.outsideMinusDealerCostMinor)}. Negative means the outside scenario costs less over its full term.</p>
-      <p>APR-only change in scheduled payments: {money(result.aprOnlyScheduledPaymentsDeltaMinor)}. Uses the outside APR with the dealer principal, term, fees, timing and add-ons held constant. This is a counterfactual estimate, not another loan offer.</p></>
-      : <p>No cost delta is available. Resolve missing terms or confirm aligned purchase assumptions before comparing costs.</p>}
-    {[result.dealer, result.outside].map((scenario, index) => scenario.status === "AVAILABLE" && <section key={index}><h4>{index === 0 ? "Dealer" : "Outside"} financed add-on effects</h4>
-      <p>Each estimate removes one add-on while holding APR, term and other inputs fixed; excludes tax changes and refunds.</p>
-      {scenario.financedAddOns.length === 0 && <p>No financed add-ons confirmed.</p>}
-      {scenario.financedAddOns.map((addon, i) => <p key={i}>{addon.label}: cash price {money(addon.cashPriceMinor)}; incremental scheduled payments {money(addon.incrementalScheduledPaymentsMinor)}; incremental interest {money(addon.incrementalInterestMinor)}.</p>)}
+    {comparable ? <><p>{fill(t.costDelta, { amount: money(result.outsideMinusDealerCostMinor) })}</p>
+      <p>{fill(t.aprOnlyDelta, { amount: money(result.aprOnlyScheduledPaymentsDeltaMinor) })}</p></>
+      : <p>{t.noDelta}</p>}
+    {[result.dealer, result.outside].map((scenario, index) => scenario.status === "AVAILABLE" && <section key={index}><h4>{index === 0 ? t.dealerAddOnEffects : t.outsideAddOnEffects}</h4>
+      <p>{t.addOnEffectsIntro}</p>
+      {scenario.financedAddOns.length === 0 && <p>{t.noAddOns}</p>}
+      {scenario.financedAddOns.map((addon, i) => <p key={i}>{fill(t.addOnLine, { addOn: addon.label, cash: money(addon.cashPriceMinor),
+        payments: money(addon.incrementalScheduledPaymentsMinor), interest: money(addon.incrementalInterestMinor) })}</p>)}
     </section>)}
-    <details><summary>Saved inputs and reproducible calculation</summary><pre>{JSON.stringify(comparison, null, 2)}</pre></details>
+    <details><summary>{t.savedInputs}</summary><pre>{JSON.stringify(comparison, null, 2)}</pre></details>
   </section>;
 }

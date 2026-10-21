@@ -33,14 +33,7 @@ const DEALER_PENDING: string[] = [];
 const MESSAGES_PENDING: string[] = [];
 
 /** Journey: insurance, loans, financing and the offer; copy in en/money.ts. */
-const MONEY_PENDING = [
-  "DealerFinancing.tsx",
-  "InsuranceQuotes.tsx",
-  "LoanPreApprovals.tsx",
-  "OneTimeOffer.tsx",
-  "OutsideFinancing.tsx",
-  "PricePlan.tsx",
-];
+const MONEY_PENDING: string[] = [];
 
 /** Journey: Buying Journeys, listings, guides, the content pages and Toto; copy in en/content.ts. */
 const CONTENT_PENDING = [
