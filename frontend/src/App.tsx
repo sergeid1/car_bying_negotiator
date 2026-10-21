@@ -7,6 +7,7 @@ import { AccountControls, AccountHeader, AccountSignedInContext, BuyerAccount, i
 import { BuyingJourneys } from "./BuyingJourneys";
 import { BuyingCaseIntake } from "./BuyingCaseIntake";
 import { type FreshDeskCase } from "./DeskCheck";
+import { SigningNote } from "./SigningNote";
 import { CaseFlow } from "./CaseFlow";
 import { AtTheDealer, DealerCameraEntry } from "./AtTheDealer";
 import { ThemeMenu } from "./ThemeMenu";
@@ -336,30 +337,16 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       </main>
 
       <footer className="page-footer">
-        <div className="page-footer-inner">
-          <section className="limitations" id="scope" aria-label="Commercial relationships and scope">
-            <strong>What this is, and what it is not</strong>
-            <div className="scope-columns">
-              <p>
-                otdog is a tool on your side, the Buyer's. We don't work with dealers. We help
-                people. It helps you find cars, check quotes, draft your emails to dealers, and check
-                desk paperwork. You send every email from your own email and make every decision, and
-                otdog never contacts a dealer itself.
-              </p>
-              <p>
-                No dealer pays otdog for anything. No company pays for placement, and no commercial
-                relationship affects any market range, rating, finding, quote order, or suggested
-                boundary. <a href={howOtdogMakesMoneyLink}>How otdog makes money</a>
-              </p>
-              <p>
-                It reviews the dealer's own paperwork for financial consistency. It is not legal, tax,
-                or mechanical advice, it does not establish that a document is safe to sign, and it
-                does not guarantee savings or any negotiating outcome.
-              </p>
-            </div>
-            <p><a href={partnerKitLink}>Referral partner kit</a></p>
-          </section>
-        </div>
+        <section className="page-footer-inner footer-statement" aria-label="About otdog">
+          <p>
+            otdog is on your side. No dealer pays us, and no company can pay to change what you see.{" "}
+            <a href={howOtdogMakesMoneyLink}>How otdog makes money</a>
+          </p>
+          <p>
+            It checks the numbers on the dealer's paperwork. It isn't legal, tax or mechanical advice, and it can't
+            promise savings. You send every email and make every decision. · <a href={partnerKitLink}>Referral partner kit</a>
+          </p>
+        </section>
       </footer>
       </div>
 
@@ -454,6 +441,8 @@ function DealReport({ report }: { report: Report }) {
         <h3>Why this needs review</h3>
         <ol>{analysis.topReasons.map((reason) => <li key={reason}>{reason}</li>)}</ol>
       </section>
+
+      <SigningNote />
 
       <aside className="limitations" aria-label="Report limitations">
         <strong>Scope and limitations</strong>

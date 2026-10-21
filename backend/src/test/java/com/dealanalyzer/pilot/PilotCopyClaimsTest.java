@@ -76,11 +76,10 @@ class PilotCopyClaimsTest {
 
   @Test void theStandingCommercialRelationshipDisclosureIsPresent() throws IOException {
     String app = normalize(Files.readString(REPOSITORY.resolve("frontend/src/App.tsx"), StandardCharsets.UTF_8));
-    assertThat(app).contains("otdog is a tool on your side, the Buyer's.");
-    assertThat(app).contains("We don't work with dealers. We help people.");
-    assertThat(app).contains("You send every email from your own email and make every decision");
-    assertThat(app).contains("no commercial relationship affects any");
-    assertThat(app).contains("No dealer pays otdog for anything. No company pays for placement");
+    assertThat(app).contains("otdog is on your side.");
+    assertThat(app).contains("No dealer pays us, and no company can pay to change what you see.");
+    assertThat(app).contains("It isn't legal, tax or mechanical advice, and it can't promise savings.");
+    assertThat(app).contains("You send every email and make every decision.");
     assertThat(app).contains("How otdog makes money");
   }
 

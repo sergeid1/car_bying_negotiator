@@ -15,6 +15,7 @@ import { VehicleSafety } from "./VehicleSafety";
 import { ListingCapture } from "./ListingCapture";
 import { InsuranceQuotes } from "./InsuranceQuotes";
 import { LoanPreApprovals } from "./LoanPreApprovals";
+import { SigningNote } from "./SigningNote";
 
 type Credentials = { caseId: string; token: string };
 export type CaseStepId = "quotes" | "compare" | "dealer" | "final";
@@ -282,6 +283,6 @@ function FinalCheck({ desk, onShowDifferences }: { desk?: DeskCheckView; onShowD
       : `No differences from your agreed price. ${totalEffectSentence(desk)}`}</p>
     <button type="button" className="btn-secondary" onClick={onShowDifferences}>
       {desk.status === "DIFFERENCES" ? "See each difference" : "See the Desk Check"}</button>
-    <p className="muted">This checks the numbers on the paperwork. It is not a legal review. Read every page before you sign.</p>
+    <SigningNote />
   </section>;
 }

@@ -28,27 +28,9 @@
     },
     {
       "file": "frontend/src/App.tsx",
-      "pattern": "safe to sign",
-      "contains": "it does not establish that a document is safe to sign",
-      "justification": "Negated standing disclosure. DEVELOPMENT_SPEC.md section 1.2 forbids the positive claim; stating its absence is the disclosure the pilot requires."
-    },
-    {
-      "file": "frontend/src/App.tsx",
-      "pattern": "guarantee",
-      "contains": "does not guarantee savings or any negotiating outcome",
-      "justification": "Negated standing disclosure withdrawing savings and outcome guarantees."
-    },
-    {
-      "file": "frontend/src/App.tsx",
       "pattern": "advice",
-      "contains": "or mechanical advice, it does not establish that a document is safe to sign",
-      "justification": "Negated advice-boundary disclosure required by DEVELOPMENT_SPEC.md section 13."
-    },
-    {
-      "file": "frontend/src/App.tsx",
-      "pattern": "contacts dealers",
-      "contains": "otdog never contacts a dealer itself.",
-      "justification": "Negated standing disclosure in the footer. DEVELOPMENT_SPEC.md sections 1.2 and 1.3 forbid the positive claim; the Buyer sends every email from their own email."
+      "contains": "It isn't legal, tax or mechanical advice",
+      "justification": "Negated advice-boundary disclosure in the footer statement, required by DEVELOPMENT_SPEC.md section 13."
     },
     {
       "file": "frontend/src/ReferralPartnerKit.tsx",

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import App from "./App";
 
@@ -62,4 +62,6 @@ test("buyer can start a synthetic cash analysis and reach the rendered report", 
   expect(screen.getByText("$28,475.00")).toBeVisible();
   expect(screen.getByText("Review required")).toBeVisible();
   expect(screen.getByText(/ask the dealer to explain/i)).toBeVisible();
+  // The footer no longer carries this, so it sits beside the report it applies to (ticket 143).
+  expect(within(screen.getByRole("article")).getByText("This checks the numbers on the paperwork. It is not a legal review. Read every page before you sign.")).toBeVisible();
 });

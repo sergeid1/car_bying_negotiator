@@ -418,6 +418,15 @@ main > * + * { margin-top: 22px; }
   margin: 0 auto;
   padding: 32px var(--gutter) 56px;
 }
+/* Two lines of small print; the notes beside each result carry the detail. */
+.footer-statement {
+  color: var(--ink-muted);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+.footer-statement p { margin: 0 0 6px; }
+.footer-statement p:last-child { margin-bottom: 0; }
+.footer-statement a { text-decoration: underline; }
 
 /* ==========================================================================
    Surfaces
@@ -1062,13 +1071,6 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
   transition: background-color 0.3s ease;
 }
 .stage-track li[data-done="true"] { background: var(--brand-ink); }
-
-/* min() keeps the column floor from exceeding a narrow container and forcing a scrollbar. */
-.scope-columns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
-  gap: 6px 32px;
-}
 
 /* ==========================================================================
    Disclosures and limitations
