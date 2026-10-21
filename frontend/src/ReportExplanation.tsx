@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { useMessages, type Messages } from "./i18n/LanguageProvider";
 
 export type ExplanationSegment = { text: string; amountId: string | null; amountIndex: number | null; precision: string | null };
 export type ExplanationSource = { id: string; sourcePointer: string; sourceValue: string | null };
@@ -9,16 +10,16 @@ export type ReportExplanationPayload = {
   provenance: { modelId: string; promptVersion: string; schemaVersion: string } | null;
 };
 
-function producerNote(explanation: ReportExplanationPayload) {
-  if (explanation.path === "MODEL") return "Generated text, shown only because every sentence was checked in code against this report's recorded findings. Each figure is inserted from the report itself.";
-  const reason = explanation.fallbackReason === "MODEL_PATH_OFF" ? "Generated explanations are switched off."
-    : explanation.fallbackReason?.startsWith("PROVIDER_") || explanation.fallbackReason === "CONTRACT_FAILURE" ? "A generated explanation was unavailable."
-    : "A generated explanation was set aside because a sentence could not be matched to this report's recorded findings.";
-  return `${reason} This is the fixed template wording for this report's findings.`;
+function producerNote(explanation: ReportExplanationPayload, t: Messages["paperwork"]["reportExplanation"]) {
+  if (explanation.path === "MODEL") return t.modelNote;
+  return explanation.fallbackReason === "MODEL_PATH_OFF" ? t.switchedOff
+    : explanation.fallbackReason?.startsWith("PROVIDER_") || explanation.fallbackReason === "CONTRACT_FAILURE" ? t.unavailable
+    : t.setAside;
 }
 
 /** Loads the checked explanation of one saved report. It is read-only and changes nothing in the report. */
 export function ReportExplanationLoader({ caseId, token, reportVersion }: { caseId: string; token: string; reportVersion: number }) {
+  const { m: { paperwork: { reportExplanation: t } } } = useMessages();
   const [explanation, setExplanation] = useState<ReportExplanationPayload>();
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -27,33 +28,34 @@ export function ReportExplanationLoader({ caseId, token, reportVersion }: { case
     fetch(`/api/v1/cases/${encodeURIComponent(caseId)}/reports/${reportVersion}/explanation`, {
       headers: { "Case-Access-Token": token }, signal: controller.signal,
     }).then(async response => {
-      if (!response.ok) throw new Error("Explanation unavailable");
+      if (!response.ok) throw new Error("explanation-unavailable");
       const result = await response.json();
-      if (!Array.isArray(result?.statements)) throw new Error("Explanation unavailable");
+      if (!Array.isArray(result?.statements)) throw new Error("explanation-unavailable");
       if (!controller.signal.aborted) setExplanation(result);
     }).catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
   }, [caseId, token, reportVersion]);
-  if (failed) return <p className="panel" role="status">The explanation of this report is unavailable. The findings and amounts below are unaffected.</p>;
-  if (!explanation) return <p role="status">Loading the explanation of this report…</p>;
+  if (failed) return <p className="panel" role="status">{t.loadFailed}</p>;
+  if (!explanation) return <p role="status">{t.loading}</p>;
   return <ReportExplanationView explanation={explanation} />;
 }
 
 export function ReportExplanationView({ explanation }: { explanation: ReportExplanationPayload }) {
+  const { m: { paperwork: { reportExplanation: t } }, fill, fillNodes } = useMessages();
   const id = useId();
   return <section className="panel report-explanation" aria-labelledby={`${id}-heading`}>
-    <h3 id={`${id}-heading`}>What the findings mean</h3>
-    <p><span className={explanation.path === "MODEL" ? "badge" : "badge badge-warn"}>{explanation.path === "MODEL" ? "Generated explanation" : "Template explanation"}</span></p>
-    <p>{producerNote(explanation)}</p>
+    <h3 id={`${id}-heading`}>{t.heading}</h3>
+    <p><span className={explanation.path === "MODEL" ? "badge" : "badge badge-warn"}>{explanation.path === "MODEL" ? t.generated : t.template}</span></p>
+    <p>{producerNote(explanation, t)}</p>
     <ul>{explanation.statements.map((statement, index) => <li key={index}>
       <p>{statement.segments.map((segment, part) => segment.amountIndex === null
         ? <span key={part}>{segment.text}</span>
         : <a key={part} href={`#amount-evidence-${segment.amountIndex}`}>{segment.text}</a>)}</p>
-      <details><summary>Recorded {statement.sources.length === 1 ? "source" : "sources"} for sentence {index + 1}</summary>
-        <ul>{statement.sources.map(source => <li key={source.id}>Report {explanation.reportVersion} · <code>{source.sourcePointer}</code>{source.sourceValue !== null && <> · <code>{source.sourceValue}</code></>}</li>)}</ul>
+      <details><summary>{fill(t.sources, { count: statement.sources.length, number: index + 1 })}</summary>
+        <ul>{statement.sources.map(source => <li key={source.id}>{fillNodes(t.source, { version: explanation.reportVersion, pointer: <code>{source.sourcePointer}</code> })}{source.sourceValue !== null && <> · <code>{source.sourceValue}</code></>}</li>)}</ul>
       </details>
     </li>)}</ul>
     <p>{explanation.scope}</p>
-    {explanation.provenance && <p><small>Model {explanation.provenance.modelId} · {explanation.provenance.promptVersion} · {explanation.provenance.schemaVersion}</small></p>}
+    {explanation.provenance && <p><small>{fill(t.model, { model: explanation.provenance.modelId, prompt: explanation.provenance.promptVersion, schema: explanation.provenance.schemaVersion })}</small></p>}
   </section>;
 }

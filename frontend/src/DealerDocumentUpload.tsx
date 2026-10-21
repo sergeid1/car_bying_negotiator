@@ -1,5 +1,8 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import * as format from "./i18n/format";
+import { en } from "./i18n/en";
+import { fillIn, type Message, type Placeholders, type Values } from "./i18n/messages";
+import { useMessages, type Messages } from "./i18n/LanguageProvider";
 
 /** The intake limits the service publishes, so a pre-check never uses a looser threshold. */
 export type DocumentLimits = {
@@ -56,138 +59,101 @@ const STAGE_ORDER = [
   "QUEUED", "NORMALIZING", "READY_FOR_EXTRACTION", "EXTRACTING", "EXTRACTION_COMPLETE",
 ];
 
-/** Stage names the Buyer can act on: each says what is happening to their paperwork. */
-const STAGE_LABELS: Record<string, string> = {
-  SENDING: "Sending to the service",
-  QUEUED: "Waiting to be processed",
-  NORMALIZING: "Preparing the pages",
-  READY_FOR_EXTRACTION: "Pages prepared",
-  EXTRACTING: "Reading the deal terms",
-  EXTRACTION_COMPLETE: "Terms read — ready to verify",
-  FAILED: "Processing failed",
-};
+type Copy = Messages["paperwork"]["dealerDocumentUpload"];
 
-function fileSizeLimit(bytes: number) {
+/** English, for a caller outside a component; components pass the current language's copy. */
+const ENGLISH: Copy = en.paperwork.dealerDocumentUpload;
+
+function fillCopy<M extends Message>(message: M, values: Values<M>) {
+  return fillIn(format.locale(), message, values);
+}
+
+function fileSizeLimit(bytes: number, t: Copy) {
   return bytes >= 1024 * 1024
-    ? `${Math.round(bytes / 104857.6) / 10} MB`
-    : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    ? fillCopy(t.megabytes, { size: String(Math.round(bytes / 104857.6) / 10) })
+    : fillCopy(t.kilobytes, { size: String(Math.max(1, Math.round(bytes / 1024))) });
 }
 
-function pixelLimit(pixels: number) {
+function pixelLimit(pixels: number, t: Copy) {
   return pixels >= 1_000_000
-    ? `${Math.round(pixels / 100_000) / 10} megapixels`
-    : `${format.number(pixels)} pixels`;
+    ? fillCopy(t.megapixels, { size: String(Math.round(pixels / 100_000) / 10) })
+    : fillCopy(t.pixels, { size: format.number(pixels) });
 }
+
+type Guidance = (file: string, limits?: DocumentLimits, t?: Copy) => string;
+
+/** The refusals whose only changing part is the file's name. */
+type NamedRefusal = { [K in keyof Copy["refusals"]]: Placeholders<Copy["refusals"][K]> extends "file" ? K : never }[keyof Copy["refusals"]];
+
+const named = (key: NamedRefusal): Guidance => (file, _limits, t = ENGLISH) => fillCopy(t.refusals[key], { file });
 
 /**
  * One actionable sentence per rejection class the document intake can raise, naming the file and
  * what to do next. Every code the service can return has an entry; the server's own detail is only
  * a fallback for a refusal this client has not been taught about.
  */
-export const refusalGuidance: Record<string, (file: string, limits?: DocumentLimits) => string> = {
-  EMPTY_FILE: file =>
-    `“${file}” has no content. Photograph the page again, or re-export the PDF, and add it.`,
-  FILE_TOO_LARGE: (file, limits) =>
-    `“${file}” is over the ${limits ? fileSizeLimit(limits.maxFileBytes) : "size"} limit for one file.`
-    + " Photograph the pages in smaller batches, or export a smaller PDF, and add them.",
-  EXECUTABLE_FILE: file =>
-    `“${file}” is a program, not paperwork. Add the Dealer's document as a PDF, JPEG, PNG, or HEIC file.`,
-  UNSUPPORTED_FILE: file =>
-    `“${file}” is not a PDF, JPEG, PNG, or HEIC document. Photograph the page with your camera, or ask`
-    + " the Dealer to email a PDF, and add that instead.",
-  ENCRYPTED_FILE: file =>
-    `“${file}” is password-protected. Ask the Dealer for an unlocked copy, or photograph the printed`
-    + " pages, and add that instead.",
-  MALFORMED_FILE: file =>
-    `“${file}” could not be read safely. Photograph the page again, or ask the Dealer to export the`
-    + " PDF again, and add it.",
-  PAGE_LIMIT_EXCEEDED: (file, limits) =>
-    `“${file}” has more than ${limits ? limits.maxPages : "the maximum number of"} pages. Split it and`
-    + " add each part as its own document.",
-  RESOLUTION_TOO_LOW: (file, limits) =>
-    `“${file}” is too small to read${limits ? ` (at least ${limits.minWidth}×${limits.minHeight} pixels)` : ""}.`
-    + " Hold the camera closer so the page fills the frame, and add the photo again.",
-  PIXEL_LIMIT_EXCEEDED: (file, limits) =>
-    `“${file}” is over the ${limits ? pixelLimit(limits.maxPixels) : "pixel"} limit. Lower your camera`
-    + " resolution, or resize the photo, and add it again.",
-  DECOMPRESSION_RISK: file =>
-    `“${file}” expands far beyond its file size and cannot be processed safely. Re-export or resize it`
-    + " and add it again.",
-  MALWARE_DETECTED: file =>
-    `“${file}” failed the malware scan and was not stored. Ask the Dealer for a clean copy.`,
-  MALWARE_SCAN_UNAVAILABLE: file =>
-    `“${file}” could not be scanned, so nothing was stored. Add it again in a few minutes.`,
-  PARSER_BUSY: file =>
-    `Document processing is busy, so “${file}” was not stored. Add it again in a moment.`,
-  PARSER_UNAVAILABLE: file =>
-    `Document processing is unavailable, so “${file}” was not stored. Add it again in a few minutes.`,
-  PARSER_TIMEOUT: file =>
-    `“${file}” took too long to process. Add one page at a time, or a simpler PDF export.`,
-  SERVICE_PROCESSING_CONSENT_REQUIRED: file =>
-    `“${file}” was not uploaded because permission to process your case is not currently granted.`
-    + " Grant it in your case permissions, then add the file again.",
-  UPLOAD_READ_FAILED: file =>
-    `“${file}” could not be read from this device. Choose the file again and add it.`,
-  DOCUMENT_EXPIRED: file =>
-    `“${file}” reached its retention deadline before processing finished. Add the file again.`,
-  NORMALIZATION_FAILED: file =>
-    `Preparing the pages of “${file}” failed. Retry processing — the file is stored and does not need`
-    + " to be added again.",
-  EXTRACTION_FAILED: file =>
-    `Reading the terms from “${file}” failed. Retry processing — the file is stored and does not need`
-    + " to be added again.",
-  PROVIDER_UNAVAILABLE: file =>
-    `The service that reads “${file}” is unavailable. Retry processing in a few minutes; the file is`
-    + " stored.",
-  PROVIDER_FAILURE: file =>
-    `The service that reads “${file}” returned an error. Retry processing; the file is stored.`,
-  CONTRACT_FAILURE: file =>
-    `The terms read from “${file}” did not pass the service's own checks, so none were kept. Retry`
-    + " processing, or add a clearer copy of the document.",
-  BUYER_INPUT: file =>
-    `“${file}” does not look like the Dealer paperwork this case needs. Check you added the buyer's`
-    + " order or quote, and add the right document.",
-  INTERNAL: file =>
-    `Processing “${file}” failed inside the service. Retry processing; the file is stored.`,
+export const refusalGuidance: Record<string, Guidance> = {
+  EMPTY_FILE: named("emptyFile"),
+  FILE_TOO_LARGE: (file, limits, t = ENGLISH) => limits
+    ? fillCopy(t.refusals.fileTooLarge, { file, limit: fileSizeLimit(limits.maxFileBytes, t) })
+    : fillCopy(t.refusals.fileTooLargeNoLimit, { file }),
+  EXECUTABLE_FILE: named("executable"),
+  UNSUPPORTED_FILE: named("unsupported"),
+  ENCRYPTED_FILE: named("encrypted"),
+  MALFORMED_FILE: named("malformed"),
+  PAGE_LIMIT_EXCEEDED: (file, limits, t = ENGLISH) => limits
+    ? fillCopy(t.refusals.pageLimit, { file, pages: String(limits.maxPages) })
+    : fillCopy(t.refusals.pageLimitNoLimit, { file }),
+  RESOLUTION_TOO_LOW: (file, limits, t = ENGLISH) => limits
+    ? fillCopy(t.refusals.resolution, { file, width: String(limits.minWidth), height: String(limits.minHeight) })
+    : fillCopy(t.refusals.resolutionNoLimit, { file }),
+  PIXEL_LIMIT_EXCEEDED: (file, limits, t = ENGLISH) => limits
+    ? fillCopy(t.refusals.pixelLimit, { file, limit: pixelLimit(limits.maxPixels, t) })
+    : fillCopy(t.refusals.pixelLimitNoLimit, { file }),
+  DECOMPRESSION_RISK: named("decompression"),
+  MALWARE_DETECTED: named("malware"),
+  MALWARE_SCAN_UNAVAILABLE: named("scanUnavailable"),
+  PARSER_BUSY: named("parserBusy"),
+  PARSER_UNAVAILABLE: named("parserUnavailable"),
+  PARSER_TIMEOUT: named("parserTimeout"),
+  SERVICE_PROCESSING_CONSENT_REQUIRED: named("consentRequired"),
+  UPLOAD_READ_FAILED: named("readFailed"),
+  DOCUMENT_EXPIRED: named("expired"),
+  NORMALIZATION_FAILED: named("normalizationFailed"),
+  EXTRACTION_FAILED: named("extractionFailed"),
+  PROVIDER_UNAVAILABLE: named("providerUnavailable"),
+  PROVIDER_FAILURE: named("providerFailure"),
+  CONTRACT_FAILURE: named("contractFailure"),
+  BUYER_INPUT: named("buyerInput"),
+  INTERNAL: named("internal"),
 };
 
-function statusGuidance(status: number, file: string, detail?: string) {
-  if (status === 401 || status === 403) {
-    return `“${file}” was not uploaded because this case's access token was not accepted. Reopen the`
-      + " case with the token you saved, then add the file again.";
-  }
-  if (status === 404) {
-    return `“${file}” was not uploaded because this Buying Case is no longer available. It may have`
-      + " been deleted or expired.";
-  }
-  if (status === 409) {
-    return `A different file was already uploaded for this request, so “${file}” was not stored.`
-      + " Choose the file again to add it.";
-  }
-  if (status === 429) {
-    return `Too many requests were made, so “${file}” was not uploaded. Wait a moment and add it again.`;
-  }
+function statusGuidance(status: number, file: string, detail: string | undefined, t: Copy) {
+  if (status === 401 || status === 403) return fillCopy(t.refusals.tokenRejected, { file });
+  if (status === 404) return fillCopy(t.refusals.caseUnavailable, { file });
+  if (status === 409) return fillCopy(t.refusals.conflict, { file });
+  if (status === 429) return fillCopy(t.refusals.tooManyRequests, { file });
   return detail
-    ? `“${file}” was not accepted: ${detail}`
-    : `“${file}” could not be uploaded. Check your connection and add it again.`;
+    ? fillCopy(t.refusals.notAccepted, { file, detail })
+    : fillCopy(t.refusals.uploadFailed, { file });
 }
 
 /** A known code comes first, then the service's own detail. */
 export function refusalMessage(
-  file: string, status: number, code?: string, detail?: string, limits?: DocumentLimits,
+  file: string, status: number, code?: string, detail?: string, limits?: DocumentLimits, t: Copy = ENGLISH,
 ) {
   const guidance = code ? refusalGuidance[code] : undefined;
-  return guidance ? guidance(file, limits) : statusGuidance(status, file, detail);
+  return guidance ? guidance(file, limits, t) : statusGuidance(status, file, detail, t);
 }
 
-function failureMessage(operation: OperationView, file: string, limits?: DocumentLimits) {
+function failureMessage(operation: OperationView, file: string, limits: DocumentLimits | undefined, t: Copy) {
   const guidance = operation.errorCode ? refusalGuidance[operation.errorCode] : undefined;
   if (guidance) {
-    return guidance(file, limits);
+    return guidance(file, limits, t);
   }
   return operation.error
-    ? `Processing “${file}” failed: ${operation.error}`
-    : `Processing “${file}” failed. Retry processing, or add a clearer copy of the document.`;
+    ? fillCopy(t.refusals.processingFailedDetail, { file, error: operation.error })
+    : fillCopy(t.refusals.processingFailed, { file });
 }
 
 function supportedMediaType(file: File, accepted: string[]) {
@@ -203,9 +169,9 @@ function supportedMediaType(file: File, accepted: string[]) {
  * Fast feedback for what can be judged without reading the document: the browser never parses a
  * PDF or interprets a page, and the service still inspects every accepted file for itself.
  */
-async function precheck(file: File, limits?: DocumentLimits) {
+async function precheck(file: File, limits: DocumentLimits | undefined, t: Copy) {
   if (file.size === 0) {
-    return refusalGuidance.EMPTY_FILE(file.name, limits);
+    return refusalGuidance.EMPTY_FILE(file.name, limits, t);
   }
   if (!limits) {
     return undefined;
@@ -213,16 +179,16 @@ async function precheck(file: File, limits?: DocumentLimits) {
   const mediaType = supportedMediaType(file, limits.acceptedMediaTypes);
   // With neither a reported type nor a known extension there is nothing to judge; the service decides.
   if (!mediaType && (file.type !== "" || /\.[a-z0-9]+$/i.test(file.name))) {
-    return refusalGuidance.UNSUPPORTED_FILE(file.name, limits);
+    return refusalGuidance.UNSUPPORTED_FILE(file.name, limits, t);
   }
   if (file.size > limits.maxFileBytes) {
-    return refusalGuidance.FILE_TOO_LARGE(file.name, limits);
+    return refusalGuidance.FILE_TOO_LARGE(file.name, limits, t);
   }
-  return mediaType && mediaType !== "application/pdf" ? pixelPrecheck(file, limits) : undefined;
+  return mediaType && mediaType !== "application/pdf" ? pixelPrecheck(file, limits, t) : undefined;
 }
 
 /** Uses the browser's own image decoder for dimensions only; an image it cannot read is the service's call. */
-async function pixelPrecheck(file: File, limits: DocumentLimits) {
+async function pixelPrecheck(file: File, limits: DocumentLimits, t: Copy) {
   if (typeof createImageBitmap !== "function") {
     return undefined;
   }
@@ -234,10 +200,10 @@ async function pixelPrecheck(file: File, limits: DocumentLimits) {
   }
   try {
     if (bitmap.width < limits.minWidth || bitmap.height < limits.minHeight) {
-      return refusalGuidance.RESOLUTION_TOO_LOW(file.name, limits);
+      return refusalGuidance.RESOLUTION_TOO_LOW(file.name, limits, t);
     }
     if (bitmap.width * bitmap.height > limits.maxPixels) {
-      return refusalGuidance.PIXEL_LIMIT_EXCEEDED(file.name, limits);
+      return refusalGuidance.PIXEL_LIMIT_EXCEEDED(file.name, limits, t);
     }
     return undefined;
   } finally {
@@ -254,14 +220,13 @@ function uploadKey(file: File) {
   return `upload-${file.size}-${file.lastModified}-${file.name.replace(/[^\x20-\x7e]/g, "").slice(-80)}`;
 }
 
-function pageWarnings(pages: PageQuality[] = []) {
+function pageWarnings(pages: PageQuality[] = [], t: Copy) {
   return pages.flatMap(page =>
     [
-      page.likelyMissing && `Page ${page.pageNumber} suggests a page of this document is missing.`,
-      page.likelyDuplicate && `Page ${page.pageNumber} repeats another page of this document.`,
-      page.likelyRotated && `Page ${page.pageNumber} looks rotated.`,
-      page.likelyCropped
-        && `Page ${page.pageNumber} looks cropped, so an amount near an edge may be cut off.`,
+      page.likelyMissing && fillCopy(t.pageMissing, { page: page.pageNumber }),
+      page.likelyDuplicate && fillCopy(t.pageDuplicate, { page: page.pageNumber }),
+      page.likelyRotated && fillCopy(t.pageRotated, { page: page.pageNumber }),
+      page.likelyCropped && fillCopy(t.pageCropped, { page: page.pageNumber }),
     ].filter((warning): warning is string => typeof warning === "string"));
 }
 
@@ -295,6 +260,7 @@ export function DealerDocumentUpload({
   /** Paperwork already chosen elsewhere, sent once through the same pre-checks. */
   initialFiles?: File[];
 }) {
+  const { m: { paperwork: { dealerDocumentUpload: t } }, fill } = useMessages();
   const [limits, setLimits] = useState<DocumentLimits>();
   const [limitsSettled, setLimitsSettled] = useState(false);
   const initialSent = useRef(false);
@@ -344,7 +310,7 @@ export function DealerDocumentUpload({
     for (const file of chosen) {
       const key = crypto.randomUUID();
       setUploads(current => [...current, { key, filename: file.name, state: "SENDING" }]);
-      const refusal = await precheck(file, limits);
+      const refusal = await precheck(file, limits, t);
       if (refusal) {
         update(key, { state: "REFUSED", problem: refusal });
         onFailed?.();
@@ -374,7 +340,7 @@ export function DealerDocumentUpload({
         const { code, detail } = await problem(response);
         update(key, {
           state: "REFUSED",
-          problem: refusalMessage(file.name, response.status, code, detail, limits),
+          problem: refusalMessage(file.name, response.status, code, detail, limits, t),
         });
         onFailed?.();
         return;
@@ -390,7 +356,7 @@ export function DealerDocumentUpload({
     } catch {
       update(key, {
         state: "REFUSED",
-        problem: refusalMessage(file.name, 0, undefined, undefined, limits),
+        problem: refusalMessage(file.name, 0, undefined, undefined, limits, t),
       });
       onFailed?.();
     }
@@ -408,7 +374,7 @@ export function DealerDocumentUpload({
           const { code, detail } = await problem(response);
           update(item.key, {
             state: "REFUSED",
-            problem: refusalMessage(item.filename, response.status, code, detail, limits),
+            problem: refusalMessage(item.filename, response.status, code, detail, limits, t),
           });
         }
         return;
@@ -417,7 +383,7 @@ export function DealerDocumentUpload({
       const change: Partial<Upload> = { stage: operation.stage, problem: undefined };
       if (operation.stage === "FAILED") {
         change.failedAt = operation.updatedAt;
-        change.problem = failureMessage(operation, item.filename, limits);
+        change.problem = failureMessage(operation, item.filename, limits, t);
       }
       if (operation.stage === "EXTRACTION_COMPLETE") {
         change.pages = (await pagesOf(item.documentId)) ?? item.pages;
@@ -461,7 +427,7 @@ export function DealerDocumentUpload({
         const { code, detail } = await problem(response);
         update(item.key, {
           retrying: false,
-          problem: refusalMessage(item.filename, response.status, code, detail, limits),
+          problem: refusalMessage(item.filename, response.status, code, detail, limits, t),
         });
         return;
       }
@@ -511,31 +477,24 @@ export function DealerDocumentUpload({
     <section className="panel" aria-labelledby={heading?.id ?? "documents-heading"}>
       <div className="section-heading">
         <div>
-          <p className="step">{heading?.step ?? "Dealer paperwork"}</p>
-          <h2 id={heading?.id ?? "documents-heading"}>{heading?.title ?? "Add the Dealer's paperwork"}</h2>
+          <p className="step">{heading?.step ?? t.step}</p>
+          <h2 id={heading?.id ?? "documents-heading"}>{heading?.title ?? t.title}</h2>
         </div>
       </div>
 
-      <p className="muted">
-        Photograph every page of the buyer's order, quote, or worksheet, or attach a PDF the Dealer
-        sent you. The service reads the pages; nothing is read on this device.
-      </p>
+      <p className="muted">{t.intro}</p>
       <p className="muted">
         {limits
-          ? `PDF, JPEG, PNG, and HEIC · up to ${fileSizeLimit(limits.maxFileBytes)} per file `
-            + `· up to ${limits.maxPages} pages per document · up to ${pixelLimit(limits.maxPixels)} per photo.`
-          : "PDF, JPEG, PNG, and HEIC are accepted."}
+          ? fill(t.limits, { size: fileSizeLimit(limits.maxFileBytes, t), pages: String(limits.maxPages), pixels: pixelLimit(limits.maxPixels, t) })
+          : t.accepted}
       </p>
 
       {replacing && (
-        <p className="notice">
-          Choose the missing or corrected pages of “{replacing}”. They are added as another document
-          and processed the same way.
-        </p>
+        <p className="notice">{fill(t.replacing, { file: replacing })}</p>
       )}
 
       <label>
-        Dealer paperwork (PDF or photos)
+        {t.chooser}
         <input
           ref={chooser}
           type="file"
@@ -547,7 +506,7 @@ export function DealerDocumentUpload({
       </label>
 
       <label>
-        Photograph a page with your camera
+        {t.camera}
         <input
           type="file"
           name="photograph"
@@ -559,9 +518,9 @@ export function DealerDocumentUpload({
       </label>
 
       {uploads.length > 0 && (
-        <ul className="upload-list" aria-label="Uploaded paperwork">
+        <ul className="upload-list" aria-label={t.uploads}>
           {uploads.map(item => {
-            const warnings = pageWarnings(item.pages);
+            const warnings = pageWarnings(item.pages, t);
             const stage = item.state === "SENDING" ? "SENDING" : item.stage;
             return (
               <li key={item.key} className="upload-item">
@@ -571,7 +530,7 @@ export function DealerDocumentUpload({
                   <>
                     <p className="operation" role="status">
                       {!terminal(stage) && <span className="spinner" aria-hidden="true" />}
-                      {STAGE_LABELS[stage ?? ""] ?? stage}
+                      {(t.stages as Record<string, string>)[stage ?? ""] ?? stage}
                     </p>
                     {stage !== "FAILED" && (
                       <ol className="stage-track" aria-hidden="true">
@@ -596,7 +555,7 @@ export function DealerDocumentUpload({
                       onClick={() => retryProcessing(item)}
                       disabled={item.retrying}
                     >
-                      {item.retrying ? "Retrying…" : "Retry processing"}
+                      {item.retrying ? t.retrying : t.retry}
                     </button>
                   </div>
                 )}
@@ -604,7 +563,7 @@ export function DealerDocumentUpload({
                 {warnings.length > 0 && (
                   <div className="notice">
                     <div>
-                      <strong>Check these pages before the terms are verified</strong>
+                      <strong>{t.checkPages}</strong>
                       <ul>
                         {warnings.map(warning => (
                           <li key={warning}>{warning}</li>
@@ -615,7 +574,7 @@ export function DealerDocumentUpload({
                         className="btn-secondary"
                         onClick={() => addOrReplacePages(item)}
                       >
-                        Add or replace pages
+                        {t.addOrReplace}
                       </button>
                     </div>
                   </div>

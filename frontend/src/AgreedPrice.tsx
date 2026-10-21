@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { DealerHandoff } from "./DealerHandoff";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
 import * as format from "./i18n/format";
+import { useMessages } from "./i18n/LanguageProvider";
 
 type SentQuote = { id: string; dealerAddress: string; state: string };
 type Source = { offerVersion: number | null };
@@ -13,6 +14,7 @@ type View = { requests: Draft[]; agreedPrice: null | { offerVersion: number; bas
 export function AgreedPrice({ caseId, token, quotes, sources, onChanged }: {
   caseId: string; token: string; quotes: SentQuote[]; sources: Source[]; onChanged: () => Promise<void>;
 }) {
+  const { m: { paperwork: { agreedPrice: t } }, fill } = useMessages();
   const [view, setView] = useState<View>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -22,12 +24,12 @@ export function AgreedPrice({ caseId, token, quotes, sources, onChanged }: {
     const response = await fetch(url, { method: body === undefined ? "GET" : "POST", headers: {
       "Case-Access-Token": token, "Content-Type": "application/json", "Idempotency-Key": key.current,
     }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
-    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail ?? "The quote could not be updated. Try refreshing.");
+    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail ?? t.updateFailed);
     return response.json();
   }
   async function refresh() {
     const value = await request(path);
-    if (!Array.isArray(value.requests) || !("agreedPrice" in value)) throw new Error("Acceptance status is unavailable. Try refreshing.");
+    if (!Array.isArray(value.requests) || !("agreedPrice" in value)) throw new Error(t.statusUnavailable);
     setView(value);
   }
   useEffect(() => {
@@ -35,7 +37,7 @@ export function AgreedPrice({ caseId, token, quotes, sources, onChanged }: {
     setView(undefined); setError(undefined);
     request(path).then(value => {
       if (current && Array.isArray(value.requests) && "agreedPrice" in value) setView(value);
-    }).catch(() => { if (current) setError("Acceptance status is unavailable. Try refreshing."); });
+    }).catch(() => { if (current) setError(t.statusUnavailable); });
     return () => { current = false; };
     // Credentials define the acceptance session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -50,7 +52,7 @@ export function AgreedPrice({ caseId, token, quotes, sources, onChanged }: {
     setBusy(true); setError(undefined);
     try {
       const response = await fetch(`${path}/summary`, { headers: { "Case-Access-Token": token } });
-      if (!response.ok) throw new Error("The summary could not be downloaded. Try again.");
+      if (!response.ok) throw new Error(t.downloadFailed);
       const url = URL.createObjectURL(await response.blob());
       const link = document.createElement("a"); link.href = url; link.download = "agreed-price.html";
       link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -67,53 +69,53 @@ export function AgreedPrice({ caseId, token, quotes, sources, onChanged }: {
   }
   const versions = [...new Set(sources.flatMap(source => source.offerVersion === null ? [] : [source.offerVersion]))].sort((a, b) => b - a);
   return <section className="panel agreed-price-panel" aria-labelledby="agreed-price-heading">
-    <h2 id="agreed-price-heading">Accept a written quote</h2>
-    <p>Acceptance is subject to a test drive and final paperwork matching the quote. Review and verify the itemized source and price boundaries first.</p>
+    <h2 id="agreed-price-heading">{t.heading}</h2>
+    <p>{t.intro}</p>
     {view?.agreedPrice ? <>
-      <p role="status">Agreed Price saved from verified offer {view.agreedPrice.offerVersion}. Approved Baseline version {view.agreedPrice.baselineVersion}.</p>
-      <p>Accepted by {view.agreedPrice.actor} at {format.dateTime(view.agreedPrice.acceptedAt)}.</p>
+      <p role="status">{fill(t.saved, { offer: view.agreedPrice.offerVersion, baseline: view.agreedPrice.baselineVersion })}</p>
+      <p>{fill(t.acceptedBy, { actor: view.agreedPrice.actor, time: format.dateTime(view.agreedPrice.acceptedAt) })}</p>
       {view.agreedPrice.journey.otherOpenNegotiations.length > 0 && <>
-        <p>Choose whether to pause or stop other open negotiations in your journey.</p>
+        <p>{t.chooseOthers}</p>
         <ul>{view.agreedPrice.journey.otherOpenNegotiations.map(other => <li key={other.caseId}>
           <p>{other.label}</p>
-          <button type="button" disabled={busy} onClick={() => void chooseOther(other.caseId, "PAUSE")}>Pause {other.label}</button>
-          <button type="button" disabled={busy} onClick={() => void chooseOther(other.caseId, "STOP")}>Stop {other.label}</button>
+          <button type="button" disabled={busy} onClick={() => void chooseOther(other.caseId, "PAUSE")}>{fill(t.pause, { label: other.label })}</button>
+          <button type="button" disabled={busy} onClick={() => void chooseOther(other.caseId, "STOP")}>{fill(t.stop, { label: other.label })}</button>
         </li>)}</ul>
       </>}
-      <button type="button" disabled={busy} onClick={() => void download()}>Download one-page Agreed Price summary</button>
-      <p>Open the downloaded HTML file to view or print the summary to bring to the dealership.</p>
+      <button type="button" disabled={busy} onClick={() => void download()}>{t.download}</button>
+      <p>{t.openDownloaded}</p>
     </> : view && <form onSubmit={event => {
       event.preventDefault(); const values = new FormData(event.currentTarget);
       void update(path, { quoteRequestId: values.get("conversation"), offerVersion: values.get("offer") ? Number(values.get("offer")) : null });
     }}>
-      <label>Dealer conversation<select name="conversation" required disabled={busy}>
-        <option value="">Choose a sent request</option>{quotes.filter(quote => quote.state === "SENT").map(quote =>
+      <label>{t.conversation}<select name="conversation" required disabled={busy}>
+        <option value="">{t.chooseSent}</option>{quotes.filter(quote => quote.state === "SENT").map(quote =>
           <option key={quote.id} value={quote.id}>{quote.dealerAddress}</option>)}
       </select></label>
-      <label>Quote to accept<select name="offer" disabled={busy}>
-        <option value="">Verbal or partial figure — ask for written confirmation</option>
-        {versions.map(version => <option key={version} value={version}>Verified offer {version}</option>)}
+      <label>{t.quoteToAccept}<select name="offer" disabled={busy}>
+        <option value="">{t.verbal}</option>
+        {versions.map(version => <option key={version} value={version}>{fill(t.verifiedOffer, { version })}</option>)}
       </select></label>
-      <button disabled={busy}>Review acceptance or confirmation request</button>
+      <button disabled={busy}>{t.review}</button>
     </form>}
     {view?.requests.map(draft => <article className="card" key={draft.id}>
-      <h3>{draft.kind === "ACCEPTANCE" ? `Accept verified offer ${draft.offerVersion}` : "Request written confirmation"}</h3>
+      <h3>{draft.kind === "ACCEPTANCE" ? fill(t.acceptOffer, { version: String(draft.offerVersion) }) : t.requestConfirmation}</h3>
       <p>{draft.gatedDraft.draft.text}</p>
-      {draft.kind === "ACCEPTANCE" && <p>Once you send it and tell us, the Agreed Price is saved with an Approved Baseline from reviewed price plan {draft.planVersion}.</p>}
+      {draft.kind === "ACCEPTANCE" && <p>{fill(t.onceSent, { plan: String(draft.planVersion) })}</p>}
       <OutboundGateDecision decision={draft.gatedDraft.decision} />
       {draft.state === "DRAFT" ? <button type="button" disabled={busy || !draft.gatedDraft.decision.pass || Boolean(view.agreedPrice)}
         onClick={() => void update(`${path}/${encodeURIComponent(draft.id)}/approval`, { approved: true, text: draft.gatedDraft.draft.text })}>
-        {draft.kind === "ACCEPTANCE" ? "Approve this acceptance text and baseline" : "Approve written-confirmation text"}
+        {draft.kind === "ACCEPTANCE" ? t.approveAcceptance : t.approveConfirmation}
       </button> : draft.state === "HANDED_OFF" && draft.messageId
         ? <DealerHandoff caseId={caseId} token={token} messageId={draft.messageId}
           onChanged={async () => { await refresh(); await onChanged(); }} />
         : <p role="status">{draft.state === "SENT"
-        ? draft.kind === "ACCEPTANCE" ? "Conditional acceptance message sent." : "Written confirmation requested. Review and verify the dealer's reply before accepting."
-        : draft.state === "BLOCKED" ? "The mandate or quote changed. Prepare a new request."
-        : draft.state === "DISCARDED" ? "Discarded. It was not sent."
-        : "Delivery was not confirmed. Check the conversation before preparing another request."}</p>}
+        ? draft.kind === "ACCEPTANCE" ? t.sentAcceptance : t.sentConfirmation
+        : draft.state === "BLOCKED" ? t.blocked
+        : draft.state === "DISCARDED" ? t.discarded
+        : t.unconfirmed}</p>}
     </article>)}
-    <button type="button" disabled={busy} onClick={() => { setError(undefined); void refresh().catch(failure => setError((failure as Error).message)); }}>Refresh acceptance status</button>
+    <button type="button" disabled={busy} onClick={() => { setError(undefined); void refresh().catch(failure => setError((failure as Error).message)); }}>{t.refresh}</button>
     {error && <p role="alert">{error}</p>}
   </section>;
 }

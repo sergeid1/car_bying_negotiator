@@ -34,23 +34,7 @@ const ACCOUNT_PENDING = [
 ];
 
 /** Journey: the dealer's paperwork and the report; copy in en/paperwork.ts. */
-const PAPERWORK_PENDING = [
-  "AgreedPrice.tsx",
-  "CoreDealReport.tsx",
-  "DealerAddOns.tsx",
-  "DealerDocumentUpload.tsx",
-  "DocFeeFindings.tsx",
-  "EvidenceSource.tsx",
-  "GovernmentFees.tsx",
-  "OfferVerification.tsx",
-  "PilotFeedback.tsx",
-  "ReportExplanation.tsx",
-  "ReportTotalMeasure.tsx",
-  "RevisedOfferReview.tsx",
-  "SampleReport.tsx",
-  "VehicleSafety.tsx",
-  "VerifiedOfferAnalysis.tsx",
-];
+const PAPERWORK_PENDING: string[] = [];
 
 /** Journey: at the dealer; copy in en/dealer.ts. */
 const DEALER_PENDING = [

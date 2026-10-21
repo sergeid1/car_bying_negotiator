@@ -1,5 +1,8 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import * as format from "./i18n/format";
+import { en } from "./i18n/en";
+import { fillIn, type Message, type Values } from "./i18n/messages";
+import { useMessages, type Messages } from "./i18n/LanguageProvider";
 
 type EvidenceRegion = { pageNumber: number; x: number; y: number; width: number; height: number };
 
@@ -41,38 +44,6 @@ type Decision = "CONFIRMED" | "CORRECTED" | "SUGGESTION";
 /** Terms read with less confidence than this are flagged for a closer look at the source page. */
 const LOW_CONFIDENCE = 0.85;
 
-const FIELD_LABELS: Record<string, string> = {
-  SELLING_PRICE: "Selling price",
-  DISCOUNT_TOTAL: "Discounts",
-  REBATE_TOTAL: "Rebates",
-  SUBTOTAL: "Subtotal",
-  TAX_TOTAL: "Taxes",
-  DEALER_CHARGES_TOTAL: "Dealer charges",
-  GOVERNMENT_CHARGES_TOTAL: "Government charges",
-  ADD_ON_TOTAL: "Add-ons",
-  TRADE_ALLOWANCE: "Trade-in allowance",
-  TRADE_PAYOFF: "Trade-in payoff",
-  CASH_DOWN: "Cash down",
-  OUT_THE_DOOR_TOTAL: "Out-the-door total",
-  AMOUNT_FINANCED: "Amount financed",
-  APR: "APR",
-  TERM_MONTHS: "Loan term",
-  MONTHLY_PAYMENT: "Monthly payment",
-  FINANCE_CHARGE: "Finance charge",
-  TOTAL_OF_PAYMENTS: "Total of payments",
-  VEHICLE_VIN: "VIN",
-  TRADE_VIN: "Trade-in VIN",
-  VEHICLE_YEAR: "Vehicle year",
-  VEHICLE_MAKE: "Vehicle make",
-  VEHICLE_MODEL: "Vehicle model",
-  VEHICLE_TRIM: "Vehicle trim",
-  DOCUMENT_NUMBER: "Document number",
-  DEALER_NAME: "Dealer name",
-  BUYER_NAME: "Buyer name",
-  OFFER_DATE: "Offer date",
-  CONDITIONAL_LANGUAGE: "Conditions",
-};
-
 const CATEGORIES = [
   "SELLING_PRICE", "DISCOUNT", "REBATE", "DEALER_FEE", "ADD_ON", "TAX",
   "GOVERNMENT_CHARGE", "TRADE", "CREDIT", "UNKNOWN",
@@ -85,17 +56,28 @@ function humanize(value: string) {
   return words[0].toUpperCase() + words.slice(1);
 }
 
-const fieldLabel = (field: string) => FIELD_LABELS[field] ?? humanize(field);
+type Copy = Messages["paperwork"]["offerVerification"];
+
+/** English, for a caller outside a component; components pass the current language's copy. */
+const ENGLISH: Copy = en.paperwork.offerVerification;
+
+function fillCopy<M extends Message>(message: M, values: Values<M>) {
+  return fillIn(format.locale(), message, values);
+}
+
+const fieldLabel = (field: string, t: Copy) => (t.fields as Record<string, string>)[field] ?? humanize(field);
+const categoryLabel = (category: string, t: Copy) => (t.categories as Record<string, string>)[category] ?? humanize(category);
+const lineLabel = (label: string, t: Copy) => fillCopy(t.lineItem, { label });
 
 function money(minor: number, currency = "USD") {
   return format.money(minor, { currency });
 }
 
-export function formatValue(value: string | null | undefined, unit: string) {
-  if (value == null || value === "") return "Not found on the paperwork";
+export function formatValue(value: string | null | undefined, unit: string, t: Copy = ENGLISH) {
+  if (value == null || value === "") return t.notFound;
   if (unit === "USD_MINOR" && /^-?\d+$/.test(value)) return money(Number(value));
   if (unit === "PERCENT") return `${value}%`;
-  if (unit === "MONTH") return `${value} months`;
+  if (unit === "MONTH") return fillCopy(t.months, { value });
   return value;
 }
 
@@ -120,7 +102,7 @@ const mustCorrect = (candidate: Candidate) => candidate.material && !candidateVa
 type Change = { term: string; before: string; after: string };
 
 /** Every term that differs between two consecutive frozen versions, including added and removed ones. */
-export function offerChanges(previous: DealerOffer, current: DealerOffer): Change[] {
+export function offerChanges(previous: DealerOffer, current: DealerOffer, t: Copy = ENGLISH): Change[] {
   const keyed = <T,>(items: T[], key: (item: T) => string) => {
     const seen = new Map<string, number>();
     return new Map(items.map(item => {
@@ -139,13 +121,13 @@ export function offerChanges(previous: DealerOffer, current: DealerOffer): Chang
     }
   };
   const candidates = (offer: DealerOffer) =>
-    keyed(offer.terms.candidates ?? [], item => fieldLabel(item.field));
+    keyed(offer.terms.candidates ?? [], item => fieldLabel(item.field, t));
   compare(candidates(previous), candidates(current),
-    item => (item ? formatValue(item.value, item.unit) : "Not in this version"));
+    item => (item ? formatValue(item.value, item.unit, t) : t.notInVersion));
   const lines = (offer: DealerOffer) =>
-    keyed(offer.terms.lineItems ?? [], item => `Line item “${item.originalLabel}”`);
+    keyed(offer.terms.lineItems ?? [], item => lineLabel(item.originalLabel, t));
   compare(lines(previous), lines(current),
-    item => (item ? `${money(item.amountMinor, item.currency)} · ${humanize(item.category)}` : "Not in this version"));
+    item => (item ? `${money(item.amountMinor, item.currency)} · ${categoryLabel(item.category, t)}` : t.notInVersion));
   return changes;
 }
 
@@ -173,6 +155,7 @@ async function detail(response: Response, fallback: string) {
 export function OfferVerification({
   caseId, token, onOfferFrozen,
 }: { caseId: string; token: string; onOfferFrozen?: (offer: { version: number }) => void }) {
+  const { m: { paperwork: { offerVerification: t } }, fill } = useMessages();
   const [documents, setDocuments] = useState<SourceDocument[]>([]);
   const [documentId, setDocumentId] = useState<string>();
   const [extraction, setExtraction] = useState<Extraction>();
@@ -298,7 +281,7 @@ export function OfferVerification({
           body: JSON.stringify({ targetType, targetId: id, ...body }),
         });
       if (!response.ok) {
-        setError(await detail(response, "The correction was not saved. Check the value and try again."));
+        setError(await detail(response, t.correctionFailed));
         return false;
       }
       setFrozen(undefined);
@@ -306,7 +289,7 @@ export function OfferVerification({
       await loadExtraction(extraction.documentId, true);
       return true;
     } catch {
-      setError("The correction was not saved. Check your connection and try again.");
+      setError(t.correctionOffline);
       return false;
     } finally {
       setBusy(false);
@@ -345,21 +328,21 @@ export function OfferVerification({
           ...(confirmedSuggestionLineItemIds.length > 0 ? { confirmedSuggestionLineItemIds } : {}) }),
       });
       if (!response.ok) {
-        setError(await detail(response, "The Dealer Offer was not frozen. Try again."));
+        setError(await detail(response, t.freezeFailed));
         return;
       }
       const offer: DealerOffer = await response.json();
-      setFrozen(`Dealer Offer version ${offer.version} is frozen. Later corrections create a new version; this one does not change.`);
+      setFrozen(fill(t.frozen, { version: offer.version }));
       onOfferFrozen?.({ version: offer.version });
       await loadOffers();
     } catch {
-      setError("The Dealer Offer was not frozen. Check your connection and try again.");
+      setError(t.freezeOffline);
     } finally {
       setBusy(false);
     }
   }
 
-  const filename = documents.find(document => document.id === extraction?.documentId)?.originalFilename ?? "the paperwork";
+  const filename = documents.find(document => document.id === extraction?.documentId)?.originalFilename ?? t.thePaperwork;
   const pageFor = (item: { evidence: EvidenceRegion }) =>
     extraction ? pages[`${extraction.documentId}:${item.evidence.pageNumber}`] : undefined;
   const rowProps = { busy, filename, onConfirm: confirm, onCorrect: correct, decisions, pageFor };
@@ -372,29 +355,26 @@ export function OfferVerification({
     <section className="panel verify-panel" aria-labelledby="verify-heading">
       <div className="section-heading">
         <div>
-          <p className="step">Dealer offer</p>
-          <h2 id="verify-heading">Check the terms against the paperwork</h2>
+          <p className="step">{t.step}</p>
+          <h2 id="verify-heading">{t.heading}</h2>
         </div>
       </div>
-      <p className="muted">
-        Compare each term with the highlighted area of its page. Confirm it, or enter what the page
-        actually says. The value read from the paperwork is kept alongside anything you enter.
-      </p>
+      <p className="muted">{t.intro}</p>
 
-      {loading && <p className="operation" role="status"><span className="spinner" aria-hidden="true" />Loading read terms</p>}
+      {loading && <p className="operation" role="status"><span className="spinner" aria-hidden="true" />{t.loading}</p>}
 
       {!loading && !extraction && (
         <div className="notice">
           <div>
-            <p>No terms have been read from this case's paperwork yet.</p>
-            <button type="button" className="btn-secondary" onClick={loadDocuments}>Check for read paperwork</button>
+            <p>{t.noTerms}</p>
+            <button type="button" className="btn-secondary" onClick={loadDocuments}>{t.checkAgain}</button>
           </div>
         </div>
       )}
 
       {documents.length > 1 && extraction && (
         <label>
-          Paperwork to verify
+          {t.paperworkToVerify}
           <select value={documentId} onChange={event => chooseDocument(event.target.value)}>
             {documents.map(document => <option key={document.id} value={document.id}>{document.originalFilename}</option>)}
           </select>
@@ -404,10 +384,10 @@ export function OfferVerification({
       {extraction && (
         <>
           <p className="muted verify-provenance">
-            Read from “{filename}” · extraction version {extraction.version} · {extraction.extractorVersion} / {extraction.modelVersion}
+            {fill(t.provenance, { file: filename, version: extraction.version, extractor: extraction.extractorVersion, model: extraction.modelVersion })}
           </p>
 
-          <ul className="verify-list" aria-label="Deal terms read from the paperwork">
+          <ul className="verify-list" aria-label={t.termsList}>
             {extraction.candidates.filter(item => !isTradeCandidate(item)).map(item =>
               <CandidateRow key={item.id} item={item} {...rowProps} />)}
             {extraction.lineItems.filter(item => !isTradeLine(item)).map(item =>
@@ -416,12 +396,9 @@ export function OfferVerification({
 
           {(tradeCandidates.length > 0 || tradeLines.length > 0) && (
             <section className="verify-trade" aria-labelledby="trade-heading">
-              <h3 id="trade-heading">Trade-in terms on the paperwork</h3>
-              <p className="muted">
-                Recorded exactly as the paperwork states them and kept apart from the purchase terms.
-                This review does not rate or value the trade-in.
-              </p>
-              <ul className="verify-list" aria-label="Trade-in terms read from the paperwork">
+              <h3 id="trade-heading">{t.tradeHeading}</h3>
+              <p className="muted">{t.tradeIntro}</p>
+              <ul className="verify-list" aria-label={t.tradeList}>
                 {tradeCandidates.map(item => <CandidateRow key={item.id} item={item} {...rowProps} />)}
                 {tradeLines.map(item => <LineItemRow key={item.id} item={item} {...rowProps} />)}
               </ul>
@@ -431,11 +408,11 @@ export function OfferVerification({
           <div className="verify-freeze">
             <p id="verify-remaining" role="status">
               {undecided.length === 0
-                ? "Every term has your decision."
-                : `${undecided.length} ${undecided.length === 1 ? "term still needs" : "terms still need"} your decision before the Dealer Offer can be frozen.`}
+                ? t.allDecided
+                : fill(t.remaining, { count: undecided.length })}
             </p>
             <button type="button" onClick={freeze} disabled={busy || undecided.length > 0 || Boolean(frozen)} aria-describedby="verify-remaining">
-              {busy ? "Saving…" : "Freeze this Dealer Offer"}
+              {busy ? t.saving : t.freeze}
             </button>
           </div>
         </>
@@ -446,21 +423,21 @@ export function OfferVerification({
 
       {offers.length > 0 && (
         <section className="verify-versions" aria-labelledby="versions-heading">
-          <h3 id="versions-heading">Saved versions of the dealer offer</h3>
-          <p className="muted">Frozen versions never change. Each later freeze adds a new version.</p>
+          <h3 id="versions-heading">{t.versionsHeading}</h3>
+          <p className="muted">{t.versionsIntro}</p>
           {offers.length > 1 && (
             <label>
-              Compare version
+              {t.compareVersion}
               <select value={compared} onChange={event => setCompared(Number(event.target.value))}>
                 {offers.slice(1).map(offer => (
                   <option key={offer.version} value={offer.version}>
-                    Version {offer.version} with version {offer.version - 1}
+                    {fill(t.versionWith, { version: offer.version, previous: offer.version - 1 })}
                   </option>
                 ))}
               </select>
             </label>
           )}
-          {current && !previous && <p>Version {current.version} is the first frozen Dealer Offer.</p>}
+          {current && !previous && <p>{fill(t.firstVersion, { version: current.version })}</p>}
           {current && previous && <VersionChanges previous={previous} current={current} />}
         </section>
       )}
@@ -469,15 +446,17 @@ export function OfferVerification({
 }
 
 function VersionChanges({ previous, current }: { previous: DealerOffer; current: DealerOffer }) {
-  const changes = offerChanges(previous, current);
+  const { m: { paperwork: { offerVerification: t } }, fill } = useMessages();
+  const changes = offerChanges(previous, current, t);
+  const versions = { previous: previous.version, current: current.version };
   if (changes.length === 0) {
-    return <p>No terms differ between version {previous.version} and version {current.version}.</p>;
+    return <p>{fill(t.noDifferences, versions)}</p>;
   }
   return (
     <table className="verify-changes">
-      <caption>Terms that differ between version {previous.version} and version {current.version}</caption>
+      <caption>{fill(t.differences, versions)}</caption>
       <thead>
-        <tr><th scope="col">Term</th><th scope="col">Version {previous.version}</th><th scope="col">Version {current.version}</th></tr>
+        <tr><th scope="col">{t.term}</th><th scope="col">{fill(t.version, { version: previous.version })}</th><th scope="col">{fill(t.version, { version: current.version })}</th></tr>
       </thead>
       <tbody>
         {changes.map(change => (
@@ -500,50 +479,54 @@ type RowProps = {
 function SourcePage({ evidence, image, filename, term }: {
   evidence: EvidenceRegion; image?: string; filename: string; term: string;
 }) {
+  const { m: { paperwork: { offerVerification: t, common } }, fill } = useMessages();
   const percent = (value: number) => `${Math.round(Math.min(1, Math.max(0, value)) * 10000) / 100}%`;
   return (
     <figure className="source-page">
       <div className="source-page-frame">
         {image
-          ? <img src={image} alt={`Page ${evidence.pageNumber} of “${filename}”, where ${term} was read`} />
-          : <div className="source-page-placeholder" role="img" aria-label={`Page ${evidence.pageNumber} of “${filename}” is not available to show`} />}
+          ? <img src={image} alt={fill(t.pageImage, { page: evidence.pageNumber, file: filename, term })} />
+          : <div className="source-page-placeholder" role="img" aria-label={fill(t.pageUnavailable, { page: evidence.pageNumber, file: filename })} />}
         <span
           className="source-region"
           aria-hidden="true"
           style={{ left: percent(evidence.x), top: percent(evidence.y), width: percent(evidence.width), height: percent(evidence.height) }}
         />
       </div>
-      <figcaption>Page {evidence.pageNumber} · outlined where it was read</figcaption>
+      <figcaption>{fill(common.pageOutlined, { page: evidence.pageNumber })}</figcaption>
     </figure>
   );
 }
 
 function DecisionBadge({ decision, lowConfidence, missing }: { decision?: Decision; lowConfidence: boolean; missing: boolean }) {
+  const { m: { paperwork: { offerVerification: t } } } = useMessages();
   return (
     <p className="verify-badges">
-      {missing && <span className="verify-flag">Missing</span>}
-      {lowConfidence && !missing && <span className="verify-flag">Low confidence</span>}
+      {missing && <span className="verify-flag">{t.missing}</span>}
+      {lowConfidence && !missing && <span className="verify-flag">{t.lowConfidence}</span>}
       <span className={decision ? "verify-state verify-done" : "verify-state"}>
-        {decision === "CONFIRMED" ? "Confirmed" : decision === "CORRECTED" ? "Corrected by you"
-          : decision === "SUGGESTION" ? "Named by you" : "Needs your decision"}
+        {decision === "CONFIRMED" ? t.confirmed : decision === "CORRECTED" ? t.corrected
+          : decision === "SUGGESTION" ? t.named : t.needsDecision}
       </span>
     </p>
   );
 }
 
 function CorrectionHistory({ history, show }: { history: Correction[]; show: (correction: Correction) => string }) {
+  const { m: { paperwork: { offerVerification: t } }, fill } = useMessages();
   if (history.length < 2) return null;
   return (
     <details className="verify-history">
-      <summary>Earlier corrections</summary>
-      <ol>{history.map(correction => <li key={correction.id}>Correction {correction.version}: {show(correction)}</li>)}</ol>
+      <summary>{t.earlierCorrections}</summary>
+      <ol>{history.map(correction => <li key={correction.id}>{fill(t.correction, { version: correction.version, value: show(correction) })}</li>)}</ol>
     </details>
   );
 }
 
 function CandidateRow({ item, busy, filename, decisions, pageFor, onConfirm, onCorrect }: RowProps & { item: Candidate }) {
+  const { m: { paperwork: { offerVerification: t } }, fill } = useMessages();
   const [editing, setEditing] = useState(false);
-  const label = fieldLabel(item.field);
+  const label = fieldLabel(item.field, t);
   const decision = decisions[item.id] === "CONFIRMED" && mustCorrect(item) ? undefined : decisions[item.id];
   const missing = !item.normalizedValue;
   const lowConfidence = item.confidence < LOW_CONFIDENCE;
@@ -565,36 +548,36 @@ function CandidateRow({ item, busy, filename, decisions, pageFor, onConfirm, onC
         <h4>{label}</h4>
         <DecisionBadge decision={decision} lowConfidence={lowConfidence} missing={missing && !item.currentCorrection} />
         <dl className="verify-facts">
-          {item.currentCorrection && <div><dt>Your value</dt><dd>{formatValue(item.currentCorrection.normalizedValue, item.normalizedUnit)}</dd></div>}
-          <div><dt>{item.currentCorrection ? "Read from paperwork (kept)" : "Read from paperwork"}</dt><dd>{formatValue(item.normalizedValue, item.normalizedUnit)}</dd></div>
-          <div><dt>Printed as</dt><dd>“{item.originalWording}”</dd></div>
-          <div><dt>Confidence</dt><dd>{Math.round(item.confidence * 100)}%</dd></div>
-          <div><dt>Source</dt><dd>Page {item.evidence.pageNumber} of “{filename}”</dd></div>
+          {item.currentCorrection && <div><dt>{t.yourValue}</dt><dd>{formatValue(item.currentCorrection.normalizedValue, item.normalizedUnit, t)}</dd></div>}
+          <div><dt>{item.currentCorrection ? t.readKept : t.read}</dt><dd>{formatValue(item.normalizedValue, item.normalizedUnit, t)}</dd></div>
+          <div><dt>{t.printedAs}</dt><dd>{fill(t.printed, { wording: item.originalWording })}</dd></div>
+          <div><dt>{t.confidence}</dt><dd>{Math.round(item.confidence * 100)}%</dd></div>
+          <div><dt>{t.source}</dt><dd>{fill(t.sourcePage, { page: item.evidence.pageNumber, file: filename })}</dd></div>
         </dl>
-        <CorrectionHistory history={item.correctionHistory} show={correction => formatValue(correction.normalizedValue, item.normalizedUnit)} />
+        <CorrectionHistory history={item.correctionHistory} show={correction => formatValue(correction.normalizedValue, item.normalizedUnit, t)} />
         <div className="actions">
           {!mustCorrect(item) && (
             <button type="button" className="btn-secondary" disabled={busy} aria-pressed={decision === "CONFIRMED"}
               onClick={() => onConfirm(item.id)}>
-              {missing ? `Confirm ${label} is not on the paperwork` : `Confirm ${label}`}
+              {fill(missing ? t.confirmMissing : t.confirm, { label })}
             </button>
           )}
           <button type="button" className="btn-secondary" disabled={busy} aria-expanded={editing}
             onClick={() => setEditing(value => !value)}>
-            Correct {label}
+            {fill(t.correct, { label })}
           </button>
         </div>
         {editing && (
           <form className="verify-correct" onSubmit={submit}>
             <label htmlFor={inputId}>
-              {label} as shown on page {item.evidence.pageNumber}
-              {item.normalizedUnit === "USD_MINOR" ? " ($)" : item.normalizedUnit === "PERCENT" ? " (%)" : item.normalizedUnit === "MONTH" ? " (months)" : ""}
+              {fill(item.normalizedUnit === "USD_MINOR" ? t.shownOnPageDollars : item.normalizedUnit === "PERCENT" ? t.shownOnPagePercent
+                : item.normalizedUnit === "MONTH" ? t.shownOnPageMonths : t.shownOnPage, { label, page: item.evidence.pageNumber })}
             </label>
             <input id={inputId} name="value" required
               type={item.normalizedUnit === "DATE" ? "date" : "text"}
               inputMode={["USD_MINOR", "PERCENT", "MONTH"].includes(item.normalizedUnit) ? "decimal" : undefined}
               pattern={item.normalizedUnit === "USD_MINOR" ? "\\$?-?[0-9,]+(\\.[0-9]{1,2})?" : undefined} />
-            <button disabled={busy}>Save correction</button>
+            <button disabled={busy}>{t.saveCorrection}</button>
           </form>
         )}
       </div>
@@ -604,8 +587,9 @@ function CandidateRow({ item, busy, filename, decisions, pageFor, onConfirm, onC
 }
 
 function LineItemRow({ item, busy, filename, decisions, pageFor, onConfirm, onCorrect }: RowProps & { item: LineItem }) {
+  const { m: { paperwork: { offerVerification: t } }, fill } = useMessages();
   const [editing, setEditing] = useState(false);
-  const label = `Line item “${item.originalLabel}”`;
+  const label = lineLabel(item.originalLabel, t);
   const decision = decisions[item.id];
   const correction = item.currentCorrection;
   const inputId = `correct-${item.id}`;
@@ -626,46 +610,46 @@ function LineItemRow({ item, busy, filename, decisions, pageFor, onConfirm, onCo
         <h4>{label}</h4>
         <DecisionBadge decision={decision} lowConfidence={item.confidence < LOW_CONFIDENCE} missing={false} />
         <dl className="verify-facts">
-          {correction && <div><dt>Your value</dt><dd>{money(correction.amountMinor ?? 0, item.currency)} · {humanize(correction.category ?? item.category)}</dd></div>}
-          <div><dt>{correction ? "Read from paperwork (kept)" : "Read from paperwork"}</dt><dd>{money(item.amountMinor, item.currency)} · {humanize(item.category)}</dd></div>
-          <div><dt>Confidence</dt><dd>{Math.round(item.confidence * 100)}%</dd></div>
-          <div><dt>Source</dt><dd>Page {item.evidence.pageNumber} of “{filename}”</dd></div>
+          {correction && <div><dt>{t.yourValue}</dt><dd>{money(correction.amountMinor ?? 0, item.currency)} · {categoryLabel(correction.category ?? item.category, t)}</dd></div>}
+          <div><dt>{correction ? t.readKept : t.read}</dt><dd>{money(item.amountMinor, item.currency)} · {categoryLabel(item.category, t)}</dd></div>
+          <div><dt>{t.confidence}</dt><dd>{Math.round(item.confidence * 100)}%</dd></div>
+          <div><dt>{t.source}</dt><dd>{fill(t.sourcePage, { page: item.evidence.pageNumber, file: filename })}</dd></div>
         </dl>
         {item.category === "UNKNOWN" && !correction && !item.suggestedCharge && (
-          <p className="notice">The paperwork does not say what this charge is. Ask the Dealer to explain it.</p>
+          <p className="notice">{t.unknownCharge}</p>
         )}
         {item.suggestedCharge && !correction && (
           <div className="notice verify-suggestion">
-            <p>This looks like {item.suggestedCharge.name}; confirm or change it.</p>
-            <p className="muted">It is named only if you confirm it. To change it, correct the kind of charge below.</p>
+            <p>{fill(t.suggestion, { name: item.suggestedCharge.name })}</p>
+            <p className="muted">{t.suggestionNote}</p>
             <button type="button" className="btn-secondary" disabled={busy} aria-pressed={decision === "SUGGESTION"}
               onClick={() => onConfirm(item.id, "SUGGESTION")}>
-              Confirm “{item.originalLabel}” is {item.suggestedCharge.name}
+              {fill(t.confirmSuggestion, { label: item.originalLabel, name: item.suggestedCharge.name })}
             </button>
           </div>
         )}
         <CorrectionHistory history={item.correctionHistory}
-          show={value => `${money(value.amountMinor ?? 0, item.currency)} · ${humanize(value.category ?? item.category)}`} />
+          show={value => `${money(value.amountMinor ?? 0, item.currency)} · ${categoryLabel(value.category ?? item.category, t)}`} />
         <div className="actions">
           <button type="button" className="btn-secondary" disabled={busy} aria-pressed={decision === "CONFIRMED"}
             onClick={() => onConfirm(item.id)}>
-            Confirm {label}
+            {fill(t.confirm, { label })}
           </button>
           <button type="button" className="btn-secondary" disabled={busy} aria-expanded={editing}
             onClick={() => setEditing(value => !value)}>
-            Correct {label}
+            {fill(t.correct, { label })}
           </button>
         </div>
         {editing && (
           <form className="verify-correct" onSubmit={submit}>
-            <label htmlFor={`${inputId}-amount`}>Amount on page {item.evidence.pageNumber} ($)</label>
+            <label htmlFor={`${inputId}-amount`}>{fill(t.amountOnPage, { page: item.evidence.pageNumber })}</label>
             <input id={`${inputId}-amount`} name="amount" required inputMode="decimal"
               pattern="\$?-?[0-9,]+(\.[0-9]{1,2})?" defaultValue={(lineAmount(item) / 100).toFixed(2)} />
-            <label htmlFor={`${inputId}-category`}>Kind of charge</label>
+            <label htmlFor={`${inputId}-category`}>{t.kindOfCharge}</label>
             <select id={`${inputId}-category`} name="category" defaultValue={lineCategory(item)}>
-              {CATEGORIES.map(category => <option key={category} value={category}>{humanize(category)}</option>)}
+              {CATEGORIES.map(category => <option key={category} value={category}>{categoryLabel(category, t)}</option>)}
             </select>
-            <button disabled={busy}>Save correction</button>
+            <button disabled={busy}>{t.saveCorrection}</button>
           </form>
         )}
       </div>
