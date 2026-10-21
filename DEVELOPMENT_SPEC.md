@@ -1,9 +1,12 @@
 # otdog — Product and Development Specification
 
 Status: Phase 1 (document analysis) built; Phases 2–4 largely built, Phase 3 moving to Buyer-sent email (tickets 82–84); public pilot gated by Section 18 prerequisites; Phase 5 (insurance and loan quotes) specified, not built  
-Version: 2.5  
-Date: 2026-10-18  
-Supersedes: version 2.4 (2026-10-16), in which every Buyer-facing sentence came from a template or was checked
+Version: 2.6\
+Date: 2026-10-20\
+Supersedes: version 2.5 (2026-10-18), which excluded multilingual support. Version 2.6 includes Spanish
+for Buyer screens and findings, records the Spanish decisions of 2026-10-19, and marks the deferred
+choices as working defaults to revisit (ticket 144).
+Version 2.5 superseded version 2.4 (2026-10-16), in which every Buyer-facing sentence came from a template or was checked
 against a finalized report. Version 2.5 adds Toto, an AI process guide that answers a Buyer's questions only from
 reviewed, code-owned guide articles, never sees case data, and cites the articles it answers from
 (`docs/toto-answer-policy.md`).
@@ -231,6 +234,45 @@ Process guide (to build, version 2.5):
   anything outside car buying. It says it is an AI guide and never presents itself as a person or as the
   Buyer's agent. It reaches Buyers only after the operator has reviewed every article.
 
+Spanish (to build, version 2.6):
+
+- Buyer screens and findings are available in Spanish so Spanish-speaking Buyers can understand the
+  app and how to use it. The claim rules in Sections 1.2, 1.3 and 13 and
+  `docs/grounded-language-policy.md` apply in every language a Buyer sees.
+- Further languages, including Russian, French and Haitian Creole, need their own decision ticket.
+
+Decisions recorded on 2026-10-19 (ticket 144; numbers follow the ticket):
+
+- **1. Who translates.** The implementing agent writes the Spanish copy, following working defaults 2
+   and 3 below. A separate human review is not required before release; the operator may add one
+   later, for example before the public pilot. Spanish claim rules still apply: Spanish copy cannot
+   make a claim that English copy may not.
+- **5. Dealer paperwork.** English only. Extraction does not support Spanish-language dealer paperwork.
+   English paperwork's terms are explained in Spanish to a Spanish-speaking Buyer, with each label
+   shown as printed.
+- **8. How the language is chosen.** The header's existing appearance button (moon/sun/monitor icon,
+   `ThemeMenu.tsx`) opens one menu with two groups: **Theme** (System, Light, Dark) and **Language**
+   (English, Español). No separate language button is added. On the first visit, language follows
+   the browser when Spanish comes first. The choice is remembered in the browser and on the Buyer
+   Account. Each Buying Case records the language for its emails and report.
+
+**Working defaults, to revisit later.** The operator deferred the following choices on 2026-10-19.
+Implementing tickets use these defaults until each is confirmed or replaced by a recorded decision;
+they are not final decisions.
+
+- **2. Register and variety.** Neutral US Latin American Spanish, addressing the Buyer as "usted".
+   One Spanish, rather than one per country.
+- **3. Terms dealers use in English.** A code-owned glossary gives the Spanish term and, on its first
+   appearance on each screen, the English term the dealer uses, for example
+   "precio total final (out-the-door)".
+- **4. Dealer email language.** Drafts to dealers stay in English. A Spanish Buyer sees a Spanish
+   reading copy of each draft and approves the exact English text that is sent. Spanish drafts to
+   dealers are not offered yet.
+- **6. Legal documents.** The Spanish site links to the English Terms of Service and Privacy Policy
+   and says they are in English. Translations wait for counsel.
+- **7. Toto.** Toto stays English-only for now (ticket 148 is deferred). On the Spanish site, Toto's
+   panel says in Spanish that it answers in English for now.
+
 ### 2.2 Excluded
 
 - New vehicles, leases, private-party sales, auctions, motorcycles, RVs, and commercial vehicles.
@@ -259,7 +301,7 @@ Process guide (to build, version 2.5):
 - Anything that makes the platform a lead source: dealer-paid leads, placement, referral, appointment,
   or success fees; dealer subscriptions; sale of Buyer data; sharing an application beyond the licensed
   partner and the providers quoting through it; and provider-paid placement or ordering of quotes.
-- Native mobile apps, multilingual support, and Buyer subscriptions. A Buyer-paid success fee is an
+- Native mobile apps, languages beyond English and Spanish, and Buyer subscriptions. A Buyer-paid success fee is an
   open decision in Section 18.
 
 ## 3. Canonical language
@@ -856,7 +898,7 @@ Upload, correction, baseline approval, analysis, export, and deletion operations
 - Complete threat modeling, dependency/container scanning, SAST, secret scanning, upload fuzzing, tenant/access isolation tests, backup restoration, and an incident runbook before public pilot.
 - Before charging Buyers, obtain a jurisdiction-specific legal review of privacy, fee/tax/optionality claims, consumer-protection and savings claims, financial/legal-advice boundaries, retention, and provider terms. A free pilot of the tool model needs published Terms of Service and a Privacy Policy, not counsel sign-off.
 - Do not encode the vacated FTC CARS Rule as active law. Legal requirements are versioned jurisdiction policy maintained from authoritative sources and counsel guidance.
-- Core flows meet WCAG 2.2 AA, including keyboard use, screen-reader labeling, contrast, focus, and non-color warning cues.
+- Core flows meet WCAG 2.2 AA, including keyboard use, screen-reader labeling, contrast, focus, and non-color warning cues; the page declares its language.
 - The platform never contacts a dealer in its own name, so it does not act as the Buyer's broker or representative and sends no commercial email of its own. Dealer messages are the Buyer's personal email. SMS and calls are excluded.
 - Mailbox Connection tokens are encrypted at rest, scoped send-only, never logged, and revocable by the Buyer at any time. The forwarded-reply intake address is unguessable per case, accepts mail only while the case accepts it, and treats everything received as untrusted.
 
