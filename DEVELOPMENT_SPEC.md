@@ -1,9 +1,11 @@
 # otdog — Product and Development Specification
 
 Status: Phase 1 (document analysis) built; Phases 2–4 largely built, Phase 3 moving to Buyer-sent email (tickets 82–84); public pilot gated by Section 18 prerequisites; Phase 5 (insurance and loan quotes) specified, not built  
-Version: 2.6\
-Date: 2026-10-20\
-Supersedes: version 2.5 (2026-10-18), which excluded multilingual support. Version 2.6 includes Spanish
+Version: 2.7\
+Date: 2026-10-21\
+Supersedes: version 2.6 (2026-10-20), which left five Spanish choices as working defaults. Version 2.7 makes
+them decisions: four are kept, and Buyers may choose to send dealer emails in Spanish (ticket 149).
+Version 2.6 superseded version 2.5 (2026-10-18), which excluded multilingual support. Version 2.6 includes Spanish
 for Buyer screens and findings, records the Spanish decisions of 2026-10-19, and marks the deferred
 choices as working defaults to revisit (ticket 144).
 Version 2.5 superseded version 2.4 (2026-10-16), in which every Buyer-facing sentence came from a template or was checked
@@ -256,22 +258,22 @@ Decisions recorded on 2026-10-19 (ticket 144; numbers follow the ticket):
    the browser when Spanish comes first. The choice is remembered in the browser and on the Buyer
    Account. Each Buying Case records the language for its emails and report.
 
-**Working defaults, to revisit later.** The operator deferred the following choices on 2026-10-19.
-Implementing tickets use these defaults until each is confirmed or replaced by a recorded decision;
-they are not final decisions.
+Decisions recorded on 2026-10-21 (ticket 144). On 2026-10-19 these were working defaults; the operator
+confirmed 2, 3, 6 and 7 and replaced 4.
 
 - **2. Register and variety.** Neutral US Latin American Spanish, addressing the Buyer as "usted".
    One Spanish, rather than one per country.
 - **3. Terms dealers use in English.** A code-owned glossary gives the Spanish term and, on its first
    appearance on each screen, the English term the dealer uses, for example
    "precio total final (out-the-door)".
-- **4. Dealer email language.** Drafts to dealers stay in English. A Spanish Buyer sees a Spanish
-   reading copy of each draft and approves the exact English text that is sent. Spanish drafts to
-   dealers are not offered yet.
+- **4. Dealer email language.** Drafts to dealers are in English unless the Buyer chooses Spanish for
+   that dealer (to build, ticket 149). An English draft shows a Spanish Buyer a Spanish reading copy, and
+   the Buyer approves the exact English text that is sent. A Spanish draft is checked by the outbound
+   gate's Spanish templates and the Spanish claim rules, and the Buyer approves the exact Spanish text.
 - **6. Legal documents.** The Spanish site links to the English Terms of Service and Privacy Policy
    and says they are in English. Translations wait for counsel.
-- **7. Toto.** Toto stays English-only for now (ticket 148 is deferred). On the Spanish site, Toto's
-   panel says in Spanish that it answers in English for now.
+- **7. Toto.** Toto stays English-only for now (ticket 148 waits on tickets 118, 122, 132 and 133).
+   On the Spanish site, Toto's panel says in Spanish that it answers in English for now.
 
 ### 2.2 Excluded
 

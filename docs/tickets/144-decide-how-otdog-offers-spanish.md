@@ -14,8 +14,9 @@ is the strongest candidate for a later language.
 
 **Blocked by:** none for the decisions recorded below. The open points do not block tickets 145–147.
 
-**Status:** open — decisions 1, 5 and 8 recorded on 2026-10-19; specification 2.6 written on 2026-10-20. Remaining:
-the operator confirms or replaces working defaults 2, 3, 4, 6 and 7.
+**Status:** complete — on 2026-10-21. Decisions 1, 5 and 8 recorded on 2026-10-19; specification 2.6 written on
+2026-10-20. On 2026-10-21 the operator confirmed working defaults 2, 3, 6 and 7 and replaced 4: Buyers may choose to
+send dealer emails in Spanish (ticket 149). Specification 2.7 records them.
 
 ## Decided on 2026-10-19
 
@@ -30,20 +31,22 @@ the operator confirms or replaces working defaults 2, 3, 4, 6 and 7.
    comes first. The choice is remembered in the browser and on the Buyer Account. Each Buying Case records the
    language for its emails and report.
 
-## Working defaults, to revisit later
+## Decided on 2026-10-21
 
-The operator deferred these on 2026-10-19. The implementing tickets use the default until a decision is recorded.
+The operator deferred these on 2026-10-19 as working defaults. On 2026-10-21 the operator confirmed 2, 3, 6 and 7
+as written and replaced 4.
 
 2. **Register and variety.** Neutral US Latin American Spanish that addresses the Buyer as "usted". One Spanish, not
    one per country.
 3. **Terms dealers use in English.** A code-owned glossary that gives the Spanish term and, the first time it appears
    on a screen, the English term the dealer uses, for example "precio total final (out-the-door)".
-4. **Dealer email language.** Drafts to dealers stay in English. A Spanish Buyer sees a Spanish reading copy of
-   each draft and approves the exact English text that is sent. Spanish drafts to dealers are not offered yet.
+4. **Dealer email language.** Replaced. The working default kept drafts to dealers in English, with a Spanish
+   reading copy (built in ticket 147). The decision: drafts stay English unless the Buyer chooses Spanish for that
+   dealer, and then the Buyer approves and sends the exact Spanish text. Ticket 149 builds it.
 6. **Legal documents.** The Spanish site links to the English Terms of Service and Privacy Policy and says they are
    in English. Translations wait for counsel.
-7. **Toto.** Toto stays English-only for now (ticket 148 is deferred). On the Spanish site, Toto's panel says in
-   Spanish that it answers in English for now.
+7. **Toto.** Toto stays English-only for now. Ticket 148 waits on tickets 118, 122, 132 and 133. On the Spanish
+   site, Toto's panel says in Spanish that it answers in English for now.
 
 ## Scope
 
@@ -57,5 +60,5 @@ The operator deferred these on 2026-10-19. The implementing tickets use the defa
 
 - [x] Decisions 1, 5 and 8 are recorded with their date.
 - [x] Specification 2.6 is merged with the changes above.
-- [ ] Each working default is either confirmed or replaced by a recorded decision, and tickets 145–148 updated to
-      match.
+- [x] Each working default is either confirmed or replaced by a recorded decision, and tickets 145–148 updated to
+      match (ticket 149 filed for the replaced default 4).
