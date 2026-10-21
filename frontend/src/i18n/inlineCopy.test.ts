@@ -28,9 +28,6 @@ const ACCOUNT_PENDING = [
   "CaseLifecycle.tsx",
   "CasePortability.tsx",
   "DealerFields.tsx",
-  "Passkeys.tsx",
-  "Passwords.tsx",
-  "SignIn.tsx",
 ];
 
 /** Journey: the dealer's paperwork and the report; copy in en/paperwork.ts. */
