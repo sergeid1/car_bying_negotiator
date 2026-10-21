@@ -9,32 +9,47 @@ On 2026-10-19 every component in `frontend/src` (about 20,000 lines of TSX) writ
 ticket touches nearly every client file, including the hot files, so run it when no other client ticket is in
 progress, and split it into several pull requests (for example by journey) if that keeps reviews readable.
 
-**Status:** open — groundwork and the site shell done on 2026-10-20 (`feature/message-catalogues`). Remaining: move
-the copy of the 56 components still listed in `PENDING` in `frontend/src/i18n/inlineCopy.test.ts`, journey by journey,
-one pull request each.
+**Status:** complete — on 2026-10-20. Every Buyer-visible string in `frontend/src` comes from the English catalogue;
+English reads as before. Delivered in two pull requests: the groundwork and site shell (#87), then the six journeys
+together (`feature/catalogue-integration`), each journey moved on its own branch and merged and tested as one.
 
 What is in place, with no new dependency:
 
-- `frontend/src/i18n/en.ts` is the English catalogue. A message is a whole sentence with named `{placeholders}`;
-  a count-dependent one is a `plural({ one, other, … })` chosen with `Intl.PluralRules`. `translation<typeof en>()`
-  checks another language at compile time: a missing id, an id English lacks, or a renamed, added or dropped
-  placeholder fails `tsc` (proved by the `@ts-expect-error` cases in `messages.test.tsx`).
+- `frontend/src/i18n/en.ts` is the English catalogue. Each journey's copy is in its own file under `i18n/en/`
+  (`account`, `paperwork`, `dealer`, `messages`, `money`, `content`), one object per component. A message is a whole
+  sentence with named `{placeholders}`; a count-dependent one is a `plural({ one, other, … })` chosen with
+  `Intl.PluralRules`. `translation<typeof en>()` checks another language at compile time: a missing id, an id English
+  lacks, or a renamed, added or dropped placeholder fails `tsc` (proved by the `@ts-expect-error` cases in
+  `messages.test.tsx`).
 - `useMessages()` returns `m` (the current catalogue), `fill` for text and `fillNodes` for a sentence holding a link.
   `LanguageProvider` in `main.tsx` sets `<html lang>`; without a provider, as in unit tests, English is served.
 - `frontend/src/i18n/format.ts` holds the shared `money`, `number`, `date`, `dateTime` and `list` formatters. Every
-  former `"en-US"` call site and every locale-less `toLocaleString()` now goes through them (`en` → `en-US`).
+  former `"en-US"` call site and every locale-less `toLocaleString()` goes through them (`en` → `en-US`). `fill`
+  formats number values with grouping, so years, versions and similar values are passed as strings.
 - `inlineCopy.test.ts` parses each component and flags JSX text, copy attributes (`aria-label`, `alt`, `title`,
   `placeholder`, `label`, …), string children, sentences passed to `set…` state setters or `new Error`, and
-  `document.title`. Allowed: the brand name, punctuation and numbers. It does not yet see copy held in module-level
-  constants (for example a `LABELS` table); review those when moving each file.
-- `ProhibitedClaims.BY_LANGUAGE` holds claim patterns per language (English only). `PilotCopyClaimsTest` checks each
-  `frontend/src/i18n/<lang>.ts` with its own language's patterns, fails when a catalogue has no patterns for its
-  language, and reads the footer disclosures from `en.ts`. `reviewed-claim-phrases.json` (now v2) records each
-  entry's language. `ClaimVocabulary` is unchanged: it checks the backend's generated English findings, which ticket
-  147 makes language-aware.
-- Moved so far: `App.tsx` (header, footer, panels, development fixture), `SiteNav`, `HomeHero`, `XrayIllustration`,
-  `ThemeMenu`, `SidePanel` and `SigningNote`. The page reads as before; unit, build and Playwright suites pass unchanged.
+  `document.title`. Allowed: the brand name, punctuation and numbers. Every journey's pending list is empty. The guard
+  cannot see copy in module-level tables; those were moved by hand and swept again at integration.
+- `ProhibitedClaims.BY_LANGUAGE` holds claim patterns per language (English only). `PilotCopyClaimsTest` checks
+  `i18n/<lang>.ts` and `i18n/<lang>/*.ts` with that language's patterns, fails when a catalogue has no patterns for
+  its language, and reads the footer disclosures and the partner kit's terms from the catalogue.
+  `reviewed-claim-phrases.json` (v2) records each entry's language. `ClaimVocabulary` is unchanged: it checks the
+  backend's generated English findings, which ticket 147 makes language-aware.
 
+Left for later tickets:
+
+- Ten places across five files show `String(error)`, with an English "Error: " prefix: `PricePlan.tsx` (2),
+  `OutsideFinancing.tsx`, `CoreDealReport.tsx`, `DealerFinancing.tsx` (3) and `NegotiationMandate.tsx` (3).
+  Ticket 146 should show only the message.
+- Some screens turn server codes into English-like words (`humanize()` in `App.tsx` for the synthetic report, the
+  precision and pointer text in `CoreDealReport.tsx`, the unknown-term fallback in `RevisedOfferReview.tsx`, the
+  confidence in `CandidateVehicles.tsx`). These belong to ticket 147.
+- A few sentences are still joined from whole-message clauses in code, with the words in the catalogue: the Desk
+  Check's total-effect sentence, the case flow's "Done: …" list, and short detail lists in the desk tactics, trade-in
+  and test drive. Ticket 146 may rewrite them as whole sentences for Spanish.
+- Some exported helpers default to the English catalogue so tests can call them directly (`EvidenceSource`,
+  `InsuranceQuotes`, `LoanPreApprovals`, `OfferVerification`, `DealerDocumentUpload`), and `CaseFlow` exports
+  `CASE_STEPS` built from English for its tests. Every screen passes the current language.
 
 ## Scope
 
@@ -62,11 +77,11 @@ What is in place, with no new dependency:
 
 ## Done when
 
-- [ ] No Buyer-visible string is written inline in a component. A test or lint rule flags new inline text in JSX,
+- [x] No Buyer-visible string is written inline in a component. A test or lint rule flags new inline text in JSX,
       with a narrow allow-list (brand name, punctuation).
-- [ ] The English site looks and reads exactly as before. The existing unit, accessibility and Playwright suites
+- [x] The English site looks and reads exactly as before. The existing unit, accessibility and Playwright suites
       pass unchanged apart from how they look up text.
 - [x] A test proves that a catalogue missing an id or with mismatched parameters fails the type check.
 - [x] `<html lang>` follows the current language, and money and dates format through the shared formatters.
 - [x] `PilotCopyClaimsTest` reads per-language claim patterns, and the English results are unchanged.
-- [ ] `npm test`, `npm run build`, `npx playwright test` and `mvn clean verify` pass.
+- [x] `npm test`, `npm run build`, `npx playwright test` and `mvn clean verify` pass.
