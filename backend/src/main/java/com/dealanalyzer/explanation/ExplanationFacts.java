@@ -22,6 +22,10 @@ import java.util.Set;
  */
 public record ExplanationFacts(int reportVersion, List<Finding> findings, List<Amount> amounts) {
   public static final String CORE_SCHEMA = "core-deal-analysis-report.v1";
+  public static boolean supports(JsonNode report) {
+    return java.util.List.of(CORE_SCHEMA, "core-deal-analysis-report.v2")
+        .contains(report.path("schemaVersion").asText());
+  }
 
   public ExplanationFacts {
     findings = List.copyOf(findings);
@@ -86,7 +90,7 @@ public record ExplanationFacts(int reportVersion, List<Finding> findings, List<A
   }
 
   public static ExplanationFacts from(JsonNode report) {
-    if (!CORE_SCHEMA.equals(report.path("schemaVersion").asText()))
+    if (!supports(report))
       throw new IllegalArgumentException("Finalized core report required");
     JsonNode analysis = report.path("analysis");
     List<Finding> findings = new ArrayList<>();

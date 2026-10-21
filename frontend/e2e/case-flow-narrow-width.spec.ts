@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { AxeBuilder, expect, test, type Page } from "./fixtures";
 import { CASE_FLOW_CURRENT, CASE_FLOW_STAGES, caseFlowRecord, type CaseFlowStage } from "../src/CaseFlow.fixture";
 
 /** What the Buyer does first on each stage's current step. */

@@ -16,8 +16,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/cases/{caseId}/desk-start")
 public class DeskStartController {
   private final DeskStartService desk;
+  private final com.fasterxml.jackson.databind.ObjectMapper json;
 
-  DeskStartController(DeskStartService desk) { this.desk = desk; }
+  DeskStartController(DeskStartService desk, com.fasterxml.jackson.databind.ObjectMapper json) { this.desk = desk; this.json = json; }
 
   @GetMapping
   public DeskStartService.Routing routing(@PathVariable String caseId,
@@ -28,10 +29,10 @@ public class DeskStartController {
 
   /** A comparison, not a change: typed four-square numbers are used for this answer and not kept. */
   @PostMapping("/result")
-  public DeskStartService.FirstResult result(@PathVariable String caseId,
+  public com.fasterxml.jackson.databind.JsonNode result(@PathVariable String caseId,
       @RequestHeader(value = "Case-Access-Token", required = false) String token,
       @RequestBody(required = false) DeskStartService.ResultRequest request) {
-    return desk.result(caseId, token, request);
+    return com.dealanalyzer.report.FindingText.annotateDesk(json.valueToTree(desk.result(caseId, token, request)), json);
   }
 
   @RestControllerAdvice(assignableTypes = DeskStartController.class)

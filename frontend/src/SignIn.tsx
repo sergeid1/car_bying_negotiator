@@ -22,7 +22,7 @@ export function SignIn({ request, onSignedIn, offerPasskeys = true, mode = "logi
   /** Whether the panel is showing, so a closed panel does not ask the server for a passkey sign-in. */
   offerPasskeys?: boolean;
 }) {
-  const { m: { account: { signIn: t } }, fill } = useMessages();
+  const { m: { account: { signIn: t } }, fill, language } = useMessages();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -69,7 +69,7 @@ export function SignIn({ request, onSignedIn, offerPasskeys = true, mode = "logi
   }
   function sendLink(notice: string = t.sent) {
     return run(async () => {
-      await request("/api/v1/account/sign-in-requests", { method: "POST", key: crypto.randomUUID(), body: JSON.stringify({ email }) });
+      await request("/api/v1/account/sign-in-requests", { method: "POST", key: crypto.randomUUID(), body: JSON.stringify({ email, language }) });
       setPassword(""); setStep("sent"); setNotice(notice);
     }, t.linkFailed);
   }

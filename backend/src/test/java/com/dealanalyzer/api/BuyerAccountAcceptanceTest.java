@@ -209,6 +209,21 @@ class BuyerAccountAcceptanceTest {
     }
   }
 
+  @Test void theChosenLanguageFollowsTheBuyerToAnotherSignIn() throws Exception {
+    try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("language", false, EmailConfiguration.class, KEY)) {
+      String phone = signIn(app.client(), "buyer@example.com");
+      assertThat(exchange(app.client(), "GET", "/api/v1/account", null, phone).body().path("preferredLanguage").isNull()).isTrue();
+      var saved = exchange(app.client(), "PUT", "/api/v1/account/language", Map.of("language", "es"), phone);
+      assertThat(saved.status()).isEqualTo(200);
+      assertThat(saved.body().path("preferredLanguage").asText()).isEqualTo("es");
+      assertThat(exchange(app.client(), "PUT", "/api/v1/account/language", Map.of("language", "fr"), phone).status()).isEqualTo(400);
+      assertThat(exchange(app.client(), "PUT", "/api/v1/account/language", Map.of("language", "es"), null).status()).isBetween(401, 403);
+
+      String laptop = signIn(app.client(), "buyer@example.com");
+      assertThat(exchange(app.client(), "GET", "/api/v1/account", null, laptop).body().path("preferredLanguage").asText()).isEqualTo("es");
+    }
+  }
+
   @Test void contactDetailsAreStoredOnceEncryptedAndNeverLogged(CapturedOutput output) throws Exception {
     try (var app = new HttpAcceptanceHarness(directory).startWithConfiguration("contact", false, EmailConfiguration.class, KEY)) {
       String token = signIn(app.client(), "private.buyer@example.com");

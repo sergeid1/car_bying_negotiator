@@ -2,6 +2,7 @@ import { useState } from "react";
 import { DealerFinancingForm, type FinancingResult } from "./DealerFinancing";
 import * as format from "./i18n/format";
 import { useMessages } from "./i18n/LanguageProvider";
+import { errorMessage } from "./i18n/errors";
 
 type Economics = FinancingResult & { finalPaymentMinor: number | null; totalScheduledPaymentsMinor: number | null;
   totalInterestMinor: number | null; totalTransactionCostMinor: number | null };
@@ -32,7 +33,7 @@ export function OutsideFinancing({ caseId, token }: { caseId: string; token: str
       const response = await fetch(`/api/v1/cases/${encodeURIComponent(caseId)}/outside-finance-offers/latest`, { headers: { "Case-Access-Token": token } });
       if (!response.ok) throw new Error(t.savedUnavailable);
       setSaved(await response.json());
-    } catch (error) { setError(String(error)); } finally { setBusy(false); }
+    } catch (error) { setError(errorMessage(error, t.savedUnavailable)); } finally { setBusy(false); }
   }
   return <section className="stack" aria-label={t.label}>
     <DealerFinancingForm caseId={caseId} token={token} outside onSaved={value => { setSaved(value as Comparison); setError(""); }} />

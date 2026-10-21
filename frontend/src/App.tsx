@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import "./styles.css";
 import "./Masthead.css";
 import { CaseLinkAccess, RecoveryAccess, RecoveryEmailOptIn, CaseDownloads, SavedCaseAccess } from "./CasePortability";
+import { CaseLanguage } from "./CaseLanguage";
+import { findingCode } from "./i18n/findings";
 import { CaseLifecycle } from "./CaseLifecycle";
 import { AccountControls, AccountHeader, AccountSignedInContext, BuyerAccount, isAccountPass } from "./BuyerAccount";
 import { BuyingJourneys } from "./BuyingJourneys";
@@ -10,7 +12,7 @@ import { type FreshDeskCase } from "./DeskCheck";
 import { SigningNote } from "./SigningNote";
 import { CaseFlow } from "./CaseFlow";
 import { AtTheDealer, DealerCameraEntry } from "./AtTheDealer";
-import { ThemeMenu } from "./ThemeMenu";
+import { ThemeLanguageMenu } from "./ThemeLanguageMenu";
 import { OfferTerms } from "./OneTimeOffer";
 import { ExampleReportPage, requestedExampleReport } from "./SampleReport";
 import { ExplainerGuide, GuideLinks, requestedGuide, requestedGuideIndex } from "./ExplainerGuides";
@@ -91,11 +93,6 @@ const stageOrder = ["QUEUED", "LOADING_INPUTS", "FETCHING_MARKET", "CALCULATING"
 
 function formatMoney(amount: MoneyAmount) {
   return formatMinor(amount.minorUnits, { currency: amount.currency });
-}
-
-function humanize(value: string) {
-  const words = value.toLowerCase().replaceAll("_", " ");
-  return words[0].toUpperCase() + words.slice(1);
 }
 
 export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
@@ -218,7 +215,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
           </a>
           {!caseOpen && !partnerKit && <SiteNav page={howItWorks ? "how-it-works" : exampleReport ? "example-report" : guide || guideIndex ? "guides" : standalone ? "other" : "home"} />}
           {!partnerKit && <DealerCameraEntry onPhotos={files => setAtDealer({ files, started: Date.now() })} />}
-          <ThemeMenu />
+          <ThemeLanguageMenu />
           {!partnerKit && <AccountHeader controls={accountControls} onOpen={() => openPanel("account")} />}
         </div>
       </header>
@@ -334,6 +331,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
       </div>
 
       <SidePanel id="case-panel" title={m.app.casePanelTitle} open={sidePanel === "case" && Boolean(caseCredentials)} onClose={closeSidePanel}>
+        {caseCredentials && !caseRevoked && <CaseLanguage key={`language-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
         {caseCredentials && !caseRevoked && <RecoveryEmailOptIn key={`email-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
         {caseCredentials && !caseRevoked && <CaseDownloads key={`export-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials} />}
         {caseCredentials && <CaseLifecycle key={`lifecycle-${caseCredentials.caseId}-${caseCredentials.token}`} {...caseCredentials}
@@ -365,7 +363,7 @@ export default function App({ pollDelayMs = 250 }: { pollDelayMs?: number }) {
 }
 
 function DealReport({ report }: { report: Report }) {
-  const { m, fill } = useMessages();
+  const { m, fill, language } = useMessages();
   const r = m.syntheticReport;
   const { analysis } = report;
   const economics = analysis.economics;
@@ -384,8 +382,8 @@ function DealReport({ report }: { report: Report }) {
         <p className="eyebrow">{r.title}</p>
         <h2 id="report-heading">{r.title}</h2>
         <div className="status-row">
-          <strong className="warning">{analysis.reviewStatus === "MATCHES_APPROVED_BASELINE" ? r.matchesApproved : humanize(analysis.reviewStatus)}</strong>
-          <span>{humanize(analysis.dealRating)}</span>
+          <strong className="warning">{analysis.reviewStatus === "MATCHES_APPROVED_BASELINE" ? r.matchesApproved : findingCode(language, analysis.reviewStatus)}</strong>
+          <span>{findingCode(language, analysis.dealRating)}</span>
         </div>
         <p className="next-action">{analysis.nextAction}</p>
       </section>
@@ -394,7 +392,7 @@ function DealReport({ report }: { report: Report }) {
         <div className="total-card">
           <span>{r.outTheDoor}</span>
           <strong>{formatMoney(economics.outTheDoorTotal)}</strong>
-          <small>{fill(r.calculation, { precision: humanize(economics.outTheDoorTotal.precision) })}</small>
+          <small>{fill(r.calculation, { precision: findingCode(language, economics.outTheDoorTotal.precision) })}</small>
         </div>
         <div className="market-card">
           <span>{r.marketRange}</span>
@@ -407,7 +405,7 @@ function DealReport({ report }: { report: Report }) {
               <span className="range-marker" style={{ left: `${position * 100}%` }} />
             </div>
           )}
-          <small>{fill(r.confidence, { confidence: humanize(market.confidence) })}</small>
+          <small>{fill(r.confidence, { confidence: findingCode(language, market.confidence) })}</small>
         </div>
       </section>
 
@@ -438,9 +436,10 @@ function DealReport({ report }: { report: Report }) {
 }
 
 function MoneyRow({ label, amount }: { label: string; amount: MoneyAmount }) {
+  const { language } = useMessages();
   return (
     <div>
-      <dt>{label}<small>{humanize(amount.precision)}</small></dt>
+      <dt>{label}<small>{findingCode(language, amount.precision)}</small></dt>
       <dd>{formatMoney(amount)}</dd>
     </div>
   );

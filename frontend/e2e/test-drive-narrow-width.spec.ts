@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { AxeBuilder, expect, test } from "./fixtures";
 import { openCaseStep } from "./case-steps";
 
 const pass = { pass: true, gateVersion: "outbound-gate.v2", reasons: [] };

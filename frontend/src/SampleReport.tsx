@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CoreDealReport, type CoreReport } from "./CoreDealReport";
 import { useMessages, type Messages } from "./i18n/LanguageProvider";
+import { findingCode } from "./i18n/findings";
 
 /** `GET /api/v1/sample-report`: a report from a synthetic case with identifying fields set to null. */
 type SampleReport = {
@@ -16,11 +17,10 @@ function redactionMethodName(method: string, t: Copy): string {
   return (t.redactionMethods as Record<string, string>)[method] ?? method;
 }
 
-function removedName(code: string, t: Copy) {
+function removedName(code: string, t: Copy, language: string) {
   const named = (t.removedFields as Record<string, string>)[code];
   if (named) return named;
-  const text = code.toLowerCase().replaceAll("_", " ");
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  return findingCode(language, code);
 }
 
 /** The example report's own page, reached from the header's Example report tab. */
@@ -33,7 +33,7 @@ export function requestedExampleReport(): boolean {
 
 /** Reachable before any case exists: the Buyer can see what the product returns before uploading. */
 export function ExampleReportPage() {
-  const { m: { paperwork: { sampleReport: t } }, fill, fillNodes } = useMessages();
+  const { m: { paperwork: { sampleReport: t } }, fill, fillNodes, language } = useMessages();
   const [sample, setSample] = useState<SampleReport>();
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -75,7 +75,7 @@ export function ExampleReportPage() {
         <p>{fill(t.redaction, { method: redactionMethodName(sample.redaction.method, t), version: sample.redaction.version })}</p>
         {sample.redaction.removed.length > 0 && <>
           <p>{t.removed}</p>
-          <ul>{sample.redaction.removed.map(code => <li key={code}>{removedName(code, t)}</li>)}</ul>
+          <ul>{sample.redaction.removed.map(code => <li key={code}>{removedName(code, t, language)}</li>)}</ul>
         </>}
       </div>
       <CoreDealReport report={sample.report} redacted />

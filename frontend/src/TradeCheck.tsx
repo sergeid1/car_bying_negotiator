@@ -2,6 +2,7 @@ import { useId } from "react";
 import { TradeTacticAnnotation, type DeskTacticFinding } from "./DeskTactics";
 import * as format from "./i18n/format";
 import { useMessages, type Messages } from "./i18n/LanguageProvider";
+import { findingCode } from "./i18n/findings";
 
 export type TradeCheckFinding = {
   code: string; severity: "BLOCKING" | "WARNING" | "INFORMATIONAL"; summary: string;
@@ -53,7 +54,7 @@ function yourPayoff(t: Copy, fill: Fill, payoff: NonNullable<TradeCheckResult["b
 export function TradeCheckPanel({ result, heading, tactics = [] }: {
   result: TradeCheckResult; heading?: string; tactics?: DeskTacticFinding[];
 }) {
-  const { m: { dealer: { tradeCheck: t, common } }, fill, fillNodes } = useMessages();
+  const { m: { dealer: { tradeCheck: t, common } }, fill, fillNodes, language } = useMessages();
   const id = useId();
   if (result.status === "NO_ALLOWANCE") return null;
   const valuation = result.valuation;
@@ -86,7 +87,7 @@ export function TradeCheckPanel({ result, heading, tactics = [] }: {
       {valuation && valuation.basis !== "BUYER_ESTIMATE" && <div><dt>{valuation.source ? fill(t.rangeFrom, { source: valuation.source }) : t.range}</dt>
         <dd>{valuation.availability === "AVAILABLE" && valuation.lowMinor !== null && valuation.highMinor !== null
           ? [fill(common.range, { low: money(valuation.lowMinor), high: money(valuation.highMinor) }),
-            valuation.conditionAssumption ? fill(t.assuming, { condition: valuation.conditionAssumption.toLowerCase() }) : "",
+            valuation.conditionAssumption ? fill(t.assuming, { condition: findingCode(language, valuation.conditionAssumption).toLocaleLowerCase(language) }) : "",
             valuation.retrievedAt ? fill(t.retrieved, { date: valuation.retrievedAt.slice(0, 10) }) : ""].filter(Boolean).join(", ")
             + (valuation.notice ? `. ${valuation.notice}` : "")
           : fill(t.unavailableNotice, { notice: valuation.notice ?? "" })}</dd></div>}

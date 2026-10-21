@@ -273,7 +273,7 @@ public class TestDriveService implements RelayMessageOwner {
       return new Sent(message(caseId, token, id), notifyKey == null ? null : accounts.accountId(caseId).orElse(null), notifyKey);
     });
     // Notifications run after the case transaction commits; they carry no appointment content.
-    if (sent.notifyAccount() != null) notifications.notify(sent.notifyAccount(), NotificationType.APPOINTMENT, sent.notifyKey());
+    if (sent.notifyAccount() != null) notifications.notifyCase(sent.notifyAccount(), NotificationType.APPOINTMENT, sent.notifyKey(), caseId);
     return sent.message();
   }
 
@@ -325,7 +325,7 @@ public class TestDriveService implements RelayMessageOwner {
         .stream().findFirst().orElse(null) : null;
     String notifyKey = applySent(caseId, message, accountId, agreed, relayMessageId, now);
     String notifyAccount = notifyKey == null ? null : accounts.accountId(caseId).orElse(null);
-    return notifyAccount == null ? null : () -> notifications.notify(notifyAccount, NotificationType.APPOINTMENT, notifyKey);
+    return notifyAccount == null ? null : () -> notifications.notifyCase(notifyAccount, NotificationType.APPOINTMENT, notifyKey, caseId);
   }
 
   @Override public void unsent(String caseId, String relayMessageId, String state) {

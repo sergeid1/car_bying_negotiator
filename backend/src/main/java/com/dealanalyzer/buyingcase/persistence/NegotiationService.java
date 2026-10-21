@@ -53,10 +53,14 @@ public class NegotiationService {
    * so no database transaction stays open during a model call.
    */
   public ReplyDraft reply(String caseId, int reportVersion, String token, String dealerResponse) {
+    return reply(caseId, reportVersion, token, dealerResponse, "en");
+  }
+
+  public ReplyDraft reply(String caseId, int reportVersion, String token, String dealerResponse, String language) {
     access.reopen(caseId, token);
     JsonNode report = read(reports.findProjectedById(new AnalysisReportKey(caseId, reportVersion))
         .orElseThrow(() -> new ResourceNotFoundException("Report not found")).getPayloadJson());
-    return replies.draft(caseId, report, dealerResponse);
+    return "es".equals(language) ? replies.draft(caseId, report, dealerResponse, "es") : replies.draft(caseId, report, dealerResponse);
   }
 
   private JsonNode read(String payload) {

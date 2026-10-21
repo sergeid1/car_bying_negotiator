@@ -3,6 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { BuyerAccount } from "./BuyerAccount";
+import { LanguageProvider } from "./i18n/LanguageProvider";
+import { LANGUAGE_STORAGE_KEY } from "./i18n/languageChoice";
+import { ThemeLanguageMenu } from "./ThemeLanguageMenu";
 
 function memoryStorage() {
   const values = new Map<string, string>();
@@ -44,7 +47,7 @@ test("requests a sign-in link from one email box without storing anything in the
   expect(screen.getByRole("status")).toHaveFocus();
   const [path, init] = fetcher.mock.calls.find(([path]) => String(path).endsWith("/sign-in-requests"))!;
   expect(path).toBe("/api/v1/account/sign-in-requests");
-  expect(JSON.parse(String(init?.body))).toEqual({ email: "buyer@example.com" });
+  expect(JSON.parse(String(init?.body))).toEqual({ email: "buyer@example.com", language: "en" });
   expect((init?.headers as Record<string, string>)["Idempotency-Key"]).toBeTruthy();
 
   await user.click(screen.getByRole("button", { name: "Send again" }));
@@ -392,4 +395,38 @@ test("a passkey autofill request that fails before the Buyer picks a passkey sho
   await new Promise(resolve => setTimeout(resolve, 50));
   expect(get).not.toHaveBeenCalled();
   expect(screen.queryByText(/Passkey sign-in could not be completed/)).toBeNull();
+});
+
+test("the language saved on the account applies on sign-in, and a new choice is saved there", async () => {
+  Object.defineProperty(navigator, "languages", { value: ["en-US"], configurable: true });
+  const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => String(input) === "/api/v1/account/language"
+    ? json({ ...account(), preferredLanguage: JSON.parse(String(init?.body)).language })
+    : json({ ...account(), preferredLanguage: "es" }));
+  vi.stubGlobal("fetch", fetcher);
+  render(<LanguageProvider><ThemeLanguageMenu /><BuyerAccount /></LanguageProvider>);
+  const user = userEvent.setup();
+  expect(await screen.findByRole("button", { name: "Tema e idioma: Sistema, Español" })).toBeInTheDocument();
+  expect(document.documentElement.lang).toBe("es");
+  expect(storage.getItem(LANGUAGE_STORAGE_KEY)).toBe("es");
+  // Adopting the saved choice does not save it back.
+  expect(fetcher.mock.calls.some(([path]) => String(path) === "/api/v1/account/language")).toBe(false);
+
+  await user.click(screen.getByRole("button", { name: "Tema e idioma: Sistema, Español" }));
+  await user.click(screen.getByRole("menuitemradio", { name: "English" }));
+  await waitFor(() => expect(fetcher.mock.calls.some(([path]) => String(path) === "/api/v1/account/language")).toBe(true));
+  const [, init] = fetcher.mock.calls.find(([path]) => String(path) === "/api/v1/account/language")!;
+  expect(init?.method).toBe("PUT");
+  expect(JSON.parse(String(init?.body))).toEqual({ language: "en" });
+  expect(screen.getByRole("button", { name: "Theme and language: System, English" })).toBeInTheDocument();
+});
+
+test("a choice made before signing in is saved on an account that has none", async () => {
+  storage.setItem(LANGUAGE_STORAGE_KEY, "es");
+  const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => String(input) === "/api/v1/account/language"
+    ? json({ ...account(), preferredLanguage: "es" }) : json({ ...account(), preferredLanguage: null }));
+  vi.stubGlobal("fetch", fetcher);
+  render(<LanguageProvider><BuyerAccount /></LanguageProvider>);
+  await waitFor(() => expect(fetcher.mock.calls.some(([path]) => String(path) === "/api/v1/account/language")).toBe(true));
+  const [, init] = fetcher.mock.calls.find(([path]) => String(path) === "/api/v1/account/language")!;
+  expect(JSON.parse(String(init?.body))).toEqual({ language: "es" });
 });

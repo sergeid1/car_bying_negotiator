@@ -21,12 +21,16 @@ public class NegotiationController {
   }
 
   /** The Dealer's answer as the Buyer pasted it; untrusted text that is never stored. */
-  public record ReplyRequest(String dealerResponse) {}
+  public record ReplyRequest(String dealerResponse, String language) {
+    public ReplyRequest(String dealerResponse) { this(dealerResponse, "en"); }
+  }
 
   @PostMapping("/replies")
   public ReplyDraft reply(@PathVariable String caseId, @PathVariable int version,
       @RequestHeader("Case-Access-Token") String token, @RequestBody ReplyRequest request) {
-    return service.reply(caseId, version, token, request == null ? null : request.dealerResponse());
+    return request != null && "es".equals(request.language())
+        ? service.reply(caseId, version, token, request.dealerResponse(), "es")
+        : service.reply(caseId, version, token, request == null ? null : request.dealerResponse());
   }
 
   @ExceptionHandler(ReplyAssistant.InvalidDealerResponse.class)

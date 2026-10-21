@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { AxeBuilder, expect, test } from "./fixtures";
 
 for (const width of [360, 1280]) {
   test(`sets, signs in, changes and removes a password at ${width}px`, async ({ page }) => {

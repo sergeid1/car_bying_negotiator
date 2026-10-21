@@ -1,5 +1,6 @@
 import * as format from "./i18n/format";
 import { useMessages, type Messages } from "./i18n/LanguageProvider";
+import { findingCode } from "./i18n/findings";
 
 export type DeskTacticFinding = {
   code: string; label: string; summary: string; policyVersion: string; verified: boolean;
@@ -17,16 +18,16 @@ type Copy = Messages["dealer"]["deskTactics"];
 type Fill = ReturnType<typeof useMessages>["fill"];
 
 /** One evidence line, such as "unit price: verified, page 2, buyer order, version 1.", its details joined by commas. */
-function evidenceLine(t: Copy, fill: Fill, evidence: DeskTacticFinding["evidenceRegions"][number], full: boolean) {
+function evidenceLine(t: Copy, fill: Fill, evidence: DeskTacticFinding["evidenceRegions"][number], full: boolean, language: string) {
   const details = [evidence.verified ? t.evidenceVerified : t.evidenceAsRead,
     evidence.region?.pageNumber ? fill(t.evidencePage, { page: String(evidence.region.pageNumber) }) : "",
-    full && evidence.region?.source ? evidence.region.source.replaceAll("_", " ") : "",
+    full && evidence.region?.source ? findingCode(language, evidence.region.source) : "",
     full && evidence.region?.version ? fill(t.evidenceVersion, { version: String(evidence.region.version) }) : ""];
-  return fill(t.evidence, { field: evidence.field.replaceAll("_", " "), details: details.filter(Boolean).join(", ") });
+  return fill(t.evidence, { field: findingCode(language, evidence.field), details: details.filter(Boolean).join(", ") });
 }
 
 export function DeskTactics({ findings = [] }: { findings?: DeskTacticFinding[] }) {
-  const { m: { dealer: { deskTactics: t, common } }, fill } = useMessages();
+  const { m: { dealer: { deskTactics: t, common } }, fill, language } = useMessages();
   const cheaper = findings.find(finding => finding.code === DEALER_FINANCING_COSTS_LESS);
   findings = findings.filter(finding => !finding.tradeFindingCode && finding.code !== DEALER_FINANCING_COSTS_LESS);
   if (!findings.length && !cheaper) return null;
@@ -46,7 +47,7 @@ export function DeskTactics({ findings = [] }: { findings?: DeskTacticFinding[] 
         <p>{finding.effectBasis}</p>
         <p>{fill(t.policyCode, { policy: finding.policyVersion, code: finding.code })}</p>
         <ul>{finding.evidenceRegions.map((evidence, index) => <li key={`${evidence.field}-${index}`}>
-          {evidenceLine(t, fill, evidence, true)}
+          {evidenceLine(t, fill, evidence, true, language)}
         </li>)}</ul>
       </details>
     </li>)}</ul>
@@ -74,7 +75,7 @@ function DealerFinancingCostsLess({ finding }: { finding: DeskTacticFinding }) {
 
 /** Adds the tactic name and policy context to an existing trade line, without another dollar display. */
 export function TradeTacticAnnotation({ finding }: { finding: DeskTacticFinding }) {
-  const { m: { dealer: { deskTactics: t, common } }, fill, fillNodes } = useMessages();
+  const { m: { dealer: { deskTactics: t, common } }, fill, fillNodes, language } = useMessages();
   return <div className="desk-tactics">
     <p><strong>{finding.label}</strong></p>
     <p>{fillNodes(t.draftQuestion, { question: <q>{finding.deskQuestion}</q> })}</p>
@@ -85,7 +86,7 @@ export function TradeTacticAnnotation({ finding }: { finding: DeskTacticFinding 
       {finding.noDollarEffectReason && <p>{finding.noDollarEffectReason}</p>}
       <p>{fill(t.policyCode, { policy: finding.policyVersion, code: finding.code })}</p>
       <ul>{finding.evidenceRegions.map((evidence, index) => <li key={`${evidence.field}-${index}`}>
-        {evidenceLine(t, fill, evidence, false)}
+        {evidenceLine(t, fill, evidence, false, language)}
       </li>)}</ul>
     </details>
   </div>;

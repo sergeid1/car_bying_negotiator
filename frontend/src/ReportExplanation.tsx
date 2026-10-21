@@ -19,13 +19,13 @@ function producerNote(explanation: ReportExplanationPayload, t: Messages["paperw
 
 /** Loads the checked explanation of one saved report. It is read-only and changes nothing in the report. */
 export function ReportExplanationLoader({ caseId, token, reportVersion }: { caseId: string; token: string; reportVersion: number }) {
-  const { m: { paperwork: { reportExplanation: t } } } = useMessages();
+  const { m: { paperwork: { reportExplanation: t } }, language } = useMessages();
   const [explanation, setExplanation] = useState<ReportExplanationPayload>();
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     setExplanation(undefined); setFailed(false);
-    fetch(`/api/v1/cases/${encodeURIComponent(caseId)}/reports/${reportVersion}/explanation`, {
+    fetch(`/api/v1/cases/${encodeURIComponent(caseId)}/reports/${reportVersion}/explanation${language === "es" ? "?language=es" : ""}`, {
       headers: { "Case-Access-Token": token }, signal: controller.signal,
     }).then(async response => {
       if (!response.ok) throw new Error("explanation-unavailable");
@@ -34,7 +34,7 @@ export function ReportExplanationLoader({ caseId, token, reportVersion }: { case
       if (!controller.signal.aborted) setExplanation(result);
     }).catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
-  }, [caseId, token, reportVersion]);
+  }, [caseId, token, reportVersion, language]);
   if (failed) return <p className="panel" role="status">{t.loadFailed}</p>;
   if (!explanation) return <p role="status">{t.loading}</p>;
   return <ReportExplanationView explanation={explanation} />;

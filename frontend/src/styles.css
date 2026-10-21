@@ -3,7 +3,7 @@
    A neutral light theme and a near-black dark theme. Every colour the
    interface uses is declared here so a surface can never drift on its own.
    The dark values apply when the device prefers dark and the Buyer has not
-   pinned light, or when the Buyer pins dark (ThemeMenu, public/theme-init.js).
+   pinned light, or when the Buyer pins dark (ThemeLanguageMenu, public/theme-init.js).
    ========================================================================== */
 
 :root {
@@ -1277,7 +1277,7 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
    Ticket 43 — selectable themes and the X-ray hero
    ========================================================================== */
 
-/* Appearance menu in the masthead. */
+/* Theme and language menu in the masthead. */
 .theme-menu { position: relative; flex: none; margin-left: 8px; }
 .theme-toggle {
   width: 44px;
@@ -1333,6 +1333,27 @@ input[type="file"]::file-selector-button:hover { background: var(--card); border
 .theme-swatch-light { background: #f7f7f9; }
 .theme-swatch-dark { background: #08080a; }
 .theme-swatch-system { background: linear-gradient(135deg, #f7f7f9 50%, #08080a 50%); }
+.theme-group { display: grid; gap: 2px; }
+.theme-group + .theme-group { margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--line); }
+.theme-group-label {
+  margin: 0;
+  padding: 4px 10px 2px;
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.theme-language-code {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
 
 /* The X-ray: an example buyer's order with a scan line and two flagged lines. Decorative. */
 .hero-visual {

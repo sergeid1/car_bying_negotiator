@@ -67,6 +67,10 @@ class JourneyQuoteComparisonServiceTest {
     var car = result.cars().getFirst();
     assertThat(car.state()).isEqualTo("Agreed");
     assertThat(car.amounts()).hasSize(6);
+    assertThat(car.stateName().code()).isEqualTo("COMPARE_STATE_AGREED");
+    assertThat(car.amounts()).extracting(JourneyQuoteComparisonService.Amount::category).containsExactly(
+        "SELLING_PRICE", "DEALER_FEES", "ADD_ONS", "TAXES", "GOVERNMENT_CHARGES", "OUT_THE_DOOR_TOTAL");
+    assertThat(car.amounts()).allSatisfy(amount -> assertThat(amount.name().text()).isEqualTo(amount.label()));
     assertThat(car.amounts().get(1).minorUnits()).isZero();
     assertThat(car.amounts().getLast().minorUnits()).isEqualTo(2200000);
     assertThat(car.amounts()).allSatisfy(amount -> {
@@ -82,6 +86,7 @@ class JourneyQuoteComparisonServiceTest {
     assertThat(result.otdComparable()).isTrue();
     assertThat(result.cars().getFirst().missing()).isEmpty();
     assertThat(result.cars().getFirst().noneListed()).containsExactly("Add-ons");
+    assertThat(result.cars().getFirst().noneListedCategories()).containsExactly("ADD_ONS");
     assertThat(result.cars().getFirst().amounts()).noneMatch(amount -> amount.label().startsWith("Add-ons"));
     jdbc.update("update analysis_cases set status = 'NEEDS_REVIEW'");
     var car = service.view("session", "journey").cars().getFirst();
@@ -100,6 +105,13 @@ class JourneyQuoteComparisonServiceTest {
     assertThat(result.otdComparable()).isFalse();
     assertThat(result.cars().getFirst().noneListed()).isEmpty();
     assertThat(result.cars().getFirst().missing()).contains("Add-ons", "Figures do not add up to the quoted OTD by 125.00 USD");
+    // Each English reason has a coded twin in the same order, so the client never matches the English text.
+    var car = result.cars().getFirst();
+    assertThat(car.missingNames()).extracting(com.dealanalyzer.report.FindingText.Finding::text).isEqualTo(car.missing());
+    assertThat(car.missingNames()).extracting(com.dealanalyzer.report.FindingText.Finding::code)
+        .contains("COMPARE_ADD_ONS", "COMPARE_OTD_OFF_BY");
+    assertThat(car.missingNames()).filteredOn(name -> name.code().equals("COMPARE_OTD_OFF_BY")).singleElement()
+        .satisfies(name -> assertThat(name.parameters()).containsEntry("difference", java.util.Map.of("minorUnits", 12500L, "currency", "USD")));
     reconciliation("one", false, true, 0);
     assertThat(service.view("session", "journey").cars().getFirst().missing()).contains("No quoted OTD in the cash reconciliation");
     when(economics.forOffer("offer-one")).thenReturn(Optional.empty());
@@ -116,6 +128,8 @@ class JourneyQuoteComparisonServiceTest {
     var terms = (com.fasterxml.jackson.databind.node.ObjectNode) offer.terms();
     ((com.fasterxml.jackson.databind.node.ArrayNode) terms.path("lineItems")).addObject().put("category", "UNKNOWN").put("originalLabel", "Package charge");
     assertThat(service.view("session", "journey").cars().get(1).missing()).contains("Unclassified charge: Package charge");
+    assertThat(service.view("session", "journey").cars().get(1).missingNames())
+        .anySatisfy(name -> assertThat(name.parameters()).containsEntry("paperworkLabel", "Package charge"));
     ((com.fasterxml.jackson.databind.node.ArrayNode) terms.path("lineItems")).removeAll();
     var candidates = (com.fasterxml.jackson.databind.node.ArrayNode) terms.path("candidates");
     candidates.remove(candidates.size() - 1);

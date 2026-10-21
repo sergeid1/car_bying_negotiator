@@ -9,6 +9,7 @@ import { DealerAddOnsNote, type DealerAddOnCheck } from "./DealerAddOns";
 import { SigningNote } from "./SigningNote";
 import * as format from "./i18n/format";
 import { useMessages, type Messages } from "./i18n/LanguageProvider";
+import { findingCode, localizeReport, type Finding } from "./i18n/findings";
 
 type Credentials = { caseId: string; token: string };
 type Term = { value?: string | null; unit?: string; amountMinor?: number; currency?: string; category?: string } | number;
@@ -20,6 +21,7 @@ export type DeskFinding = {
   chargeName?: string | null;
 };
 export type DeskCheckView = {
+  textFindings?: Record<string, Finding>;
   status: "NO_AGREED_PRICE" | "AWAITING_PAPERWORK" | "READING" | "DIFFERENT_VIN" | "DIFFERENCES" | "NO_DIFFERENCES";
   source: "READ_FROM_PAPERWORK" | "VERIFIED_OFFER" | "DEAL_REVIEW" | null;
   agreedPrice: null | { offerVersion: number; baselineVersion: number; vin: string | null;
@@ -48,9 +50,9 @@ function money(minor: number, signed = false) {
   const text = format.money(Math.abs(minor));
   return signed ? `${minor < 0 ? "−" : "+"}${text}` : minor < 0 ? `−${text}` : text;
 }
-function labelOf(t: Copy, finding: DeskFinding) {
+function labelOf(t: Copy, finding: DeskFinding, language: string) {
   return (t.labels as Record<string, string>)[finding.label] ?? (finding.term.startsWith("line:") ? finding.label
-    : finding.label.toLowerCase().replaceAll("_", " ").replace(/^./, first => first.toUpperCase()));
+    : findingCode(language, finding.label));
 }
 function show(t: Copy, fill: Fill, term: Term | null) {
   if (term === null || term === undefined) return t.nothing;
@@ -63,8 +65,8 @@ function show(t: Copy, fill: Fill, term: Term | null) {
   return term.value;
 }
 /** One plain sentence per difference, saying what changed relative to the Agreed Price. */
-export function describeFinding(t: Copy, fill: Fill, finding: DeskFinding) {
-  const label = labelOf(t, finding);
+export function describeFinding(t: Copy, fill: Fill, finding: DeskFinding, language = "en") {
+  const label = labelOf(t, finding, language);
   const term = (value: Term | null) => show(t, fill, value);
   if (finding.kind === "DOC_FEE_CHECK") return fill(t.docFee, { label });
   switch (finding.group) {
@@ -84,12 +86,12 @@ export function describeFinding(t: Copy, fill: Fill, finding: DeskFinding) {
   }
 }
 /** A trade finding's sentence comes from the trade check itself (ticket 103). */
-function describe(t: Copy, fill: Fill, view: DeskCheckView, finding: DeskFinding) {
+function describe(t: Copy, fill: Fill, view: DeskCheckView, finding: DeskFinding, language: string) {
   if (finding.term.startsWith("trade:")) {
     const trade = view.trade?.findings.find(item => `trade:${item.code}` === finding.term);
     if (trade) return trade.summary;
   }
-  return describeFinding(t, fill, finding);
+  return describeFinding(t, fill, finding, language);
 }
 /** The lead line: how many differences and what they do to the total. Its clauses are joined with semicolons. */
 export function totalEffectSentence(t: Copy, fill: Fill, view: DeskCheckView) {
@@ -118,8 +120,9 @@ function asView(value: unknown, unavailable: string): DeskCheckView {
 export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Credentials & {
   refreshKey?: number; onFreshCase?: (value: FreshDeskCase) => void;
 }) {
-  const { m: { dealer: { deskCheck: t, common } }, fill } = useMessages();
-  const [view, setView] = useState<DeskCheckView>();
+  const { m: { dealer: { deskCheck: t, common } }, fill, language } = useMessages();
+  const [storedView, setView] = useState<DeskCheckView>();
+  const view = storedView ? localizeReport(storedView, language) : undefined;
   const [error, setError] = useState<string>();
   const [starting, setStarting] = useState(false);
   const files = useRef<File[]>([]);
@@ -182,7 +185,7 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
           : fill(read ? t.noDifferencesRead : t.noDifferencesVerified, { effect: totalEffectSentence(t, fill, view) })}</p>
         {shownFindings.length > 0 && <ol className="desk-check-findings" aria-label={t.findings}>
           {shownFindings.map(finding => <li key={`${finding.group}-${finding.term}`} data-severity={finding.severity}>
-            <p>{describe(t, fill, view, finding)}</p>
+            <p>{describe(t, fill, view, finding, language)}</p>
             <p className="desk-check-meta">
               <span className={finding.verified ? "cash-badge" : "badge badge-warn"}>{finding.verified ? t.verifiedBadge : t.asReadBadge}</span>
               {finding.evidence?.pageNumber ? <span> {fill(t.page, { page: finding.evidence.pageNumber })}</span> : null}
@@ -199,7 +202,7 @@ export function DeskCheck({ caseId, token, refreshKey = 0, onFreshCase }: Creden
             ? t.otherNotes
             : fill(t.otherChanges, { count: view.otherDifferences.length })}</summary>
           <ul>{view.otherDifferences.map(finding => <li key={`${finding.group}-${finding.term}`}>
-            {describeFinding(t, fill, finding)} {finding.verified ? t.verifiedSentence : common.asReadSentence}
+            {describeFinding(t, fill, finding, language)} {finding.verified ? t.verifiedSentence : common.asReadSentence}
             {finding.kind === "DOC_FEE_CHECK" && <p>{finding.buyerAction}</p>}
           </li>)}</ul>
         </details>}

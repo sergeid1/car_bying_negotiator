@@ -19,7 +19,11 @@ public final class AmountEvidence {
       String wording, int pageNumber, Region region) {}
   public record Region(double x, double y, double width, double height) {}
   /** One term of the arithmetic; the first operand has no operator. */
-  public record Operand(String operator, String label, Long minorUnits, String value) {}
+  public record Operand(String operator, String label, Long minorUnits, String value, boolean paperworkLabel) {
+    public Operand(String operator, String label, Long minorUnits, String value) {
+      this(operator, label, minorUnits, value, false);
+    }
+  }
   public record Calculation(List<Operand> operands, List<String> notes) {}
   public record Explanation(DocumentSource documentSource, String sourceNote, Calculation calculation) {}
 
@@ -216,7 +220,7 @@ public final class AmountEvidence {
         String type = line.path("type").asText();
         boolean rebate = subtractVerifiedRebates && type.equals("REBATE") && line.path("eligibility").asText().equals("VERIFIED");
         boolean matches = adding ? added.contains(type) : subtracted.contains(type) || rebate;
-        if (matches) operands.add(money(adding ? operands.isEmpty() ? null : "+" : "−",
+        if (matches) operands.add(quotedMoney(adding ? operands.isEmpty() ? null : "+" : "−",
             line.path("label").asText(), line.path("amount")));
       }
     return new Calculation(operands, operands.isEmpty() ? List.of("No Dealer Offer line contributes, so the amount is zero.") : List.of());
@@ -226,7 +230,7 @@ public final class AmountEvidence {
     List<Operand> operands = new ArrayList<>();
     for (JsonNode line : lines)
       if (line.path("type").asText().equals("REBATE") && line.path("eligibility").asText().equals(eligibility))
-        operands.add(money(operands.isEmpty() ? null : "+", line.path("label").asText(), line.path("amount")));
+        operands.add(quotedMoney(operands.isEmpty() ? null : "+", line.path("label").asText(), line.path("amount")));
     return new Calculation(operands, operands.isEmpty() ? List.of("No Dealer Offer line contributes, so the amount is zero.") : List.of());
   }
 
@@ -310,6 +314,10 @@ public final class AmountEvidence {
 
   private static Operand money(String operator, String label, JsonNode amount) {
     return new Operand(operator, label, amount.path("minorUnits").isIntegralNumber() ? amount.path("minorUnits").asLong() : null, null);
+  }
+  private static Operand quotedMoney(String operator, String label, JsonNode amount) {
+    var value = money(operator, label, amount);
+    return new Operand(value.operator(), value.label(), value.minorUnits(), value.value(), true);
   }
 
   private static Operand minor(String operator, String label, JsonNode value) {

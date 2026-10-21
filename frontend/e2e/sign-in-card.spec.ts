@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, Page, test } from "@playwright/test";
+import { AxeBuilder, expect, Page, test } from "./fixtures";
 
 async function stub(page: Page, providers = ["GOOGLE", "APPLE"], failure?: string) {
   let signedIn = false;

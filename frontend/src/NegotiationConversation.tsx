@@ -3,6 +3,7 @@ import { DealerHandoff } from "./DealerHandoff";
 import { OutboundGateDecision, type GateDecision } from "./OutboundGateDecision";
 import * as format from "./i18n/format";
 import { useMessages } from "./i18n/LanguageProvider";
+import { DealerReadingCopy } from "./DealerReadingCopy";
 
 type Revision = { revision: number; editedByBuyer: boolean; text: string; decision: GateDecision; createdAt: string };
 type Counteroffer = {
@@ -145,7 +146,8 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
               {draft.revisions.map(revision => <section key={revision.revision} className="conversation-revision"
                 aria-label={fill(t.revision, { revision: String(revision.revision) })}>
                 <h4>{fill(revision.editedByBuyer ? t.revisionEdited : t.revisionDrafted, { revision: String(revision.revision) })}</h4>
-                <pre>{revision.text}</pre>
+                <DealerReadingCopy english={revision.text} />
+                <pre lang="en">{revision.text}</pre>
                 <OutboundGateDecision decision={revision.decision} />
               </section>)}
               {draft.state === "PROPOSED" && !view.dealerDeclined && <>

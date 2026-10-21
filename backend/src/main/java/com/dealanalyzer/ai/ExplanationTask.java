@@ -51,6 +51,16 @@ public class ExplanationTask {
     return task();
   }
 
+  @Bean
+  public ModelTask<Output> spanishExplanationModelTask() { return spanishTask(); }
+
+  public static ModelTask<Output> spanishTask() {
+    var english = task();
+    return new ModelTask<>(english.operation(), "report-explanation-es-prompt.v1", english.schemaVersion(),
+        english.instructions() + "\nWrite every sentence in neutral US Latin American Spanish, addressing the Buyer as usted.",
+        english.outputSchema(), english.maxOutputTokens(), english.parse());
+  }
+
   public static ModelTask<Output> task() {
     Map<String, Object> text = Map.of("type", "string");
     Map<String, Object> sentence = Map.of(

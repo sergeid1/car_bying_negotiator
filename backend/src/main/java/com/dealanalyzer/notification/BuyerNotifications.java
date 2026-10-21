@@ -79,6 +79,16 @@ public class BuyerNotifications {
    * not confirmed inbox receipt. Failed and uncertain attempts are not retried automatically.
    */
   public void notify(String accountId, NotificationType type, String dedupeKey) {
+    notifyInLanguage(accountId, type, dedupeKey, accounts.preferredLanguage(accountId));
+  }
+
+  public void notifyCase(String accountId, NotificationType type, String dedupeKey, String caseId) {
+    var language = jdbc.queryForList("select language from analysis_cases where id = ? and lifecycle = 'ACTIVE'", String.class, caseId);
+    if (language.isEmpty()) return;
+    notifyInLanguage(accountId, type, dedupeKey, language.getFirst());
+  }
+
+  private void notifyInLanguage(String accountId, NotificationType type, String dedupeKey, String language) {
     if (type == null || dedupeKey == null || dedupeKey.isBlank() || dedupeKey.length() > 200)
       throw new IllegalArgumentException("A notification type and stable event key are required");
     String hash = secrets.protectAccountSecret("notification", dedupeKey);
@@ -109,7 +119,11 @@ public class BuyerNotifications {
       String state;
       if (!enabled(accountId, type)) state = "OPTED_OUT";
       else {
-        try { email.send(recipient, journey, RecoveryEmail.Purpose.valueOf(type.name())); state = "SENT"; }
+        try {
+          if ("es".equals(language)) email.send(recipient, journey, RecoveryEmail.Purpose.valueOf(type.name()), "es");
+          else email.send(recipient, journey, RecoveryEmail.Purpose.valueOf(type.name()));
+          state = "SENT";
+        }
         catch (RuntimeException failure) { state = "FAILED"; } // Never log provider payloads or addresses.
       }
       jdbc.update("update buyer_notification_deliveries set state = ?, completed_at = ? where id = ?",

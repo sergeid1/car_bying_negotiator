@@ -82,6 +82,7 @@ class CaseIsolationInventoryAcceptanceTest {
   static final List<Endpoint> CASE_ENDPOINTS = List.of(
       caseRow("GET", C, null),
       caseRow("POST", C + "/consents", "{\"purpose\":\"HUMAN_REVIEW\",\"granted\":false,\"policyVersion\":\"human-review.v1\"}"),
+      caseRow("PUT", C + "/language", "{\"language\":\"es\"}"),
       caseRow("POST", C + "/analyses", "{}"),
       caseRow("POST", C + "/finance-offers", "{}"),
       caseRow("GET", C + "/finance-offers/latest", null),
@@ -215,6 +216,7 @@ class CaseIsolationInventoryAcceptanceTest {
   static final List<Endpoint> ACCOUNT_ENDPOINTS = List.of(
       accountRow("GET", V + "/account", null),
       accountRow("PUT", V + "/account/contact", "{\"firstName\":\"Pat\"}"),
+      accountRow("PUT", V + "/account/language", "{\"language\":\"es\"}"),
       accountRow("POST", V + "/account/cases", "{\"caseId\":\"{caseId}\"}"),
       accountRow("POST", V + "/account/cases/{caseId}/open", "{}"),
       accountRow("POST", V + "/account/sign-out", "{}"),

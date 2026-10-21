@@ -83,7 +83,7 @@ export function SaveCaseLink(credentials: Credentials) {
   </section>;
 }
 export function RecoveryAccess({ onRecovered, caseId }: { onRecovered: (value: Credentials) => void; caseId?: string }) {
-  const { m: { account: { casePortability: t } } } = useMessages();
+  const { m: { account: { casePortability: t } }, language } = useMessages();
   const [secret, setSecret] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get("recover") ?? "");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -106,7 +106,7 @@ export function RecoveryAccess({ onRecovered, caseId }: { onRecovered: (value: C
     }}>{t.verify}</button> : null}
     <form onSubmit={async event => {
       event.preventDefault(); const data = new FormData(event.currentTarget);
-      const body = { caseId: caseId ?? readCaseLink(String(data.get("recoveryLink")))?.caseId ?? "unrecognized", email: String(data.get("recoveryEmail")) };
+      const body = { caseId: caseId ?? readCaseLink(String(data.get("recoveryLink")))?.caseId ?? "unrecognized", email: String(data.get("recoveryEmail")), language };
       if (request.current.body !== JSON.stringify(body)) request.current = { body: JSON.stringify(body), key: crypto.randomUUID() };
       setBusy(true); setError("");
       try {
@@ -122,7 +122,7 @@ export function RecoveryAccess({ onRecovered, caseId }: { onRecovered: (value: C
   </section>;
 }
 export function RecoveryEmailOptIn({ caseId, token }: Credentials) {
-  const { m: { account: { casePortability: t } } } = useMessages();
+  const { m: { account: { casePortability: t } }, language } = useMessages();
   const [email, setEmail] = useState(""); const [message, setMessage] = useState("");
   const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
   const key = useRef(crypto.randomUUID());
@@ -132,7 +132,7 @@ export function RecoveryEmailOptIn({ caseId, token }: Credentials) {
     <form onSubmit={async event => {
       event.preventDefault(); setBusy(true); setError("");
       try {
-        await post(t, `/api/v1/cases/${encodeURIComponent(caseId)}/recovery-email`, { email }, key.current, token);
+        await post(t, `/api/v1/cases/${encodeURIComponent(caseId)}/recovery-email`, { email, language }, key.current, token);
         setMessage(t.optInSaved); key.current = crypto.randomUUID();
       } catch (failure) { setError(String(failure)); } finally { setBusy(false); }
     }}>

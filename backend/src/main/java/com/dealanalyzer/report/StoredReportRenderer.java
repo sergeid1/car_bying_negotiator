@@ -15,7 +15,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class StoredReportRenderer {
   private record Line(String text, boolean heading) {}
-  private List<Line> lines(JsonNode payload) {
+  private List<Line> lines(JsonNode payload, String language) {
+    payload = FindingText.localized(payload, language);
     var lines=new ArrayList<Line>();
     lines.add(new Line("Deal Analysis Report - version " + payload.path("version").asText(), true));
     var analysis=payload.path("analysis");
@@ -171,7 +172,50 @@ public class StoredReportRenderer {
     lines.add(new Line("Complete saved payload and evidence",true));
     lines.add(new Line("The following reference paths preserve all recorded fields. Unsupported font characters are identified by their Unicode code point.",false));
     walk(payload, "", lines);
+    if ("es".equals(language)) lines.replaceAll(line -> new Line(spanish(line.text()), line.heading()));
     return lines;
+  }
+  private String spanish(String text) {
+    var finding = FindingText.identify(text);
+    if (finding != null) return FindingText.render("es", finding);
+    text = text.replace("(UNAVAILABLE)", "(no disponible)").replace("(ESTIMATED)", "(estimado)").replace("(EXACT)", "(exacto)");
+    return switch (text) {
+      case "Unknown (no disponible)" -> "Desconocido (no disponible)";
+      case "Out-the-door total" -> "Precio total final (out-the-door)";
+      case "Three material findings" -> "Tres hallazgos relevantes";
+      case "Next action" -> "Próximo paso";
+      case "Questions to ask the dealer" -> "Preguntas para el concesionario";
+      case "Material amounts" -> "Montos relevantes";
+      case "Market evidence" -> "Información de mercado";
+      case "Trade-in findings" -> "Hallazgos sobre el vehículo en parte de pago";
+      case "Worksheet tactics" -> "Tácticas en la hoja de negociación";
+      case "Recalls and safety ratings" -> "Llamados a revisión y calificaciones de seguridad";
+      case "The listing you saved" -> "El anuncio que guardó";
+      case "State fees" -> "Cargos estatales";
+      case "Add-ons and extra dealer charges" -> "Productos adicionales y cargos del concesionario";
+      case "Dealer documentary fee" -> "Cargo por documentación (doc fee)";
+      case "Limitations" -> "Limitaciones";
+      case "Complete saved payload and evidence" -> "Datos e información completos guardados";
+      case "Saved immutable report. Screen edits to questions are not saved in this payload." -> "Informe guardado inmutable. Los cambios de las preguntas en pantalla no se guardan en estos datos.";
+      case "The following reference paths preserve all recorded fields. Unsupported font characters are identified by their Unicode code point." -> "Las siguientes rutas de referencia conservan todos los campos registrados. Los caracteres no admitidos por la fuente se identifican por su código Unicode.";
+      default -> text.startsWith("Deal Analysis Report - version ") ? text.replace("Deal Analysis Report - version ", "Informe de análisis de la oferta - versión ")
+          : text.startsWith("Could you explain this finding: ") ? text.replace("Could you explain this finding: ", "¿Puede explicar este hallazgo?: ")
+          : text.startsWith("Question to ask: ") ? text.replace("Question to ask: ", "Pregunta para el concesionario: ")
+          : text.startsWith("Evidence: ") ? text.replace("Evidence: ", "Información: ")
+          : text.startsWith("Source: ") ? text.replace("Source: ", "Fuente: ")
+          : text.startsWith("As of: ") ? text.replace("As of: ", "Fecha: ")
+          : text.startsWith("Calculation: ") ? text.replace("Calculation: ", "Cálculo: ")
+          : text.startsWith("Monthly effect: ") ? text.replace("Monthly effect: ", "Efecto mensual: ")
+          : text.startsWith("Full-term effect: ") ? text.replace("Full-term effect: ", "Efecto durante todo el plazo: ")
+          : text.startsWith("Draft desk question (") ? text.replace("Draft desk question (PENDING_OPERATOR_REVIEW): ", "Pregunta preliminar para el concesionario (pendiente de revisión): ")
+          : text.startsWith("Rating: ") ? "Evaluación: " + switch (text.substring(8)) {
+            case "INSUFFICIENT DATA" -> "Datos insuficientes";
+            case "STRONG DEAL" -> "Oferta favorable";
+            case "FAIR NEGOTIATE" -> "Razonable, negociar";
+            case "POOR DEAL" -> "Oferta desfavorable";
+            default -> text.substring(8);
+          } : text;
+    };
   }
   private void walk(JsonNode node, String path, List<Line> lines) {
     if (node.isObject()) node.fields().forEachRemaining(field -> {
@@ -188,23 +232,31 @@ public class StoredReportRenderer {
     return (minor < 0 ? "-$" : "$") + java.math.BigDecimal.valueOf(minor, 2).abs().toPlainString();
   }
   public byte[] html(JsonNode payload) {
+    return html(payload, payload.path("language").asText("en"));
+  }
+  public byte[] html(JsonNode payload, String language) {
     var out=new StringBuilder("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Saved Deal Analysis Report</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:72ch;margin:2rem auto;padding:0 1rem;color:#172b3a}p{overflow-wrap:anywhere}h1,h2{break-after:avoid}@media print{body{font-size:10pt;margin:0}p{orphans:3;widows:3}}</style><main>");
     boolean first=true;
-    for (var line:lines(payload)) {
+    for (var line:lines(payload, language)) {
       String tag=line.heading() ? first ? "h1" : "h2" : "p";
       out.append('<').append(tag).append('>').append(escape(line.text())).append("</").append(tag).append('>');
       first=false;
     }
-    return out.append("</main></html>").toString().getBytes(StandardCharsets.UTF_8);
+    String html = out.append("</main></html>").toString();
+    if ("es".equals(language)) html = html.replace("lang=\"en\"", "lang=\"es\"").replace("<title>Saved Deal Analysis Report</title>", "<title>Informe de análisis de la oferta guardado</title>");
+    return html.getBytes(StandardCharsets.UTF_8);
   }
   private String escape(String value) { return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;"); }
   public byte[] pdf(JsonNode payload) {
+    return pdf(payload, payload.path("language").asText("en"));
+  }
+  public byte[] pdf(JsonNode payload, String language) {
     try (var document=new PDDocument(); var output=new ByteArrayOutputStream()) {
       var font=PDType0Font.load(document, StoredReportRenderer.class.getResourceAsStream("/org/apache/pdfbox/resources/ttf/LiberationSans-Regular.ttf"));
       var bold=font;
       PDPageContentStream stream=null; float y=0; int pageNumber=0;
       try {
-        for (var line:lines(payload)) {
+        for (var line:lines(payload, language)) {
           var selected=line.heading() ? bold : font; int size=line.heading() ? 14 : 10;
           String remaining=printable(line.text(), selected);
           do {
@@ -213,7 +265,7 @@ public class StoredReportRenderer {
               var page=new PDPage(PDRectangle.LETTER); document.addPage(page);
               stream=new PDPageContentStream(document, page); y=744; pageNumber++;
               stream.beginText(); stream.setFont(font, 9); stream.newLineAtOffset(48, 30);
-              stream.showText("Saved Deal Analysis Report | Page " + pageNumber); stream.endText();
+              stream.showText(("es".equals(language) ? "Informe de análisis guardado | Página " : "Saved Deal Analysis Report | Page ") + pageNumber); stream.endText();
             }
             int end=remaining.length();
             while (end>1 && selected.getStringWidth(remaining.substring(0,end))*size/1000 > 516) end--;

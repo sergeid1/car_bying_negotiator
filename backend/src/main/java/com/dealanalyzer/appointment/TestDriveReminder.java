@@ -31,13 +31,13 @@ class TestDriveReminder {
 
   int remind(Instant now) {
     var due = jdbc.query("""
-        select a.id, b.account_id from test_drive_appointments a
+        select a.id, b.account_id, a.case_id from test_drive_appointments a
         join buyer_account_cases b on b.case_id = a.case_id
         join analysis_cases c on c.id = a.case_id and c.lifecycle = 'ACTIVE'
         where a.state = 'SCHEDULED' and a.starts_at > ? and a.starts_at <= ?
-        """, (row, n) -> new String[] {row.getString(1), row.getString(2)}, Timestamp.from(now), Timestamp.from(now.plus(notice)));
+        """, (row, n) -> new String[] {row.getString(1), row.getString(2), row.getString(3)}, Timestamp.from(now), Timestamp.from(now.plus(notice)));
     for (String[] appointment : due)
-      notifications.notify(appointment[1], NotificationType.APPOINTMENT, "appointment-reminder:" + appointment[0]);
+      notifications.notifyCase(appointment[1], NotificationType.APPOINTMENT, "appointment-reminder:" + appointment[0], appointment[2]);
     return due.size();
   }
 }

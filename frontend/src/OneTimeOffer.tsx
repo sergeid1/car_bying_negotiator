@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as format from "./i18n/format";
 import { type Messages, useMessages } from "./i18n/LanguageProvider";
+import { findingCode } from "./i18n/findings";
 
 /** `GET /api/v1/offer`. Codes are stable; every Buyer-facing word below is chosen here. */
 export type Offer = {
@@ -24,21 +25,20 @@ type OfferMessages = Messages["money"]["oneTimeOffer"];
 type Fill = ReturnType<typeof useMessages>["fill"];
 
 /** An unknown code is still shown, readably, rather than dropped from the terms. */
-function word(words: Readonly<Record<string, string>>, code: string) {
+function word(words: Readonly<Record<string, string>>, code: string, language: string) {
   if (words[code]) return words[code];
-  const text = code.toLowerCase().replaceAll("_", " ");
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  return findingCode(language, code);
 }
 
 export function offerPrice(offer: Offer) {
   return format.money(offer.price.amountMinor, { currency: offer.price.currency });
 }
 
-function refundTerms(offer: Offer, t: OfferMessages, fill: Fill) {
+function refundTerms(offer: Offer, t: OfferMessages, fill: Fill, language: string) {
   const count = offer.refund.windowDays;
   return offer.refund.terms === "FULL_REFUND_ON_REQUEST_WITHIN_WINDOW"
     ? fill(t.fullRefund, { count })
-    : fill(t.otherRefund, { terms: word({}, offer.refund.terms), count });
+    : fill(t.otherRefund, { terms: word({}, offer.refund.terms, language), count });
 }
 
 /** Anything other than a well-formed available offer means no price and no paywall. */
@@ -70,21 +70,21 @@ function DevelopmentCheckoutNotice({ checkout }: { checkout: string }) {
 }
 
 function OfferDetails({ offer, headingLevel }: { offer: Offer; headingLevel: "h3" | "h4" }) {
-  const { m: { money: { oneTimeOffer: t } }, fill } = useMessages();
+  const { m: { money: { oneTimeOffer: t } }, fill, language } = useMessages();
   const Heading = headingLevel;
   return <>
     <Heading>{t.freeHeading}</Heading>
-    <ul>{offer.free.map(code => <li key={code}>{word(t.free, code)}</li>)}</ul>
+    <ul>{offer.free.map(code => <li key={code}>{word(t.free, code, language)}</li>)}</ul>
     <Heading>{t.paidHeading}</Heading>
-    <ul>{offer.paid.map(code => <li key={code}>{word(t.paid, code)}</li>)}</ul>
+    <ul>{offer.paid.map(code => <li key={code}>{word(t.paid, code, language)}</li>)}</ul>
     <Heading>{t.refundsHeading}</Heading>
-    <p>{refundTerms(offer, t, fill)}</p>
+    <p>{refundTerms(offer, t, fill, language)}</p>
     <Heading>{t.whereHeading}</Heading>
     <p>{offer.jurisdiction ? fill(t.pilotState, { state: offer.jurisdiction.name }) : t.noPilotState}</p>
     <Heading>{t.excludedHeading}</Heading>
-    <ul>{offer.excludedPurchaseTypes.map(code => <li key={code}>{word(t.excluded, code)}</li>)}</ul>
+    <ul>{offer.excludedPurchaseTypes.map(code => <li key={code}>{word(t.excluded, code, language)}</li>)}</ul>
     <Heading>{t.scopeHeading}</Heading>
-    <ul>{offer.scopeLimits.map(code => <li key={code}>{word(t.scopeLimits, code)}</li>)}</ul>
+    <ul>{offer.scopeLimits.map(code => <li key={code}>{word(t.scopeLimits, code, language)}</li>)}</ul>
   </>;
 }
 

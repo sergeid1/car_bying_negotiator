@@ -1,6 +1,7 @@
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { applyThemeChoice, readThemeChoice, THEME_CHOICES, type ThemeChoice } from "./theme";
-import { useMessages } from "./i18n/LanguageProvider";
+import { useLanguageChoice, useMessages } from "./i18n/LanguageProvider";
+import { type Language, languages } from "./i18n/format";
 
 function ThemeIcon({ choice }: { choice: ThemeChoice }) {
   const common = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
@@ -10,9 +11,19 @@ function ThemeIcon({ choice }: { choice: ThemeChoice }) {
   return <svg {...common}><rect x="3" y="4.5" width="18" height="12" rx="2" /><path d="M8.5 20h7M12 16.5V20" /></svg>;
 }
 
-/** The header's appearance menu: follow the device, or pin light or dark. */
-export function ThemeMenu() {
-  const { m, fill } = useMessages();
+function Check() {
+  return <svg className="theme-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>;
+}
+
+const LANGUAGES = Object.keys(languages) as Language[];
+
+/**
+ * The header's theme and language menu (ticket 144, decision 8): follow the device or pin light or dark, and choose
+ * the language. Each group is its own set of radio items; arrow keys, Home and End move through both groups.
+ */
+export function ThemeLanguageMenu() {
+  const { m, fill, language, languageName } = useMessages();
+  const { choose } = useLanguageChoice();
   const LABELS: Record<ThemeChoice, string> = { system: m.theme.system, light: m.theme.light, dark: m.theme.dark };
   const [choice, setChoice] = useState<ThemeChoice>(readThemeChoice);
   const [open, setOpen] = useState(false);
@@ -29,11 +40,20 @@ export function ThemeMenu() {
     return () => document.removeEventListener("pointerdown", closeOutside);
   }, [open]);
 
-  function pick(next: ThemeChoice) {
-    setChoice(next);
-    applyThemeChoice(next);
+  function close() {
     setOpen(false);
     toggle.current?.focus();
+  }
+
+  function pickTheme(next: ThemeChoice) {
+    setChoice(next);
+    applyThemeChoice(next);
+    close();
+  }
+
+  function pickLanguage(next: Language) {
+    choose(next);
+    close();
   }
 
   function navigate(event: KeyboardEvent<HTMLDivElement>) {
@@ -52,16 +72,28 @@ export function ThemeMenu() {
 
   return <div className="theme-menu" ref={container}>
     <button type="button" ref={toggle} className="theme-toggle" aria-haspopup="menu" aria-expanded={open}
-      aria-label={fill(m.theme.current, { choice: LABELS[choice] })} onClick={() => setOpen(value => !value)}>
+      aria-label={fill(m.theme.current, { choice: LABELS[choice], language: languageName })} onClick={() => setOpen(value => !value)}>
       <ThemeIcon choice={choice} />
     </button>
     {open && <div role="menu" aria-label={m.theme.menu} className="theme-options" onKeyDown={navigate}>
-      {THEME_CHOICES.map(option => <button key={option} type="button" role="menuitemradio"
-        aria-checked={option === choice} tabIndex={option === choice ? 0 : -1} onClick={() => pick(option)}>
-        <span className={`theme-swatch theme-swatch-${option}`} aria-hidden="true" />
-        <span>{LABELS[option]}</span>
-        {option === choice && <svg className="theme-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
-      </button>)}
+      <div role="group" className="theme-group" aria-labelledby="theme-group-label">
+        <p id="theme-group-label" className="theme-group-label" role="presentation">{m.theme.themeGroup}</p>
+        {THEME_CHOICES.map(option => <button key={option} type="button" role="menuitemradio"
+          aria-checked={option === choice} tabIndex={option === choice ? 0 : -1} onClick={() => pickTheme(option)}>
+          <span className={`theme-swatch theme-swatch-${option}`} aria-hidden="true" />
+          <span>{LABELS[option]}</span>
+          {option === choice && <Check />}
+        </button>)}
+      </div>
+      <div role="group" className="theme-group" aria-labelledby="language-group-label">
+        <p id="language-group-label" className="theme-group-label" role="presentation">{m.theme.languageGroup}</p>
+        {LANGUAGES.map(option => <button key={option} type="button" role="menuitemradio" lang={option}
+          aria-checked={option === language} tabIndex={-1} onClick={() => pickLanguage(option)}>
+          <span className="theme-language-code" aria-hidden="true">{option}</span>
+          <span>{languages[option].name}</span>
+          {option === language && <Check />}
+        </button>)}
+      </div>
     </div>}
   </div>;
 }

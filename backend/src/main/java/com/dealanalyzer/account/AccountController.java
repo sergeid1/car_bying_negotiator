@@ -23,16 +23,20 @@ public class AccountController {
     this.accounts = accounts; this.exports = exports; this.deletion = deletion; this.cookies = cookies;
   }
 
-  public record SignInRequest(@NotBlank @Email @Size(max = 254) String email) {}
+  public record SignInRequest(@NotBlank @Email @Size(max = 254) String email,
+      @Pattern(regexp = "en|es") String language) {
+    public SignInRequest(String email) { this(email, null); }
+  }
   public record VerifyRequest(@NotBlank @Size(max = 128) String token) {}
   public record ContactRequest(@Size(max = 100) String firstName, @Size(max = 100) String lastName,
       @Size(max = 32) @Pattern(regexp = "^$|^[+]?[0-9 ().-]{7,32}$") String phone) {}
+  public record LanguageRequest(@NotBlank @Size(max = 8) String language) {}
   public record AttachRequest(@NotBlank @Size(max = 36) String caseId) {}
 
   @PostMapping("/sign-in-requests") @ResponseStatus(HttpStatus.ACCEPTED)
   public Map<String, String> requestSignIn(@RequestHeader("Idempotency-Key") @NotBlank @Size(max = 200) String key,
       @Valid @RequestBody SignInRequest request) {
-    accounts.requestSignIn(request.email(), key);
+    accounts.requestSignIn(request.email(), key, request.language());
     // The same acknowledgement for new, existing and pending-deletion accounts.
     return Map.of("status", "Check your email for a single-use sign-in link. It expires in 15 minutes.");
   }
@@ -55,6 +59,12 @@ public class AccountController {
   public BuyerAccountService.AccountView updateContact(@com.dealanalyzer.account.AccountSession String session,
       @Valid @RequestBody ContactRequest request) {
     return accounts.updateContact(session, request.firstName(), request.lastName(), request.phone());
+  }
+
+  @PutMapping("/language")
+  public BuyerAccountService.AccountView updateLanguage(@com.dealanalyzer.account.AccountSession String session,
+      @Valid @RequestBody LanguageRequest request) {
+    return accounts.updateLanguage(session, request.language());
   }
 
   @PostMapping("/cases")

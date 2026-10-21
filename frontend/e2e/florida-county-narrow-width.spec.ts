@@ -1,5 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { AxeBuilder, expect, test } from "./fixtures";
 
 test("synthetic Florida intake chooses the registration county and fits at 360 px", async ({ page }) => {
   await page.route("**/api/v1/**", route => route.fulfill({ status: 204, body: "" }));

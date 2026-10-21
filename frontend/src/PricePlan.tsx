@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import * as format from "./i18n/format";
 import { useMessages } from "./i18n/LanguageProvider";
+import { errorMessage } from "./i18n/errors";
 
 type Boundary = { openingMinor: number; targetMinor: number; policyMaximumMinor: number; walkAwayMinor: number };
 type Snapshot = { version: number; payload: { plan: {
@@ -32,12 +33,12 @@ export function PricePlan({ caseId, token }: { caseId: string; token: string }) 
     try {
       setPlan(await post("price-plans", { maxSellingPriceMinor: limit("selling"), maxOutTheDoorPriceMinor: limit("otd") }, crypto.randomUUID()));
       setBaseline(undefined); setApproved(false); setApprovalKey(crypto.randomUUID());
-    } catch (caught) { setError(String(caught)); } finally { setBusy(false); }
+    } catch (caught) { setError(errorMessage(caught, t.requestFailed)); } finally { setBusy(false); }
   }
   async function approve() {
     setBusy(true); setError(undefined);
     try { setBaseline(await post("approved-baselines", { planVersion: plan!.version, approved }, approvalKey)); }
-    catch (caught) { setError(String(caught)); } finally { setBusy(false); }
+    catch (caught) { setError(errorMessage(caught, t.requestFailed)); } finally { setBusy(false); }
   }
   const money = (minor: number) => format.money(minor, { currency: plan?.payload.plan.currency ?? "USD" });
   return <section className="panel" aria-labelledby="plan-heading">

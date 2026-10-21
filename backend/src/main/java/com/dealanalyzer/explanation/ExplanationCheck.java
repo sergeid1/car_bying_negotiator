@@ -65,18 +65,31 @@ public final class ExplanationCheck {
       + "fraud\\w*|scams?|advice|advise|recommend\\w*|you should|you must)(?![\\w-])");
 
   private static final Pattern MARKUP = Pattern.compile("(?i)[<>{}\\[\\]\\\\*_#`|]|https?:|www\\.|@|\\p{Cntrl}");
+  private static final Pattern SPANISH_FRAMING = Pattern.compile("(?iu)(?<![\\p{L}\\p{N}_-])(?:"
+      + "inteligencia artificial|negociador(?:es)?|robot|bot|chatbot|"
+      + "segur[oa]s?|seguridad|firmar|firma|firmado|firmando|"
+      + "legal(?:es)?|legalmente|ilegal(?:es)?|ley(?:es)?|cumplimiento|normativa|reglamento|abogad[oa]s?|contratos?|"
+      + "impuestos?|tributari[oa]s?|deducible|mecánic[oa]s?|condición|inspección|reparacion(?:es)?|reparación|"
+      + "títulos?|gravamen|historial|historia|accidentes?|dañad[oa]s?|inundación|siniestro|retiros?|odómetro|"
+      + "ahorrar|ahorros?|ahorra|ahorrará|garant[ií]as?|garantiz\\p{L}*|sin riesgo|"
+      + "consejos?|asesoría|asesoramiento|recomend\\p{L}*|debería|debe usted|usted debe"
+      + ")(?![\\p{L}\\p{N}_-])");
 
   private ExplanationCheck() {}
 
   public static List<Statement> check(ExplanationFacts facts, List<Sentence> sentences) {
+    return check(facts, sentences, "en");
+  }
+
+  public static List<Statement> check(ExplanationFacts facts, List<Sentence> sentences, String language) {
     if (sentences.isEmpty()) throw new Rejected("NOTHING_TO_EXPLAIN");
     if (sentences.size() > MAX_SENTENCES) throw new Rejected("TOO_MANY_SENTENCES");
     List<Statement> statements = new ArrayList<>();
-    for (Sentence sentence : sentences) statements.add(statement(facts, sentence));
+    for (Sentence sentence : sentences) statements.add(statement(facts, sentence, language));
     return statements;
   }
 
-  private static Statement statement(ExplanationFacts facts, Sentence sentence) {
+  private static Statement statement(ExplanationFacts facts, Sentence sentence, String language) {
     String text = sentence.text() == null ? "" : sentence.text().strip();
     if (text.isEmpty() || text.length() > MAX_TEXT) throw new Rejected("TEXT_OUT_OF_BOUNDS");
     // One finding per sentence, so no state can be borrowed from one finding for another's subject.
@@ -93,7 +106,13 @@ public final class ExplanationCheck {
       if (amount == null) throw new Rejected("UNKNOWN_AMOUNT");
       if (amount.subjects().stream().noneMatch(finding.amountSubjects()::contains)) throw new Rejected("UNRELATED_AMOUNT");
       if (matcher.start() > last) segments.add(Segment.text(text.substring(last, matcher.start())));
-      segments.add(Segment.amount(amount));
+      if ("es".equals(language)) {
+        var format = java.text.NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("es-US"));
+        format.setCurrency(java.util.Currency.getInstance(amount.currency()));
+        String rendered = !amount.known() ? "desconocido" : format.format(java.math.BigDecimal.valueOf(amount.minorUnits(), 2))
+            + ("ESTIMATED".equals(amount.precision()) ? " (estimado)" : "");
+        segments.add(new Segment(rendered, amount.id(), amount.index(), amount.precision()));
+      } else segments.add(Segment.amount(amount));
       referenced.add(amount);
       // The placeholder reads as an amount; keep the words around it apart for the scans below.
       prose.append(text, last, matcher.start()).append(' ');
@@ -106,6 +125,14 @@ public final class ExplanationCheck {
     if (FIGURES.matcher(words).find() || NUMBER_WORDS.matcher(words).find()) throw new Rejected("AMOUNT_RESTATED");
     if (MARKUP.matcher(words).find()) throw new Rejected("MARKUP");
     if (PROHIBITED.matcher(words).find()) throw new Rejected("PROHIBITED_FRAMING");
+    if ("es".equals(language)) {
+      if (SPANISH_FRAMING.matcher(words).find() || com.dealanalyzer.ai.ProhibitedClaims.contains(words, "es"))
+        throw new Rejected("PROHIBITED_FRAMING");
+      if (Pattern.compile("(?i)\\b(the|this|these|those|unavailable|unknown|requires|matches|above|below|within)\\b")
+          .matcher(words).find()) throw new Rejected("LANGUAGE_MISMATCH");
+      if (Pattern.compile("(?iu)(?<![\\p{L}])(?:cero|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|dieciséis|diecisiete|dieciocho|diecinueve|veint\\p{L}*|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa|cien|ciento|doscientos|trescientos|cuatrocientos|quinientos|seiscientos|setecientos|ochocientos|novecientos|mil|miles|millón|millones|d[oó]lar(?:es)?|centavos?|por ciento)(?![\\p{L}])")
+          .matcher(words).find()) throw new Rejected("AMOUNT_RESTATED");
+    }
 
     Set<Term> permitted = EnumSet.noneOf(Term.class);
     permitted.addAll(finding.permits());

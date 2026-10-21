@@ -59,8 +59,10 @@ export const en = {
     total: "Out-the-door total",
   },
   theme: {
-    menu: "Appearance",
-    current: "Appearance: {choice}",
+    menu: "Theme and language",
+    current: "Theme and language: {choice}, {language}",
+    themeGroup: "Theme",
+    languageGroup: "Language",
     system: "System",
     light: "Light",
     dark: "Dark",

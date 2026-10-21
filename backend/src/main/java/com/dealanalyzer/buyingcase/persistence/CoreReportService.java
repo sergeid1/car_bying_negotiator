@@ -265,7 +265,7 @@ public class CoreReportService {
       amounts.add(new MaterialAmount("Market selling-price high", assessment.range().highMinor(), assessment.range().currency(),
           "ESTIMATED", "marketAssessment", "/range/highMinor"));
     } else amounts.add(new MaterialAmount("Market selling-price range", null, "USD", "UNAVAILABLE", "marketAssessment", ""));
-    if (cash == null && finance == null) amounts.add(new MaterialAmount("Out-the-door total", null, "USD", "UNAVAILABLE", "cashEconomics", ""));
+    if (cash == null && finance == null) amounts.add(new MaterialAmount("Out-the-door total", null, "USD", "UNAVAILABLE", "cashEconomics", "/result/outTheDoorTotal"));
     if (baseline != null) collectPlanAmounts(baseline.payload().path("plan"), "/payload/plan", plan.currency(), amounts);
     var explained = new AmountEvidence()
         .cash(cashView == null ? null : cashView.result(), offer == null ? null : offer.terms(),
@@ -294,9 +294,11 @@ public class CoreReportService {
         "Financing covers only the recorded standard monthly schedule. Mechanical condition, title, legal compliance and purchase safety are excluded. Savings are not guaranteed.")));
     ObjectNode payload = json.createObjectNode();
     payload.put("id", UUID.randomUUID().toString()); payload.put("caseId", caseId);
-    payload.put("schemaVersion", "core-deal-analysis-report.v1"); payload.put("version", version);
+    payload.put("schemaVersion", "core-deal-analysis-report.v2"); payload.put("version", version);
     payload.put("generatedAt", now.toString()); payload.put("asOf", now.toString()); payload.put("status", completion);
     payload.set("analysis", analysis); payload.set("evidence", evidence);
+    payload.put("language", buyingCase.language);
+    com.dealanalyzer.report.FindingText.annotate(payload, json);
     String fingerprint = offers.fingerprint(analysis);
     payload.set("reproduction", json.valueToTree(Map.of("inputFingerprint", offers.fingerprint(evidence),
         "analysisFingerprint", fingerprint, "inputs", "#/evidence", "policyVersions", "#/analysis/policyVersions",

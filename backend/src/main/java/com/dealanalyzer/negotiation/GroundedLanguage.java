@@ -16,7 +16,7 @@ public final class GroundedLanguage {
   }
 
   public Language generate(JsonNode report) {
-    if (!"core-deal-analysis-report.v1".equals(report.path("schemaVersion").asText()))
+    if (!com.dealanalyzer.explanation.ExplanationFacts.supports(report))
       throw new IllegalArgumentException("Finalized core report required");
     List<Item> items = new ArrayList<>();
     String review = report.at("/analysis/reviewStatus").asText();

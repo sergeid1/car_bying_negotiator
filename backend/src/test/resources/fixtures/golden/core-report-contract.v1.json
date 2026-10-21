@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "core-deal-analysis-report.v1",
+  "schemaVersion": "core-deal-analysis-report.v2",
   "scenario": "buyerCanCorrectAndVerifyMaterialTermsIntoOneImmutableDealerOffer",
   "expected": {
     "/status": "COMPLETE",
