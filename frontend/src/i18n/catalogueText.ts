@@ -125,7 +125,9 @@ function holdingFragment(fragment: string, atStart = false): Pair[] {
       let length = 0;
       for (let end = words.length; end > start; end--) {
         const run = words.slice(start, end).join(" ");
-        if ((end - start > 1 || run.length >= 5) && segments.some(segment => segment.includes(run))) { length = end - start; break; }
+        // A run must hold a word of five letters or more, so "the VIN" alone does not tie a sentence to a message.
+        const telling = words.slice(start, end).some(word => /\p{L}{5}/u.test(word));
+        if (telling && segments.some(segment => segment.includes(run))) { length = end - start; break; }
       }
       covered += length;
       start += Math.max(length, 1);
@@ -137,10 +139,34 @@ function holdingFragment(fragment: string, atStart = false): Pair[] {
 }
 
 /**
+ * Fragments the catalogue lookup cannot place, because the journey quotes part of a filled message: each is written
+ * out here with its Spanish, taken from the Spanish catalogue.
+ */
+export const FRAGMENTS: Record<string, RegExp> = {
+  "Brief version 2": /Versión 2 de la descripción/,
+  "High Country · Matters": /High Country · Importa/,
+  "Selling price evidence": /^Prueba de (Precio de venta|Selling price)/i,
+  "/where selling price was read/i": /donde se leyó Precio de venta/i,
+  "Added: Vehicle service contract": /Agregado: Vehicle service contract/,
+  "Reset coverage to North Carolina's minimums": /Volver a los mínimos de cobertura de (North Carolina|Carolina del Norte)/,
+  "Gulfside Mutual Assurance of Northeast Florida, $910 for 6 months": /Gulfside Mutual Assurance of Northeast Florida, \$910 por 6 meses/,
+  "Pilot state: North Carolina.": /Estado piloto: (North Carolina|Carolina del Norte)\./,
+  "/dealer paperwork/i": /^Documentos del concesionario \(PDF o fotos\)/i,
+  "/where the dealer was read/": /donde se leyó el dato «.+?»/,
+  "/amount financed as shown on page 2/i": /como aparece en la página 2/i,
+  "/Dealer message body: added as a document for your review/": /Texto del mensaje del concesionario: se agregó como documento para que usted lo revise/,
+  "/where out The Door Total was read/i": /donde se leyó/i,
+  "/where the price the ad shows was read/": /donde se leyó el dato «.+?»/,
+  "This ad is for VIN 1M8GDM9AXKP042788": /Este anuncio es para el VIN 1M8GDM9AXKP042788/,
+  "/Read from page 2/": /Leído de la página 2/,
+};
+
+/**
  * A selector's English text in Spanish, keeping Playwright's matching rules: a string matches case-insensitively as a
  * substring, or whole when `exact`. Text that is not in the catalogue, such as a dealer name, is returned unchanged.
  */
 export function translateSelector(text: string, whole = false, ignoreCase = !whole): string | RegExp {
+  if (FRAGMENTS[text]) return FRAGMENTS[text];
   let candidates = spanishFor(text, 0, ignoreCase);
   // A text can also be a fragment of a longer message, as "page 1 looks rotated" is: a frame such as "Page {page}"
   // fits it whole but leaves its English words untranslated.
@@ -158,6 +184,7 @@ export function translateSelector(text: string, whole = false, ignoreCase = !who
  * one; an alternation is translated branch by branch; other pattern syntax is read as a gap between words.
  */
 export function translatePattern(pattern: RegExp): RegExp {
+  if (FRAGMENTS[String(pattern)]) return FRAGMENTS[String(pattern)];
   const anchoredStart = pattern.source.startsWith("^");
   const anchoredEnd = pattern.source.endsWith("$") && !pattern.source.endsWith("\\$");
   const body = pattern.source.replace(/^\^/, "").replace(/(?<!\\)\$$/, "");

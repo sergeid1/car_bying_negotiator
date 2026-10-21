@@ -23,30 +23,8 @@ const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  * still English by design: what the backend sends (findings are ticket 147's), and what the Buyer or dealer wrote.
  * The English-copy check below is what fails when catalogue copy shows up in English.
  */
-/**
- * Fragments the catalogue lookup cannot place, because the journey quotes part of a filled message: each is written
- * out here with its Spanish, taken from the Spanish catalogue.
- */
-const FRAGMENTS: Record<string, RegExp> = {
-  "Brief version 2": /Versión 2 de la descripción/,
-  "High Country · Matters": /High Country · Importa/,
-  "Selling price evidence": /^Prueba de (Precio de venta|Selling price)/i,
-  "/where selling price was read/i": /donde se leyó Precio de venta/i,
-  "Added: Vehicle service contract": /Agregado: Vehicle service contract/,
-  "Reset coverage to North Carolina's minimums": /Volver a los mínimos de cobertura de (North Carolina|Carolina del Norte)/,
-  "Gulfside Mutual Assurance of Northeast Florida, $910 for 6 months": /Gulfside Mutual Assurance of Northeast Florida, \$910 por 6 meses/,
-  "Pilot state: North Carolina.": /Estado piloto: (North Carolina|Carolina del Norte)\./,
-  "/dealer paperwork/i": /^Documentos del concesionario \(PDF o fotos\)/i,
-  "/where the dealer was read/": /donde se leyó el dato «.+?»/,
-  "/amount financed as shown on page 2/i": /como aparece en la página 2/i,
-  "/Dealer message body: added as a document for your review/": /Texto del mensaje del concesionario: se agregó como documento para que usted lo revise/,
-  "/where out The Door Total was read/i": /donde se leyó/i,
-};
-
 function translate(value: unknown, whole = false): unknown {
   if (!spanish()) return value;
-  const listed = FRAGMENTS[String(value)];
-  if (listed) return listed;
   if (typeof value === "string") {
     const spanishValue = translateSelector(value, whole);
     if (spanishValue === value) return value;
