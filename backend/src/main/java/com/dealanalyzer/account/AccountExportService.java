@@ -49,6 +49,7 @@ public class AccountExportService {
     data.put("schemaVersion", "buyer-account-export.v1");
     data.put("contact", view.contact());
     data.put("createdAt", view.createdAt());
+    data.put("preferredLanguage", view.preferredLanguage());
     data.put("passkeys", passkeys.metadata(session.accountId));
     // Provider and link date only: the provider's subject is never exported.
     data.put("socialSignIns", social.exportForAccount(session.accountId));

@@ -13,6 +13,7 @@ class BuyerAccountEntity {
   @Column(name = "updated_at") Instant updatedAt;
   @Column(name = "verified_at") Instant verifiedAt;
   @Column(name = "password_hash") String passwordHash;
+  @Column(name = "preferred_language") String preferredLanguage;
   protected BuyerAccountEntity() {}
   BuyerAccountEntity(String id) { this.id = id; }
 }
