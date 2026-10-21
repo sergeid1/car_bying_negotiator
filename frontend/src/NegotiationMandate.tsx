@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import * as format from "./i18n/format";
 import { useMessages } from "./i18n/LanguageProvider";
+import { errorMessage } from "./i18n/errors";
 
 type Disclosure = "PAYING_CASH" | "HAS_OUTSIDE_FINANCING" | "FIRST_NAME" | "PURCHASE_TIMELINE";
 type Status = "ACTIVE" | "SUPERSEDED" | "REVOKED" | "PLAN_CHANGED" | "EXPIRED";
@@ -39,7 +40,7 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
       setProposal(await request<MandateProposal>(`${path}/proposal`));
       const list = await request<Mandate[]>(path);
       setMandates(Array.isArray(list) ? list : []);
-    } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)); }
+    } catch (caught) { setError(errorMessage(caught, t.requestFailed)); }
     finally { setBusy(false); }
   }
   useEffect(() => { void load(); }, [caseId, token]);
@@ -63,7 +64,7 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
       setApprovalKey(crypto.randomUUID());
       form.reset();
       await load();
-    } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)); setBusy(false); }
+    } catch (caught) { setError(errorMessage(caught, t.requestFailed)); setBusy(false); }
   }
 
   async function revoke(version: number) {
@@ -71,7 +72,7 @@ export function NegotiationMandate({ caseId, token }: { caseId: string; token: s
     try {
       await request<Mandate>(`${path}/${version}/revocation`, { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() } });
       await load();
-    } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)); setBusy(false); }
+    } catch (caught) { setError(errorMessage(caught, t.requestFailed)); setBusy(false); }
   }
 
   const money = (minor: number, currency?: string | null) =>

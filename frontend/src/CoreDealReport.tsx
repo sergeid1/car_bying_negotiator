@@ -19,6 +19,7 @@ import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
 import { SigningNote } from "./SigningNote";
 import * as format from "./i18n/format";
 import { useMessages } from "./i18n/LanguageProvider";
+import { errorMessage } from "./i18n/errors";
 
 export type MaterialAmount = {
   label: string; minorUnits: number | null; currency: string; precision: string; source: string; pointer: string;
@@ -72,7 +73,7 @@ export function CoreReportLoader({ caseId, token }: { caseId: string; token: str
       if (!payload.analysis?.materialAmounts) throw new Error(t.syntheticReport);
       setReport(payload);
       if (generate) setKey(crypto.randomUUID());
-    } catch (caught) { setError(String(caught)); } finally { setBusy(false); }
+    } catch (caught) { setError(errorMessage(caught, t.reportUnavailable)); } finally { setBusy(false); }
   }
   return <section className="stack" aria-label={t.loaderLabel}>
     {report && <CoreDealReport report={report} caseId={caseId} token={token}>
