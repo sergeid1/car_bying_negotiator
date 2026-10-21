@@ -9,7 +9,7 @@ This first version is a process guide only. Toto does not see the Buyer's case, 
 and it answers only from a code-owned guide that the operator has reviewed.
 
 **Status:** draft, 2026-10-18. The guide articles await the operator's review (ticket 118). The decline reasons
-and their wording are provisional until ticket 132, the exact-passage rule is under review in ticket 133, and the
+and their wording were approved on 2026-10-21 (ticket 132). The exact-passage rule is under review in ticket 133, and the
 evaluation thresholds and measured cost belong to ticket 122. Toto stays off (`toto.enabled=false`) and the guide
 is not released until all of these close.
 
@@ -30,15 +30,16 @@ that its cited articles do not contain.
 ## What Toto declines
 
 Toto declines these with fixed, code-owned wording. The model returns only the reason; the Buyer sees the wording
-below, never model text. The reasons and wording are as shipped in `TotoAnswerTask.DeclineReason` and remain
-provisional until the operator approves them in ticket 132.
+below, never model text. The operator approved the reasons and wording, and the fallback below, on 2026-10-21 (ticket
+132); `TotoAnswerTask.DeclineReason` holds them. The vehicle reply names an inspection only: dealers usually give
+Buyers the vehicle's history report, often on their websites, so Toto does not point Buyers to one.
 
 | Reason | When | What the Buyer sees |
 | --- | --- | --- |
 | `LEGAL_OR_TAX` | Legal or tax questions, including whether a charge is lawful or how a tax applies to the Buyer | "I can explain buying terms. For legal or tax questions, talk with a qualified professional." |
 | `WHETHER_TO_SIGN` | Whether to sign, buy or accept | "The decision to sign is yours. I can explain the buying process." |
 | `OWN_CASE` | The Buyer's own numbers, quote, report or case, including "is this a good deal" | "Open your report for questions about your own numbers or case." |
-| `VEHICLE_JUDGMENT` | Mechanical condition, accident, title or vehicle-history judgments | "I can't assess a vehicle's condition or history. A vehicle inspection or history report may help." |
+| `VEHICLE_JUDGMENT` | Mechanical condition, accident, title or vehicle-history judgments | "I can't assess a vehicle's condition. A vehicle inspection may help." |
 | `PROVIDER_CHOICE` | Which dealer, lender or insurer to choose | "I can't choose a dealer, lender or insurer for you. I can explain how to compare offers." |
 | `OUTSIDE_CAR_BUYING` | Anything outside car buying and otdog | "I can help with questions about the car-buying process and otdog." |
 
@@ -239,7 +240,6 @@ and both vendor SDKs against `StubModelServer`; they never call a live provider.
 ## Open
 
 - The operator's review of every article (ticket 118).
-- The decline reasons and wording (ticket 132).
 - Whether answers must stay exact passages (ticket 133).
 - Operator grades, a passing live comparison and measured cost per answer (ticket 122). The frozen question set,
   offline harness and thresholds above prepare that work; they do not close the ticket.

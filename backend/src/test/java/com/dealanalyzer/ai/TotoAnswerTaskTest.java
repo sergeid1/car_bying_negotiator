@@ -147,6 +147,9 @@ class TotoAnswerTaskTest {
     }
     assertFallback("{\"kind\":\"DECLINE\",\"paragraphs\":[],\"decline_reason\":null}");
     assertFallback("{\"kind\":\"DECLINE\",\"paragraphs\":[],\"decline_reason\":\"UNKNOWN\"}");
+    // Ticket 132: dealers usually supply the history report, so the reply points only to an inspection.
+    assertThat(DeclineReason.VEHICLE_JUDGMENT.buyerText())
+        .isEqualTo("I can't assess a vehicle's condition. A vehicle inspection may help.");
   }
 
   @Test void allProviderFailuresGiveTheSameFallbackAndTitleMatchesAreDeterministic() {

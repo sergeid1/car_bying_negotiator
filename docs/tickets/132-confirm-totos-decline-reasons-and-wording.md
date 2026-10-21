@@ -7,7 +7,10 @@ Buyer sees for each. Ticket 119 shipped them as provisional (`TotoAnswerTask.Dec
 **Blocked by:** the operator, as the expert reviewer. Coordinate with ticket 118, which writes
 `docs/toto-answer-policy.md`.
 
-**Status:** open — filed on 2026-10-16.
+**Status:** complete — on 2026-10-21. The operator approved all six reasons, their wording and the fallback as
+shipped, except `VEHICLE_JUDGMENT`, now "I can't assess a vehicle's condition. A vehicle inspection may help."
+Dealers usually give Buyers the history report, often on their websites, so Toto no longer mentions one. The reason
+still covers history judgments. Only code-owned wording changed, so the prompt version is unchanged.
 
 ## Scope
 
@@ -26,6 +29,6 @@ Buyer sees for each. Ticket 119 shipped them as provisional (`TotoAnswerTask.Dec
 
 ## Done when
 
-- [ ] The operator has approved each reason and its wording, recorded in `docs/toto-answer-policy.md`.
-- [ ] `TotoAnswerTask` matches the approved list, its tests cover each reason, and `PilotCopyClaimsTest` passes.
-- [ ] The provisional note in ticket 119's status is resolved.
+- [x] The operator has approved each reason and its wording, recorded in `docs/toto-answer-policy.md`.
+- [x] `TotoAnswerTask` matches the approved list, its tests cover each reason, and `PilotCopyClaimsTest` passes.
+- [x] The provisional note in ticket 119's status is resolved.
