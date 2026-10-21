@@ -32,6 +32,7 @@ import { BuyingJourneys } from "./BuyingJourneys";
 import { NegotiationConversation } from "./NegotiationConversation";
 import { JourneyCandidates, ShortlistEntry } from "./JourneyCandidates";
 import { QuoteComparison } from "./QuoteComparison";
+import { codedView } from "./QuoteComparison.fixture";
 import { Passkeys } from "./Passkeys";
 import { Passwords } from "./Passwords";
 import { SignIn } from "./SignIn";
@@ -124,13 +125,13 @@ const AA = {
 
 // Ticket 62: partial quotes and expanded source evidence.
 test("quote comparison and its document evidence have no automated AA violations", async () => {
-  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ otdComparable: false, cars: [{
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(codedView({ otdComparable: false, cars: [{
     caseId: "one", candidateId: "one", title: "2024 Honda Civic", state: "Verified quote", offerVersion: 2,
     missing: ["Taxes"], reportVersion: null, marketPosition: "Market position unavailable.",
     amounts: [{ label: "Selling price", minorUnits: 2000000, currency: "USD", evidence: { sourceNote: null,
       calculation: null, documentSource: { documentId: "doc", extractionId: "ex", offerVersion: 2, pageNumber: 1,
         wording: "Selling price", region: { x: .1, y: .2, width: .5, height: .1 } } } }],
-  }] })));
+  }] }))));
   const { container } = render(<main><h1>Buying Journey</h1><QuoteComparison journeyId="j1" onSessionEnded={() => {}} /></main>);
   await screen.findByText("Selling price evidence");
   expect((await axe.run(container, AA)).violations).toEqual([]);

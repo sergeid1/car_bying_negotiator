@@ -1,19 +1,21 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import { ComparisonCar, QuoteComparison, QuoteComparisonView } from "./QuoteComparison";
+import { QuoteComparison } from "./QuoteComparison";
+import { codedView } from "./QuoteComparison.fixture";
+import { LanguageProvider } from "./i18n/LanguageProvider";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
-export const comparisonCar = (caseId: string, price: number): ComparisonCar => ({
-  caseId, candidateId: caseId, title: `2024 Honda Civic ${caseId}`, state: "Verified quote", offerVersion: 2,
-  missing: [], marketPosition: "Selling price within the stored market range.", reportVersion: 3,
+export const comparisonCar = (caseId: string, price: number) => ({
+  caseId, candidateId: caseId, title: `2024 Honda Civic ${caseId}`, state: "Verified quote", offerVersion: 2 as number | null,
+  missing: [] as string[], noneListed: undefined as string[] | undefined, marketPosition: "Selling price within the stored market range.", reportVersion: 3,
   amounts: [{ label: "Selling price", minorUnits: price, currency: "USD", evidence: { sourceNote: null, calculation: null,
     documentSource: { documentId: "doc", extractionId: "ex", offerVersion: 2, wording: "Selling price", pageNumber: 2,
       region: { x: .1, y: .2, width: .3, height: .1 } } } },
     { label: "Out-the-door total", minorUnits: price + 10000, currency: "USD",
       evidence: { documentSource: null, sourceNote: "Quoted on the verified offer; region unavailable.", calculation: null } }],
 });
-function mock(view: QuoteComparisonView) {
-  return vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(view)));
+function mock(view: { cars: ReturnType<typeof comparisonCar>[]; otdComparable: boolean }) {
+  return vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(codedView(view))));
 }
 test("starts in shortlist order and changes only by the Buyer's chosen column", async () => {
   const fetcher = mock({ cars: [comparisonCar("first", 2000000), comparisonCar("second", 1900000)], otdComparable: true });
@@ -79,8 +81,22 @@ test.each(["fees", "addons"])("%s ordering puts None listed first and missing fi
 test("unreconciled quotes show the per-car reason", async () => {
   mock({ cars: [{ ...comparisonCar("one", 2000000), missing: ["Figures do not add up to the quoted OTD by 125.00 USD"] }], otdComparable: false });
   render(<QuoteComparison journeyId="journey" onSessionEnded={() => {}} />);
-  await screen.findByText(/Figures do not add up to the quoted OTD by 125.00 USD/);
+  await screen.findByText(/Figures do not add up to the quoted OTD by \$125\.00/);
   expect(screen.getByRole("option", { name: "Out-the-door total, lowest first" })).toBeDisabled();
+});
+test("in Spanish, names and reasons come from the catalogue and paperwork labels stay as printed", async () => {
+  const car = comparisonCar("one", 2000000);
+  car.amounts.push({ label: "Dealer fees: DOC FEE", minorUnits: 89900, currency: "USD",
+    evidence: { documentSource: null, sourceNote: "Quoted.", calculation: null } } as typeof car.amounts[number]);
+  mock({ cars: [{ ...car, missing: ["Figures do not add up to the quoted OTD by 125.00 USD"] }], otdComparable: false });
+  render(<LanguageProvider language="es"><QuoteComparison journeyId="journey" onSessionEnded={() => {}} /></LanguageProvider>);
+  await screen.findByText(/Las cifras no suman el precio total final cotizado; la diferencia es de \$125\.00/);
+  expect(screen.getByText("Cotización verificada", { exact: false })).toBeInTheDocument();
+  expect(screen.getByText("Cargos del concesionario: «DOC FEE»")).toBeInTheDocument();
+  expect(screen.getByText("Precio de venta")).toBeInTheDocument();
+  expect(screen.getByText(/El precio de venta está dentro del rango de mercado guardado\./)).toBeInTheDocument();
+  // Only the dealer's own wording, quoted from the document, stays in English.
+  expect(screen.queryByText(/Verified quote|Selling price within|^Selling price$|^Dealer fees/)).not.toBeInTheDocument();
 });
 test("refreshes, handles expired sessions and explains load failure", async () => {
   const fetcher = mock({ cars: [], otdComparable: false }); const ended = vi.fn();
