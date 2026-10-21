@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { TradeValueChecks } from "./TradeValueChecks";
 import * as format from "./i18n/format";
+import { useMessages } from "./i18n/LanguageProvider";
 
 type Credentials = { caseId: string; token: string };
 type Condition = "EXCELLENT" | "GOOD" | "FAIR" | "POOR";
@@ -30,8 +31,7 @@ class Problem extends Error {
   constructor(message: string, readonly errors: FieldError[] = [], readonly status = 0) { super(message); }
 }
 
-const OWED: { value: Owed; label: string }[] = [
-  { value: "YES", label: "Yes" }, { value: "NO", label: "No" }, { value: "NOT_SURE", label: "I'm not sure" }];
+const OWED: readonly Owed[] = ["YES", "NO", "NOT_SURE"];
 
 function money(minor: number) {
   return format.money(minor);
@@ -46,16 +46,17 @@ export function toMinor(text: string) {
   if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
   return Math.round(Number(cleaned) * 100);
 }
-export function vehicleName(trade: Trade) {
+/** The car's year, make, model and trim; `unidentified` when the decoder named none of them. */
+export function vehicleName(trade: Trade, unidentified: string) {
   const v = trade.vehicle;
   const name = [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ");
-  return name || "VIN not identified by the decoder";
+  return name || unidentified;
 }
 
-function asView(value: unknown): TradeView {
+function asView(value: unknown, unavailable: string): TradeView {
   const v = value as Partial<TradeView> | null;
   if (!v || (v.holder !== "JOURNEY" && v.holder !== "CASE") || !Array.isArray(v.conditions) || !v.analysis)
-    throw new Problem("Your trade-in is unavailable. Try refreshing.");
+    throw new Problem(unavailable);
   return v as TradeView;
 }
 
@@ -65,6 +66,7 @@ function asView(value: unknown): TradeView {
  * when this case was started at the Desk Check for another car, so the trade carries into it.
  */
 export function TradeVehicle({ caseId, token, carryFrom }: Credentials & { carryFrom?: Credentials }) {
+  const { m: { dealer: { tradeVehicle: t } }, fill } = useMessages();
   const [view, setView] = useState<TradeView>();
   const [error, setError] = useState<string>();
   const [editing, setEditing] = useState(false);
@@ -74,11 +76,11 @@ export function TradeVehicle({ caseId, token, carryFrom }: Credentials & { carry
 
   async function request(url: string, init: RequestInit = {}) {
     const response = await fetch(url, { ...init, headers: { "Case-Access-Token": token, ...(init.headers ?? {}) } });
-    if (response.status === 204) throw new Problem("Your trade-in is unavailable. Try refreshing.", [], 204);
+    if (response.status === 204) throw new Problem(t.unavailable, [], 204);
     const body = await response.json().catch(() => null);
-    if (!response.ok) throw new Problem(body?.detail ?? "Your trade-in could not be saved. Try again.",
+    if (!response.ok) throw new Problem(body?.detail ?? t.saveFailed,
       Array.isArray(body?.errors) ? body.errors : [], response.status);
-    return asView(body);
+    return asView(body, t.unavailable);
   }
 
   useEffect(() => {
@@ -98,7 +100,7 @@ export function TradeVehicle({ caseId, token, carryFrom }: Credentials & { carry
   }, [path, token, carryFrom?.caseId]);
 
   if (!view) return error ? <section className="panel trade-vehicle" aria-labelledby="trade-heading">
-    <h2 id="trade-heading">Your trade-in</h2><p role="alert">{error}</p></section> : null;
+    <h2 id="trade-heading">{t.heading}</h2><p role="alert">{error}</p></section> : null;
   const trade = view.trade;
 
   async function remove() {
@@ -110,23 +112,19 @@ export function TradeVehicle({ caseId, token, carryFrom }: Credentials & { carry
 
   return <section className="panel trade-vehicle" aria-labelledby="trade-heading">
     <div className="section-heading"><div>
-      <p className="step">Trade-in</p>
-      <h2 id="trade-heading">Your trade-in</h2>
+      <p className="step">{t.step}</p>
+      <h2 id="trade-heading">{t.heading}</h2>
     </div></div>
-    <p>If you are trading a car in, record it once. It is used only to check your own deal. otdog does not buy cars,
-      does not ask anyone for trade offers, and does not send your trade-in details to a dealer or to anyone else.</p>
-    <p className="muted">{view.holder === "JOURNEY"
-      ? "This trade-in belongs to your Buying Journey, so every case in the journey uses the same one."
-      : "This case holds its own trade-in."}</p>
-    {trade && view.analysis.outdated && view.analysis.analyzedAt && <p role="alert">Your trade-in changed after this case was
-      analyzed on {format.date(view.analysis.analyzedAt, { month: "short", day: "numeric", year: "numeric" })},
-      so that analysis is outdated. Analyze the deal again to use the trade-in as it is now.</p>}
-    {!trade && !editing && <button type="button" onClick={() => setEditing(true)}>Add the car I'm trading in</button>}
+    <p>{t.intro}</p>
+    <p className="muted">{view.holder === "JOURNEY" ? t.journeyHolder : t.caseHolder}</p>
+    {trade && view.analysis.outdated && view.analysis.analyzedAt && <p role="alert">{fill(t.outdated,
+      { date: format.date(view.analysis.analyzedAt, { month: "short", day: "numeric", year: "numeric" }) })}</p>}
+    {!trade && !editing && <button type="button" onClick={() => setEditing(true)}>{t.addCar}</button>}
     {trade && !editing && <TradeSummary trade={trade} view={view} />}
     {trade && !editing && <div className="trade-actions">
-      <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>Edit trade-in</button>
-      {!removing && <button type="button" className="btn-secondary" onClick={() => setRemoving(true)}>I'm not trading it in</button>}
-      {removing && <button type="button" className="btn-secondary" disabled={busy} onClick={() => void remove()}>Remove the trade-in and its offers</button>}
+      <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>{t.edit}</button>
+      {!removing && <button type="button" className="btn-secondary" onClick={() => setRemoving(true)}>{t.notTrading}</button>}
+      {removing && <button type="button" className="btn-secondary" disabled={busy} onClick={() => void remove()}>{t.removeAll}</button>}
     </div>}
     {editing && <TradeForm view={view} busy={busy} onCancel={() => setEditing(false)} onSave={async input => {
       setBusy(true); setError(undefined);
@@ -141,27 +139,30 @@ export function TradeVehicle({ caseId, token, carryFrom }: Credentials & { carry
   </section>;
 }
 
+/** The Buyer's answer to "Do you still owe money on it?", in the catalogue's words. */
+function owedLabel(common: ReturnType<typeof useMessages>["m"]["dealer"]["common"], owed: Owed) {
+  return owed === "YES" ? common.yes : owed === "NO" ? common.no : common.notSure;
+}
+
 function TradeSummary({ trade, view }: { trade: Trade; view: TradeView }) {
+  const { m: { dealer: { tradeVehicle: t, common } }, fill } = useMessages();
   const condition = view.conditions.find(option => option.value === trade.condition);
   return <>
     <dl className="facts trade-facts">
-      <div><dt>Car</dt><dd>{vehicleName(trade)}</dd></div>
-      <div><dt>VIN</dt><dd className="vin">{trade.vehicle.vin}</dd></div>
-      <div><dt>Mileage</dt><dd>{format.number(trade.mileage)} mi</dd></div>
-      <div><dt>Condition</dt><dd>{condition?.label ?? trade.condition}</dd></div>
-      <div><dt>Money owed</dt><dd>{trade.moneyOwed === null ? "Not answered yet"
-        : OWED.find(option => option.value === trade.moneyOwed)!.label}</dd></div>
-      {trade.moneyOwed === "YES" && <div><dt>Lender</dt><dd>{trade.lender}</dd></div>}
-      {trade.moneyOwed !== "NO" && trade.moneyOwed !== null && <div><dt>Payoff</dt><dd>{trade.payoffMinor !== null && trade.payoffGoodThrough
-        ? `${money(trade.payoffMinor)}, good through ${day(trade.payoffGoodThrough)}` : "Unknown"}</dd></div>}
+      <div><dt>{t.car}</dt><dd>{vehicleName(trade, t.unidentified)}</dd></div>
+      <div><dt>{common.vin}</dt><dd className="vin">{trade.vehicle.vin}</dd></div>
+      <div><dt>{common.mileage}</dt><dd>{fill(t.mileageValue, { miles: format.number(trade.mileage) })}</dd></div>
+      <div><dt>{common.condition}</dt><dd>{condition?.label ?? trade.condition}</dd></div>
+      <div><dt>{t.moneyOwed}</dt><dd>{trade.moneyOwed === null ? t.notAnswered : owedLabel(common, trade.moneyOwed)}</dd></div>
+      {trade.moneyOwed === "YES" && <div><dt>{common.lender}</dt><dd>{trade.lender}</dd></div>}
+      {trade.moneyOwed !== "NO" && trade.moneyOwed !== null && <div><dt>{t.payoff}</dt><dd>{trade.payoffMinor !== null && trade.payoffGoodThrough
+        ? fill(t.payoffValue, { amount: money(trade.payoffMinor), date: day(trade.payoffGoodThrough) }) : t.unknown}</dd></div>}
     </dl>
-    {trade.vehicle.decodeOutcome === "UNDECODABLE" && <p className="notice">The VIN decoder did not identify this VIN, so no
-      year, make, model or trim is shown. Check the VIN against the car or its title.</p>}
-    {!trade.complete && <p className="notice">Answer “Do you still owe money on it?” to complete your trade-in.</p>}
-    {trade.payoffStale && trade.payoffGoodThrough && <p role="alert">Stale payoff: the good-through date, {day(trade.payoffGoodThrough)},
-      has passed. Ask {trade.lender} for a new payoff quote and update it here.</p>}
-    {trade.payoffUnknown && <p className="notice">The payoff is unknown, not zero. Ask your lender for a payoff quote; it states
-      the amount and the date it is good through.</p>}
+    {trade.vehicle.decodeOutcome === "UNDECODABLE" && <p className="notice">{t.undecodable}</p>}
+    {!trade.complete && <p className="notice">{t.incomplete}</p>}
+    {trade.payoffStale && trade.payoffGoodThrough && <p role="alert">{fill(t.stale,
+      { date: day(trade.payoffGoodThrough), lender: trade.lender ?? "" })}</p>}
+    {trade.payoffUnknown && <p className="notice">{t.payoffUnknown}</p>}
   </>;
 }
 
@@ -170,6 +171,7 @@ type Input = { basedOnRevision: number | null; vin: string; mileage: number | nu
 
 function TradeForm({ view, busy, onSave, onCancel }: { view: TradeView; busy: boolean; onCancel: () => void;
   onSave: (input: Input) => Promise<void> }) {
+  const { m: { dealer: { tradeVehicle: t, common } } } = useMessages();
   const trade = view.trade;
   const [owed, setOwed] = useState<Owed | null>(trade?.moneyOwed ?? null);
   const [unknown, setUnknown] = useState(Boolean(trade && trade.moneyOwed === "YES" && trade.payoffMinor === null));
@@ -187,8 +189,7 @@ function TradeForm({ view, busy, onSave, onCancel }: { view: TradeView; busy: bo
     const payoff = text("payoff");
     const payoffMinor = payoff ? toMinor(payoff) : null;
     if (owed === "YES" && !unknown && payoff && payoffMinor === null) {
-      setProblem(new Problem("Check the highlighted trade-in details.",
-        [{ field: "payoffMinor", message: "Enter the payoff amount in dollars and cents, such as 18250.00." }]));
+      setProblem(new Problem(t.checkHighlighted, [{ field: "payoffMinor", message: t.payoffError }]));
       return;
     }
     setProblem(undefined);
@@ -206,15 +207,15 @@ function TradeForm({ view, busy, onSave, onCancel }: { view: TradeView; busy: bo
     }
   }
 
-  return <form className="trade-form" onSubmit={event => void submit(event)} noValidate aria-label="Trade-in details">
-    <label>VIN<input name="vin" defaultValue={trade?.vehicle.vin ?? ""} autoCapitalize="characters" autoComplete="off"
+  return <form className="trade-form" onSubmit={event => void submit(event)} noValidate aria-label={t.form}>
+    <label>{common.vin}<input name="vin" defaultValue={trade?.vehicle.vin ?? ""} autoCapitalize="characters" autoComplete="off"
       spellCheck={false} maxLength={17} {...described("vin")} /></label>
     {errorFor("vin")}
-    <label>Mileage<input name="mileage" inputMode="numeric" autoComplete="off" defaultValue={trade ? String(trade.mileage) : ""}
+    <label>{common.mileage}<input name="mileage" inputMode="numeric" autoComplete="off" defaultValue={trade ? String(trade.mileage) : ""}
       {...described("mileage")} /></label>
     {errorFor("mileage")}
     <fieldset className="trade-choices" aria-describedby={fieldError("condition") ? "trade-condition-error" : undefined}>
-      <legend>Condition</legend>
+      <legend>{common.condition}</legend>
       {view.conditions.map(option => <label key={option.value}>
         <input type="radio" name="condition" value={option.value} defaultChecked={trade?.condition === option.value} />
         <span><strong>{option.label}</strong><span className="trade-choice-detail">{option.description}</span></span>
@@ -222,40 +223,39 @@ function TradeForm({ view, busy, onSave, onCancel }: { view: TradeView; busy: bo
     </fieldset>
     {errorFor("condition")}
     <fieldset className="trade-choices trade-owed" aria-describedby={fieldError("moneyOwed") ? "trade-moneyOwed-error" : undefined}>
-      <legend>Do you still owe money on it?</legend>
-      {OWED.map(option => <label key={option.value}>
-        <input type="radio" name="owed" value={option.value} checked={owed === option.value} onChange={() => setOwed(option.value)} />
-        <span><strong>{option.label}</strong></span>
+      <legend>{common.owedQuestion}</legend>
+      {OWED.map(option => <label key={option}>
+        <input type="radio" name="owed" value={option} checked={owed === option} onChange={() => setOwed(option)} />
+        <span><strong>{owedLabel(common, option)}</strong></span>
       </label>)}
     </fieldset>
     {errorFor("moneyOwed")}
     {owed === "YES" && <>
-      <p className="muted trade-hint">Ask your lender for a payoff quote. It states the amount and the date it is good through;
-        the amount changes as interest adds up, so a quote from the last few days is best.</p>
-      <label>Lender<input name="lender" autoComplete="off" maxLength={120} defaultValue={trade?.lender ?? ""} {...described("lender")} /></label>
+      <p className="muted trade-hint">{t.payoffHint}</p>
+      <label>{common.lender}<input name="lender" autoComplete="off" maxLength={120} defaultValue={trade?.lender ?? ""} {...described("lender")} /></label>
       {errorFor("lender")}
-      <label><input type="checkbox" checked={unknown} onChange={event => setUnknown(event.target.checked)} />I don't know the payoff yet</label>
+      <label><input type="checkbox" checked={unknown} onChange={event => setUnknown(event.target.checked)} />{common.payoffUnknownYet}</label>
       {!unknown && <>
-        <label>Payoff amount ($)<input name="payoff" inputMode="decimal" autoComplete="off"
+        <label>{t.payoffAmount}<input name="payoff" inputMode="decimal" autoComplete="off"
           defaultValue={trade?.payoffMinor ? (trade.payoffMinor / 100).toFixed(2) : ""} {...described("payoffMinor")} /></label>
         {errorFor("payoffMinor")}
-        <label>Good through<input name="goodThrough" type="date" defaultValue={trade?.payoffGoodThrough ?? ""}
+        <label>{common.goodThrough}<input name="goodThrough" type="date" defaultValue={trade?.payoffGoodThrough ?? ""}
           {...described("payoffGoodThrough")} /></label>
         {errorFor("payoffGoodThrough")}
       </>}
     </>}
-    {owed === "NOT_SURE" && <p className="muted trade-hint">Check your loan statement or ask the lender. Until then the payoff
-      stays unknown, not zero.</p>}
+    {owed === "NOT_SURE" && <p className="muted trade-hint">{t.notSureHint}</p>}
     {problem && <p role="alert" tabIndex={-1} ref={summary}>{problem.message}</p>}
     <div className="trade-actions">
-      <button type="submit" disabled={busy}>{busy ? "Saving…" : "Save trade-in"}</button>
-      <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
+      <button type="submit" disabled={busy}>{busy ? t.saving : t.save}</button>
+      <button type="button" className="btn-secondary" onClick={onCancel}>{common.cancel}</button>
     </div>
   </form>;
 }
 
 function TradeOffers({ trade, path, token, request, onView }: { trade: Trade; path: string; token: string;
   request: (url: string, init?: RequestInit) => Promise<TradeView>; onView: (view: TradeView) => void }) {
+  const { m: { dealer: { tradeVehicle: { offers: t }, common } }, fill } = useMessages();
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<Problem>();
@@ -300,51 +300,48 @@ function TradeOffers({ trade, path, token, request, onView }: { trade: Trade; pa
   async function show(offer: TradeOffer) {
     if (typeof URL.createObjectURL !== "function") return;
     const response = await fetch(`${path}/offers/${encodeURIComponent(offer.id)}/pages/1/image`, { headers: { "Case-Access-Token": token } });
-    if (!response.ok) { setProblem(new Problem("The offer's page could not be shown. Try again.")); return; }
+    if (!response.ok) { setProblem(new Problem(t.pageFailed)); return; }
     setShown({ id: offer.id, url: URL.createObjectURL(await response.blob()) });
   }
 
   return <section className="trade-offers" aria-labelledby="trade-offers-heading">
-    <h3 id="trade-offers-heading">Written trade offers you got</h3>
-    <p className="muted">Add an offer you got in writing yourself, such as a CarMax or Carvana instant offer or one from another
-      dealer, with a photo or PDF of it. otdog never requests, arranges, sells or refers trade offers. Only an unexpired offer is used to
-      compare a dealer's trade allowance.</p>
-    {trade.offers.length > 0 && <ul className="trade-offer-list" aria-label="Your written trade offers">
+    <h3 id="trade-offers-heading">{t.heading}</h3>
+    <p className="muted">{t.intro}</p>
+    {trade.offers.length > 0 && <ul className="trade-offer-list" aria-label={t.list}>
       {trade.offers.map(offer => <li key={offer.id}>
-        <p className="trade-offer-amount">{money(offer.amountMinor)} from {offer.source}</p>
-        <p className="muted">Dated {day(offer.offerDate)}. {offer.expired ? "Expired" : "Expires"} {day(offer.expiresOn)}.</p>
+        <p className="trade-offer-amount">{fill(t.amountFrom, { amount: money(offer.amountMinor), source: offer.source })}</p>
+        <p className="muted">{fill(offer.expired ? t.datedExpired : t.datedExpires, { date: day(offer.offerDate), expires: day(offer.expiresOn) })}</p>
         <p className="desk-check-meta">
-          {offer.expired ? <span className="badge badge-warn">Expired: not used for comparison</span>
-            : offer.id === trade.bestOfferId ? <span className="cash-badge">Best unexpired offer</span> : null}
-          <span>{offer.evidence.state === "READY" ? "Offer page stored." : offer.evidence.state === "PROCESSING"
-            ? "Checking the offer page…" : offer.evidence.state === "FAILED" ? "The offer page could not be processed."
-            : "The offer page was removed under document retention."}</span>
+          {offer.expired ? <span className="badge badge-warn">{t.expired}</span>
+            : offer.id === trade.bestOfferId ? <span className="cash-badge">{t.best}</span> : null}
+          <span>{t.evidence[offer.evidence.state === "READY" || offer.evidence.state === "PROCESSING" || offer.evidence.state === "FAILED"
+            ? offer.evidence.state : "REMOVED"]}</span>
         </p>
         <div className="trade-actions">
           {offer.evidence.state === "READY" && shown?.id !== offer.id && <button type="button" className="btn-secondary"
-            onClick={() => void show(offer)}>Show the offer page</button>}
+            onClick={() => void show(offer)}>{t.show}</button>}
           <button type="button" className="btn-secondary" disabled={busy} onClick={() => void remove(offer)}>
-            Remove offer from {offer.source}</button>
+            {fill(t.remove, { source: offer.source })}</button>
         </div>
-        {shown?.id === offer.id && <img className="trade-offer-page" src={shown.url} alt={`Page 1 of the written offer from ${offer.source}`} />}
+        {shown?.id === offer.id && <img className="trade-offer-page" src={shown.url} alt={fill(t.pageAlt, { source: offer.source })} />}
       </li>)}
     </ul>}
-    {!adding && <button type="button" className="btn-secondary" onClick={() => setAdding(true)}>Add a written offer</button>}
-    {adding && <form className="trade-form" onSubmit={event => void add(event)} noValidate aria-label="Written trade offer">
-      <label>Amount on the offer ($)<input name="amount" inputMode="decimal" autoComplete="off" {...described("amountMinor")} /></label>
+    {!adding && <button type="button" className="btn-secondary" onClick={() => setAdding(true)}>{t.add}</button>}
+    {adding && <form className="trade-form" onSubmit={event => void add(event)} noValidate aria-label={t.form}>
+      <label>{t.amount}<input name="amount" inputMode="decimal" autoComplete="off" {...described("amountMinor")} /></label>
       {errorFor("amountMinor")}
-      <label>Who made the offer<input name="source" autoComplete="off" maxLength={120} {...described("source")} /></label>
+      <label>{t.who}<input name="source" autoComplete="off" maxLength={120} {...described("source")} /></label>
       {errorFor("source")}
-      <label>Offer date<input name="offerDate" type="date" {...described("offerDate")} /></label>
+      <label>{t.offerDate}<input name="offerDate" type="date" {...described("offerDate")} /></label>
       {errorFor("offerDate")}
-      <label>Expires<input name="expiresOn" type="date" {...described("expiresOn")} /></label>
+      <label>{t.expires}<input name="expiresOn" type="date" {...described("expiresOn")} /></label>
       {errorFor("expiresOn")}
-      <label>Photo or PDF of the offer<input name="file" type="file" ref={fileInput} accept="application/pdf,image/jpeg,image/png,image/heic"
+      <label>{t.file}<input name="file" type="file" ref={fileInput} accept="application/pdf,image/jpeg,image/png,image/heic"
         {...described("file")} /></label>
       {errorFor("file")}
       <div className="trade-actions">
-        <button type="submit" disabled={busy}>{busy ? "Adding…" : "Add written offer"}</button>
-        <button type="button" className="btn-secondary" onClick={() => { setAdding(false); setProblem(undefined); }}>Cancel</button>
+        <button type="submit" disabled={busy}>{busy ? common.adding : t.addOffer}</button>
+        <button type="button" className="btn-secondary" onClick={() => { setAdding(false); setProblem(undefined); }}>{common.cancel}</button>
       </div>
     </form>}
     {problem && <p role="alert">{problem.message}</p>}

@@ -11,6 +11,7 @@ import { ListingCapture, ListingPriceNote, type ListingPriceCheck } from "./List
 import { GovernmentFeeNote, type GovernmentFeeCheck } from "./GovernmentFees";
 import { DealerAddOnsNote, type DealerAddOnCheck } from "./DealerAddOns";
 import * as format from "./i18n/format";
+import { useMessages } from "./i18n/LanguageProvider";
 
 type Credentials = { caseId: string; token: string };
 type Route = "AGREED_CAR" | "THIS_CASE";
@@ -41,9 +42,8 @@ type Typed = { vin?: string; sellingPriceMinor?: number; tradeAllowanceMinor?: n
 type Phase = "start" | "reading" | "route" | "fresh" | "typed" | "questions" | "result";
 
 const PHOTO_TYPES = "image/jpeg,image/png,image/heic,image/heif,.jpg,.jpeg,.png,.heic,.heif";
-const CONDITIONS = [
-  { value: "EXCELLENT", label: "Excellent" }, { value: "GOOD", label: "Good" },
-  { value: "FAIR", label: "Fair" }, { value: "POOR", label: "Poor" }];
+/** Trade-in conditions offered until the server's own list arrives. */
+const CONDITIONS = ["EXCELLENT", "GOOD", "FAIR", "POOR"] as const;
 /** Marks taken in the browser so upload-to-first-result can be read on a phone through remote debugging. */
 export const LATENCY_MARK = "desk-start:photo";
 export const LATENCY_MEASURE = "desk-start:first-result";
@@ -71,8 +71,10 @@ function money(minor: number) {
   return format.money(Math.abs(minor), { minimumFractionDigits: minor % 100 ? 2 : 0 });
 }
 
+/** A refused step. `reason` names a refusal whose words come from the catalogue; otherwise the message is the server's. */
 class Refusal extends Error {
-  constructor(message: string, readonly field?: string, readonly errors: { field: string; message: string }[] = []) { super(message); }
+  constructor(message: string, readonly field?: string, readonly errors: { field: string; message: string }[] = [],
+    readonly reason?: "purchase-required" | "failed") { super(message); }
 }
 async function send<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   const response = await fetch(path, { ...init, headers: {
@@ -82,13 +84,15 @@ async function send<T>(path: string, init: RequestInit = {}, token?: string): Pr
   if (response.ok) return response.json() as Promise<T>;
   let body: { detail?: string; field?: string; errors?: { field: string; message: string }[] } = {};
   try { body = await response.json(); } catch { /* No problem body to show. */ }
-  if (response.status === 402) throw new Refusal("The Desk Check uses this case's report, which needs the one-time purchase first.");
-  throw new Refusal(typeof body.detail === "string" ? body.detail : "That did not work. Check your connection and try again.",
-    body.field, Array.isArray(body.errors) ? body.errors : []);
+  if (response.status === 402) throw new Refusal("purchase-required", undefined, [], "purchase-required");
+  const errors = Array.isArray(body.errors) ? body.errors : [];
+  if (typeof body.detail !== "string") throw new Refusal("failed", body.field, errors, "failed");
+  throw new Refusal(body.detail, body.field, errors);
 }
 
 /** The header's camera control: one tap opens the phone's camera on the dealer's paperwork. */
 export function DealerCameraEntry({ onPhotos }: { onPhotos: (files: File[]) => void }) {
+  const { m: { dealer: { atTheDealer: t } } } = useMessages();
   function chosen(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
@@ -100,7 +104,7 @@ export function DealerCameraEntry({ onPhotos }: { onPhotos: (files: File[]) => v
   return <label className="header-camera">
     <input type="file" className="visually-hidden" accept={PHOTO_TYPES} capture="environment" multiple onChange={chosen} />
     <span className="header-camera-icon" aria-hidden="true" />
-    I'm at the dealer<span className="visually-hidden">: photograph the paperwork</span>
+    {t.cameraEntry}<span className="visually-hidden">{t.cameraEntryHidden}</span>
   </label>;
 }
 
@@ -113,6 +117,7 @@ export function AtTheDealer({ files, open, onCaseOpened, onFreshCase, onDeskChec
   onCaseOpened: (value: Credentials) => void; onFreshCase: (value: FreshDeskCase) => void;
   onDeskCheck: () => void; onClose: () => void;
 }) {
+  const { m: { dealer: { atTheDealer: t, common } }, fill } = useMessages();
   const signedIn = useContext(AccountSignedInContext);
   const [target, setTarget] = useState<Credentials | undefined>(open);
   const [phase, setPhase] = useState<Phase>(open ? (files.length ? "reading" : "typed") : "start");
@@ -152,8 +157,9 @@ export function AtTheDealer({ files, open, onCaseOpened, onFreshCase, onDeskChec
     setBusy(true); setError(undefined);
     try { await action(); }
     catch (failure) {
-      const refusal = failure instanceof Refusal ? failure : new Refusal("That did not work. Check your connection and try again.");
-      setError({ message: refusal.message, field: refusal.field, errors: refusal.errors });
+      const refusal = failure instanceof Refusal ? failure : new Refusal("failed", undefined, [], "failed");
+      const message = refusal.reason === "purchase-required" ? common.purchaseRequired : refusal.reason === "failed" ? t.failed : refusal.message;
+      setError({ message, field: refusal.field, errors: refusal.errors });
     } finally { setBusy(false); }
   }
 
@@ -246,14 +252,14 @@ export function AtTheDealer({ files, open, onCaseOpened, onFreshCase, onDeskChec
     return tradeAsk(value, numbers) !== "NONE" || financingAsk(value, numbers);
   }
 
-  return <section className="stack at-the-dealer" aria-label="At the dealer">
+  return <section className="stack at-the-dealer" aria-label={t.label}>
     <div className="panel">
       <div className="section-heading"><div>
-        <p className="step">At the dealer</p>
-        <h2 id="dealer-start-heading" ref={heading} tabIndex={-1}>Check the paperwork in front of you</h2>
+        <p className="step">{t.step}</p>
+        <h2 id="dealer-start-heading" ref={heading} tabIndex={-1}>{t.heading}</h2>
       </div></div>
-      <p className="muted">otdog reads the paperwork and shows you what to ask. It never contacts the dealer; you decide what to say.</p>
-      {files.length > 0 && phase !== "result" && <p className="muted">{files.length === 1 ? "1 photo" : `${files.length} photos`} ready.</p>}
+      <p className="muted">{t.intro}</p>
+      {files.length > 0 && phase !== "result" && <p className="muted">{fill(t.photosReady, { count: files.length })}</p>}
 
       {phase === "start" && <StartCase busy={busy} error={error} onSubmit={event => {
         event.preventDefault();
@@ -271,13 +277,12 @@ export function AtTheDealer({ files, open, onCaseOpened, onFreshCase, onDeskChec
         onType={() => setPhase("typed")} />}
 
       {phase === "fresh" && freshVin && <form onSubmit={startFresh}>
-        <h3>Start a separate case for VIN {freshVin}</h3>
-        <p className="muted">It gets its own result, including your state's fees and taxes.
-          {routing?.agreedVin ? " Your Agreed Price stays as it is." : ""} Your trade-in comes with it.</p>
+        <h3>{fill(t.freshHeading, { vin: freshVin })}</h3>
+        <p className="muted">{routing?.agreedVin ? t.freshBodyAgreed : t.freshBody}</p>
         <CaseFields dealerLocation={routing?.freshCase?.dealerLocation ?? routing?.freshCase?.dealerPostalCode ?? undefined} purchaseMethod={routing?.freshCase?.purchaseMethod} />
         <div className="actions">
-          <button type="submit" disabled={busy}>{busy ? "Starting…" : "Start the separate case"}</button>
-          <button type="button" className="btn-secondary" onClick={() => setPhase(routing ? "route" : "typed")}>Back</button>
+          <button type="submit" disabled={busy}>{busy ? common.starting : t.startSeparate}</button>
+          <button type="button" className="btn-secondary" onClick={() => setPhase(routing ? "route" : "typed")}>{t.back}</button>
         </div>
       </form>}
 
@@ -299,10 +304,10 @@ export function AtTheDealer({ files, open, onCaseOpened, onFreshCase, onDeskChec
           await showResult(route!, typed, apr);
         })} />}
 
-      {phase === "reading" && <p className="muted">Reading your paperwork. Most pages take a few seconds.
-        {" "}<button type="button" className="btn-link" onClick={() => setPhase("typed")}>Type the numbers instead</button></p>}
+      {phase === "reading" && <p className="muted">{t.reading}
+        {" "}<button type="button" className="btn-link" onClick={() => setPhase("typed")}>{common.typeInstead}</button></p>}
       {error && !["start", "typed", "questions"].includes(phase) && <p className="error" role="alert">{error.message}</p>}
-      {phase !== "result" && <button type="button" className="btn-secondary" onClick={onClose}>Close</button>}
+      {phase !== "result" && <button type="button" className="btn-secondary" onClick={onClose}>{common.close}</button>}
     </div>
 
     {phase === "result" && result && <ResultView result={result} headingRef={resultHeading} elapsed={elapsed}
@@ -315,7 +320,7 @@ export function AtTheDealer({ files, open, onCaseOpened, onFreshCase, onDeskChec
     {/* Kept mounted while it reads, so the photos are sent once through the ordinary intake. */}
     {target && files.length > 0 && !typed && phase !== "fresh" && phase !== "start" && <DealerDocumentUpload key={target.caseId}
       caseId={target.caseId} token={target.token} initialFiles={files} pollDelayMs={pollDelayMs}
-      heading={{ id: "dealer-paperwork-heading", step: "At the dealer", title: "Your paperwork" }}
+      heading={{ id: "dealer-paperwork-heading", step: t.paperworkStep, title: t.paperworkTitle }}
       onExtracted={document => { if (phaseNow.current === "reading") void read(document); }}
       onFailed={() => { setUnreadable(true); setPhase(current => current === "reading" ? "typed" : current);
         void loadRouting().catch(() => undefined); }} />}
@@ -338,67 +343,70 @@ function FieldError({ error, field }: { error?: { field?: string; message: strin
 }
 
 function CaseFields({ dealerLocation, purchaseMethod }: { dealerLocation?: string; purchaseMethod?: string }) {
+  const { m: { dealer: { atTheDealer: t } } } = useMessages();
   const [buyerPostalCode, setBuyerPostalCode] = useState("");
   return <>
-    <label>Your ZIP code<input name="buyerPostalCode" inputMode="numeric" autoComplete="postal-code" required
+    <label>{t.zip}<input name="buyerPostalCode" inputMode="numeric" autoComplete="postal-code" required
       onChange={event => setBuyerPostalCode(event.target.value)} /></label>
     <DealerFields buyerPostalCode={buyerPostalCode} initialLocation={dealerLocation} />
-    <label>How you are paying<select name="purchaseMethod" defaultValue={purchaseMethod ?? "CASH"}>
-      <option value="CASH">Cash</option><option value="FINANCE">Dealer financing</option></select></label>
+    <label>{t.paying}<select name="purchaseMethod" defaultValue={purchaseMethod ?? "CASH"}>
+      <option value="CASH">{t.cash}</option><option value="FINANCE">{t.dealerFinancing}</option></select></label>
   </>;
 }
 
 function StartCase({ busy, error, onSubmit }: { busy: boolean; error?: { message: string };
   onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+  const { m: { dealer: { atTheDealer: t, common } } } = useMessages();
   const signedIn = useContext(AccountSignedInContext);
   return <form onSubmit={onSubmit}>
-    {signedIn && <p className="notice">Is this for a car in your journey? Open its Buying Case from the journey first, then
-      tap “I'm at the dealer”, and the paperwork is checked against its Agreed Price and your trade-in.</p>}
-    <p>Your ZIP code sets your state's taxes and fees. No account is needed, and the paperwork answers the rest.</p>
+    {signedIn && <p className="notice">{t.journeyNotice}</p>}
+    <p>{t.zipNote}</p>
     <CaseFields />
-    <p className="muted">Starting means otdog may process what you enter and photograph to produce your result.</p>
+    <p className="muted">{t.consent}</p>
     {error && <p className="error" role="alert">{error.message}</p>}
-    <button type="submit" disabled={busy}>{busy ? "Starting…" : "Read my paperwork"}</button>
+    <button type="submit" disabled={busy}>{busy ? common.starting : t.readMyPaperwork}</button>
   </form>;
 }
 
 function RouteChoice({ routing, busy, onConfirm, onFresh, onType }: { routing: DeskRouting; busy: boolean;
   onConfirm: (route: Route) => void; onFresh: (vin: string) => void; onType: () => void }) {
+  const { m: { dealer: { atTheDealer: { route: t }, common } }, fill, fillNodes } = useMessages();
   const [otherVin, setOtherVin] = useState("");
   const known = routing.agreedVin ?? routing.caseVin;
+  const vin = <strong className="vin">{routing.vin}</strong>;
+  const notThisCar = routing.agreedVin ? (known ? t.notAgreedCarKnown : t.notAgreedCar) : known ? t.notCaseCarKnown : t.notCaseCar;
   return <div className="dealer-route" role="group" aria-labelledby="dealer-route-heading">
-    <h3 id="dealer-route-heading">Which car is this paperwork for?</h3>
+    <h3 id="dealer-route-heading">{t.heading}</h3>
     {routing.route === "AGREED_CAR" && <>
-      <p>It shows VIN <strong className="vin">{routing.vin}</strong>, the car in your Agreed Price.</p>
-      <button type="button" disabled={busy} onClick={() => onConfirm("AGREED_CAR")}>Check it against my Agreed Price</button>
+      <p>{fillNodes(t.agreedCar, { vin })}</p>
+      <button type="button" disabled={busy} onClick={() => onConfirm("AGREED_CAR")}>{t.checkAgreed}</button>
     </>}
     {routing.route === "THIS_CASE" && <>
-      <p>{routing.vin ? <>It shows VIN <strong className="vin">{routing.vin}</strong>{routing.caseVin ? ", the car in this case." : "."}</>
-        : "No VIN could be read on it."}</p>
+      <p>{routing.vin ? fillNodes(routing.caseVin ? t.thisCaseCar : t.shows, { vin }) : t.noVin}</p>
       <button type="button" disabled={busy} onClick={() => onConfirm("THIS_CASE")}>
-        {routing.vin && !routing.caseVin ? "Yes, check this car" : "Check this paperwork"}</button>
+        {routing.vin && !routing.caseVin ? t.yesCheck : t.checkPaperwork}</button>
     </>}
     {routing.route === "FRESH_CASE" && routing.freshCase && <>
-      <p role="alert">It shows VIN <strong className="vin">{routing.vin}</strong>, not {routing.agreedVin ? "your agreed car" : "this case's car"}
-        {known ? <> (VIN <span className="vin">{known}</span>)</> : null}. Nothing on it is compared with {routing.agreedVin ? "your Agreed Price" : "that car"}.</p>
-      <button type="button" disabled={busy} onClick={() => onFresh(routing.vin!)}>Start a separate case for this car</button>
+      <p role="alert">{fillNodes(notThisCar, { vin, known: <span className="vin">{known}</span> })}</p>
+      <button type="button" disabled={busy} onClick={() => onFresh(routing.vin!)}>{t.startSeparateForCar}</button>
     </>}
     {routing.route === "CHOOSE" && <>
-      <p>No VIN could be read on it.</p>
+      <p>{t.noVin}</p>
       <button type="button" disabled={busy} onClick={() => onConfirm(routing.agreedVin ? "AGREED_CAR" : "THIS_CASE")}>
-        It is for {routing.agreedVin ? "my agreed car" : "this case's car"}, VIN {known}</button>
-      <label>Or type the other car's VIN<input value={otherVin} autoComplete="off" onChange={event => setOtherVin(event.target.value)} /></label>
+        {fill(routing.agreedVin ? t.forAgreedCar : t.forCaseCar, { vin: known ?? "" })}</button>
+      <label>{t.otherVin}<input value={otherVin} autoComplete="off" onChange={event => setOtherVin(event.target.value)} /></label>
       <button type="button" className="btn-secondary" disabled={otherVin.trim().length !== 17}
-        onClick={() => onFresh(otherVin.trim().toUpperCase())}>Start a separate case for that VIN</button>
+        onClick={() => onFresh(otherVin.trim().toUpperCase())}>{t.startSeparateForVin}</button>
     </>}
     {routing.route === "AGREED_CAR" || routing.route === "THIS_CASE"
-      ? <p className="muted">Nothing is compared until you choose.</p> : null}
-    <button type="button" className="btn-link" onClick={onType}>Type the numbers instead</button>
+      ? <p className="muted">{t.nothingCompared}</p> : null}
+    <button type="button" className="btn-link" onClick={onType}>{common.typeInstead}</button>
   </div>;
 }
 
 function TypedForm({ unreadable, routing, busy, error, onSubmit }: { unreadable: boolean; routing?: DeskRouting; busy: boolean;
   error?: { message: string; field?: string }; onSubmit: (numbers: Typed, other: boolean) => void }) {
+  const { m: { dealer: { atTheDealer: { typed: t }, common } } } = useMessages();
   const known = routing?.agreedVin ?? routing?.caseVin ?? null;
   const [which, setWhich] = useState<"KNOWN" | "OTHER">(routing?.route === "FRESH_CASE" ? "OTHER" : "KNOWN");
   const [problem, setProblem] = useState<{ field: string; message: string }>();
@@ -410,7 +418,7 @@ function TypedForm({ unreadable, routing, busy, error, onSubmit }: { unreadable:
       const text = String(values.get(name) ?? "").trim();
       if (!text) return true;
       const minor = toMinor(text);
-      if (minor === null) { setProblem({ field: name, message: "Enter a dollar amount, like 25,000 or 489.50." }); return false; }
+      if (minor === null) { setProblem({ field: name, message: t.amountError }); return false; }
       (numbers as Record<string, number>)[name] = minor;
       return true;
     };
@@ -418,47 +426,47 @@ function TypedForm({ unreadable, routing, busy, error, onSubmit }: { unreadable:
     for (const name of ["sellingPriceMinor", "tradeAllowanceMinor", "cashDownMinor", "monthlyPaymentMinor", "outTheDoorMinor"] as const)
       if (!amount(name)) return;
     const term = String(values.get("termMonths") ?? "").trim(), apr = String(values.get("aprPercent") ?? "").trim();
-    if (term) { if (!/^\d{1,3}$/.test(term)) return setProblem({ field: "termMonths", message: "Enter the term in whole months, like 72." }); numbers.termMonths = Number(term); }
-    if (apr) { if (!/^\d{1,2}(\.\d{1,3})?$/.test(apr)) return setProblem({ field: "aprPercent", message: "Enter the APR as a number, like 6.9." }); numbers.aprPercent = Number(apr); }
+    if (term) { if (!/^\d{1,3}$/.test(term)) return setProblem({ field: "termMonths", message: t.termError }); numbers.termMonths = Number(term); }
+    if (apr) { if (!/^\d{1,2}(\.\d{1,3})?$/.test(apr)) return setProblem({ field: "aprPercent", message: t.aprError }); numbers.aprPercent = Number(apr); }
     const vin = String(values.get("vin") ?? "").trim().toUpperCase();
     if (vin) numbers.vin = vin;
     if (Object.keys(numbers).filter(key => key !== "vin").length === 0)
-      return setProblem({ field: "sellingPriceMinor", message: "Type at least one number from the worksheet." });
+      return setProblem({ field: "sellingPriceMinor", message: t.atLeastOne });
     const other = known ? which === "OTHER" : false;
-    if (other && !vin) return setProblem({ field: "vin", message: "Type the VIN of the car on this paperwork to start a separate case for it." });
+    if (other && !vin) return setProblem({ field: "vin", message: t.vinNeeded });
     onSubmit(numbers, other);
   }
   const shown = problem ?? error;
   const described = (field: string) => (shown?.field === field ? { "aria-describedby": `dealer-${field}-error`, "aria-invalid": true } : {});
   return <form onSubmit={submit} className="dealer-typed" noValidate>
-    <h3>{unreadable ? "This photo could not be read. Type the numbers instead" : "Type the worksheet's numbers"}</h3>
-    <p className="muted">Fill in what the four-square or buyer's order shows and leave the rest blank. These numbers are compared, not saved.</p>
-    {known && <fieldset><legend>Which car is it for?</legend><div className="segmented">
+    <h3>{unreadable ? t.unreadableHeading : t.heading}</h3>
+    <p className="muted">{t.help}</p>
+    {known && <fieldset><legend>{t.whichCar}</legend><div className="segmented">
       <label><input type="radio" name="which" checked={which === "KNOWN"} onChange={() => setWhich("KNOWN")} />
-        {routing?.agreedVin ? "My agreed car" : "This case's car"}</label>
-      <label><input type="radio" name="which" checked={which === "OTHER"} onChange={() => setWhich("OTHER")} />Another car</label>
+        {routing?.agreedVin ? t.agreedCar : t.caseCar}</label>
+      <label><input type="radio" name="which" checked={which === "OTHER"} onChange={() => setWhich("OTHER")} />{t.anotherCar}</label>
     </div></fieldset>}
     <div className="dealer-typed-grid">
-      <label>Selling price<input name="sellingPriceMinor" inputMode="decimal" {...described("sellingPriceMinor")} /></label>
+      <label>{t.sellingPrice}<input name="sellingPriceMinor" inputMode="decimal" {...described("sellingPriceMinor")} /></label>
       <FieldError error={shown} field="sellingPriceMinor" />
-      <label>Trade-in allowance<input name="tradeAllowanceMinor" inputMode="decimal" {...described("tradeAllowanceMinor")} /></label>
+      <label>{t.tradeAllowance}<input name="tradeAllowanceMinor" inputMode="decimal" {...described("tradeAllowanceMinor")} /></label>
       <FieldError error={shown} field="tradeAllowanceMinor" />
-      <label>Down payment<input name="cashDownMinor" inputMode="decimal" {...described("cashDownMinor")} /></label>
+      <label>{t.downPayment}<input name="cashDownMinor" inputMode="decimal" {...described("cashDownMinor")} /></label>
       <FieldError error={shown} field="cashDownMinor" />
-      <label>Monthly payment<input name="monthlyPaymentMinor" inputMode="decimal" {...described("monthlyPaymentMinor")} /></label>
+      <label>{t.monthlyPayment}<input name="monthlyPaymentMinor" inputMode="decimal" {...described("monthlyPaymentMinor")} /></label>
       <FieldError error={shown} field="monthlyPaymentMinor" />
-      <label>Term (months)<input name="termMonths" inputMode="numeric" {...described("termMonths")} /></label>
+      <label>{t.term}<input name="termMonths" inputMode="numeric" {...described("termMonths")} /></label>
       <FieldError error={shown} field="termMonths" />
-      <label>APR (%)<input name="aprPercent" inputMode="decimal" {...described("aprPercent")} /></label>
+      <label>{t.apr}<input name="aprPercent" inputMode="decimal" {...described("aprPercent")} /></label>
       <FieldError error={shown} field="aprPercent" />
-      <label>Out-the-door total, if shown<input name="outTheDoorMinor" inputMode="decimal" {...described("outTheDoorMinor")} /></label>
+      <label>{t.outTheDoor}<input name="outTheDoorMinor" inputMode="decimal" {...described("outTheDoorMinor")} /></label>
       <FieldError error={shown} field="outTheDoorMinor" />
-      <label>VIN{known && which === "KNOWN" ? " (optional)" : ""}<input name="vin" autoComplete="off" {...described("vin")} /></label>
+      <label>{known && which === "KNOWN" ? t.vinOptional : common.vin}<input name="vin" autoComplete="off" {...described("vin")} /></label>
       <FieldError error={shown} field="vin" />
     </div>
     {shown && !["sellingPriceMinor", "tradeAllowanceMinor", "cashDownMinor", "monthlyPaymentMinor", "termMonths", "aprPercent",
       "outTheDoorMinor", "vin"].includes(shown.field ?? "") && <p className="error" role="alert">{shown.message}</p>}
-    <button type="submit" disabled={busy}>{busy ? "Checking…" : "Check these numbers"}</button>
+    <button type="submit" disabled={busy}>{busy ? common.checking : t.check}</button>
   </form>;
 }
 
@@ -467,13 +475,15 @@ function Questions({ credentials, ask, recorded, financing, busy, error, onDone 
   error?: { message: string; field?: string; errors?: { field: string; message: string }[] };
   onDone: (ownApr: number | undefined, saveTrade?: () => Promise<void>) => void;
 }) {
+  const { m: { dealer: { atTheDealer: { questions: t }, tradeVehicle, common } }, fill } = useMessages();
   const [trading, setTrading] = useState<"YES" | "NO" | undefined>(ask === "DETAILS" || ask === "OWED" ? "YES" : undefined);
   const [owed, setOwed] = useState<string>("");
   const [unknownPayoff, setUnknownPayoff] = useState(false);
   const [hasOwn, setHasOwn] = useState<"YES" | "NO">();
   const [typedVin, setTypedVin] = useState("");
   const [typedMileage, setTypedMileage] = useState("");
-  const [conditions, setConditions] = useState(CONDITIONS);
+  const [conditions, setConditions] = useState<{ value: string; label: string }[]>(
+    () => CONDITIONS.map(value => ({ value, label: t.conditions[value] })));
   const [problem, setProblem] = useState<{ field: string; message: string }>();
   useEffect(() => {
     if (ask !== "DETAILS" && ask !== "WHETHER") return;
@@ -490,7 +500,7 @@ function Questions({ credentials, ask, recorded, financing, busy, error, onDone 
     let apr: number | undefined;
     if (financing && hasOwn === "YES") {
       const text = String(values.get("ownApr") ?? "").trim();
-      if (!/^\d{1,2}(\.\d{1,3})?$/.test(text)) return setProblem({ field: "ownApr", message: "Enter your lender's APR as a number, like 5.9." });
+      if (!/^\d{1,2}(\.\d{1,3})?$/.test(text)) return setProblem({ field: "ownApr", message: t.ownAprError });
       apr = Number(text);
     }
     const saving = ask === "OWED" || (ask !== "NONE" && trading === "YES");
@@ -499,7 +509,7 @@ function Questions({ credentials, ask, recorded, financing, busy, error, onDone 
       const payoff = String(values.get("payoff") ?? "").trim();
       const payoffMinor = owed === "YES" && !unknownPayoff && payoff ? toMinor(payoff) : null;
       if (owed === "YES" && !unknownPayoff && payoff && payoffMinor === null)
-        return setProblem({ field: "payoffMinor", message: "Enter the payoff as a dollar amount, like 12,400." });
+        return setProblem({ field: "payoffMinor", message: t.payoffError });
       const body = ask === "OWED" && recorded
         ? { basedOnRevision: recorded.revision, vin: recorded.vehicle.vin, mileage: recorded.mileage, condition: recorded.condition }
         : { vin: String(values.get("tradeVin") ?? "").trim(), mileage: Number(String(values.get("mileage") ?? "").replace(/[,\s]/g, "")) || null,
@@ -516,52 +526,54 @@ function Questions({ credentials, ask, recorded, financing, busy, error, onDone 
   const fieldErrors = [...(error?.errors ?? []), ...(problem ? [problem] : [])];
   const errorFor = (field: string) => fieldErrors.find(item => item.field === field)?.message;
   const field = (name: string) => errorFor(name) ? <p className="error" role="alert">{errorFor(name)}</p> : null;
-  const owedChoice = <fieldset><legend>Do you still owe money on it?</legend><div className="segmented">
-    {[["YES", "Yes"], ["NO", "No"], ["NOT_SURE", "I'm not sure"]].map(([value, label]) =>
+  const carName = (trade: Trade) => vehicleName(trade, tradeVehicle.unidentified);
+  const owedChoice = <fieldset><legend>{common.owedQuestion}</legend><div className="segmented">
+    {[["YES", common.yes], ["NO", common.no], ["NOT_SURE", common.notSure]].map(([value, label]) =>
       <label key={value}><input type="radio" name="owed" value={value} required checked={owed === value} onChange={() => setOwed(value)} />{label}</label>)}
   </div>{field("moneyOwed")}</fieldset>;
   return <form onSubmit={submit} className="dealer-questions">
-    <h3>What the paperwork cannot tell us</h3>
-    {ask === "NONE" && recorded && <p className="muted">Using your trade-in: {vehicleName(recorded)}
-      {recorded.payoffMinor != null ? `, payoff ${money(recorded.payoffMinor)}` : ""}.{recorded.payoffStale ? " Its payoff is past its good-through date; ask your lender for a new one." : ""}</p>}
-    {ask === "WHETHER" && <fieldset><legend>Are you trading a car in?</legend><div className="segmented">
-      <label><input type="radio" name="trading" required checked={trading === "YES"} onChange={() => setTrading("YES")} />Yes</label>
-      <label><input type="radio" name="trading" required checked={trading === "NO"} onChange={() => setTrading("NO")} />No</label>
+    <h3>{t.heading}</h3>
+    {ask === "NONE" && recorded && <p className="muted">{recorded.payoffMinor != null
+      ? fill(t.usingTradePayoff, { car: carName(recorded), payoff: money(recorded.payoffMinor) })
+      : fill(t.usingTrade, { car: carName(recorded) })}{recorded.payoffStale ? ` ${t.stalePayoff}` : ""}</p>}
+    {ask === "WHETHER" && <fieldset><legend>{t.trading}</legend><div className="segmented">
+      <label><input type="radio" name="trading" required checked={trading === "YES"} onChange={() => setTrading("YES")} />{common.yes}</label>
+      <label><input type="radio" name="trading" required checked={trading === "NO"} onChange={() => setTrading("NO")} />{common.no}</label>
     </div></fieldset>}
-    {ask === "DETAILS" && <p>This paperwork shows a trade-in. Tell us about the car, once; it stays with your journey.</p>}
-    {ask === "OWED" && recorded && <p>Your trade-in: {vehicleName(recorded)}.</p>}
+    {ask === "DETAILS" && <p>{t.details}</p>}
+    {ask === "OWED" && recorded && <p>{fill(t.yourTrade, { car: carName(recorded) })}</p>}
     {(ask === "DETAILS" || ask === "WHETHER") && trading === "YES" && <>
-      <label>Trade-in VIN<input name="tradeVin" autoComplete="off" required value={typedVin}
+      <label>{t.tradeVin}<input name="tradeVin" autoComplete="off" required value={typedVin}
         onChange={event => setTypedVin(event.target.value)} /></label>{field("vin")}
-      <label>Mileage<input name="mileage" inputMode="numeric" required value={typedMileage}
+      <label>{common.mileage}<input name="mileage" inputMode="numeric" required value={typedMileage}
         onChange={event => setTypedMileage(event.target.value)} /></label>{field("mileage")}
-      <label>Condition<select name="condition" required defaultValue="">
-        <option value="" disabled>Choose one</option>
+      <label>{common.condition}<select name="condition" required defaultValue="">
+        <option value="" disabled>{t.chooseOne}</option>
         {conditions.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>{field("condition")}
     </>}
     {(ask === "OWED" || ((ask === "DETAILS" || ask === "WHETHER") && trading === "YES")) && <>
       {owedChoice}
       {owed === "YES" && <>
-        <label>Lender<input name="lender" required /></label>{field("lender")}
-        <label><input type="checkbox" checked={unknownPayoff} onChange={event => setUnknownPayoff(event.target.checked)} />I don't know the payoff yet</label>
+        <label>{common.lender}<input name="lender" required /></label>{field("lender")}
+        <label><input type="checkbox" checked={unknownPayoff} onChange={event => setUnknownPayoff(event.target.checked)} />{common.payoffUnknownYet}</label>
         {!unknownPayoff && <>
-          <label>Payoff amount<input name="payoff" inputMode="decimal" required /></label>{field("payoffMinor")}
-          <label>Good through<input name="goodThrough" type="date" required /></label>{field("payoffGoodThrough")}
+          <label>{t.payoffAmount}<input name="payoff" inputMode="decimal" required /></label>{field("payoffMinor")}
+          <label>{common.goodThrough}<input name="goodThrough" type="date" required /></label>{field("payoffGoodThrough")}
         </>}
       </>}
     </>}
     {(recorded && ask !== "WHETHER" && ask !== "DETAILS" ? <TradeValueLinks headingLevel={4} vin={recorded.vehicle.vin} mileage={recorded.mileage} />
       : (ask === "DETAILS" || ask === "WHETHER") && trading === "YES" ? <TradeValueLinks headingLevel={4} vin={typedVin.trim() || null}
         mileage={/^\d+$/.test(typedMileage.replace(/[,\s]/g, "")) ? Number(typedMileage.replace(/[,\s]/g, "")) : null} /> : null)}
-    {financing && <fieldset><legend>The worksheet shows a loan. Do you have your own loan offer from a bank or credit union?</legend>
+    {financing && <fieldset><legend>{t.financing}</legend>
       <div className="segmented">
-        <label><input type="radio" name="hasOwn" required checked={hasOwn === "YES"} onChange={() => setHasOwn("YES")} />Yes</label>
-        <label><input type="radio" name="hasOwn" required checked={hasOwn === "NO"} onChange={() => setHasOwn("NO")} />No</label>
+        <label><input type="radio" name="hasOwn" required checked={hasOwn === "YES"} onChange={() => setHasOwn("YES")} />{common.yes}</label>
+        <label><input type="radio" name="hasOwn" required checked={hasOwn === "NO"} onChange={() => setHasOwn("NO")} />{common.no}</label>
       </div>
-      {hasOwn === "YES" && <><label>Its APR (%)<input name="ownApr" inputMode="decimal" required /></label>{field("ownApr")}</>}
+      {hasOwn === "YES" && <><label>{t.ownApr}<input name="ownApr" inputMode="decimal" required /></label>{field("ownApr")}</>}
     </fieldset>}
     {error && !error.errors?.length && <p className="error" role="alert">{error.message}</p>}
-    <button type="submit" disabled={busy}>{busy ? "Checking…" : "Show my result"}</button>
+    <button type="submit" disabled={busy}>{busy ? common.checking : t.showResult}</button>
   </form>;
 }
 
@@ -569,24 +581,25 @@ function ResultView({ result, headingRef, elapsed, onDeskCheck, onType, onClose 
   result: FirstResult; headingRef: RefObject<HTMLHeadingElement | null>; elapsed: { read?: number; result?: number };
   onDeskCheck: () => void; onType: () => void; onClose: () => void;
 }) {
+  const { m: { dealer: { atTheDealer: { result: t }, common } }, fill } = useMessages();
   const total = result.outTheDoor;
   // The lead is the first finding; the rest stay one tap away.
   const more = result.findings.slice(1);
   return <section className="panel dealer-result" aria-labelledby="dealer-result-heading" data-read-ms={elapsed.read} data-first-result-ms={elapsed.result}>
-    <p className="step">First look · {result.source === "TYPED_BY_BUYER" ? "as you typed it" : "as read, not verified"}</p>
+    <p className="step">{result.source === "TYPED_BY_BUYER" ? t.typedStep : t.readStep}</p>
     <h2 id="dealer-result-heading" ref={headingRef} tabIndex={-1}>
-      {total.amountMinor !== null ? `Out the door: ${money(total.amountMinor)}` : "No out-the-door total shown"}</h2>
+      {total.amountMinor !== null ? fill(t.outTheDoor, { amount: money(total.amountMinor) }) : t.noTotal}</h2>
     {total.differenceMinor !== null && total.agreedMinor !== null && <p className="dealer-result-delta">
-      {total.differenceMinor === 0 ? `The same as your Agreed Price of ${money(total.agreedMinor)}.`
-        : `${money(total.differenceMinor)} ${total.differenceMinor > 0 ? "more" : "less"} than your Agreed Price of ${money(total.agreedMinor)}.`}</p>}
+      {total.differenceMinor === 0 ? fill(t.same, { agreed: money(total.agreedMinor) })
+        : fill(total.differenceMinor > 0 ? t.more : t.less, { amount: money(total.differenceMinor), agreed: money(total.agreedMinor) })}</p>}
     {result.lead ? <div className="dealer-lead">
       <p className="dealer-lead-summary">{result.lead.summary}</p>
-      <p className="dealer-question"><span className="dealer-question-label">Ask at the desk</span>
+      <p className="dealer-question"><span className="dealer-question-label">{t.askAtDesk}</span>
         <q>{result.lead.deskQuestion}</q></p>
       {result.tacticFindings?.some(tactic => (tactic.code === result.lead?.code || tactic.tradeFindingCode === result.lead?.code) && tactic.questionReview === "PENDING_OPERATOR_REVIEW")
-        && <p className="muted">Draft question wording awaits operator review.</p>}
-    </div> : <p>Nothing in these terms stood out. Check them against the paperwork for the full result.</p>}
-    {result.listingPrice && <ListingPriceNote check={result.listingPrice} title="The ad you saved"
+        && <p className="muted">{common.draftAwaitsReview}</p>}
+    </div> : <p>{t.nothingStoodOut}</p>}
+    {result.listingPrice && <ListingPriceNote check={result.listingPrice} title={common.listingTitle}
       question={!result.findings.some(finding => finding.code.startsWith("LISTING_"))} />}
     {/* Its questions are already among the findings to ask about. */}
     {result.governmentFees && <GovernmentFeeNote check={result.governmentFees} question={false} />}
@@ -594,22 +607,22 @@ function ResultView({ result, headingRef, elapsed, onDeskCheck, onType, onClose 
     {result.addOns && <DealerAddOnsNote check={result.addOns}
       question={!result.findings.some(finding => finding.code === "ADD_ON" || finding.code === "ADDED_CHARGE")} />}
     {more.length > 0 && <details>
-      <summary>{more.length} more to ask about</summary>
+      <summary>{fill(t.moreToAsk, { count: more.length })}</summary>
       <ul className="dealer-more">{more.map((finding, index) => <li key={`${finding.code}-${index}`}>
         <p>{finding.summary}</p><p className="muted"><q>{finding.deskQuestion}</q></p>
         {result.tacticFindings?.some(tactic => (tactic.code === finding.code || tactic.tradeFindingCode === finding.code) && tactic.questionReview === "PENDING_OPERATOR_REVIEW")
-          && <p className="muted">Draft question wording awaits operator review.</p>}
+          && <p className="muted">{common.draftAwaitsReview}</p>}
       </li>)}</ul>
     </details>}
     <SigningNote />
     <div className="actions">
-      {result.route === "AGREED_CAR" && <button type="button" onClick={onDeskCheck}>Open the full Desk Check</button>}
+      {result.route === "AGREED_CAR" && <button type="button" onClick={onDeskCheck}>{t.openDeskCheck}</button>}
       {result.route === "THIS_CASE" && result.source === "READ_FROM_PAPERWORK" && <button type="button" onClick={() => {
         onClose();
         window.setTimeout(() => { const target = document.getElementById("verify-heading"); target?.scrollIntoView?.({ block: "start" }); target?.focus(); });
-      }}>Check the terms against the paperwork</button>}
-      {result.source === "READ_FROM_PAPERWORK" && <button type="button" className="btn-secondary" onClick={onType}>Type the numbers instead</button>}
-      <button type="button" className="btn-secondary" onClick={onClose}>Close</button>
+      }}>{t.checkTerms}</button>}
+      {result.source === "READ_FROM_PAPERWORK" && <button type="button" className="btn-secondary" onClick={onType}>{common.typeInstead}</button>}
+      <button type="button" className="btn-secondary" onClick={onClose}>{common.close}</button>
     </div>
   </section>;
 }
