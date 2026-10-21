@@ -38,6 +38,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class NegotiationConversationService implements RelayMessageOwner {
   public static final String SUBJECT = "Revised itemized written offer";
+  public static final String SUBJECT_ES = "Oferta revisada por escrito y detallada";
+  public static String subject(String language) { return "es".equals(language) ? SUBJECT_ES : SUBJECT; }
   static final Set<State> ACTIVE = Set.of(State.MANDATE_ACTIVE, State.AWAITING_DEALER, State.AWAITING_BUYER);
 
   private final EphemeralBuyingCaseService cases;
@@ -68,7 +70,9 @@ public class NegotiationConversationService implements RelayMessageOwner {
   public record Create(String quoteRequestId) {}
   public record Edit(String text) {}
   public record Approval(boolean approved, String text) {}
-  public record Revision(int revision, boolean editedByBuyer, String text, OutboundGate.Decision decision, Instant createdAt) {}
+  /** {@code language} is the dealer's email language this revision is written in; an edit keeps it. */
+  public record Revision(int revision, boolean editedByBuyer, String text, OutboundGate.Decision decision, Instant createdAt,
+      String language) {}
   public record Draft(String id, String quoteRequestId, String dealerAddress, String state, String cancelReason,
       Long proposalMinor, int reportVersion, int offerVersion, List<Counteroffer.Paragraph> grounds,
       List<Revision> revisions, String messageId, Instant createdAt, Instant decidedAt) {
@@ -114,13 +118,14 @@ public class NegotiationConversationService implements RelayMessageOwner {
     if (!offer.id().equals(report.at("/evidence/dealerOffer/id").asText()))
       throw new IllegalArgumentException("Run the analysis for the latest verified quote before drafting a counteroffer.");
     Counteroffer.Draft draft;
-    try { draft = Counteroffer.draft(report, mandate.currency(), mandate.targetMinor(), mandate.ceilingMinor(), selling); }
+    String language = drafts.language(caseId, dealerId);
+    try { draft = Counteroffer.draft(report, mandate.currency(), mandate.targetMinor(), mandate.ceilingMinor(), selling, language); }
     catch (Counteroffer.TargetReached reached) { throw new IllegalArgumentException(reached.getMessage()); }
     Instant now = com.dealanalyzer.time.PersistedInstant.round(Instant.now());
     // One queued draft at a time: a new draft replaces any older one awaiting approval.
     jdbc.update("update negotiation_drafts set state = 'CANCELLED', cancel_reason = 'SUPERSEDED', decided_at = ? where case_id = ? and state = 'PROPOSED'",
         Timestamp.from(now), caseId);
-    var gated = drafts.create(caseId, token, "negotiation:" + offers.fingerprint(key), new OutboundGate.Draft(dealerId, draft.text()));
+    var gated = drafts.create(caseId, token, "negotiation:" + offers.fingerprint(key), new OutboundGate.Draft(dealerId, draft.text()), language);
     String id = UUID.randomUUID().toString();
     jdbc.update("""
         insert into negotiation_drafts (id, case_id, quote_request_id, mandate_id, report_version, dealer_offer_id, proposal_minor,
@@ -147,11 +152,11 @@ public class NegotiationConversationService implements RelayMessageOwner {
     var dealer = dealerId(caseId, draft);
     if (!replayed.isEmpty()) {
       // A repeated edit with the same key must carry the same text, as for every other idempotent write.
-      drafts.create(caseId, token, outboundKey, new OutboundGate.Draft(dealer, edit.text().strip()));
+      drafts.create(caseId, token, outboundKey, new OutboundGate.Draft(dealer, edit.text().strip()), draft.current().language());
       return draft;
     }
     if (!"PROPOSED".equals(draft.state())) throw new IllegalArgumentException("Only a draft awaiting your approval can be edited.");
-    var gated = drafts.create(caseId, token, outboundKey, new OutboundGate.Draft(dealer, edit.text().strip()));
+    var gated = drafts.create(caseId, token, outboundKey, new OutboundGate.Draft(dealer, edit.text().strip()), draft.current().language());
     revision(caseId, id, draft.current().revision() + 1, gated.id(), true, com.dealanalyzer.time.PersistedInstant.round(Instant.now()));
     return get(caseId, token, id);
   }
@@ -195,7 +200,7 @@ public class NegotiationConversationService implements RelayMessageOwner {
       }
       // The case lock is held through the hand-off, so revocation waits for it or blocks it.
       try {
-        var handoff = handoffs.handOff(caseId, draft.dealerAddress(), SUBJECT, draft.current().text(), Set.of());
+        var handoff = handoffs.handOff(caseId, draft.dealerAddress(), subject(draft.current().language()), draft.current().text(), Set.of());
         jdbc.update("update negotiation_drafts set state = ?, message_id = ? where id = ?", handoff.state(), handoff.messageId(), id);
         if (handoff.sent()) negotiation.transition(caseId, State.AWAITING_DEALER);
       } catch (RelayService.RelayRefusedException refused) {
@@ -212,7 +217,7 @@ public class NegotiationConversationService implements RelayMessageOwner {
     if (state == State.PAUSED) throw new IllegalArgumentException("Negotiation is paused. Resume it before sending.");
     if (!ACTIVE.contains(state)) throw new IllegalArgumentException("Negotiation is not active. No message can be sent.");
     var revision = draftRevision(caseId, draft);
-    var context = drafts.context(caseId, revision.draft().dealerId());
+    var context = drafts.context(caseId, revision.draft().dealerId(), draft.current().language());
     if (!revision.decision().pass() || !new OutboundGate().check(revision.draft(), context).pass()
         || context.mandate() == null || !context.mandate().id().equals(revision.mandateId()))
       throw new IllegalArgumentException("The current mandate or policy no longer permits this draft. Prepare a new counteroffer.");
@@ -365,7 +370,8 @@ public class NegotiationConversationService implements RelayMessageOwner {
         """, (r, n) -> new Object[] {r.getInt(1), r.getBoolean(2), r.getString(3), r.getTimestamp(4).toInstant()}, caseId, id)
         .stream().map(row -> {
           var stored = drafts.get(caseId, token, (String) row[2]);
-          return new Revision((Integer) row[0], (Boolean) row[1], stored.draft().text(), stored.decision(), (Instant) row[3]);
+          return new Revision((Integer) row[0], (Boolean) row[1], stored.draft().text(), stored.decision(), (Instant) row[3],
+              stored.language());
         }).toList();
     return jdbc.query("""
         select n.quote_request_id, q.dealer_address, n.state, n.cancel_reason, n.proposal_minor, n.report_version, o.offer_version,

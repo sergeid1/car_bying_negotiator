@@ -1,11 +1,13 @@
 # Outbound draft policy
 
-`OutboundGate.VERSION` is `outbound-gate.v4`. The gate has no model, I/O, or clock. Its trusted
+`OutboundGate.VERSION` is `outbound-gate.v5`. The gate has no model, I/O, or clock. Its trusted
 context contains an active mandate, verified money values in that mandate's currency, verified
 disclosure facts, known personal values, values released for this specific dealer, and an optional
 finalized core report. HTTP clients supply only `dealerId` and `text`, never gate context.
 
-The policy accepts paragraphs separated by exactly two newlines. Each paragraph must be one of:
+The context also carries the dealer's email language, English or Spanish (ticket 149, below). The policy
+accepts paragraphs separated by exactly two newlines. Each paragraph must be one of these, or, for a
+Spanish draft, its Spanish counterpart:
 
 - `Could you provide a current itemized written offer?`
 - `Is there flexibility in the written selling price?`
@@ -173,3 +175,37 @@ message to its case's address. No real provider exists in this build. `RelayProd
 the fake provider in pilot and production, where `dealer-relay.provider=none` issues addresses that
 receive nothing, and the relay view's `forwardingAvailable` stays false, so the Buyer is told to paste
 replies instead.
+
+## Spanish dealer emails (ticket 149)
+
+English is every dealer's email language unless the Buyer chooses Spanish for that dealer, from that
+dealer's quote request, in either site language (`PUT /api/v1/cases/{caseId}/quote-requests/dealers/{dealerId}/email-language`
+with `{"language": "es"}` or `"en"`). V66 stores the choice as `dealers.email_language` and records the
+language each draft was written in as `outbound_drafts.language`; both are in the case export and are
+deleted with the case. A switch re-prepares only that dealer's quote requests still awaiting approval:
+each is marked `REPLACED`, kept in the case record and dropped from the views, and a new request in the
+new language takes its place. Every other draft keeps its language, a Buyer's edit keeps the language of
+the draft it revises, and every recheck (approval, hand-off, "I sent it") rebuilds the context in the
+draft's stored language, so a later switch never changes or blocks a draft already prepared or approved.
+
+The gate is `outbound-gate.v5`. A Spanish draft is checked against Spanish templates only, and an
+English draft against English ones, so neither language opens the other. Every accepted English paragraph
+has one exact Spanish counterpart: the fixed questions and every question `GroundedLanguage.generate`
+produces (`GroundedLanguage.question`), the price question (`¿Consideraría USD 23000.00 como precio de venta
+en una oferta revisada por escrito?`), the two disclosures (`Voy a pagar en efectivo.`, `Tengo financiamiento
+externo.`), and the case-backed quote request, written-confirmation request, conditional acceptance and
+test-drive messages, rendered from the same validated values. The Spanish price uses the same strict
+`USD 23000.00` form and the same currency, ceiling and traceability rules; Spanish-style (`23.000,00`),
+spelled-out (`veintitrés mil`) and every other representation fails closed. The keyword checks also look for
+Spanish commitment, amount, competing-offer and contact words in a Spanish draft, and a Spanish draft is
+checked against both the Spanish and English prohibited-claim lists (`ProhibitedClaims.contains(text, "es")`,
+reason `PROHIBITED_CLAIM`). Template matching remains the enforcement boundary. Which sentences the gate
+accepts did not change: a new Spanish sentence needs a policy version, as an English one does.
+
+English drafts and their decisions are unchanged: `english-decisions.v4.json` freezes v4's decision and
+reasons for the English corpus and templates, and `SpanishOutboundGateTest` requires v5 to reproduce them.
+`adversarial-drafts.es.json` pairs each English attack with a Spanish one; each must fail for its own
+language and for the other. Dates in Spanish test-drive messages use Spanish day and month names; paperwork
+labels are never quoted in dealer emails. Subjects follow the draft's language. A Spanish draft has no
+reading copy; the approve button names the Spanish text. The dealer may still answer in English, and
+otdog reads only English paperwork (spec decision 5); the choice says so.

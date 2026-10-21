@@ -11,22 +11,43 @@ import java.util.regex.Pattern;
 
 /** A closed language policy: unknown prose fails rather than guessing its meaning. No I/O or clock. */
 public final class OutboundGate {
-  public static final String VERSION = "outbound-gate.v4";
+  public static final String VERSION = "outbound-gate.v5";
   private static final Set<String> QUESTIONS = Set.of(
       "Could you provide a current itemized written offer?",
       "Is there flexibility in the written selling price?",
       "Could you confirm the full payment schedule and full-term cost in writing?");
   private static final Pattern PRICE = Pattern.compile(
       "Would you consider ([A-Z]{3}) ([0-9]{1,9}\\.[0-9]{2}) as the selling price in a revised written offer\\?");
+  private static final Pattern PRICE_ES = Pattern.compile(
+      "¿Consideraría ([A-Z]{3}) ([0-9]{1,9}\\.[0-9]{2}) como precio de venta en una oferta revisada por escrito\\?");
+  private static final Map<String, Map<Disclosure, String>> DISCLOSURES = Map.of(
+      "en", Map.of(Disclosure.PAYING_CASH, "I am paying cash.", Disclosure.HAS_OUTSIDE_FINANCING, "I have outside financing."),
+      "es", Map.of(Disclosure.PAYING_CASH, "Voy a pagar en efectivo.", Disclosure.HAS_OUTSIDE_FINANCING, "Tengo financiamiento externo."));
   private static final Pattern NUMBERS = Pattern.compile("[0-9]+(?:,[0-9]{3})*(?:\\.[0-9]{1,2})?");
   private static final Pattern COMMITMENT = Pattern.compile(
       "(?i)\\b(buy|take it|deposit|sign|signature|hold|payment to follow|deal is done|accept|commit|purchase|reserve)\\b");
+
+  /** Spanish keyword checks run on Spanish drafts as well as the English ones; they name reasons, never permit. */
+  private static final Pattern PERSONAL_ES = palabra("tel[eé]fono|celular|direcci[oó]n|domicilio|seguro social"
+      + "|cuenta (bancaria|de banco)|fecha de nacimiento");
+  private static final Pattern COMMITMENT_ES = palabra("compr\\p{L}*|firm\\p{L}*|dep[oó]sit\\p{L}*|reserv\\p{L}*|apart\\p{L}*"
+      + "|acept\\p{L}*|adquir\\p{L}*|me comprometo|me (lo|la) llevo|trato hecho|vendid[oa]|pago a seguir");
+  private static final Pattern AMOUNT_WORDS_ES = palabra("d[oó]lar(es)?|mil|miles|cien|ciento|\\p{L}*cientos|mill[oó]n|millones"
+      + "|lucas|varos|centavos?");
+  private static final Pattern UNGROUNDED_ES = palabra("otr[oa]s? (concesionari[oa]s?|agencias?|ofertas?|vendedor(es)?)|competencia"
+      + "|me ofrecieron|me ofrecen|accidentes?|garant\\p{L}*");
 
   public record Draft(String dealerId, String text) {}
   /** Only trusted callers build context. Released values are specific to draft.dealerId. */
   public record GateContext(Mandate mandate, Set<Long> verifiedAmountsMinor,
       Set<Disclosure> verifiedDisclosures, Set<String> personalValues,
-      Set<String> releasedForDealer, JsonNode finalizedReport, Set<String> caseQuestions, String quoteRequestQuestion) {
+      Set<String> releasedForDealer, JsonNode finalizedReport, Set<String> caseQuestions, String quoteRequestQuestion,
+      String language) {
+    /** An English context, as every context was before ticket 149. */
+    public GateContext(Mandate mandate, Set<Long> amounts, Set<Disclosure> disclosures, Set<String> personal,
+        Set<String> released, JsonNode report, Set<String> questions, String quoteRequestQuestion) {
+      this(mandate, amounts, disclosures, personal, released, report, questions, quoteRequestQuestion, "en");
+    }
     public GateContext(Mandate mandate, Set<Long> amounts, Set<Disclosure> disclosures,
         Set<String> personal, Set<String> released, JsonNode report, Set<String> questions) {
       this(mandate, amounts, disclosures, personal, released, report, questions, null);
@@ -44,6 +65,7 @@ public final class OutboundGate {
       if (quoteRequestQuestion != null && !caseQuestions.contains(quoteRequestQuestion))
         throw new IllegalArgumentException("The quote request must be included in the grounded questions.");
       finalizedReport = finalizedReport == null ? null : finalizedReport.deepCopy();
+      if (language == null || !DISCLOSURES.containsKey(language)) throw new IllegalArgumentException("Unsupported dealer email language");
     }
   }
   public record Reason(String code, String text) {}
@@ -64,21 +86,28 @@ public final class OutboundGate {
       if (!value.isBlank() && folded.contains(fold(value)) && !ctx.releasedForDealer().contains(value))
         add(reasons, "PERSONAL_DATA", "The draft contains your personal information that has not been released for this dealer.");
     }
-    if (text.contains("@") || Pattern.compile("(?i)\\b(phone|address|ssn|social security|bank account|date of birth)\\b").matcher(text).find())
+    boolean spanish = "es".equals(ctx.language());
+    if (text.contains("@") || Pattern.compile("(?i)\\b(phone|address|ssn|social security|bank account|date of birth)\\b").matcher(text).find()
+        || spanish && PERSONAL_ES.matcher(text).find())
       add(reasons, "PERSONAL_DATA", "The draft includes personal contact or identity details. Remove them before review.");
+    // A Spanish draft meets the claim rules the Spanish screens meet: the Spanish list and the English one (ticket 146).
+    if (spanish && com.dealanalyzer.ai.ProhibitedClaims.contains(text, "es"))
+      add(reasons, "PROHIBITED_CLAIM", "The draft makes a claim that messages may not make. Revise it before review.");
 
-    Set<String> grounded = new HashSet<>(QUESTIONS);
+    Set<String> grounded = new HashSet<>();
+    for (String question : QUESTIONS) grounded.add(GroundedLanguage.question(question, ctx.language()));
     grounded.addAll(ctx.caseQuestions());
     if (ctx.finalizedReport() != null) {
       try {
         var language = new GroundedLanguage().generate(ctx.finalizedReport());
-        language.items().forEach(item -> grounded.add(item.question()));
+        for (var item : language.items()) grounded.add(GroundedLanguage.question(item.question(), ctx.language()));
       } catch (IllegalArgumentException invalid) {
-        // An unfinalized report authorizes no additional language.
+        // An unfinalized report, or a question without a counterpart, authorizes no additional language.
       }
     }
+    var disclosures = DISCLOSURES.get(ctx.language());
     for (String paragraph : text.split("\\n\\n", -1)) {
-      var price = PRICE.matcher(paragraph);
+      var price = (spanish ? PRICE_ES : PRICE).matcher(paragraph);
       if (price.matches()) {
         long amount = new BigDecimal(price.group(2)).movePointRight(2).longValueExact();
         if (mandate != null) {
@@ -90,19 +119,21 @@ public final class OutboundGate {
               && !ctx.verifiedAmountsMinor().contains(amount))
             add(reasons, "UNTRACEABLE_AMOUNT", "The amount does not come from your mandate or verified case facts.");
         }
-      } else if (paragraph.equals("I am paying cash.") || paragraph.equals("I have outside financing.")) {
-        Disclosure disclosure = paragraph.equals("I am paying cash.") ? Disclosure.PAYING_CASH : Disclosure.HAS_OUTSIDE_FINANCING;
+      } else if (disclosures.containsValue(paragraph)) {
+        Disclosure disclosure = paragraph.equals(disclosures.get(Disclosure.PAYING_CASH)) ? Disclosure.PAYING_CASH : Disclosure.HAS_OUTSIDE_FINANCING;
         if (mandate == null || !mandate.disclosures().contains(disclosure))
           add(reasons, "DISCLOSURE", "Your mandate does not permit this disclosure to the dealer.");
         if (!ctx.verifiedDisclosures().contains(disclosure))
           add(reasons, "UNGROUNDED_FACT", "This statement is not supported by verified case facts.");
       } else if (!grounded.contains(paragraph)) {
-        if (COMMITMENT.matcher(paragraph).find())
+        if (COMMITMENT.matcher(paragraph).find() || spanish && COMMITMENT_ES.matcher(paragraph).find())
           add(reasons, "COMMITMENT", "This wording may commit you to buying, paying, reserving or signing. Ask for written terms instead.");
         add(reasons, "UNSUPPORTED_LANGUAGE", "This wording cannot be checked against the approved message templates and verified facts. Revise it before review.");
-        if (NUMBERS.matcher(paragraph).find() || Pattern.compile("(?i)\\b(dollars?|thousand|hundred|million|grand|bucks)\\b").matcher(paragraph).find())
+        if (NUMBERS.matcher(paragraph).find() || Pattern.compile("(?i)\\b(dollars?|thousand|hundred|million|grand|bucks)\\b").matcher(paragraph).find()
+            || spanish && AMOUNT_WORDS_ES.matcher(paragraph).find())
           add(reasons, "UNVERIFIABLE_AMOUNT", "Use an explicit currency and decimal amount in the approved price question so every amount can be checked.");
-        if (Pattern.compile("(?i)\\b(other dealer|competing|another offer|offered me|accident|warranty|guarantee)\\b").matcher(paragraph).find())
+        if (Pattern.compile("(?i)\\b(other dealer|competing|another offer|offered me|accident|warranty|guarantee)\\b").matcher(paragraph).find()
+            || spanish && UNGROUNDED_ES.matcher(paragraph).find())
           add(reasons, "UNGROUNDED_FACT", "The draft makes a statement that is not grounded in verified case facts.");
       }
     }
@@ -112,6 +143,10 @@ public final class OutboundGate {
   private static String fold(String value) {
     return java.text.Normalizer.normalize(value, java.text.Normalizer.Form.NFKC)
         .toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]", "");
+  }
+  /** A whole-word pattern over Unicode letters, so accented Spanish words keep their boundaries. */
+  private static Pattern palabra(String alternatives) {
+    return Pattern.compile("(?iu)(?<![\\p{L}\\p{N}_])(" + alternatives + ")(?![\\p{L}\\p{N}_])");
   }
   private static void add(Map<String, Reason> reasons, String code, String text) {
     reasons.putIfAbsent(code, new Reason(code, text));

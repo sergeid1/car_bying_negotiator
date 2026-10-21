@@ -7,7 +7,7 @@ import { useMessages } from "./i18n/LanguageProvider";
 type SentQuote = { id: string; dealerAddress: string; state: string };
 type Source = { offerVersion: number | null };
 type Draft = { id: string; kind: string; state: string; offerVersion: number | null; planVersion: number | null; messageId?: string | null;
-  gatedDraft: { draft: { text: string }; decision: GateDecision } };
+  gatedDraft: { draft: { text: string }; decision: GateDecision; language?: "en" | "es" } };
 type View = { requests: Draft[]; agreedPrice: null | { offerVersion: number; baselineVersion: number;
   acceptedAt: string; actor: string; journey: { journeyLinked: boolean; otherOpenNegotiations: { caseId: string; label: string }[] } } };
 
@@ -100,12 +100,14 @@ export function AgreedPrice({ caseId, token, quotes, sources, onChanged }: {
     </form>}
     {view?.requests.map(draft => <article className="card" key={draft.id}>
       <h3>{draft.kind === "ACCEPTANCE" ? fill(t.acceptOffer, { version: String(draft.offerVersion) }) : t.requestConfirmation}</h3>
-      <p>{draft.gatedDraft.draft.text}</p>
+      <p lang={draft.gatedDraft.language ?? "en"}>{draft.gatedDraft.draft.text}</p>
       {draft.kind === "ACCEPTANCE" && <p>{fill(t.onceSent, { plan: String(draft.planVersion) })}</p>}
       <OutboundGateDecision decision={draft.gatedDraft.decision} />
       {draft.state === "DRAFT" ? <button type="button" disabled={busy || !draft.gatedDraft.decision.pass || Boolean(view.agreedPrice)}
         onClick={() => void update(`${path}/${encodeURIComponent(draft.id)}/approval`, { approved: true, text: draft.gatedDraft.draft.text })}>
-        {draft.kind === "ACCEPTANCE" ? t.approveAcceptance : t.approveConfirmation}
+        {draft.gatedDraft.language === "es"
+          ? draft.kind === "ACCEPTANCE" ? t.approveSpanishAcceptance : t.approveSpanishConfirmation
+          : draft.kind === "ACCEPTANCE" ? t.approveAcceptance : t.approveConfirmation}
       </button> : draft.state === "HANDED_OFF" && draft.messageId
         ? <DealerHandoff caseId={caseId} token={token} messageId={draft.messageId}
           onChanged={async () => { await refresh(); await onChanged(); }} />

@@ -32,6 +32,8 @@ export const paperwork = {
     onceSent: "Once you send it and tell us, the Agreed Price is saved with an Approved Baseline from reviewed price plan {plan}.",
     approveAcceptance: "Approve this acceptance text and baseline",
     approveConfirmation: "Approve written-confirmation text",
+    approveSpanishAcceptance: "Approve this Spanish acceptance text and baseline",
+    approveSpanishConfirmation: "Approve the Spanish written-confirmation text",
     sentAcceptance: "Conditional acceptance message sent.",
     sentConfirmation: "Written confirmation requested. Review and verify the dealer's reply before accepting.",
     blocked: "The mandate or quote changed. Prepare a new request.",

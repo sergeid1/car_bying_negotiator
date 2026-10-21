@@ -28,9 +28,10 @@ async function stubCaseApi(page: Page) {
   await page.route("**/api/v1/cases/case-1/vehicle-evidence", route => route.fulfill({ json: { identityConflicts: [], reliableForAnalysis: true } }));
   await page.route("**/api/v1/cases/case-1/quote-requests", route => route.fulfill({ json: {
     negotiationState: state.quote === "SENT" ? state.reply ? "AWAITING_BUYER" : "AWAITING_DEALER" : "MANDATE_ACTIVE",
-    dealers: [{ id: "d1", name: "Triangle Motors" }],
+    // The dealer's email-language choice (ticket 149) and its warning sit on the request card.
+    dealers: [{ id: "d1", name: "Triangle Motors", emailLanguage: "en" }],
     requests: [{ id: "q1", dealerAddress: DEALER, state: state.quote, messageId: state.quote === "DRAFT" ? null : "m1", approvedAt: null,
-      gatedDraft: { draft: { text: TEXT }, decision: PASS } }],
+      gatedDraft: { draft: { dealerId: "d1", text: TEXT }, decision: PASS, language: "en" } }],
     documents: state.reply ? [{ documentId: "doc1", outcome: "ACCEPTED", offerVersion: null, sourceKind: "MESSAGE_BODY", messageId: "in1" }] : [],
   } }));
   await page.route("**/api/v1/cases/case-1/quote-requests/q1/approval", route => {
@@ -81,6 +82,12 @@ test("approve, open or copy, mark sent and paste the dealer's reply for a quote 
   await page.getByLabel(/^vin$/i).fill("1HGCM82633A004352");
   await page.getByRole("button", { name: /start my case/i }).click();
   const panel = page.locator("[aria-label='Request a dealer quote'] > .panel").first();
+
+  // The dealer's email language is chosen on the request, with its warning, and fits the narrow screen.
+  await expect(panel.getByRole("combobox", { name: "Language for this dealer's emails" })).toHaveValue("en");
+  await expect(panel.getByText(/The dealer may still answer in English/)).toBeVisible();
+  await expectFits(page);
+  await expectAccessible(page);
 
   // Approval hands the exact text to the Buyer; nothing is added to it.
   await panel.getByRole("button", { name: "Approve this text" }).click();

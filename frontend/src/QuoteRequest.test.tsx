@@ -54,3 +54,35 @@ test("an empty eligible dealer list explains what is needed accessibly", async (
   expect(screen.queryByRole("button", { name: "Prepare request" })).not.toBeInTheDocument();
   expect((await axe.run(container, { rules: { "color-contrast": { enabled: false } } })).violations).toEqual([]);
 });
+
+// Ticket 149: the dealer's email language is chosen from that dealer's request, in either site language.
+test("a Spanish request shows its Spanish subject and approval, and the dealer's language can be switched", async () => {
+  const spanish = { ...quote, id: "q2", gatedDraft: { ...quote.gatedDraft, language: "es",
+    draft: { dealerId: "d1", text: "¿Podría enviarme una cotización detallada del precio total final (out-the-door) para el VIN 1HGCM82633A004352?" } } };
+  const english = { negotiationState: "MANDATE_ACTIVE", documents: [], dealers: [{ id: "d1", name: "Dealer", emailLanguage: "en" }],
+    requests: [{ ...quote, gatedDraft: { ...quote.gatedDraft, language: "en", draft: { ...quote.gatedDraft.draft, dealerId: "d1" } } }] };
+  const switched = { ...english, dealers: [{ id: "d1", name: "Dealer", emailLanguage: "es" }], requests: [spanish] };
+  const fetcher = vi.fn(async (url: string, init?: RequestInit) => new Response(JSON.stringify(url.endsWith("/relay")
+    ? { address: "relay@example.test", forwardingAvailable: false, messages: [] }
+    : init?.method === "PUT" || fetcher.mock.calls.some(([, call]) => (call as RequestInit | undefined)?.method === "PUT") ? switched : english)));
+  vi.stubGlobal("fetch", fetcher);
+  const { container } = render(<QuoteRequest caseId="c1" token="secret" />);
+  const choice = await screen.findByRole("combobox", { name: "Language for this dealer's emails" });
+  expect(choice).toHaveValue("en");
+  expect(screen.getByText(/The dealer may still answer in English, and otdog reads only English paperwork/)).toBeInTheDocument();
+  expect(screen.getByText("Subject: Request for an itemized vehicle quote")).toBeInTheDocument();
+  fireEvent.change(choice, { target: { value: "es" } });
+  await waitFor(() => expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/quote-requests/dealers/d1/email-language",
+    expect.objectContaining({ method: "PUT", body: JSON.stringify({ language: "es" }),
+      headers: expect.objectContaining({ "Case-Access-Token": "secret" }) })));
+  const approve = await screen.findByRole("button", { name: "Approve this Spanish text" });
+  expect(screen.getByRole("combobox", { name: "Language for this dealer's emails" })).toHaveValue("es");
+  expect(screen.getByText("Subject: Solicitud de una cotización detallada del vehículo")).toBeInTheDocument();
+  expect(screen.getByText(spanish.gatedDraft.draft.text)).toHaveAttribute("lang", "es");
+  expect(screen.getByText("Language saved for this dealer's emails.")).toBeInTheDocument();
+  expect(screen.queryByText(/For you to read/)).not.toBeInTheDocument();
+  expect((await axe.run(container, { rules: { "color-contrast": { enabled: false } } })).violations).toEqual([]);
+  fireEvent.click(approve);
+  await waitFor(() => expect(fetcher).toHaveBeenCalledWith("/api/v1/cases/c1/quote-requests/q2/approval", expect.objectContaining({
+    method: "POST", body: JSON.stringify({ approved: true, text: spanish.gatedDraft.draft.text }) })));
+});

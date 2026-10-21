@@ -84,8 +84,9 @@ public class AgreedPriceService implements RelayMessageOwner {
         throw new IllegalArgumentException("Review new price boundaries for the current quote before accepting.");
       planVersion = plan.version();
     }
-    String text = accepting ? written.text() : WrittenQuoteEvidence.CONFIRMATION;
-    var draft = drafts.create(caseId, token, "agreement:" + offers.fingerprint(key), new OutboundGate.Draft(dealer.id(), text));
+    String language = drafts.language(caseId, dealer.id());
+    String text = accepting ? written.text(language) : WrittenQuoteEvidence.confirmation(language);
+    var draft = drafts.create(caseId, token, "agreement:" + offers.fingerprint(key), new OutboundGate.Draft(dealer.id(), text), language);
     String id = UUID.randomUUID().toString();
     jdbc.update("""
         insert into quote_acceptance_requests (id, case_id, quote_request_id, draft_id, offer_version, plan_version,
@@ -123,9 +124,8 @@ public class AgreedPriceService implements RelayMessageOwner {
       if (accepting) plans.reviewApproval(caseId, token, request.planVersion());
       try {
         Dealer dealer = dealer(caseId, request.quoteRequestId());
-        var handoff = handoffs.handOff(caseId, dealer.address(), "ACCEPTANCE".equals(request.kind())
-            ? "Conditional acceptance of itemized quote" : "Please confirm the quote in writing", request.gatedDraft().draft().text(),
-            java.util.Set.of());
+        var handoff = handoffs.handOff(caseId, dealer.address(), subject(request.kind(), request.gatedDraft().language()),
+            request.gatedDraft().draft().text(), java.util.Set.of());
         jdbc.update("update quote_acceptance_requests set state = ?, message_id = ? where id = ?", handoff.state(), handoff.messageId(), id);
         if (handoff.sent()) applySent(caseId, token, request);
       } catch (RelayService.RelayRefusedException refused) {
@@ -197,8 +197,15 @@ public class AgreedPriceService implements RelayMessageOwner {
         String.class, caseId, relayMessageId);
   }
 
+  static String subject(String kind, String language) {
+    boolean accepting = "ACCEPTANCE".equals(kind);
+    if ("es".equals(language))
+      return accepting ? "Aceptación condicional de la cotización detallada" : "Por favor, confirme la cotización por escrito";
+    return accepting ? "Conditional acceptance of itemized quote" : "Please confirm the quote in writing";
+  }
+
   private void requirePermitted(String caseId, String token, Request request) {
-    var context = drafts.context(caseId, request.gatedDraft().draft().dealerId());
+    var context = drafts.context(caseId, request.gatedDraft().draft().dealerId(), request.gatedDraft().language());
     if (!request.gatedDraft().decision().pass() || !new OutboundGate().check(request.gatedDraft().draft(), context).pass()
         || context.mandate() == null || !context.mandate().id().equals(request.gatedDraft().mandateId())
         || negotiation.current(caseId) == NegotiationStateService.State.AGREED)

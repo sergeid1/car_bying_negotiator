@@ -42,9 +42,23 @@ public final class Counteroffer {
    * @param verifiedSellingMinor the Buyer-verified selling price of the current Dealer Offer, if recorded
    */
   public static Draft draft(JsonNode report, String currency, long targetMinor, long ceilingMinor, Long verifiedSellingMinor) {
+    return draft(report, currency, targetMinor, ceilingMinor, verifiedSellingMinor, "en");
+  }
+
+  /** The proposed selling price in the gate's price template, in the dealer's email language. */
+  public static String priceQuestion(String currency, long minor, String language) {
+    String amount = currency + " " + BigDecimal.valueOf(minor, 2).toPlainString();
+    return "es".equals(language)
+        ? "¿Consideraría " + amount + " como precio de venta en una oferta revisada por escrito?"
+        : "Would you consider " + amount + " as the selling price in a revised written offer?";
+  }
+
+  /** As {@link #draft(JsonNode, String, long, long, Long)}, with every paragraph in the dealer's email language. */
+  public static Draft draft(JsonNode report, String currency, long targetMinor, long ceilingMinor, Long verifiedSellingMinor,
+      String language) {
     if (targetReached(verifiedSellingMinor, targetMinor)) throw new TargetReached();
     ReplyGrounds grounds = ReplyGrounds.from(report);
-    var language = new GroundedLanguage().generate(report);
+    var grounded = new GroundedLanguage().generate(report);
     var boundary = grounds.boundary();
     Long proposal = null;
     if (verifiedSellingMinor != null && targetMinor > 0 && targetMinor <= ceilingMinor && "USD".equals(currency)
@@ -52,15 +66,17 @@ public final class Counteroffer {
     List<Paragraph> paragraphs = new ArrayList<>();
     var seen = new LinkedHashSet<String>();
     if (proposal != null) {
-      String text = "Would you consider " + currency + " " + BigDecimal.valueOf(proposal, 2).toPlainString()
-          + " as the selling price in a revised written offer?";
+      String text = priceQuestion(currency, proposal, language);
       paragraphs.add(new Paragraph(text, "mandate:targetMinor"));
       seen.add(text);
-      seen.add(LOWER_PRICE);
+      seen.add(GroundedLanguage.question(LOWER_PRICE, language));
     }
-    for (var item : language.items())
-      if (seen.add(item.question())) paragraphs.add(new Paragraph(item.question(), "report:" + item.sourcePointer()));
-    if (seen.add(ITEMIZED_OFFER)) paragraphs.add(new Paragraph(ITEMIZED_OFFER, "gate:fixed-question"));
+    for (var item : grounded.items()) {
+      String question = GroundedLanguage.question(item.question(), language);
+      if (seen.add(question)) paragraphs.add(new Paragraph(question, "report:" + item.sourcePointer()));
+    }
+    String itemized = GroundedLanguage.question(ITEMIZED_OFFER, language);
+    if (seen.add(itemized)) paragraphs.add(new Paragraph(itemized, "gate:fixed-question"));
     String text = String.join("\n\n", paragraphs.stream().map(Paragraph::text).toList());
     return new Draft(VERSION, grounds.reportVersion(), paragraphs, proposal, text);
   }

@@ -5,7 +5,8 @@ import * as format from "./i18n/format";
 import { useMessages } from "./i18n/LanguageProvider";
 import { DealerReadingCopy } from "./DealerReadingCopy";
 
-type Revision = { revision: number; editedByBuyer: boolean; text: string; decision: GateDecision; createdAt: string };
+/** `language` is the dealer's email language the revision is written in; absent means English. */
+type Revision = { revision: number; editedByBuyer: boolean; text: string; decision: GateDecision; createdAt: string; language?: "en" | "es" };
 type Counteroffer = {
   id: string; quoteRequestId: string; dealerAddress: string; state: string; cancelReason: string | null;
   proposalMinor: number | null; reportVersion: number; offerVersion: number;
@@ -17,7 +18,7 @@ type Message = {
   completedAt: string | null; contentAvailable: boolean; subject: string | null; body: string | null; attachments: Attachment[];
   sendPath?: string;
 };
-type GatedRequest = { id: string; state: string; gatedDraft: { draft: { text: string }; decision: GateDecision } };
+type GatedRequest = { id: string; state: string; gatedDraft: { draft: { text: string }; decision: GateDecision; language?: "en" | "es" } };
 type Entry = {
   kind: "QUOTE_REQUEST" | "ACCEPTANCE_REQUEST" | "COUNTEROFFER" | "OUTBOUND_MESSAGE" | "INBOUND_MESSAGE"; at: string;
   quoteRequest: (GatedRequest & { dealerAddress: string }) | null; acceptance: (GatedRequest & { kind: string }) | null;
@@ -146,8 +147,8 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
               {draft.revisions.map(revision => <section key={revision.revision} className="conversation-revision"
                 aria-label={fill(t.revision, { revision: String(revision.revision) })}>
                 <h4>{fill(revision.editedByBuyer ? t.revisionEdited : t.revisionDrafted, { revision: String(revision.revision) })}</h4>
-                <DealerReadingCopy english={revision.text} />
-                <pre lang="en">{revision.text}</pre>
+                {revision.language !== "es" && <DealerReadingCopy english={revision.text} />}
+                <pre lang={revision.language ?? "en"}>{revision.text}</pre>
                 <OutboundGateDecision decision={revision.decision} />
               </section>)}
               {draft.state === "PROPOSED" && !view.dealerDeclined && <>
@@ -159,14 +160,14 @@ export function NegotiationConversation({ caseId, token, version = 0 }: { caseId
                     void act(`${drafts}/${encodeURIComponent(draft.id)}/revisions`, { text: edit })
                       .then(done => done && setEditing(previous => { const next = { ...previous }; delete next[draft.id]; return next; }));
                   }}>
-                    <label>{t.revisedText}<textarea value={edit} rows={6} disabled={busy}
+                    <label>{t.revisedText}<textarea lang={current.language ?? "en"} value={edit} rows={6} disabled={busy}
                       onChange={event => setEditing(previous => ({ ...previous, [draft.id]: event.target.value }))} /></label>
                     <p>{t.checkedAgain}</p>
                     <button type="submit" disabled={busy}>{t.checkRevised}</button>
                   </form>}
                 <button type="button" disabled={busy || !current.decision.pass}
                   onClick={() => void act(`${drafts}/${encodeURIComponent(draft.id)}/approval`, { approved: true, text: current.text })}>
-                  {fill(t.approveRevision, { revision: String(current.revision) })}</button>
+                  {fill(current.language === "es" ? t.approveSpanishRevision : t.approveRevision, { revision: String(current.revision) })}</button>
                 <button type="button" disabled={busy} onClick={() => void act(`${drafts}/${encodeURIComponent(draft.id)}/decline`)}>
                   {t.declineDraft}</button>
               </>}
@@ -188,7 +189,7 @@ function GatedEntry({ title, request }: { title: string; request: GatedRequest }
   return <article className="card">
     <h3>{title}</h3>
     <p>{fill(common.sentence, { text: label(t.requestStates, request.state) })}</p>
-    <pre>{request.gatedDraft.draft.text}</pre>
+    <pre lang={request.gatedDraft.language ?? "en"}>{request.gatedDraft.draft.text}</pre>
     <OutboundGateDecision decision={request.gatedDraft.decision} />
   </article>;
 }
