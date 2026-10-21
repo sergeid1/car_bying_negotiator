@@ -20,7 +20,7 @@ function total(car: ComparisonCar, order: Exclude<Order, "shortlist">) {
 export function QuoteComparison({ journeyId, onSessionEnded }: {
   journeyId: string; onSessionEnded: () => void;
 }) {
-  const { m: { messages: { quoteComparison: t } }, fill } = useMessages();
+  const { m: { messages: { quoteComparison: t }, paperwork: { common: { unknown } } }, fill } = useMessages();
   const id = useId();
   const [view, setView] = useState<QuoteComparisonView>();
   const [order, setOrder] = useState<Order>("shortlist");
@@ -72,7 +72,7 @@ export function QuoteComparison({ journeyId, onSessionEnded }: {
               {(car.noneListed ?? []).map(category => <div key={category}><dt>{category}</dt><dd>{t.noneListed}</dd></div>)}
               {car.amounts.map((amount, index) => <div key={index}>
                 <dt>{amount.label}</dt>
-                <dd>{formatMoney(amount.minorUnits, amount.currency)} · <a href={`#${id}-${car.caseId}-${index}`}
+                <dd>{formatMoney(amount.minorUnits, amount.currency, unknown)} · <a href={`#${id}-${car.caseId}-${index}`}
                   onClick={() => { const evidence = document.getElementById(`${id}-${car.caseId}-${index}`); if (evidence instanceof HTMLDetailsElement) evidence.open = true; }}>
                   {fill(t.sourceFor, { label: amount.label })}</a></dd>
               </div>)}
