@@ -6,7 +6,7 @@ export const esFindings = translation<typeof enFindings>()({
   englishName: "English", spanishName: "Español",
   caseLanguage: "Idioma de este caso", caseLanguageNote: "Los correos y los informes descargados usan este idioma.",
   caseLanguageFailed: "No se pudo guardar el idioma del caso. Inténtelo de nuevo.", caseLanguageSaved: "Se guardó el idioma del caso.",
-  readingCopy: "Para que usted lo lea — el concesionario recibe el texto en inglés.", approveEnglish: "Aprobar este texto exacto en inglés para el concesionario",
+  readingCopy: "Para que usted lo lea — el concesionario recibe el texto en inglés.",
   readingUnavailable: "No hay una copia de lectura disponible para este texto editado. Revise el texto exacto en inglés antes de aprobarlo.",
   MATCHES_APPROVED_BASELINE: "Coincide con la versión de referencia aprobada", REVIEW_REQUIRED: "Requiere revisión", UNABLE_TO_VERIFY: "No se puede verificar",
   STRONG_DEAL: "Oferta favorable", FAIR_NEGOTIATE: "Razonable, negociar", POOR_DEAL: "Oferta desfavorable", INSUFFICIENT_DATA: "Datos insuficientes",

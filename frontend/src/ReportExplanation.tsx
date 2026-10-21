@@ -25,7 +25,7 @@ export function ReportExplanationLoader({ caseId, token, reportVersion }: { case
   useEffect(() => {
     const controller = new AbortController();
     setExplanation(undefined); setFailed(false);
-    fetch(`/api/v1/cases/${encodeURIComponent(caseId)}/reports/${reportVersion}/explanation${String(language) === "es" ? "?language=es" : ""}`, {
+    fetch(`/api/v1/cases/${encodeURIComponent(caseId)}/reports/${reportVersion}/explanation${language === "es" ? "?language=es" : ""}`, {
       headers: { "Case-Access-Token": token }, signal: controller.signal,
     }).then(async response => {
       if (!response.ok) throw new Error("explanation-unavailable");

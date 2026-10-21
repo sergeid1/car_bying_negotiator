@@ -211,7 +211,7 @@ export const messages = translation<typeof english>()({
     revisedText: "Texto cambiado",
     checkedAgain: "Su cambio se vuelve a revisar antes de poder enviarse.",
     checkRevised: "Revisar el texto cambiado",
-    approveRevision: "Aprobar la versión {revision}",
+    approveRevision: "Aprobar el texto en inglés de la versión {revision}",
     declineDraft: "Rechazar este borrador",
     messageTo: "Para {address}",
     messageSentTo: "Enviado a {address}",

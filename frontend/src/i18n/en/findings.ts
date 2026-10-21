@@ -3,7 +3,7 @@ export const enFindings = {
   englishName: "English", spanishName: "Español",
   caseLanguage: "Language for this case", caseLanguageNote: "Emails and downloaded reports use this language.",
   caseLanguageFailed: "The case language could not be saved. Try again.", caseLanguageSaved: "Case language saved.",
-  readingCopy: "For you to read — the dealer receives the English text.", approveEnglish: "Approve this exact English text for the dealer",
+  readingCopy: "For you to read — the dealer receives the English text.",
   readingUnavailable: "A reading copy is unavailable for this edited text. Review the exact English text before approving it.",
   // Server enums are presentation codes, never translated by changing underscores or capitalization.
   MATCHES_APPROVED_BASELINE: "Matches approved baseline", REVIEW_REQUIRED: "Review required", UNABLE_TO_VERIFY: "Unable to verify",

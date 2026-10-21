@@ -102,7 +102,7 @@ export function DealerReplyAssistant({ caseId, token, reportVersion }: { caseId:
     try {
       const response = await fetch(`/api/v1/cases/${encodeURIComponent(caseId)}/reports/${reportVersion}/negotiation/replies`, {
         method: "POST", headers: { "Content-Type": "application/json", "Case-Access-Token": token },
-        body: JSON.stringify({ dealerResponse, ...(String(language) === "es" ? { language } : {}) }),
+        body: JSON.stringify({ dealerResponse, ...(language === "es" ? { language } : {}) }),
       });
       if (!response.ok) {
         const problem = await response.json().catch(() => undefined);
