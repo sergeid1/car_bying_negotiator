@@ -352,6 +352,7 @@ export const dealer = {
     negativeEquityCost: "{amount}: {payment} a month, {scheduled} in scheduled payments for {months} months, {interest} of it interest",
     taxCredit: "About {amount} under {jurisdiction} rules ({policy})",
     taxNone: "None under {jurisdiction} rules",
+    taxNotChecked: "Not calculated, because tax is not checked for a car bought from a dealer in another state.",
     tradeVin: "Trade-in VIN on the paperwork",
     shortfall: "A trade-in shortfall is a trade figure, never a discount on the car. otdog does not buy cars or send your trade anywhere.",
   },

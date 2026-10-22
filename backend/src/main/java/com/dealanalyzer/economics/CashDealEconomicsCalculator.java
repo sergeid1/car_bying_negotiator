@@ -25,7 +25,16 @@ public final class CashDealEconomicsCalculator {
   private static final BigDecimal ZERO = BigDecimal.ZERO;
 
   public Result calculate(Offer offer, Policy policy) {
+    return calculate(offer, policy, null);
+  }
+
+  /**
+   * With a {@code crossStateDealer} ("US-XX"), the car is registered under {@code policy} but bought from a dealer in
+   * that other state (ticket 141): the tax is the dealer's tax lines as written, with no trade-in tax credit.
+   */
+  public Result calculate(Offer offer, Policy policy, String crossStateDealer) {
     requireCompatible(offer, policy);
+    boolean checked = crossStateDealer == null;
     BigDecimal sellingPrice = sum(offer, LineType.SELLING_PRICE, null);
     BigDecimal discounts = sum(offer, LineType.DEALER_DISCOUNT, null);
     BigDecimal verifiedRebates = sum(offer, LineType.REBATE, Eligibility.VERIFIED);
@@ -44,11 +53,11 @@ public final class CashDealEconomicsCalculator {
         .add(sum(offer, LineType.CREDIT, null));
 
     BigDecimal taxableCharges = taxableCharges(offer, vehicleSubtotal, policy);
-    BigDecimal availableTaxCredit = policy.tradeTaxCreditEnabled()
+    BigDecimal availableTaxCredit = checked && policy.tradeTaxCreditEnabled()
         ? (policy.taxComponents().isEmpty() ? taxCredits(offer) : tradeAllowance) : ZERO;
     BigDecimal appliedTaxCredit = availableTaxCredit.min(taxableCharges.max(ZERO));
     BigDecimal taxableBasis = taxableCharges.subtract(appliedTaxCredit).max(ZERO);
-    BigDecimal unroundedTax = taxAt(taxableBasis, policy);
+    BigDecimal unroundedTax = checked ? taxAt(taxableBasis, policy) : sum(offer, LineType.QUOTED_TAX, null);
     BigDecimal taxes = unroundedTax.setScale(policy.currencyScale(), policy.roundingMode());
     BigDecimal otd = vehicleSubtotal.add(dealerCharges).add(governmentCharges)
         .add(unknownCharges).add(taxes);
@@ -72,12 +81,15 @@ public final class CashDealEconomicsCalculator {
         amount(downPayment, policy), amount(credits, policy), amount(netDue, policy),
         new PriceReductions(amount(discounts, policy), amount(verifiedRebates, policy),
             amount(excludedRebates, policy), amount(discounts.add(verifiedRebates), policy)),
-        new TaxCalculation(taxableCharges, availableTaxCredit, appliedTaxCredit, taxableBasis,
-            policy.taxRate(), unroundedTax, policy.taxComponents(), policy.taxRules().taxName(),
-            policy.taxRules().buyerNote()),
+        checked
+            ? new TaxCalculation(taxableCharges, availableTaxCredit, appliedTaxCredit, taxableBasis,
+                policy.taxRate(), unroundedTax, policy.taxComponents(), policy.taxRules().taxName(),
+                policy.taxRules().buyerNote())
+            : new TaxCalculation(taxableCharges, ZERO, ZERO, taxableBasis, ZERO, unroundedTax, List.of(), null,
+                CrossStatePurchase.TAX_NOT_CHECKED, TaxCalculation.NOT_CHECKED, crossStateDealer),
         new RoundingDisclosure(policy.currencyScale(), policy.roundingMode(),
             "TAX_AND_FINAL_MONETARY_OUTPUTS"),
-        reconcile(offer, policy, recomputed, taxes), List.copyOf(classified));
+        reconcile(offer, policy, recomputed, taxes, checked), List.copyOf(classified));
   }
 
   /** Shared by economics and the outside trade-offer comparison. */
@@ -115,7 +127,8 @@ public final class CashDealEconomicsCalculator {
         .map(item -> item.amount().amount()).reduce(ZERO, BigDecimal::add);
   }
 
-  private static Reconciliation reconcile(Offer offer, Policy policy, Amount recomputed, BigDecimal taxes) {
+  private static Reconciliation reconcile(Offer offer, Policy policy, Amount recomputed, BigDecimal taxes,
+      boolean taxChecked) {
     if (offer.quotedOutTheDoorTotal() == null) {
       Amount unavailable = new Amount(0, policy.currency().getCurrencyCode());
       return new Reconciliation(null, recomputed, unavailable,
@@ -127,11 +140,18 @@ public final class CashDealEconomicsCalculator {
         .subtract(toMajor(recomputed, policy));
     Amount discrepancy = amount(discrepancyValue, policy);
     boolean within = discrepancyValue.abs().compareTo(policy.reconciliationTolerance()) <= 0;
-    String reason = within
+    String reason = !taxChecked
+        ? within ? "Quoted total matches the sum of the dealer's lines, including the dealer's tax as written; tax is "
+              + "not checked for a car registered in another state"
+            : offer.lineItems().stream().noneMatch(item -> item.type() == LineType.QUOTED_TAX)
+            ? "Quoted total differs from the sum of the dealer's lines, and the paperwork shows no tax line; tax is not "
+              + "checked for a car registered in another state"
+            : "Quoted total differs from the sum of the dealer's lines, including the dealer's tax as written"
+        : within
         ? "Quoted total is within the policy reconciliation tolerance"
         : "Quoted total differs from the policy recomputation; no favorable classification inferred";
     // A tax paid when the car is titled may be left off the dealer's total; it is still owed and still counted.
-    if (!within && policy.taxRules().paidAtTitling() && taxes.signum() > 0
+    if (taxChecked && !within && policy.taxRules().paidAtTitling() && taxes.signum() > 0
         && discrepancyValue.add(taxes).abs().compareTo(policy.reconciliationTolerance()) <= 0) {
       within = true;
       reason = "Quoted total leaves out the " + policy.taxRules().taxName() + ", which is paid when the car is "

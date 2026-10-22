@@ -19,7 +19,7 @@ export type TradeCheckResult = {
     paymentIncreaseMinor: number | null; scheduledPaymentsIncreaseMinor: number | null; interestMinor: number | null };
   bestOffer: null | { id: string; amountMinor: number; source: string; offerDate: string; expiresOn: string; label: string };
   shortfallToOfferMinor: number | null;
-  taxCredit: null | { status: "AVAILABLE" | "NOT_APPLICABLE" | "UNAVAILABLE"; reason: string | null; jurisdiction: string | null;
+  taxCredit: null | { status: "AVAILABLE" | "NOT_APPLICABLE" | "UNAVAILABLE" | "NOT_CHECKED"; reason: string | null; jurisdiction: string | null;
     policyVersion: string | null; creditMinor: number | null; taxName?: string | null };
   offerGapAfterTaxMinor: number | null;
   valuation: null | { availability: string; notice: string | null; source: string | null; synthetic: boolean; retrievedAt: string | null;
@@ -103,7 +103,8 @@ export function TradeCheckPanel({ result, heading, tactics = [] }: {
       {tax && <div><dt>{taxHeading(t, fill, tax.taxName)}</dt>
         <dd>{tax.status === "AVAILABLE" && tax.creditMinor !== null
           ? fill(t.taxCredit, { amount: money(tax.creditMinor), jurisdiction: String(tax.jurisdiction), policy: String(tax.policyVersion) })
-          : tax.status === "NOT_APPLICABLE" ? fill(t.taxNone, { jurisdiction: String(tax.jurisdiction) }) : tax.reason}
+          : tax.status === "NOT_APPLICABLE" ? fill(t.taxNone, { jurisdiction: String(tax.jurisdiction) })
+          : tax.status === "NOT_CHECKED" ? t.taxNotChecked : tax.reason}
           {tax.status === "AVAILABLE" && tax.reason && <>. {tax.reason}</>}</dd></div>}
       {result.vinMatch?.paperworkVin && <div><dt>{t.tradeVin}</dt><dd>{result.vinMatch.paperworkVin}</dd></div>}
     </dl>

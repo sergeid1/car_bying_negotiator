@@ -237,6 +237,9 @@ public final class AmountEvidence {
   private static Calculation tax(JsonNode result) {
     JsonNode tax = result.path("taxCalculation");
     if (!tax.isObject()) return null;
+    if (com.dealanalyzer.economics.CashDealEconomics.TaxCalculation.NOT_CHECKED.equals(tax.path("status").asText()))
+      return new Calculation(List.of(major(null, "Dealer's tax as written", tax.path("unrounded"))),
+          List.of(com.dealanalyzer.economics.CrossStatePurchase.TAX_NOT_CHECKED));
     BigDecimal rate = tax.path("rate").decimalValue();
     String currency = result.at("/outTheDoorTotal/currency").asText("USD");
     if (tax.path("components").isArray() && !tax.path("components").isEmpty()) {

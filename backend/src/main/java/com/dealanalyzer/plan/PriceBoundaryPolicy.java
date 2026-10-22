@@ -23,7 +23,8 @@ public final class PriceBoundaryPolicy {
     long high = market.range().highMinor();
     long target = low + (high - low) / 2;
     Boundary selling = boundary(low, target, high, sellingLimit);
-    boolean convertible = deal.unknownCharges().minorUnits() == 0
+    boolean taxChecked = deal.taxCalculation().checked();
+    boolean convertible = taxChecked && deal.unknownCharges().minorUnits() == 0
         && deal.lineItems().stream().noneMatch(line -> line.taxTreatment() == TaxTreatment.UNKNOWN)
         && deal.lineItems().stream().anyMatch(line -> line.type() == LineType.SELLING_PRICE
             && line.taxTreatment() == TaxTreatment.TAXABLE);
@@ -32,7 +33,8 @@ public final class PriceBoundaryPolicy {
     List<String> warnings = new ArrayList<>();
     if (sellingLimit != null && sellingLimit < low || otd != null && otdLimit != null && otdLimit < otd.openingMinor())
       warnings.add("Buyer maximum is below the market-derived opening; market values have not been changed.");
-    if (!convertible) warnings.add("OTD conversion unavailable: tax treatment or charges are incomplete. Any Buyer OTD maximum still applies separately.");
+    if (!taxChecked) warnings.add("OTD conversion unavailable: tax is not checked for a car registered in another state. Any Buyer OTD maximum still applies separately.");
+    else if (!convertible) warnings.add("OTD conversion unavailable: tax treatment or charges are incomplete. Any Buyer OTD maximum still applies separately.");
     long quoted = sellingPrice(deal);
     return new Plan(VERSION, market.range().currency(), selling, otd, sellingLimit, otdLimit,
         new Savings(Math.max(0, quoted - target), "Dealer Offer " + deal.dealerOfferId()

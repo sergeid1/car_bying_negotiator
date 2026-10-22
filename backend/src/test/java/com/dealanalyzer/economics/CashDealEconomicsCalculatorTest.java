@@ -157,6 +157,57 @@ class CashDealEconomicsCalculatorTest {
         .hasMessage("Mixed currencies are not supported");
   }
 
+  @Test
+  void aCarRegisteredInAnotherStateUsesTheDealersTaxAsWrittenAndAddsNoTradeCredit() {
+    // Ticket 141: synthetic NC registration, Texas dealer. The 6.25% the dealer wrote is not checked against NC's 3%.
+    List<LineItem> lines = List.of(
+        line("vehicle", "20000.00", LineType.SELLING_PRICE, TaxTreatment.TAXABLE),
+        line("doc-fee", "Documentary fee", "150.00", LineType.DEALER_FEE, TaxTreatment.TAXABLE),
+        line("dmv", "Title and registration", "124.00", LineType.GOVERNMENT_CHARGE, TaxTreatment.NOT_TAXABLE),
+        line("tax", "Sales tax", "1000.00", LineType.QUOTED_TAX, TaxTreatment.NOT_TAXABLE),
+        line("trade", "Trade allowance", "4000.00", LineType.TRADE_ALLOWANCE, TaxTreatment.TAX_CREDIT));
+    var calculator = new CashDealEconomicsCalculator();
+    var crossState = calculator.calculate(new Offer("offer-x", 1, USD, lines, money("21274.00"), "total"),
+        policy("0.03", "1.00"), "US-TX");
+
+    assertThat(crossState.taxes().minorUnits()).isEqualTo(100_000);
+    assertThat(crossState.outTheDoorTotal().minorUnits()).isEqualTo(2_127_400);
+    assertThat(crossState.taxCalculation().checked()).isFalse();
+    assertThat(crossState.taxCalculation().status()).isEqualTo("NOT_CHECKED");
+    assertThat(crossState.taxCalculation().dealerState()).isEqualTo("US-TX");
+    assertThat(crossState.taxCalculation().tradeCreditApplied()).isEqualByComparingTo("0");
+    assertThat(crossState.taxCalculation().components()).isEmpty();
+    assertThat(crossState.taxCalculation().buyerNote()).isEqualTo(CrossStatePurchase.TAX_NOT_CHECKED);
+    assertThat(crossState.reconciliation().withinTolerance()).isTrue();
+    assertThat(crossState.reconciliation().reason()).contains("dealer's tax as written", "not checked");
+
+    // A total that does not add up, and paperwork with no tax line, say so rather than guess the tax.
+    var noTaxLine = calculator.calculate(new Offer("offer-y", 1, USD,
+        lines.stream().filter(line -> line.type() != LineType.QUOTED_TAX).toList(), money("21274.00"), "total"),
+        policy("0.03", "1.00"), "US-TX");
+    assertThat(noTaxLine.taxes().minorUnits()).isZero();
+    assertThat(noTaxLine.reconciliation().withinTolerance()).isFalse();
+    assertThat(noTaxLine.reconciliation().reason()).contains("shows no tax line");
+
+    // The same paperwork registered in the dealer's state is calculated as before.
+    var sameState = calculator.calculate(new Offer("offer-x", 1, USD, lines, money("21274.00"), "total"),
+        policy("0.03", "1.00"));
+    assertThat(sameState.taxCalculation().checked()).isTrue();
+    assertThat(sameState.taxes().minorUnits()).isEqualTo(48_450); // 3% of $20,150 less the $4,000 trade
+    assertThat(sameState.taxCalculation().dealerState()).isNull();
+    assertThat(sameState).isEqualTo(calculator.calculate(
+        new Offer("offer-x", 1, USD, lines, money("21274.00"), "total"), policy("0.03", "1.00"), null));
+  }
+
+  @Test
+  void aStoredResultWithoutATaxStatusReadsAsCalculated() throws Exception {
+    var stored = new ObjectMapper().readValue("""
+        {"taxableCharges":100,"tradeCreditAvailable":0,"tradeCreditApplied":0,"taxableBasis":100,"rate":0.03,
+         "unrounded":3,"components":[]}""", CashDealEconomics.TaxCalculation.class);
+    assertThat(stored.checked()).isTrue();
+    assertThat(stored.status()).isEqualTo("CALCULATED");
+  }
+
   private static Policy policy(String taxRate, String tolerance) {
     return new Policy("US-NC.cash.v1", "US-NC", USD, new BigDecimal(taxRate),
         Set.of(LineType.SELLING_PRICE, LineType.DEALER_FEE, LineType.ADD_ON), true,

@@ -36,5 +36,14 @@ class PriceBoundaryPolicyTest {
     assertThat(plan.outTheDoor().walkAwayMinor()).isEqualTo(1_000_000);
     assertThatThrownBy(() -> new PriceBoundaryPolicy().calculate(market, deal, -1L, null))
         .isInstanceOf(IllegalArgumentException.class);
+
+    // Ticket 141: without a checked tax rate there is no OTD conversion; selling-price targets and caps remain.
+    var crossState = new PriceBoundaryPolicy().calculate(market,
+        new CashDealEconomicsCalculator().calculate(offer, policy, "US-TX"), 950_000L, 1_000_000L);
+    assertThat(crossState.outTheDoor()).isNull();
+    assertThat(crossState.sellingPrice()).isEqualTo(plan.sellingPrice());
+    assertThat(crossState.buyerMaxOutTheDoorPriceMinor()).isEqualTo(1_000_000);
+    assertThat(crossState.warnings()).anySatisfy(warning ->
+        assertThat(warning).contains("tax is not checked for a car registered in another state"));
   }
 }

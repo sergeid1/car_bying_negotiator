@@ -162,9 +162,27 @@ public final class CashDealEconomics {
       BigDecimal unrounded,
       List<TaxComponent> components,
       String taxName,
-      String buyerNote) {
+      String buyerNote,
+      String status,
+      String dealerState) {
+    /** The pack's rules calculated the tax. */
+    public static final String CALCULATED = "CALCULATED";
+    /** Ticket 141: the dealer's tax line as written, for a car registered in another state than the dealer's. */
+    public static final String NOT_CHECKED = "NOT_CHECKED";
+
     public TaxCalculation {
       components = components == null ? List.of() : List.copyOf(components);
+      // Results stored before ticket 141 carry no status; they were all calculated.
+      status = status == null ? CALCULATED : status;
+    }
+    public TaxCalculation(BigDecimal taxableCharges, BigDecimal tradeCreditAvailable,
+        BigDecimal tradeCreditApplied, BigDecimal taxableBasis, BigDecimal rate, BigDecimal unrounded,
+        List<TaxComponent> components, String taxName, String buyerNote) {
+      this(taxableCharges, tradeCreditAvailable, tradeCreditApplied, taxableBasis, rate, unrounded, components,
+          taxName, buyerNote, CALCULATED, null);
+    }
+    public boolean checked() {
+      return CALCULATED.equals(status);
     }
     public TaxCalculation(BigDecimal taxableCharges, BigDecimal tradeCreditAvailable,
         BigDecimal tradeCreditApplied, BigDecimal taxableBasis, BigDecimal rate, BigDecimal unrounded,

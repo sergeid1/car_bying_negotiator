@@ -43,6 +43,17 @@ class FindingTextTest {
     assertThat(FindingText.render("es", new FindingText.Finding("FUTURE_CODE", java.util.Map.of(), "Stored English.")))
         .isEqualTo("Stored English.");
   }
+  @Test void theCrossStateTaxNoteReadsInSpanish() {
+    var scope = FindingText.identify("Jurisdiction coverage: US-NC using US-NC.cash.2026.v1. "
+        + com.dealanalyzer.economics.CrossStatePurchase.TAX_NOT_CHECKED);
+    assertThat(scope.code()).isEqualTo("SCOPE_JURISDICTION");
+    assertThat(FindingText.render("es", scope)).contains("No se comprueba el impuesto", "antes de firmar");
+    assertThat(FindingText.identify(com.dealanalyzer.economics.CrossStatePurchase.TAX_NOT_CHECKED).code())
+        .isEqualTo("CROSS_STATE_TAX");
+    assertThat(FindingText.identify(new CoreReviewPolicy().reasons("REVIEW_REQUIRED", true, true, false).get(1)).code())
+        .isEqualTo("OTD_ADDS_UP_TAX_NOT_CHECKED");
+  }
+
   @Test void everyBackendTemplatePassesBothLanguagesClaimChecks() {
     for (var finding : FindingText.templates()) {
       assertThat(ProhibitedClaims.contains(FindingText.render("es", finding), "es")).as(finding.code()).isFalse();
