@@ -1,0 +1,26 @@
+{
+ "Count": 1,
+ "Message": "Results returned successfully. NOTE: Any missing decoded values should be interpreted as NHTSA does not have data on the specific variable. Missing value should NOT be interpreted as an indication that a feature or technology is unavailable for a vehicle.",
+ "SearchCriteria": "VIN(s): 2HGFC2F87KH550788",
+ "Results": [
+  {
+   "ErrorCode": "0",
+   "ErrorText": "0 - VIN decoded clean. Check Digit (9th position) is correct",
+   "VIN": "2HGFC2F87KH550788",
+   "ModelYear": "2019",
+   "Make": "HONDA",
+   "Manufacturer": "HONDA OF CANADA MFG., A DIVISION OF HONDA CANADA INC.",
+   "Model": "Civic",
+   "Series": "",
+   "Trim": "Sport",
+   "BodyClass": "Sedan/Saloon",
+   "DriveType": "4x2",
+   "DisplacementL": "2.0",
+   "EngineCylinders": "4",
+   "FuelTypePrimary": "Gasoline",
+   "TransmissionSpeeds": "",
+   "TransmissionStyle": "Continuously Variable Transmission (CVT)",
+   "PlantCountry": "CANADA"
+  }
+ ]
+}
