@@ -357,6 +357,7 @@ export const dealer = translation<typeof english>()({
     negativeEquityCost: "{amount}: {payment} al mes, {scheduled} en pagos programados durante {months} meses, de los cuales {interest} son intereses",
     taxCredit: "Unos {amount} según las reglas de {jurisdiction} ({policy})",
     taxNone: "Ninguno según las reglas de {jurisdiction}",
+    taxNotChecked: "No se calcula, porque el impuesto no se comprueba cuando el concesionario está en otro estado.",
     tradeVin: "Número de identificación del vehículo (VIN) en parte de pago, según los documentos",
     shortfall: "Un faltante en el vehículo en parte de pago es una cifra de ese vehículo, nunca un descuento en el auto. otdog no compra autos ni envía su vehículo en parte de pago a ningún lado.",
   },

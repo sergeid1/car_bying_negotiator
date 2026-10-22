@@ -33,11 +33,17 @@ public final class CoreReviewPolicy {
   }
 
   public List<String> reasons(String status, boolean marketAvailable, boolean reconciled) {
+    return reasons(status, marketAvailable, reconciled, true);
+  }
+
+  /** taxChecked is false for a car registered in another state than the dealer's (ticket 141). */
+  public List<String> reasons(String status, boolean marketAvailable, boolean reconciled, boolean taxChecked) {
     return List.of(switch (status) {
       case "MATCHES_APPROVED_BASELINE" -> "Verified terms and cash calculation match the approved version within both approved ceilings.";
       case "UNABLE_TO_VERIFY" -> "Missing, stale, conflicting, or unclassified evidence prevents reliable verification.";
       default -> "Approval, term differences, or approved price limits need Buyer review.";
-    }, reconciled ? "The quoted OTD reconciles under the recorded jurisdiction policy."
+    }, reconciled && !taxChecked ? "The quoted OTD adds up, using the dealer's tax as written, which is not checked."
+        : reconciled ? "The quoted OTD reconciles under the recorded jurisdiction policy."
         : "The quoted OTD is missing or differs from the recorded cash calculation.",
         marketAvailable ? "The market rating is a separate estimated selling-price comparison."
             : "Market analysis is unavailable; available cash economics remain visible.");

@@ -34,15 +34,18 @@ public class CashEconomicsService {
   private final EphemeralBuyingCaseService cases;
   private final DealerOfferPersistence offers;
   private final CashEconomicsPersistence persistence;
+  private final CrossStatePurchase crossState;
   private final CashDealEconomicsCalculator calculator = new CashDealEconomicsCalculator();
 
   CashEconomicsService(
       EphemeralBuyingCaseService cases,
       DealerOfferPersistence offers,
-      CashEconomicsPersistence persistence) {
+      CashEconomicsPersistence persistence,
+      CrossStatePurchase crossState) {
     this.cases = cases;
     this.offers = offers;
     this.persistence = persistence;
+    this.crossState = crossState;
   }
 
   public CashEconomicsView calculate(
@@ -60,12 +63,14 @@ public class CashEconomicsService {
     Policy policy = persistence.requirePolicy(buyingCase.buyerJurisdiction());
     CalculateCashEconomicsRequest effectiveRequest = request == null
         ? CalculateCashEconomicsRequest.empty() : request;
-    String eligibilityFingerprint = fingerprint(effectiveRequest.verifiedRebateEvidenceIds());
+    String crossStateDealer = crossState.dealerState(caseId);
+    String eligibilityFingerprint = fingerprint(effectiveRequest.verifiedRebateEvidenceIds(), crossStateDealer);
     CashEconomicsView existing = persistence.find(
         dealerOffer.id(), policy.version(), eligibilityFingerprint).orElse(null);
     if (existing != null) return existing;
     var result = calculator.calculate(toDomain(
-        dealerOffer, policy, effectiveRequest.verifiedRebateEvidenceIds()), policy);
+        dealerOffer, policy, effectiveRequest.verifiedRebateEvidenceIds(), crossStateDealer != null), policy,
+        crossStateDealer);
     try {
       return persistence.save(caseId, dealerOffer.id(), policy.version(), eligibilityFingerprint,
           result, Instant.now());
@@ -81,8 +86,9 @@ public class CashEconomicsService {
         .orElseThrow(() -> new ResourceNotFoundException("Cash economics result not found"));
   }
 
+  /** dealerTaxAsWritten also reads a tax total with no tax line, which only a cross-state result uses (ticket 141). */
   private Offer toDomain(
-      DealerOfferView offer, Policy policy, Set<String> verifiedRebateEvidenceIds) {
+      DealerOfferView offer, Policy policy, Set<String> verifiedRebateEvidenceIds, boolean dealerTaxAsWritten) {
     Currency currency = policy.currency();
     List<LineItem> lines = new ArrayList<>();
     EnumSet<LineType> represented = EnumSet.noneOf(LineType.class);
@@ -101,6 +107,8 @@ public class CashEconomicsService {
               line.path("optionalityClaim").asText("UNKNOWN"), verifiedRebateEvidenceIds)));
     }
     addCandidateFallbacks(offer.terms().path("candidates"), lines, represented, currency);
+    if (dealerTaxAsWritten) addFallback(offer.terms().path("candidates"), lines, represented, currency, "TAX_TOTAL",
+        LineType.QUOTED_TAX, TaxTreatment.NOT_TAXABLE);
     Set<String> rebateEvidence = lines.stream().filter(line -> line.type() == LineType.REBATE)
         .map(LineItem::evidence).collect(java.util.stream.Collectors.toSet());
     if (!rebateEvidence.containsAll(verifiedRebateEvidenceIds)) {
@@ -203,10 +211,12 @@ public class CashEconomicsService {
         ? Eligibility.VERIFIED : Eligibility.UNVERIFIED;
   }
 
-  private static String fingerprint(Set<String> evidenceIds) {
+  /** A cross-state result (ticket 141) gets its own key, so a same-state result is never reused for it. */
+  private static String fingerprint(Set<String> evidenceIds, String crossStateDealer) {
     try {
       String normalized = evidenceIds.stream().sorted()
-          .collect(java.util.stream.Collectors.joining("\n"));
+          .collect(java.util.stream.Collectors.joining("\n"))
+          + (crossStateDealer == null ? "" : "\ncross-state-dealer:" + crossStateDealer);
       return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
           .digest(normalized.getBytes(StandardCharsets.UTF_8)));
     } catch (NoSuchAlgorithmException exception) {

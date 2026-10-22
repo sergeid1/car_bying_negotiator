@@ -189,7 +189,7 @@ public class CoreReportService {
     analysis.put("dealRating", rating);
     analysis.put("ratingBasis", "Estimated selling-price comparison; OTD market rating is not available.");
     analysis.set("topReasons", json.valueToTree(new CoreReviewPolicy().reasons(status, available,
-        cash != null && cash.reconciliation().withinTolerance())));
+        cash != null && cash.reconciliation().withinTolerance(), cash == null || cash.taxCalculation().checked())));
     if (financeCase) analysis.set("topReasons", json.valueToTree(List.of(
         "Dealer financing: " + financeAvailability + ".",
         "AVAILABLE".equals(financeAvailability) && Boolean.FALSE.equals(finance.result().withinTolerance())

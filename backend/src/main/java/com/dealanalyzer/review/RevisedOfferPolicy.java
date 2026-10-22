@@ -66,7 +66,11 @@ public final class RevisedOfferPolicy {
     result.put("observedOutTheDoorMinor", observed.at("/outTheDoorTotal/minorUnits").longValue());
     result.put("expectedTaxesMinor", expected.at("/taxes/minorUnits").longValue());
     result.put("observedTaxesMinor", observed.at("/taxes/minorUnits").longValue());
-    result.put("reason", "Complete pre-tax OTD difference, including fees, add-ons and reductions; tax effect is the difference between separately calculated taxes.");
+    boolean unchecked = "NOT_CHECKED".equals(expected.at("/taxCalculation/status").asText())
+        || "NOT_CHECKED".equals(observed.at("/taxCalculation/status").asText());
+    result.put("reason", unchecked
+        ? "Complete pre-tax OTD difference, including fees, add-ons and reductions; tax effect is the difference between the dealer's tax lines as written, which are not checked."
+        : "Complete pre-tax OTD difference, including fees, add-ons and reductions; tax effect is the difference between separately calculated taxes.");
     result.put("expectedPolicy", expected.path("policyVersion").asText()); result.put("observedPolicy", observed.path("policyVersion").asText());
     return result;
   }

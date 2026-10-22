@@ -65,12 +65,15 @@ public class TradeDeskCheck {
   public record BestOffer(String id, long amountMinor, String source, String offerDate, String expiresOn, String label) {}
   /**
    * The sales tax a trade-in removes under the case's jurisdiction policy, which selling the car elsewhere
-   * would not. status: AVAILABLE, NOT_APPLICABLE (the policy gives no trade credit) or UNAVAILABLE.
+   * would not. status: AVAILABLE, NOT_APPLICABLE (the policy gives no trade credit), UNAVAILABLE, or NOT_CHECKED
+   * for a car bought from a dealer in another state than the one where it will be registered (ticket 141).
    * taxName is what the state calls the tax ("sales tax" when the pack does not name it, or before ticket 137).
    */
   public record TaxCredit(String status, String reason, String jurisdiction, String policyVersion, BigDecimal rate,
       Long creditMinor, String taxName) {}
   static final String DEFAULT_TAX_NAME = "sales tax";
+  static final String TAX_NOT_CHECKED = "The tax a trade-in removes is not calculated, because tax is not checked "
+      + "for a car bought from a dealer in another state.";
   /**
    * position: BELOW, WITHIN or ABOVE the range, or null when unavailable. Every amount is an estimate from the source.
    * basis (v2): PROVIDER for ticket 101's adapter, or BUYER_ESTIMATE for a value the Buyer looked up and entered
@@ -98,14 +101,20 @@ public class TradeDeskCheck {
   /** severity: BLOCKING, WARNING or INFORMATIONAL. estimate marks lines that rest on the valuation range. */
   public record Finding(String code, String severity, String summary, Long amountMinor, String deskQuestion, boolean estimate) {}
 
-  /** The case's tax jurisdiction and the dealer ZIP the valuation is asked for. */
-  record CaseFacts(String jurisdiction, String zip) {}
+  /**
+   * The case's tax jurisdiction, the dealer ZIP the valuation is asked for, and the dealer's state when it differs
+   * from the registration state (ticket 141).
+   */
+  record CaseFacts(String jurisdiction, String zip, String crossStateDealer) {
+    CaseFacts(String jurisdiction, String zip) { this(jurisdiction, zip, null); }
+  }
   private record Cached(TradeValuationAdapter.Result result, Instant at) {}
 
   private final TradeService trades;
   private final TradeValuationService valuations;
   private final CashEconomicsPersistence policies;
   private final JdbcTemplate jdbc;
+  private final com.dealanalyzer.economics.CrossStatePurchase crossState;
   private final Clock clock;
   private final FinancingCalculator financing = new FinancingCalculator();
   /** Repeated Desk Check reads reuse one valuation per trade revision briefly; nothing is persisted. */
@@ -113,13 +122,19 @@ public class TradeDeskCheck {
 
   @Autowired
   public TradeDeskCheck(TradeService trades, TradeValuationService valuations, CashEconomicsPersistence policies,
-      JdbcTemplate jdbc) {
-    this(trades, valuations, policies, jdbc, Clock.systemUTC());
+      JdbcTemplate jdbc, com.dealanalyzer.economics.CrossStatePurchase crossState) {
+    this(trades, valuations, policies, jdbc, crossState, Clock.systemUTC());
   }
 
   TradeDeskCheck(TradeService trades, TradeValuationService valuations, CashEconomicsPersistence policies,
       JdbcTemplate jdbc, Clock clock) {
-    this.trades = trades; this.valuations = valuations; this.policies = policies; this.jdbc = jdbc; this.clock = clock;
+    this(trades, valuations, policies, jdbc, null, clock);
+  }
+
+  TradeDeskCheck(TradeService trades, TradeValuationService valuations, CashEconomicsPersistence policies,
+      JdbcTemplate jdbc, com.dealanalyzer.economics.CrossStatePurchase crossState, Clock clock) {
+    this.trades = trades; this.valuations = valuations; this.policies = policies; this.jdbc = jdbc;
+    this.crossState = crossState; this.clock = clock;
   }
 
   /**
@@ -135,7 +150,7 @@ public class TradeDeskCheck {
     Long paperworkPayoff = abs(amount(deskTerms, "TRADE_PAYOFF"));
     String paperworkVin = value(deskTerms, "TRADE_VIN");
     Long sellingPrice = amount(deskTerms, "SELLING_PRICE");
-    var tax = taxCredit(facts.jurisdiction(), allowance, sellingPrice);
+    var tax = taxCredit(facts.jurisdiction(), facts.crossStateDealer(), allowance, sellingPrice);
     List<Finding> findings = new ArrayList<>();
     if (trade == null) {
       findings.add(new Finding("TRADE_NOT_RECORDED", "WARNING", "This paperwork shows a trade-in allowance of "
@@ -315,7 +330,7 @@ public class TradeDeskCheck {
   }
 
   private static String taxSentence(TaxCredit tax, Long gapAfterTax) {
-    if ("UNAVAILABLE".equals(tax.status())) return " " + tax.reason();
+    if ("UNAVAILABLE".equals(tax.status()) || "NOT_CHECKED".equals(tax.status())) return " " + tax.reason();
     if (!"AVAILABLE".equals(tax.status()) || tax.creditMinor() == 0 || gapAfterTax == null) return "";
     return " Trading in lowers the " + tax.taxName() + " on this car by about " + money(tax.creditMinor()) + " under "
         + tax.jurisdiction() + " tax rules, which selling it elsewhere would not, so after tax the offer is "
@@ -375,7 +390,9 @@ public class TradeDeskCheck {
   }
 
   /** The trade-in sales-tax credit under the case's jurisdiction policy pack; unavailable without one. */
-  private TaxCredit taxCredit(String jurisdiction, long allowance, Long sellingPrice) {
+  private TaxCredit taxCredit(String jurisdiction, String crossStateDealer, long allowance, Long sellingPrice) {
+    if (crossStateDealer != null)
+      return new TaxCredit("NOT_CHECKED", TAX_NOT_CHECKED, jurisdiction, null, null, null, DEFAULT_TAX_NAME);
     if (jurisdiction == null || !policies.hasPolicy(jurisdiction))
       return new TaxCredit("UNAVAILABLE", "The sales tax a trade-in removes is not calculated because no tax rules are "
           + "configured for " + (jurisdiction == null ? "your state" : jurisdiction) + " yet.", jurisdiction, null, null, null,
@@ -478,7 +495,10 @@ public class TradeDeskCheck {
       String location = r.getString(2);
       String zip = location == null ? null : location.strip();
       return new CaseFacts(r.getString(1), zip != null && zip.matches("[0-9]{5}") ? zip : r.getString(3));
-    }, caseId).stream().findFirst().orElse(new CaseFacts(null, null));
+    }, caseId).stream().findFirst()
+        .map(found -> new CaseFacts(found.jurisdiction(), found.zip(),
+            crossState == null ? null : crossState.dealerState(caseId)))
+        .orElse(new CaseFacts(null, null));
   }
 
   static String value(JsonNode terms, String field) {

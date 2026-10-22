@@ -1,9 +1,12 @@
 # otdog — Product and Development Specification
 
 Status: Phase 1 (document analysis) built; Phases 2–4 largely built, Phase 3 moving to Buyer-sent email (tickets 82–84); public pilot gated by Section 18 prerequisites; Phase 5 (insurance and loan quotes) specified, not built  
-Version: 2.7\
-Date: 2026-10-21\
-Supersedes: version 2.6 (2026-10-20), which left five Spanish choices as working defaults. Version 2.7 makes
+Version: 2.8\
+Date: 2026-10-22\
+Supersedes: version 2.7 (2026-10-21), which left a car bought in one state and registered in another undefined.
+Version 2.8 skips the tax calculation for such a purchase and keeps every other check (ticket 141), and plans the
+rollout of tax rules to every state once the pilot works in production (ticket 150).
+Version 2.7 superseded version 2.6 (2026-10-20), which left five Spanish choices as working defaults. Version 2.7 makes
 them decisions: four are kept, and Buyers may choose to send dealer emails in Spanish (ticket 149).
 Version 2.6 superseded version 2.5 (2026-10-18), which excluded multilingual support. Version 2.6 includes Spanish
 for Buyer screens and findings, records the Spanish decisions of 2026-10-19, and marks the deferred
@@ -170,6 +173,13 @@ Phase 1 (document analysis, built):
 - Responsive web application.
 - Used passenger vehicles sold by licensed dealers.
 - Three pilot states, Florida, Texas and North Carolina, each with its own sourced jurisdiction pack; jurisdiction behavior must be versioned configuration rather than hard-coded branching.
+- A car registered in a pilot state and bought from a dealer in another state (ticket 141): the report and every
+  other check run as usual, but tax is not calculated. The tax figure is the dealer's tax line as written, with no
+  tax finding, no trade-in tax credit and no out-the-door price targets, and the Buyer is told to confirm the tax
+  with the registration state. The doc fee follows the dealer's state and government fees the registration state.
+- After the main flow works in production for the pilot states, tax rules roll out to every state, each from
+  sourced statute and agency publications; every tax figure says what it rests on and asks the Buyer to confirm it
+  before signing (ticket 150).
 - VIN/manual vehicle entry and a listing URL as Buyer-supplied evidence.
 - Licensed vehicle, inventory, and valuation data through replaceable adapters.
 - PDF, JPEG, PNG, and HEIC dealer documents within configured limits.

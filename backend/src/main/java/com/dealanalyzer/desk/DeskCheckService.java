@@ -52,6 +52,7 @@ public class DeskCheckService {
   private final com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees;
   private final com.dealanalyzer.economics.fees.DocFeeCheck docFees;
   private final com.dealanalyzer.economics.fees.DealerAddOnCheck addOns;
+  private final com.dealanalyzer.economics.CrossStatePurchase crossState;
 
   public DeskCheckService(EphemeralBuyingCaseService cases, PricePlanService plans, DealerOfferPersistence offers,
       DocumentExtractionPersistence extractions, JdbcTemplate jdbc, ObjectMapper json,
@@ -61,8 +62,10 @@ public class DeskCheckService {
       com.dealanalyzer.economics.persistence.CashEconomicsPersistence policies,
       com.dealanalyzer.economics.fees.GovernmentFeeCheck governmentFees,
       com.dealanalyzer.economics.fees.DocFeeCheck docFees,
-      com.dealanalyzer.economics.fees.DealerAddOnCheck addOns) {
+      com.dealanalyzer.economics.fees.DealerAddOnCheck addOns,
+      com.dealanalyzer.economics.CrossStatePurchase crossState) {
     this.governmentFees = governmentFees;
+    this.crossState = crossState;
     this.docFees = docFees;
     this.addOns = addOns;
     this.listingPrice = listingPrice;
@@ -72,8 +75,12 @@ public class DeskCheckService {
     this.tactics = tactics;
   }
 
-  /** The case's pack rules when its tax is paid at titling (ticket 137); null otherwise or without a pack. */
+  /**
+   * The case's pack rules when its tax is paid at titling (ticket 137); null otherwise, without a pack, or for a
+   * dealer in another state, whose tax is not checked (ticket 141).
+   */
   private com.dealanalyzer.economics.CashDealEconomics.TaxRules titlingTax(String caseId) {
+    if (crossState.dealerState(caseId) != null) return null;
     String jurisdiction = jdbc.queryForList("select buyer_jurisdiction from analysis_cases where id = ?", String.class, caseId)
         .stream().filter(java.util.Objects::nonNull).findFirst().orElse(null);
     if (jurisdiction == null || !policies.hasPolicy(jurisdiction)) return null;

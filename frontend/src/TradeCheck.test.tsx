@@ -154,3 +154,12 @@ test("the tax a trade-in removes is named the way the state names it (ticket 137
   render(<TradeCheckPanel result={result} />);
   expect(screen.getByText("Sales tax a trade-in removes")).toBeInTheDocument();
 });
+
+test("a dealer in another state shows the trade-in tax as not calculated (ticket 141)", () => {
+  const result = tradeCheckFixture();
+  render(<TradeCheckPanel result={{ ...result, taxCredit: { status: "NOT_CHECKED", jurisdiction: "US-NC",
+    policyVersion: null, creditMinor: null, taxName: "sales tax",
+    reason: "The tax a trade-in removes is not calculated, because tax is not checked for a car bought from a dealer in another state." } }} />);
+  expect(screen.getByText("Not calculated, because tax is not checked for a car bought from a dealer in another state."))
+    .toBeInTheDocument();
+});

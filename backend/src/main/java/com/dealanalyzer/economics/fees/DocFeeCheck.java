@@ -1,7 +1,6 @@
 package com.dealanalyzer.economics.fees;
 
 import com.dealanalyzer.buyingcase.location.PostalJurisdictionResolver;
-import com.dealanalyzer.buyingcase.location.PostalResolution;
 import com.dealanalyzer.review.RevisedOfferPolicy.Discrepancy;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,14 +32,8 @@ public class DocFeeCheck {
 
   public List<Discrepancy> findings(String caseId, JsonNode terms) {
     String location = jdbc.queryForObject("select dealer_location from analysis_cases where id = ?", String.class, caseId);
-    String state = null;
-    if (location != null && location.matches("[0-9]{5}")) {
-      var resolved = postal.resolve(location);
-      if (resolved.status() == PostalResolution.Status.RESOLVED) state = resolved.jurisdiction();
-    } else if (location != null && location.matches(".+, [A-Z]{2}")) {
-      state = "US-" + location.substring(location.length() - 2);
-    }
-    return evaluate(state, terms, LocalDate.now(java.time.ZoneOffset.UTC));
+    return evaluate(com.dealanalyzer.economics.CrossStatePurchase.stateOf(location, postal), terms,
+        LocalDate.now(java.time.ZoneOffset.UTC));
   }
 
   public List<Discrepancy> evaluate(String state, JsonNode terms, LocalDate date) {

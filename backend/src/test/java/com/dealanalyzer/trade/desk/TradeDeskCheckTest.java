@@ -104,6 +104,28 @@ class TradeDeskCheckTest {
     return result.findings().stream().map(TradeDeskCheck.Finding::code).toList();
   }
 
+  @Test void aDealerInAnotherStateGetsNoTradeTaxCreditButTheSameOfferComparison() {
+    // Ticket 141: NC registration, Texas dealer. The allowance comparison stands; the tax part is not calculated.
+    var adapter = new DeterministicFakeTradeValuationAdapter(CLOCK, Scenario.WIDE_RANGE);
+    when(valuations.value(anyString(), any(TradeVehicle.class), anyString()))
+        .thenAnswer(call -> adapter.value(call.getArgument(1), call.getArgument(2)));
+    when(policies.hasPolicy("US-NC")).thenReturn(true);
+    when(policies.requirePolicy("US-NC")).thenReturn(policy("US-NC.cash.v1", "US-NC", "0.03"));
+    var desk = new TradeDeskCheck(trades, valuations, policies, null, CLOCK) {
+      @Override CaseFacts facts(String caseId) { return new CaseFacts("US-NC", "75201", "US-TX"); }
+    };
+    recorded(MoneyOwed.NO, null, null, false, offer("best", 1_400_000, "Synthetic Car Exchange", false));
+    var result = desk.check("case", "token", terms("TRADE_ALLOWANCE", 1_150_000, "TRADE_VIN", TRADE_VIN,
+        "SELLING_PRICE", 2_500_000), null);
+
+    assertThat(result.taxCredit().status()).isEqualTo("NOT_CHECKED");
+    assertThat(result.taxCredit().creditMinor()).isNull();
+    assertThat(result.offerGapAfterTaxMinor()).isNull();
+    assertThat(result.shortfallToOfferMinor()).isEqualTo(250_000);
+    assertThat(result.leading().getFirst().summary()).contains("$2,500 below", "tax is not checked")
+        .doesNotContain("about $345");
+  }
+
   @Test void syntheticFloridaOutsideOfferComparisonUsesTheDifferenceInCappedTaxes() {
     var desk = check(Scenario.UNAVAILABLE);
     jurisdiction = "US-FL:Broward";
