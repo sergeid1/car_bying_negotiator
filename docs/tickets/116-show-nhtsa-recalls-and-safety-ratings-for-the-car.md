@@ -18,8 +18,18 @@ and model sent. `VehicleSafetyProductionGuard` refuses the fake under a producti
 metered as `VEHICLE_SAFETY`. Successful answers are cached per process by year, make and model (six hours, 500
 entries); failures are not cached. `GET /api/v1/cases/{caseId}/vehicle-safety` serves the case panel, shown collapsed
 below the case header; a fresh report freezes the facts as `vehicleSafety` after rechecking the car under the case
-lock. Open: the live NHTSA service has not been called; a model name NHTSA spells differently returns zero records,
-which the copy covers by sending the Buyer to NHTSA's VIN lookup.
+lock. Verified against live NHTSA on 2026-10-22 (recalls, ratings variants and variant details for ten
+cars, plus five public VINs decoded through vPIC and looked up end to end), which fixed four mismatches the stub
+hid: a lookup with no recall records answers HTTP 400 with an empty JSON body and was shown as "NHTSA did not
+answer" (now zero records); `ReportReceivedDate` is day first and was shown raw (`01/02/2022` reads as 2 January
+to a US Buyer; now ISO); an unrated variant's `0.0` rollover risk was shown as 0.0% (now not supplied); and a model
+with `/` hit a path NHTSA rejects (now no ratings request). Trimmed live answers are the stub fixtures in
+`fixtures/nhtsa-safety`. Open: model names differ between sources, so some cars return zero records, which the copy
+covers by sending the Buyer to NHTSA's VIN lookup. vPIC decodes a 2018 Silverado 1500 as "Silverado" (Series
+"1500"), which finds none of the 7 recalls or 7 rated variants NHTSA lists under "Silverado 1500"; a 2021 F-150
+finds 29 recalls but no ratings, which NHTSA lists under "F-150 Super Crew" and other cab names. vPIC's Series field
+is not consistent enough to join to the model (Ford "F-Series", Toyota chassis codes), so nothing is matched by
+guess.
 
 ## How it works
 

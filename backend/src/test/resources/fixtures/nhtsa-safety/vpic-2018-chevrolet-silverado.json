@@ -1,0 +1,26 @@
+{
+ "Count": 1,
+ "Message": "Results returned successfully. NOTE: Any missing decoded values should be interpreted as NHTSA does not have data on the specific variable. Missing value should NOT be interpreted as an indication that a feature or technology is unavailable for a vehicle.",
+ "SearchCriteria": "VIN(s): 3GCUKREC0JG358411",
+ "Results": [
+  {
+   "ErrorCode": "0",
+   "ErrorText": "0 - VIN decoded clean. Check Digit (9th position) is correct",
+   "VIN": "3GCUKREC0JG358411",
+   "ModelYear": "2018",
+   "Make": "CHEVROLET",
+   "Manufacturer": "GENERAL MOTORS LLC",
+   "Model": "Silverado",
+   "Series": "1500",
+   "Trim": "LT",
+   "BodyClass": "Pickup",
+   "DriveType": "4WD/4-Wheel Drive/4x4",
+   "DisplacementL": "5.3",
+   "EngineCylinders": "8",
+   "FuelTypePrimary": "Gasoline",
+   "TransmissionSpeeds": "",
+   "TransmissionStyle": "",
+   "PlantCountry": "MEXICO"
+  }
+ ]
+}

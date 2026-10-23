@@ -13,6 +13,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -29,6 +33,8 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "vehicle-safety.provider", havingValue = "nhtsa")
 public class NhtsaVehicleSafetyProvider implements VehicleSafetyProvider {
   static final int MAX_BODY_BYTES = 1024 * 1024;
+  /** Live NHTSA sends ReportReceivedDate day first ("28/05/2020"), checked on 2026-10-22. */
+  private static final DateTimeFormatter NHTSA_DATE = DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT);
   private final URI base;
   private final Duration timeout;
   private final Duration delay;
@@ -55,19 +61,25 @@ public class NhtsaVehicleSafetyProvider implements VehicleSafetyProvider {
 
   @Override public Facts retrieve(Vehicle vehicle) {
     var recalls = new ArrayList<Recall>();
+    // Live NHTSA answers a lookup with no recall records (unknown model, or a model with none) with
+    // HTTP 400 and its usual empty JSON body, so only that exact empty answer is accepted from a 400.
     for (var row : get("/recalls/recallsByVehicle?make=" + encode(vehicle.make()) + "&model="
-        + encode(vehicle.model()) + "&modelYear=" + vehicle.year())) {
+        + encode(vehicle.model()) + "&modelYear=" + vehicle.year(), true)) {
       recalls.add(new Recall(required(row, "NHTSACampaignNumber"), required(row, "Component"),
-          required(row, "Summary"), text(row, "Consequence"), text(row, "Remedy"), text(row, "ReportReceivedDate")));
+          required(row, "Summary"), text(row, "Consequence"), text(row, "Remedy"), date(row, "ReportReceivedDate")));
     }
-    var variants = get("/SafetyRatings/modelyear/" + vehicle.year() + "/make/" + encode(vehicle.make())
-        + "/model/" + encode(vehicle.model()) + "?format=json");
+    // NHTSA's server rejects an encoded slash or backslash in the path, and no ratings model name
+    // contains one, so such a model has no ratings variants to look up.
+    boolean pathSafe = vehicle.make().indexOf('/') < 0 && vehicle.make().indexOf('\\') < 0
+        && vehicle.model().indexOf('/') < 0 && vehicle.model().indexOf('\\') < 0;
+    var variants = !pathSafe ? json.createArrayNode() : get("/SafetyRatings/modelyear/" + vehicle.year() + "/make/"
+        + encode(vehicle.make()) + "/model/" + encode(vehicle.model()) + "?format=json", false);
     if (variants.size() > 50) throw unavailable();
     var ratings = new ArrayList<Rating>();
     for (var variant : variants) {
       String id = required(variant, "VehicleId");
       if (!id.matches("[0-9]{1,12}")) throw unavailable();
-      var details = get("/SafetyRatings/VehicleId/" + id + "?format=json");
+      var details = get("/SafetyRatings/VehicleId/" + id + "?format=json", false);
       if (details.size() != 1) throw unavailable();
       var row = details.get(0);
       ratings.add(new Rating(id, required(variant, "VehicleDescription"), stars(row, "OverallRating"),
@@ -77,7 +89,7 @@ public class NhtsaVehicleSafetyProvider implements VehicleSafetyProvider {
     return new Facts("AVAILABLE", "NHTSA", Instant.now(), vehicle, recalls, ratings);
   }
 
-  private JsonNode get(String path) {
+  private JsonNode get(String path, boolean emptyOn400) {
     var request = HttpRequest.newBuilder(URI.create(base + path)).timeout(timeout)
         .header("Accept", "application/json").GET().build();
     for (int attempt = 1; attempt <= attempts; attempt++) {
@@ -92,6 +104,13 @@ public class NhtsaVehicleSafetyProvider implements VehicleSafetyProvider {
           var rows = root.has("results") ? root.path("results") : root.path("Results");
           if (!rows.isArray() || rows.size() > 1000) throw unavailable();
           return rows;
+        }
+        if (response.statusCode() == 400 && emptyOn400) {
+          var root = json.readTree(response.body());
+          var rows = root == null ? null : root.path("results");
+          if (rows != null && rows.isArray() && rows.isEmpty() && root.path("Count").isInt()
+              && root.path("Count").intValue() == 0) return rows;
+          throw unavailable();
         }
         if (response.statusCode() != 429 && response.statusCode() < 500) throw unavailable();
       } catch (IOException failure) {
@@ -139,6 +158,13 @@ public class NhtsaVehicleSafetyProvider implements VehicleSafetyProvider {
     if (value.length() > 20000) throw unavailable();
     return value.isEmpty() ? null : value;
   }
+  /** Returns an ISO date; a date that is not NHTSA's day-first form is dropped rather than guessed. */
+  private static String date(JsonNode row, String key) {
+    String value = text(row, key);
+    if (value == null) return null;
+    try { return LocalDate.parse(value, NHTSA_DATE).toString(); }
+    catch (DateTimeParseException unexpected) { return null; }
+  }
   private static String required(JsonNode row, String key) {
     String value = text(row, key); if (value == null) throw unavailable(); return value;
   }
@@ -147,7 +173,7 @@ public class NhtsaVehicleSafetyProvider implements VehicleSafetyProvider {
   }
   private static String risk(JsonNode row) {
     String value = text(row, "RolloverPossibility");
-    try { double risk = Double.parseDouble(value); return risk >= 0 && risk <= 1 ? value : null; }
+    try { double risk = Double.parseDouble(value); return risk > 0 && risk <= 1 ? value : null; }
     catch (RuntimeException invalid) { return null; }
   }
   private static IllegalStateException unavailable() { return new IllegalStateException("NHTSA did not answer"); }

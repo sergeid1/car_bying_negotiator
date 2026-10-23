@@ -56,6 +56,17 @@ evidence, so later lookups or cache expiry cannot change saved reports. Existing
 and case-erasure paths include that JSON without a new table or migration. A VIN without
 confirmed year/make/model is shown as missing model facts; this adapter never decodes a VIN.
 
+Checked against live `api.nhtsa.gov` on 2026-10-22. The recalls endpoint answers HTTP 400 with its
+normal empty JSON body (`{"Count":0,...,"results":[]}`) for any lookup with no recall records,
+whether the model is unknown or simply has none; the adapter accepts exactly that answer from a
+400 as zero records and treats every other 400 as unavailable. `ReportReceivedDate` is day first
+(`28/05/2020`); the adapter stores it as an ISO date (`2020-05-28`) and drops a date in any other
+form rather than guess. A ratings `RolloverPossibility` of `0.0` means not rated and is stored as
+not supplied. NHTSA's server rejects an encoded `/` or `\` in the ratings path, and no ratings
+model name contains one, so a model containing either gets no ratings request (recalls are still
+looked up). Plain HTTP redirects to HTTPS (301); the adapter only calls HTTPS and follows no
+redirects. Observed bodies were under 40 KB, well within the 1 MiB cap.
+
 The Anthropic default model is `claude-opus-5-5`, priced at $4 input / $20 output per million
 tokens, with `output_config.effort=high`. Explicitly pinned `claude-opus-5` remains priced at
 $5 / $25. Both remain disabled unless the provider's terms are executed and the configured model
